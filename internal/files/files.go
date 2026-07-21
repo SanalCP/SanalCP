@@ -1,0 +1,384 @@
+// Package files: domain ev dizinine chroot edilmis dosya yoneticisi API'si
+package files
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+
+	"sanalpanel/internal/httpx"
+
+	"github.com/go-chi/chi/v5"
+)
+
+// MaxUploadBytes: tek yükleme için üst sınır. Onceden 10 GiB idi ve ParseMultipartForm'a
+// maxMemory olarak veriliyordu → tek istekle 10 GiB RAM ayrilabiliyordu (DoS).
+const MaxUploadBytes = 10 * 1024 * 1024 * 1024 // 10 GiB
+
+// maxMultipartMemory: multipart ayrıştırmada RAM'de tutulacak azami tampon. Fazlası
+// otomatik olarak geçici diske taşar → büyük yüklemelerde RAM patlamaz.
+const maxMultipartMemory = 32 << 20 // 32 MiB
+
+type Handlers struct {
+	DB *sql.DB
+}
+
+// home: domain id -> /home/c_<user>
+func (h *Handlers) home(r *http.Request) (string, string, error) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var sk string
+	var isDemo int
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).
+		Scan(&sk, &isDemo)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", os.ErrNotExist
+	}
+	if err != nil {
+		return "", "", err
+	}
+	if isDemo == 1 {
+		return "", "", errDemo
+	}
+	if !strings.HasPrefix(sk, "c_") {
+		return "", "", errBadUser
+	}
+	return "/home/" + sk, sk, nil
+}
+
+var (
+	errDemo    = errors.New("demo aboneliğin dosyaları yönetilemez")
+	errBadUser = errors.New("güvenlik: geçersiz sistem kullanıcısı")
+	errEscape  = errors.New("güvenlik: ev dizini dışına çıkış engellendi")
+)
+
+type Entry struct {
+	Adi      string `json:"adi"`
+	Yol      string `json:"yol"` // home'a goreceli (panel UI icin)
+	Tip      string `json:"tip"` // "klasor" | "dosya" | "sembolik"
+	BoyutB   int64  `json:"boyut_b"`
+	Mod      string `json:"mod"`      // "0644"
+	Yetkiler string `json:"yetkiler"` // rwx dizesi: "rwxr-xr-x"
+	Sahip    string `json:"sahip"`    // owner kullanıcı adı (uid çözülemezse sayı)
+	Grup     string `json:"grup"`     // grup adı (gid çözülemezse sayı)
+	Degisme  string `json:"degisme"`  // RFC3339
+}
+
+// uid/gid → isim çözüm cache'i (aynı user/grup tekrar tekrar lookup edilmesin).
+var (
+	uidAdiMu  sync.RWMutex
+	uidAdiMap = map[uint32]string{}
+	gidAdiMu  sync.RWMutex
+	gidAdiMap = map[uint32]string{}
+)
+
+func uidAdi(uid uint32) string {
+	uidAdiMu.RLock()
+	if v, ok := uidAdiMap[uid]; ok {
+		uidAdiMu.RUnlock()
+		return v
+	}
+	uidAdiMu.RUnlock()
+	ad := strconv.FormatUint(uint64(uid), 10)
+	if u, err := user.LookupId(ad); err == nil && u.Username != "" {
+		ad = u.Username
+	}
+	uidAdiMu.Lock()
+	uidAdiMap[uid] = ad
+	uidAdiMu.Unlock()
+	return ad
+}
+
+func gidAdi(gid uint32) string {
+	gidAdiMu.RLock()
+	if v, ok := gidAdiMap[gid]; ok {
+		gidAdiMu.RUnlock()
+		return v
+	}
+	gidAdiMu.RUnlock()
+	ad := strconv.FormatUint(uint64(gid), 10)
+	if g, err := user.LookupGroupId(ad); err == nil && g.Name != "" {
+		ad = g.Name
+	}
+	gidAdiMu.Lock()
+	gidAdiMap[gid] = ad
+	gidAdiMu.Unlock()
+	return ad
+}
+
+func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
+	home, _, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	rel := r.URL.Query().Get("yol")
+	if rel == "" {
+		rel = "/"
+	}
+	abs, err := jailJoinStrict(home, rel)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	dir, err := os.ReadDir(abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma: "+err.Error())
+		return
+	}
+	out := make([]Entry, 0, len(dir))
+	for _, e := range dir {
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		tip := "dosya"
+		if info.IsDir() {
+			tip = "klasor"
+		} else if info.Mode()&os.ModeSymlink != 0 {
+			tip = "sembolik"
+		}
+		// Sahip / grup (Linux): FileInfo.Sys() → *syscall.Stat_t. Çözülemezse "-".
+		sahip, grup := "-", "-"
+		if st, ok := info.Sys().(*syscall.Stat_t); ok {
+			sahip = uidAdi(st.Uid)
+			grup = gidAdi(st.Gid)
+		}
+		out = append(out, Entry{
+			Adi:      e.Name(),
+			Yol:      filepath.ToSlash(filepath.Join(rel, e.Name())),
+			Tip:      tip,
+			BoyutB:   info.Size(),
+			Mod:      "0" + strconv.FormatInt(int64(info.Mode().Perm()), 8),
+			Yetkiler: yetkiRWX(info.Mode()),
+			Sahip:    sahip,
+			Grup:     grup,
+			Degisme:  info.ModTime().UTC().Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	// klasörler önce, sonra alfabetik
+	sort.SliceStable(out, func(i, j int) bool {
+		if (out[i].Tip == "klasor") != (out[j].Tip == "klasor") {
+			return out[i].Tip == "klasor"
+		}
+		return strings.ToLower(out[i].Adi) < strings.ToLower(out[j].Adi)
+	})
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"yol":    filepath.ToSlash(rel),
+		"icerik": out,
+		"toplam": len(out),
+	})
+}
+
+// Dosya icerigini ham olarak donder (download)
+func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
+	home, _, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	rel := r.URL.Query().Get("yol")
+	abs, err := jailJoinStrict(home, rel)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "bulunamadı")
+		return
+	}
+	if info.IsDir() {
+		httpx.WriteError(w, http.StatusBadRequest, "klasör indirilemez")
+		return
+	}
+	f, err := os.Open(abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "açılamadı: "+err.Error())
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Name()+"\"")
+	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+	_, _ = io.Copy(w, f)
+}
+
+// Metin dosyasini okuma (editor icin)
+func (h *Handlers) Read(w http.ResponseWriter, r *http.Request) {
+	home, _, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	rel := r.URL.Query().Get("yol")
+	abs, err := jailJoinStrict(home, rel)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "bulunamadı")
+		return
+	}
+	if info.Size() > 2*1024*1024 {
+		httpx.WriteError(w, http.StatusBadRequest, "dosya 2 MB'tan büyük; düzenleme için uygun değil")
+		return
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"yol":    rel,
+		"icerik": string(data),
+		"boyut":  info.Size(),
+	})
+}
+
+type mkdirReq struct {
+	Yol string `json:"yol"`
+}
+
+func (h *Handlers) Mkdir(w http.ResponseWriter, r *http.Request) {
+	home, sk, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	var req mkdirReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
+	// TOCTOU symlink-güvenli: mkdir -p'yi her bileşende Mkdirat+O_NOFOLLOW ile yürüt; yeni
+	// dizinler fd üzerinden tenant'a chown edilir (bkz. safeio.go). Eski os.MkdirAll(abs)
+	// resolved-string üzerinde çalışıp ara-dizin symlink takasına açıktı.
+	if err := mkdirAllBeneath(home, req.Yol, sk); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "mkdir: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"ok": true, "yol": req.Yol})
+}
+
+func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
+	home, _, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	rel := r.URL.Query().Get("yol")
+	if p := relClean(rel); p == "" || p == "." {
+		httpx.WriteError(w, http.StatusBadRequest, "ana ev dizini silinemez")
+		return
+	}
+	// TOCTOU symlink-güvenli: parent'ı openat2(RESOLVE_BENEATH|RESOLVE_NO_SYMLINKS) ile pinle,
+	// fd-özyinelemeli unlinkat ile sil (bkz. safeio.go). Eski os.RemoveAll(abs) resolved-string
+	// üzerinde çalışıp ara-dizin symlink takasıyla jail-dışı silmeye kandırılabilirdi.
+	if err := removeAllBeneath(home, rel); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "silme: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "silinen": rel})
+}
+
+func (h *Handlers) Upload(w http.ResponseWriter, r *http.Request) {
+	home, sk, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	rel := r.URL.Query().Get("yol")
+	if rel == "" {
+		rel = "/"
+	}
+	// DoS savunması: istek gövdesini üst sınırla kes. MaxBytesReader hem RAM'i hem
+	// diski korur; sınır aşılınca okuma *http.MaxBytesError döner.
+	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
+	// maxMemory küçük → gövde RAM yerine geçici diske taşar (RAM DoS engellenir).
+	if err := r.ParseMultipartForm(maxMultipartMemory); err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) || strings.Contains(err.Error(), "too large") {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "yükleme boyutu sınırı aştı (max 2 GiB)")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "form parse: "+err.Error())
+		return
+	}
+	file, fh, err := r.FormFile("dosya")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "dosya alanı bulunamadı: "+err.Error())
+		return
+	}
+	defer file.Close()
+	if fh.Size > MaxUploadBytes {
+		httpx.WriteError(w, http.StatusRequestEntityTooLarge, "dosya çok büyük (max 2 GiB)")
+		return
+	}
+	// TOCTOU symlink-güvenli: hedefi openat2 ile aç (ara-bileşen/leaf symlink REDDEDİLİR),
+	// fd'ye akışla kopyala, sonra fd üzerinden tenant'a chown (bkz. safeio.go). Eski
+	// os.Create(abs) resolved-string üzerinde çalışıp symlink takasına açıktı.
+	dstRel := filepath.Join(rel, fh.Filename)
+	written, err := copyStreamBeneath(home, dstRel, file, sk)
+	if err != nil {
+		_ = removeAllBeneath(home, dstRel)
+		httpx.WriteError(w, http.StatusInternalServerError, "yazma: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
+		"ok":    true,
+		"yol":   filepath.ToSlash(filepath.Join(rel, fh.Filename)),
+		"boyut": written,
+		"isim":  fh.Filename,
+	})
+}
+
+// yetkiRWX: izin bitlerini rwx dizesine çevirir (ör. 0644 → "rw-r--r--").
+func yetkiRWX(m os.FileMode) string {
+	const rwx = "rwxrwxrwx"
+	p := m.Perm()
+	b := []byte("---------")
+	for i := 0; i < 9; i++ {
+		if p&(1<<uint(8-i)) != 0 {
+			b[i] = rwx[i]
+		}
+	}
+	return string(b)
+}
+
+func statusFromErr(err error) int {
+	switch err {
+	case os.ErrNotExist:
+		return http.StatusNotFound
+	case errDemo:
+		return http.StatusForbidden
+	case errBadUser, errEscape:
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
+}
+
+// chown helper — dosyayı domain user'ına ata + SELinux context'ini düzelt (restorecon).
+// restorecon ŞART: panel root olarak çalışır; oluşturduğu/değiştirdiği dosya doğru
+// SELinux context'i (httpd_sys_content_t) almazsa nginx/php-fpm erişemez ve
+// "dosya izinleri bozuldu" gibi görünür (SELinux Enforcing sunucularda).
+func chown(path, sistemKullanici string) {
+	if uu, err := userLookup(sistemKullanici); err == nil {
+		_ = osChown(path, uu.UID, uu.GID)
+	}
+	_, _ = exec.Command("restorecon", path).CombinedOutput()
+}
