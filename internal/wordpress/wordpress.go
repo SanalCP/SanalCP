@@ -22,6 +22,7 @@ import (
 
 	"sanalpanel/internal/hesaplar"
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -133,8 +134,11 @@ type wpAday struct {
 // GET /wordpress/tumu — TÜM domainlerdeki kurulu WordPress'leri tarar (sürüm + güncelleme + kurulum tarihi).
 // AdminOnly. wp-cli çağrıları worker-pool (4) ile paralel, her çağrı context-timeout'lu.
 func (h *Handlers) TumListe(w http.ResponseWriter, r *http.Request) {
+	// Kapsam: bayi yalnız kendi müşterilerinin sitelerini görür.
+	kosul, arg := middleware.KapsamSQL(r, "d")
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT id, sistem_kullanici, alan_adi, COALESCE(cert_path,'') FROM domains ORDER BY alan_adi`)
+		`SELECT d.id, d.sistem_kullanici, d.alan_adi, COALESCE(d.cert_path,'') FROM domains d`+
+			kosul+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "domainler listelenemedi")
 		return

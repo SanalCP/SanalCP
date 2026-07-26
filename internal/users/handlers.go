@@ -443,12 +443,16 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 // ayrımın yanlış tarafına düşme riski olmasın.
 
 type BayiLimit struct {
-	UserID        int64 `json:"user_id"`
-	MaxMusteri    int   `json:"max_customer"`
-	MaxDomain     int   `json:"max_domain"`
-	TanimliMi     bool  `json:"tanimli"`         // reseller_limits satırı var mı
-	MevcutMusteri int   `json:"mevcut_customer"` // şu anki kullanım
-	MevcutDomain  int   `json:"mevcut_domain"`
+	UserID         int64 `json:"user_id"`
+	MaxMusteri     int   `json:"max_customer"`
+	MaxDomain      int   `json:"max_domain"`
+	DiskKotaMB     int64 `json:"disk_kota_mb"`
+	TrafikKotaMB   int64 `json:"trafik_kota_mb"`
+	TanimliMi      bool  `json:"tanimli"`         // reseller_limits satırı var mı
+	MevcutMusteri  int   `json:"mevcut_customer"` // şu anki kullanım
+	MevcutDomain   int   `json:"mevcut_domain"`
+	MevcutDiskMB   int64 `json:"mevcut_disk_mb"`
+	MevcutTrafikMB int64 `json:"mevcut_trafik_mb"`
 }
 
 // LimitGetir: GET /users/{id}/limitler
@@ -467,8 +471,9 @@ func (h *Handlers) LimitGetir(w http.ResponseWriter, r *http.Request) {
 
 	out := BayiLimit{UserID: id}
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT max_customer, max_domain FROM reseller_limits WHERE user_id=?`, id).
-		Scan(&out.MaxMusteri, &out.MaxDomain)
+		`SELECT max_customer, max_domain, disk_kota_mb, trafik_kota_mb
+		 FROM reseller_limits WHERE user_id=?`, id).
+		Scan(&out.MaxMusteri, &out.MaxDomain, &out.DiskKotaMB, &out.TrafikKotaMB)
 	out.TanimliMi = err == nil // satır yoksa sınırsız
 
 	// Kullanım: limitin anlamlı olması için yanında gösterilir.
@@ -477,6 +482,10 @@ func (h *Handlers) LimitGetir(w http.ResponseWriter, r *http.Request) {
 	_ = h.DB.QueryRowContext(r.Context(), `
 		SELECT COUNT(*) FROM domains d JOIN customers c ON c.id = d.customer_id
 		WHERE c.owner_user_id = ?`, id).Scan(&out.MevcutDomain)
+	_ = h.DB.QueryRowContext(r.Context(), `
+		SELECT COALESCE(SUM(d.boyut_kb),0) DIV 1024, COALESCE(SUM(d.trafik_kb),0) DIV 1024
+		FROM domains d JOIN customers c ON c.id = d.customer_id
+		WHERE c.owner_user_id = ?`, id).Scan(&out.MevcutDiskMB, &out.MevcutTrafikMB)
 
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -501,29 +510,32 @@ func (h *Handlers) LimitKaydet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var b struct {
-		MaxMusteri int `json:"max_customer"`
-		MaxDomain  int `json:"max_domain"`
+		MaxMusteri   int   `json:"max_customer"`
+		MaxDomain    int   `json:"max_domain"`
+		DiskKotaMB   int64 `json:"disk_kota_mb"`
+		TrafikKotaMB int64 `json:"trafik_kota_mb"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	if b.MaxMusteri < 0 || b.MaxDomain < 0 {
+	if b.MaxMusteri < 0 || b.MaxDomain < 0 || b.DiskKotaMB < 0 || b.TrafikKotaMB < 0 {
 		httpx.WriteError(w, http.StatusBadRequest, "limitler negatif olamaz (0 = sınırsız)")
 		return
 	}
 
-	if b.MaxMusteri == 0 && b.MaxDomain == 0 {
+	if b.MaxMusteri == 0 && b.MaxDomain == 0 && b.DiskKotaMB == 0 && b.TrafikKotaMB == 0 {
 		if _, err := h.DB.ExecContext(r.Context(),
 			`DELETE FROM reseller_limits WHERE user_id=?`, id); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "limitler kaldırılamadı")
 			return
 		}
 	} else if _, err := h.DB.ExecContext(r.Context(), `
-		INSERT INTO reseller_limits(user_id, max_customer, max_domain)
-		VALUES(?,?,?)
-		ON DUPLICATE KEY UPDATE max_customer=VALUES(max_customer), max_domain=VALUES(max_domain)`,
-		id, b.MaxMusteri, b.MaxDomain); err != nil {
+		INSERT INTO reseller_limits(user_id, max_customer, max_domain, disk_kota_mb, trafik_kota_mb)
+		VALUES(?,?,?,?,?)
+		ON DUPLICATE KEY UPDATE max_customer=VALUES(max_customer), max_domain=VALUES(max_domain),
+		                        disk_kota_mb=VALUES(disk_kota_mb), trafik_kota_mb=VALUES(trafik_kota_mb)`,
+		id, b.MaxMusteri, b.MaxDomain, b.DiskKotaMB, b.TrafikKotaMB); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "limitler kaydedilemedi: "+err.Error())
 		return
 	}

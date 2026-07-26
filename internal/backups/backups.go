@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -92,8 +93,10 @@ type OzetSatir struct {
 
 // Ozet: GET /admin/backups/ozet — TÜM domainlerin yedek özeti (dosya sisteminden, gerçek disk kullanımı).
 func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
+	// Kapsam: bayi yalnız kendi müşterilerinin yedek özetini görür.
+	kosul, arg := middleware.KapsamSQL(r, "d")
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT id, alan_adi, sistem_kullanici FROM domains ORDER BY alan_adi`)
+		`SELECT d.id, d.alan_adi, d.sistem_kullanici FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
 		return
