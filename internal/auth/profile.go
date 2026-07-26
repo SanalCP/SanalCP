@@ -75,22 +75,51 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	if len(b.Yeni) < 8 {
+	if len(b.Yeni) < ParolaEnAzKarakter {
 		httpx.WriteError(w, http.StatusBadRequest, "yeni parola en az 8 karakter olmalı")
 		return
 	}
-	if !rootParolaDogrula(b.Mevcut) {
-		WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", false)
+
+	// root'un parolası sistemdedir (/etc/shadow), panel DB'sinde değil —
+	// doğrulama shadow'dan, değiştirme chpasswd ile. Bayi hesaplarının
+	// sistemde karşılığı yoktur; onlar users.password_hash kullanır.
+	if KullaniciRootMu(c.Username) {
+		if !rootParolaDogrula(b.Mevcut) {
+			WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", false)
+			httpx.WriteError(w, http.StatusUnauthorized, "mevcut parola hatalı")
+			return
+		}
+		cmd := exec.Command("chpasswd")
+		cmd.Stdin = strings.NewReader("root:" + b.Yeni)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi: "+strings.TrimSpace(string(out)))
+			return
+		}
+		WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", true)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+
+	var mevcutHash string
+	if err := h.DB.QueryRow(`SELECT password_hash FROM users WHERE id=?`, c.UserID).Scan(&mevcutHash); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "hesap okunamadı")
+		return
+	}
+	if !ParolaEslesiyorMu(mevcutHash, b.Mevcut) {
+		WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.parola", c.Username, false)
 		httpx.WriteError(w, http.StatusUnauthorized, "mevcut parola hatalı")
 		return
 	}
-	cmd := exec.Command("chpasswd")
-	cmd.Stdin = strings.NewReader("root:" + b.Yeni)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi: "+strings.TrimSpace(string(out)))
+	yeniHash, err := ParolaHashle(b.Yeni)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", true)
+	if _, err := h.DB.Exec(`UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?`, yeniHash, c.UserID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi")
+		return
+	}
+	WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.parola", c.Username, true)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

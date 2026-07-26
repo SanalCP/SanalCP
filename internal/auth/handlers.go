@@ -118,25 +118,63 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	// bağımsız DB yükü yok).
 	ip := httpx.ClientIP(r)
 
-	if req.Kullanici != "root" {
-		WriteAudit(h.DB, 0, req.Kullanici, ip, "auth.login", req.Kullanici, false)
-		httpx.WriteError(w, http.StatusUnauthorized, "yalnızca sunucu root kullanıcısı admin paneline giriş yapabilir")
-		return
-	}
-	if !rootParolaDogrula(req.Parola) {
-		WriteAudit(h.DB, 0, req.Kullanici, ip, "auth.login", req.Kullanici, false)
-		httpx.WriteError(w, http.StatusUnauthorized, "kullanıcı adı veya parola hatalı")
-		return
+	// Kimlik çözümleme — iki ayrı parola dünyası (bkz. parola.go):
+	//
+	//   root  → /etc/shadow (yescrypt). Bu yol çok kullanıcılı desteğe
+	//           geçerken bilinçli olarak DEĞİŞTİRİLMEDİ; panelden kilitlenme
+	//           riskini sıfırda tutmanın tek yolu buydu.
+	//   diğer → users.password_hash (bcrypt), yalnız status='active' hesaplar.
+	//
+	// İki dalın da başarısızlık yanıtı aynıdır ("kullanıcı adı veya parola
+	// hatalı") — hangi kullanıcı adlarının var olduğunu sızdırmamak için.
+	var (
+		uid     int64
+		kadi    string
+		rol     string
+		adSoyad string
+	)
+
+	if KullaniciRootMu(req.Kullanici) {
+		if !rootParolaDogrula(req.Parola) {
+			WriteAudit(h.DB, 0, req.Kullanici, ip, "auth.login", req.Kullanici, false)
+			httpx.WriteError(w, http.StatusUnauthorized, "kullanıcı adı veya parola hatalı")
+			return
+		}
+		uid, kadi, rol = 1, "root", "admin"
+		_ = h.DB.QueryRow(`SELECT full_name FROM users WHERE id=1`).Scan(&adSoyad)
+	} else {
+		var hash, durum string
+		err := h.DB.QueryRow(
+			`SELECT id, username, password_hash, role, status, full_name FROM users WHERE username=?`,
+			req.Kullanici).Scan(&uid, &kadi, &hash, &rol, &durum, &adSoyad)
+		if err != nil || !ParolaEslesiyorMu(hash, req.Parola) {
+			WriteAudit(h.DB, 0, req.Kullanici, ip, "auth.login", req.Kullanici, false)
+			httpx.WriteError(w, http.StatusUnauthorized, "kullanıcı adı veya parola hatalı")
+			return
+		}
+		if durum != "active" {
+			WriteAudit(h.DB, uid, kadi, ip, "auth.login", kadi, false)
+			httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
+			return
+		}
+		// Müşteri rolü panel oturumu açamaz; müşteriler /musteri/login ile
+		// kendi domain panellerine girer.
+		if rol != "admin" && rol != "reseller" {
+			WriteAudit(h.DB, uid, kadi, ip, "auth.login", kadi, false)
+			httpx.WriteError(w, http.StatusForbidden, "bu hesap yönetim paneline giriş yapamaz")
+			return
+		}
 	}
 
-	// 2FA — parola doğru; 2FA açıksa TOTP kodu da gerekir.
+	// 2FA — parola doğru; 2FA açıksa TOTP kodu da gerekir. Artık giriş yapan
+	// kullanıcının kendi kaydından okunuyor (eskiden id=1'e sabitti).
 	// FAIL-CLOSED: 2FA durumu okunamıyorsa (DB hatası) giriş REDDEDİLİR (eskiden
 	// hata yutulup 2FA sessizce atlanıyordu = fail-open).
 	{
 		var en int
 		var sec string
 		var sonAdim int64
-		if err := h.DB.QueryRow(`SELECT totp_enabled, totp_secret, totp_last_step FROM users WHERE id=1`).Scan(&en, &sec, &sonAdim); err != nil {
+		if err := h.DB.QueryRow(`SELECT totp_enabled, totp_secret, totp_last_step FROM users WHERE id=?`, uid).Scan(&en, &sec, &sonAdim); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "2FA durumu doğrulanamadı")
 			return
 		}
@@ -151,28 +189,26 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 			}
 			adim, ok := TOTPVerifyAdim(sec, req.Kod, sonAdim)
 			if !ok {
-				WriteAudit(h.DB, 1, "root", ip, "auth.2fa", "root", false)
+				WriteAudit(h.DB, uid, kadi, ip, "auth.2fa", kadi, false)
 				httpx.WriteError(w, http.StatusUnauthorized, "2FA kodu hatalı veya tekrar kullanıldı")
 				return
 			}
-			_, _ = h.DB.Exec(`UPDATE users SET totp_last_step=? WHERE id=1`, adim) // replay koruması
+			_, _ = h.DB.Exec(`UPDATE users SET totp_last_step=? WHERE id=?`, adim, uid) // replay koruması
 		}
 	}
 
-	const adminUID = int64(1)
-	tok, err := Issue(h.Secret, h.LifetimeSec, adminUID, "root", "admin")
+	tok, err := Issue(h.Secret, h.LifetimeSec, uid, kadi, rol)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "token üretilemedi")
 		return
 	}
-	WriteAudit(h.DB, adminUID, "root", ip, "auth.login", "root", true)
+	WriteAudit(h.DB, uid, kadi, ip, "auth.login", kadi, true)
+	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
 
 	resp := loginResp{Token: tok, Bitis: time.Now().Add(time.Duration(h.LifetimeSec) * time.Second).Unix()}
-	resp.Kullanici.ID = adminUID
-	resp.Kullanici.Adi = "root"
-	resp.Kullanici.Rol = "admin"
-	var adSoyad string
-	_ = h.DB.QueryRow(`SELECT full_name FROM users WHERE id=1`).Scan(&adSoyad)
+	resp.Kullanici.ID = uid
+	resp.Kullanici.Adi = kadi
+	resp.Kullanici.Rol = rol
 	resp.Kullanici.AdSoyad = adSoyad
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
