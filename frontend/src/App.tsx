@@ -55,6 +55,8 @@ import MailGenelPage from '@/pages/MailGenelPage'
 import VeritabanlariGenelPage from '@/pages/VeritabanlariGenelPage'
 import MusterilerPage from '@/pages/MusterilerPage'
 import GuvenlikGunluguPage from '@/pages/GuvenlikGunluguPage'
+import KullanicilarPage from '@/pages/KullanicilarPage'
+import SunucuDurumuPage from '@/pages/SunucuDurumuPage'
 
 function GuardedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuth((s) => s.token)
@@ -123,6 +125,8 @@ export default function App() {
         <Route path="veritabanlari"  element={<VeritabanlariGenelPage />} />
 
         {/* Faz 4 — yönetim ekranları */}
+        <Route path="kullanicilar"      element={<KullanicilarPage />} />
+        <Route path="sunucu-durumu"     element={<SunucuDurumuPage />} />
         <Route path="musteriler"        element={<MusterilerPage />} />
         <Route path="guvenlik-gunlugu"  element={<GuvenlikGunluguPage />} />
 

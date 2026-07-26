@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { useAuth } from '@/store/auth'
 import TopBar from './TopBar'
 import AltNavBar from './AltNavBar'
 import DomainSecici from './DomainSecici'
@@ -90,9 +91,27 @@ const NAV: NavGroup[] = [
     { to: '/istatistikler',        etiket: 'İstatistikler',     ikon: ICONS.istatistik },
   ]},
   { baslik: 'Yönetim', items: [
+    { to: '/kullanicilar',         etiket: 'Kullanıcılar',      ikon: ICONS.bayi },
     { to: '/musteriler',           etiket: 'Müşteriler',        ikon: ICONS.musteri },
     { to: '/guvenlik-gunlugu',     etiket: 'Güvenlik Günlüğü',  ikon: ICONS.log },
     { to: '/araclar-ayarlar',      etiket: 'Araçlar ve Ayarlar', ikon: ICONS.araclar },
+  ]},
+]
+
+// Bayi menüsü — YALNIZ bayinin gerçekten erişebildiği yerler.
+//
+// Bayi yetkisi Faz 5A'da uç uç sınıflandırıldı: kendi hesapları + salt-okunur
+// sunucu durumu açık, domain/DNS/SSL işlemleri kapsam filtresi (Faz 5D) gelene
+// kadar kapalı. Menüye 403 verecek link koymamak için bu liste dar tutuldu;
+// 5D bitince Barındırma grubu buraya eklenecek.
+const BAYI_NAV: NavGroup[] = [
+  { items: [{ to: '/', etiket: 'Anasayfa', ikon: ICONS.home, end: true }] },
+  { baslik: 'Hesaplarım', items: [
+    { to: '/kullanicilar',   etiket: 'Müşterilerim',   ikon: ICONS.musteri },
+  ]},
+  { baslik: 'Sunucu', items: [
+    { to: '/sunucu-durumu',   etiket: 'Sunucu Durumu',   ikon: ICONS.izleme },
+    { to: '/hizmet-planlari', etiket: 'Hizmet Planları', ikon: ICONS.plan },
   ]},
 ]
 
@@ -147,6 +166,7 @@ function domainNav(id: string): NavGroup[] {
 export default function DashboardLayout() {
   const isMusteri = typeof window !== 'undefined' && localStorage.getItem('sanalpanel.musteri') === '1'
   const musteriDomainID = typeof window !== 'undefined' ? localStorage.getItem('sanalpanel.musteri.domain_id') || '' : ''
+  const rol = useAuth((s) => s.kullanici?.rol)
 
   // Gruplar varsayılan olarak açıktır; yalnız kullanıcının kapattıkları saklanır.
   // Böylece menüye yeni grup eklendiğinde ayrıca kayıt gerekmez.
@@ -229,9 +249,20 @@ export default function DashboardLayout() {
   // menüsünü korur (ve alan adı seçici görmez).
   const domainEslesme = konum.pathname.match(/^\/abonelikler\/(\d+)/)
   const aktifDomainID = domainEslesme?.[1] ?? ''
+  // Bayi de domain kipine girebilir (kendi müşterisinin domaini); yalnız
+  // müşteri kendi sabit menüsünde kalır.
   const domainKipi = !isMusteri && aktifDomainID !== ''
 
-  const aktifNav = isMusteri ? MUSTERI_NAV : domainKipi ? domainNav(aktifDomainID) : NAV
+  // Menü rolden türetilir. isMusteri, FTP kimlikli eski oturumların bayrağı;
+  // panel hesabıyla giren müşteri (Faz 5C) rol='user' olarak gelir — ikisi de
+  // aynı müşteri menüsünü görür.
+  const aktifNav = isMusteri || rol === 'user'
+    ? MUSTERI_NAV
+    : domainKipi
+    ? domainNav(aktifDomainID)
+    : rol === 'reseller'
+    ? BAYI_NAV
+    : NAV
 
   const grupAcik = (b: string) => !kapaliGruplar.includes(b)
 
