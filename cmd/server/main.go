@@ -416,6 +416,15 @@ func main() {
 				// ama okunacak uç yoktu.
 				r.With(middleware.AdminOnly).Get("/audit", authH.AuditListe)
 				r.With(middleware.AdminOnly).Get("/audit/eylemler", authH.AuditEylemler)
+				// Panel hesapları (admin + bayi). Kapsam daraltması handler
+				// içindedir: bayi yalnız kendi altındaki hesapları görür/yönetir
+				// ve yalnız 'user' rolünde hesap açabilir.
+				r.With(middleware.BayiVeUstu).Get("/users", usersH.Liste)
+				r.With(middleware.BayiVeUstu).Post("/users", usersH.Olustur)
+				r.With(middleware.BayiVeUstu).Put("/users/{id}", usersH.Guncelle)
+				r.With(middleware.BayiVeUstu).Post("/users/{id}/parola", usersH.ParolaSifirla)
+				r.With(middleware.BayiVeUstu).Post("/users/{id}/durum", usersH.DurumDegistir)
+				r.With(middleware.BayiVeUstu).Delete("/users/{id}", usersH.Sil)
 				r.With(middleware.AdminOnly).Get("/customers", accountsH.ListCustomers)
 				r.With(middleware.AdminOnly).Post("/customers", accountsH.CreateCustomer)
 				r.With(middleware.AdminOnly).Put("/customers/{id}", accountsH.UpdateCustomer)
