@@ -54,13 +54,59 @@ func CheckBayiDomainEklenebilir(ctx context.Context, db *sql.DB, bayiUserID int6
 	return nil
 }
 
+// CheckBayiDiskKotasi: bayinin tüm müşterilerinin toplam disk kullanımı
+// limitini aşmış mı?
+//
+// domains.boyut_kb periyodik olarak güncellenir (bkz. internal/domains
+// disk toplayıcı), yani bu kontrol ANLIK değil son ölçüme dayanır. Amaç sert
+// bir kesme değil, yeni kaynak eklemeyi durdurmak: kota dolmuşsa bayi yeni
+// domain açamaz. Var olan siteler çalışmaya devam eder — disk kesmesi
+// tenant seviyesinde XFS kotasının işidir (bkz. internal/kaynaklimit).
+func CheckBayiDiskKotasi(ctx context.Context, db *sql.DB, bayiUserID int64) error {
+	maks, err := bayiLimiti(ctx, db, bayiUserID, "disk_kota_mb")
+	if err != nil || maks <= 0 {
+		return nil
+	}
+	var kullanilanKB int64
+	_ = db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(d.boyut_kb), 0)
+		FROM domains d JOIN customers c ON c.id = d.customer_id
+		WHERE c.owner_user_id = ?`, bayiUserID).Scan(&kullanilanKB)
+	kullanilanMB := int(kullanilanKB / 1024)
+	if kullanilanMB >= maks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf(
+			"bayi disk kotası dolu: %d MB / %d MB", kullanilanMB, maks)}
+	}
+	return nil
+}
+
+// CheckBayiTrafikKotasi: aylık trafik kotası. domains.trafik_kb, aylık
+// toplayıcı tarafından doldurulur (bkz. internal/istatistik).
+func CheckBayiTrafikKotasi(ctx context.Context, db *sql.DB, bayiUserID int64) error {
+	maks, err := bayiLimiti(ctx, db, bayiUserID, "trafik_kota_mb")
+	if err != nil || maks <= 0 {
+		return nil
+	}
+	var kullanilanKB int64
+	_ = db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(d.trafik_kb), 0)
+		FROM domains d JOIN customers c ON c.id = d.customer_id
+		WHERE c.owner_user_id = ?`, bayiUserID).Scan(&kullanilanKB)
+	kullanilanMB := int(kullanilanKB / 1024)
+	if kullanilanMB >= maks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf(
+			"bayi trafik kotası dolu: %d MB / %d MB", kullanilanMB, maks)}
+	}
+	return nil
+}
+
 // bayiLimiti: reseller_limits'ten tek bir sayısal limiti okur.
 // Satır yoksa 0 (sınırsız) döner.
 func bayiLimiti(ctx context.Context, db *sql.DB, bayiUserID int64, kolon string) (int, error) {
 	// kolon adı yalnız bu paketten sabit string olarak gelir (SQL enjeksiyonu
 	// yüzeyi yok); yine de beklenen değerlerle sınırlanır.
 	switch kolon {
-	case "max_customer", "max_domain":
+	case "max_customer", "max_domain", "disk_kota_mb", "trafik_kota_mb":
 	default:
 		return 0, fmt.Errorf("bilinmeyen limit kolonu: %s", kolon)
 	}

@@ -44,9 +44,13 @@ type BayiLimit = {
   user_id: number
   max_customer: number
   max_domain: number
+  disk_kota_mb: number
+  trafik_kota_mb: number
   tanimli: boolean
   mevcut_customer: number
   mevcut_domain: number
+  mevcut_disk_mb: number
+  mevcut_trafik_mb: number
 }
 
 export default function KullanicilarPage() {
@@ -145,6 +149,8 @@ export default function KullanicilarPage() {
       await api.put(`/users/${limitHedef.id}/limitler`, {
         max_customer: limit.max_customer,
         max_domain: limit.max_domain,
+        disk_kota_mb: limit.disk_kota_mb,
+        trafik_kota_mb: limit.trafik_kota_mb,
       })
       setBasari(`${limitHedef.kullanici_adi} limitleri güncellendi.`)
       setLimitHedef(null)
@@ -433,6 +439,35 @@ export default function KullanicilarPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Disk kotası (MB)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={limit.disk_kota_mb}
+                  onChange={(e) => setLimit({ ...limit, disk_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_disk_mb} MB kullanılıyor</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Trafik kotası (MB/ay)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={limit.trafik_kota_mb}
+                  onChange={(e) => setLimit({ ...limit, trafik_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_trafik_mb} MB kullanılıyor</p>
+              </div>
+            </div>
+
             {!limit.tanimli && (
               <div className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
                 Bu bayi için tanımlı limit yok — şu anda sınırsız.
@@ -440,7 +475,8 @@ export default function KullanicilarPage() {
             )}
 
             <p className="text-[11px] text-slate-400">
-              Limitin altına düşmek mevcut hesapları silmez; yalnız yeni ekleme engellenir.
+              Limitin altına düşmek mevcut hesapları silmez ve siteleri kesmez; yalnız yeni
+              müşteri/domain eklemeyi engeller. Disk ve trafik son ölçüme dayanır.
             </p>
 
             <div className="flex justify-end gap-2 pt-1">

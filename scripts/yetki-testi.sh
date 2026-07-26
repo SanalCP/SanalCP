@@ -108,7 +108,7 @@ echo "== 1. DİKEY: bayi, admin uçlarına erişememeli =="
 # NOT: yalnız GET rotası TANIMLI olan uçlar sınanır — tanımsız yol/metot 405
 # döner ve bu yetki kararı değildir.
 for uc in system/processes admin/system/loglar firewall paketler/kurulu audit \
-          admin/backups/ozet wordpress/tumu system/panel-domain paketler/durum; do
+          system/panel-domain paketler/durum; do
   bekle 403 "GET /$uc" -H "$AA" "$URL/$uc"
 done
 bekle 403 "POST /system/servis-islem" -X POST -H "$AA" -H 'Content-Type: application/json' \
@@ -119,7 +119,9 @@ bekle 403 "POST /plans (plan oluşturma)" -X POST -H "$AA" -H 'Content-Type: app
 
 echo
 echo "== 2. Bayiye AÇIK olması gereken uçlar =="
-for uc in me users customers domains plans php-surumler system/usage system/servisler system/load-history genel/dns genel/ssl genel/mail genel/veritabanlari; do
+for uc in me users customers domains plans php-surumler system/usage system/servisler \
+          system/load-history genel/dns genel/ssl genel/mail genel/veritabanlari \
+          wordpress/tumu admin/backups/ozet; do
   bekle 200 "GET /$uc" -H "$AA" "$URL/$uc"
 done
 

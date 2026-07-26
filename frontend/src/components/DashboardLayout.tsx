@@ -113,6 +113,9 @@ const BAYI_NAV: NavGroup[] = [
     { to: '/veritabanlari',  etiket: 'Veritabanları',  ikon: ICONS.db },
     { to: '/ssl',            etiket: 'SSL Sertifikaları', ikon: ICONS.kilit },
   ]},
+  { baslik: 'Uygulamalar', items: [
+    { to: '/wordpress',      etiket: 'WordPress',      ikon: ICONS.wp },
+  ]},
   { baslik: 'Hesaplarım', items: [
     { to: '/kullanicilar',   etiket: 'Müşteri Hesapları', ikon: ICONS.bayi },
     { to: '/musteriler',     etiket: 'Müşteri Kayıtları', ikon: ICONS.musteri },

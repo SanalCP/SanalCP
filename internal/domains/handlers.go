@@ -189,6 +189,16 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusForbidden, err.Error())
 			return
 		}
+		// Disk/trafik kotası: dolmuşsa yeni domain açılamaz. Var olan siteler
+		// etkilenmez — bunlar "yeni kaynak ekleme" kapısıdır, kesme değil.
+		if err := kota.CheckBayiDiskKotasi(r.Context(), h.DB, c.UserID); err != nil {
+			httpx.WriteError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err := kota.CheckBayiTrafikKotasi(r.Context(), h.DB, c.UserID); err != nil {
+			httpx.WriteError(w, http.StatusForbidden, err.Error())
+			return
+		}
 		// Bayi yalnız kendi müşterisine domain açabilir.
 		if req.CustomerID == nil {
 			httpx.WriteError(w, http.StatusBadRequest, "domain bir müşteriye bağlanmalı")
