@@ -294,9 +294,22 @@ if [ ! -x /root/.acme.sh/acme.sh ]; then
 fi
 if [ -x /root/.acme.sh/acme.sh ]; then
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
-  # LE hesabını ŞİMDİ kaydet (geçerli email varsa onunla, yoksa contact'sız) — issue anında hata olmasın
-  if [ -n "$AEMAIL" ]; then /root/.acme.sh/acme.sh --register-account -m "$AEMAIL" --server letsencrypt >/dev/null 2>&1
-  else /root/.acme.sh/acme.sh --register-account --server letsencrypt >/dev/null 2>&1; fi
+  # LE hesabını ŞİMDİ kaydet (geçerli email varsa onunla, yoksa contact'sız) — issue anında hata olmasın.
+  # "@ + nokta" regex'i .local/.test/.internal gibi GEÇERSİZ (public suffix olmayan) alan adlarını
+  # yakalayamaz — LE bunları invalidContact ile reddeder VE bu email'i hem account.conf'taki
+  # ACCOUNT_EMAIL'e hem ca/*/directory/ca.conf'taki CA_EMAIL'e KAYDEDER (kayıt başarısız olsa
+  # bile). acme.sh sonraki her çağrıda (-m verilmese dahi) önce CA_EMAIL'e, sonra ACCOUNT_EMAIL'e
+  # bakar — bu yüzden düz "--register-account" ile yeniden deneme YETMEZ, aynı bozuk değeri
+  # kullanıp aynı hatayı tekrarlar ve panel HİÇBİR ZAMAN (özel domain gerçek olsa bile) SSL
+  # alamaz hale gelir. Kayıt email'le başarısız olursa İKİ dosyadaki değeri de temizleyip
+  # contact'sız yeniden dene.
+  if [ -n "$AEMAIL" ] && ! /root/.acme.sh/acme.sh --register-account -m "$AEMAIL" --server letsencrypt >/dev/null 2>&1; then
+    sed -i "s/^ACCOUNT_EMAIL=.*/ACCOUNT_EMAIL=''/" /root/.acme.sh/account.conf 2>/dev/null || true
+    sed -i "s/^CA_EMAIL=.*/CA_EMAIL=''/" /root/.acme.sh/ca/*/directory/ca.conf 2>/dev/null || true
+    /root/.acme.sh/acme.sh --register-account --server letsencrypt >/dev/null 2>&1
+  elif [ -z "$AEMAIL" ]; then
+    /root/.acme.sh/acme.sh --register-account --server letsencrypt >/dev/null 2>&1
+  fi
   ok "acme.sh (Let's Encrypt CA + hesap kayıtlı + oto-yenileme cron)"
 else
   warn "acme.sh kurulamadı — Let's Encrypt SSL için elle: curl https://get.acme.sh | sh"

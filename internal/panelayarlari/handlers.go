@@ -149,8 +149,21 @@ func sslKur(domain string) (durum, hata, bitis string) {
 	_, _ = exec.Command("restorecon", "-R", acmeWebroot).CombinedOutput()
 
 	issueArgs := []string{"--issue", "--webroot", acmeWebroot, "-d", domain, "--keylength", "2048"}
-	issueCmd := exec.Command(acmeBinYolu, issueArgs...)
-	out, err := issueCmd.CombinedOutput()
+	out, err := exec.Command(acmeBinYolu, issueArgs...).CombinedOutput()
+	if err != nil && strings.Contains(string(out), "invalidContact") {
+		// Kurulumda geçersiz bir contact-email ile (ör. admin@test.local — public suffix
+		// olmayan bir TLD) hesap kaydı BAŞARISIZ olmuş olabilir. acme.sh bu email'i HEM
+		// account.conf'taki ACCOUNT_EMAIL'de HEM DE ca/<server>/directory/ca.conf'taki
+		// CA_EMAIL'de saklar ve _getAccountEmail() ACCOUNT_EMAIL env'i verilmezse ÖNCE
+		// CA_EMAIL'e bakar — düz "--register-account" (email'siz) bile bu kayıtlı değeri
+		// kullanıp AYNI invalidContact hatasını tekrarlar, hesap LE'de HİÇ oluşmaz ve her
+		// --issue çağrısı (domain'in kendisi geçerli olsa bile) SÜREKLİ başarısız olur. İki
+		// dosyadaki eski email'i temizleyip yeniden kaydet — bu kalıcı-kilitlenmeyi kırar
+		// (bkz. sanalpanel-install.sh'daki aynı sınıf düzeltme).
+		acmeContactTemizle()
+		_, _ = exec.Command(acmeBinYolu, "--register-account", "--server", "letsencrypt").CombinedOutput()
+		out, err = exec.Command(acmeBinYolu, issueArgs...).CombinedOutput()
+	}
 	if err != nil {
 		// acme.sh exit code 2 = RENEW_SKIP: store'da zaten gecerli (yenileme penceresine
 		// girmemis) bir sertifika var, YENIDEN CEKMEDI — bu GERCEK bir hata DEGIL. Bu
@@ -222,6 +235,33 @@ func certBitisOku(path string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(dateOut)), nil
+}
+
+// acmeContactTemizle: acme.sh'in kayıtlı contact-email'ini account.conf VE aktif CA'nın
+// ca.conf'undan temizler (boş string'e çevirir). acme.sh _getAccountEmail() sırasıyla
+// ACCOUNT_EMAIL env, CA_EMAIL (ca.conf), sonra ACCOUNT_EMAIL (account.conf) dosyasına
+// bakar — invalidContact'tan kurtulmak için İKİSİ de temizlenmeli, biri yeterli değil.
+func acmeContactTemizle() {
+	acmeAnahtarBosalt("/root/.acme.sh/account.conf", "ACCOUNT_EMAIL")
+	acmeAnahtarBosalt("/root/.acme.sh/ca/acme-v02.api.letsencrypt.org/directory/ca.conf", "CA_EMAIL")
+}
+
+func acmeAnahtarBosalt(path, anahtar string) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	satirlar := strings.Split(string(b), "\n")
+	degisti := false
+	for i, s := range satirlar {
+		if strings.HasPrefix(s, anahtar+"=") {
+			satirlar[i] = anahtar + "=''"
+			degisti = true
+		}
+	}
+	if degisti {
+		_ = os.WriteFile(path, []byte(strings.Join(satirlar, "\n")), 0600)
+	}
 }
 
 func copyFile(src, dst string) error {
