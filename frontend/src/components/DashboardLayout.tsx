@@ -100,14 +100,22 @@ const NAV: NavGroup[] = [
 
 // Bayi menüsü — YALNIZ bayinin gerçekten erişebildiği yerler.
 //
-// Bayi yetkisi Faz 5A'da uç uç sınıflandırıldı: kendi hesapları + salt-okunur
-// sunucu durumu açık, domain/DNS/SSL işlemleri kapsam filtresi (Faz 5D) gelene
-// kadar kapalı. Menüye 403 verecek link koymamak için bu liste dar tutuldu;
-// 5D bitince Barındırma grubu buraya eklenecek.
+// Faz 5D'de kapsam filtreleri (middleware.KapsamSQL) gelince domain listeleri
+// bayiye açıldı: bayi artık kendi müşterilerinin domainlerini, DNS/SSL/e-posta
+// ve veritabanı özetlerini görüyor. Sunucuyu DEĞİŞTİREN uçlar (servis işlem,
+// paket kurulumu, firewall, panel ayarları) hâlâ yalnız admin'de.
 const BAYI_NAV: NavGroup[] = [
   { items: [{ to: '/', etiket: 'Anasayfa', ikon: ICONS.home, end: true }] },
+  { baslik: 'Barındırma', items: [
+    { to: '/domainler',      etiket: 'Domainler',      ikon: ICONS.domain },
+    { to: '/dns',            etiket: 'DNS Yönetimi',   ikon: ICONS.dns },
+    { to: '/mail',           etiket: 'E-posta',        ikon: ICONS.posta },
+    { to: '/veritabanlari',  etiket: 'Veritabanları',  ikon: ICONS.db },
+    { to: '/ssl',            etiket: 'SSL Sertifikaları', ikon: ICONS.kilit },
+  ]},
   { baslik: 'Hesaplarım', items: [
-    { to: '/kullanicilar',   etiket: 'Müşterilerim',   ikon: ICONS.musteri },
+    { to: '/kullanicilar',   etiket: 'Müşteri Hesapları', ikon: ICONS.bayi },
+    { to: '/musteriler',     etiket: 'Müşteri Kayıtları', ikon: ICONS.musteri },
   ]},
   { baslik: 'Sunucu', items: [
     { to: '/sunucu-durumu',   etiket: 'Sunucu Durumu',   ikon: ICONS.izleme },

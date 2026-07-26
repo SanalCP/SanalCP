@@ -7,8 +7,10 @@
 // yanıtlamak için. Yalnız okuma yapar — değişiklik hâlâ domain kapsamlı
 // uçlardan geçer, böylece yetki ve doğrulama mantığı tek yerde kalır.
 //
-// Tüm uçlar AdminOnly'dir (bkz. cmd/server/main.go); sunucudaki tüm
-// tenantları listeledikleri için müşteri/bayi kapsamına açılmazlar.
+// Yetki: admin + bayi (BayiVeUstu). Listeler middleware.KapsamSQL ile
+// daraltılır — admin tüm domainleri, bayi yalnız kendi müşterilerininkini,
+// müşteri yalnız kendi domainini görür. Daraltma sorgunun içindedir; satır
+// satır filtrelemek liste uçlarında sızıntıyı önlemez.
 package genelbakis
 
 import (
@@ -21,6 +23,7 @@ import (
 	"time"
 
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/middleware"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -40,7 +43,7 @@ type DNSSatir struct {
 }
 
 func (h *Handlers) DNS(w http.ResponseWriter, r *http.Request) {
-	const q = `
+	q := `
 SELECT d.id, d.alan_adi, d.durum, d.dnssec_aktif,
        COUNT(r.id),
        COALESCE(SUM(r.tip='A'), 0),
@@ -48,11 +51,14 @@ SELECT d.id, d.alan_adi, d.durum, d.dnssec_aktif,
        COALESCE(SUM(r.tip='TXT'), 0),
        COALESCE(SUM(r.aktif=0), 0)
 FROM domains d
-LEFT JOIN dns_records r ON r.domain_id = d.id
+LEFT JOIN dns_records r ON r.domain_id = d.id`
+
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	q += kosul + `
 GROUP BY d.id, d.alan_adi, d.durum, d.dnssec_aktif
 ORDER BY d.alan_adi`
 
-	rows, err := h.DB.QueryContext(r.Context(), q)
+	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -87,14 +93,17 @@ type SSLSatir struct {
 func (h *Handlers) SSL(w http.ResponseWriter, r *http.Request) {
 	// Sıralama, ekranın asıl işine göre: önce süresi dolmuş/dolmak üzere olan
 	// sertifikalar, sonra ileri tarihliler, en sonda SSL'i hiç olmayanlar.
-	const q = `
-SELECT id, alan_adi, durum, ssl_aktif,
-       COALESCE(DATE_FORMAT(ssl_bitis, '%Y-%m-%d'), ''),
-       CASE WHEN ssl_bitis IS NULL THEN NULL ELSE DATEDIFF(ssl_bitis, CURDATE()) END
-FROM domains
-ORDER BY (ssl_bitis IS NULL), ssl_bitis ASC, alan_adi`
+	q := `
+SELECT d.id, d.alan_adi, d.durum, d.ssl_aktif,
+       COALESCE(DATE_FORMAT(d.ssl_bitis, '%Y-%m-%d'), ''),
+       CASE WHEN d.ssl_bitis IS NULL THEN NULL ELSE DATEDIFF(d.ssl_bitis, CURDATE()) END
+FROM domains d`
 
-	rows, err := h.DB.QueryContext(r.Context(), q)
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	q += kosul + `
+ORDER BY (d.ssl_bitis IS NULL), d.ssl_bitis ASC, d.alan_adi`
+
+	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -134,17 +143,20 @@ type MailSatir struct {
 func (h *Handlers) Mail(w http.ResponseWriter, r *http.Request) {
 	// Alt sorgu kullanılıyor: mailboxes ve mail_aliases'ı aynı anda JOIN etmek
 	// kartezyen çarpım üretir ve sayımları şişirir.
-	const q = `
+	q := `
 SELECT d.id, d.alan_adi,
        COALESCE(md.durum, ''),
        (SELECT COUNT(*) FROM mailboxes mb WHERE mb.domain_id = d.id),
        (SELECT COUNT(*) FROM mail_aliases a WHERE a.domain_id = d.id),
        (SELECT COUNT(*) FROM mailboxes mb2 WHERE mb2.domain_id = d.id AND mb2.status = 'suspended')
 FROM domains d
-LEFT JOIN mail_domains md ON md.domain_id = d.id
+LEFT JOIN mail_domains md ON md.domain_id = d.id`
+
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	q += kosul + `
 ORDER BY d.alan_adi`
 
-	rows, err := h.DB.QueryContext(r.Context(), q)
+	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -214,14 +226,17 @@ func dbBoyutlari() map[string]int64 {
 }
 
 func (h *Handlers) Veritabanlari(w http.ResponseWriter, r *http.Request) {
-	const q = `
+	q := `
 SELECT a.id, a.domain_id, d.alan_adi, a.db_name, a.db_user, a.db_host,
        COALESCE(DATE_FORMAT(a.created_at, '%Y-%m-%d'), '')
 FROM db_accounts a
-JOIN domains d ON d.id = a.domain_id
+JOIN domains d ON d.id = a.domain_id`
+
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	q += kosul + `
 ORDER BY d.alan_adi, a.db_name`
 
-	rows, err := h.DB.QueryContext(r.Context(), q)
+	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return

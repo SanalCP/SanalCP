@@ -238,7 +238,7 @@ func main() {
 			r.With(middleware.BayiVeUstu).Post("/me/2fa/disable", authH.TwoFADisable)
 			// NOT: /domains listesi bayiye ancak kapsam filtresi (Faz 5D) geldikten
 			// sonra açılabilir — filtresiz açmak bayiye TÜM domainleri gösterir.
-			r.With(middleware.AdminOnly).Get("/domains", domainsH.List)
+			r.With(middleware.BayiVeUstu).Get("/domains", domainsH.List)
 			r.With(middleware.MusteriScope).Get("/domains/{id}", domainsH.Get)
 			// Salt-okunur sunucu durumu — bayi destek verebilsin diye görünür
 			// (kullanıcı kararı, Faz 5 planı); değiştiren uçlar AdminOnly'de kalır.
@@ -272,7 +272,7 @@ func main() {
 
 			// Yazma + müşteri-scope route'ları — per-route AdminOnly/MusteriScope ile yetkilendirilir
 			r.Group(func(r chi.Router) {
-				r.With(middleware.AdminOnly).Post("/domains", domainsH.Create)
+				r.With(middleware.BayiVeUstu).Post("/domains", domainsH.Create)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}", domainsH.Delete)
 				r.With(middleware.AdminOnly).Post("/domains/toplu/sahip", domainsH.TopluSahip)
 				r.With(middleware.AdminOnly).Post("/domains/toplu/durum", domainsH.TopluDurum)
@@ -406,10 +406,10 @@ func main() {
 				r.With(middleware.AdminOnly).Put("/dns-template", dnsH.PutTemplate)
 				// Sunucu geneli özet listeler (salt-okunur) — panelin sol menüsündeki
 				// DNS / SSL / E-posta / Veritabanları sayfaları bunları okur.
-				r.With(middleware.AdminOnly).Get("/genel/dns", genelH.DNS)
-				r.With(middleware.AdminOnly).Get("/genel/ssl", genelH.SSL)
-				r.With(middleware.AdminOnly).Get("/genel/mail", genelH.Mail)
-				r.With(middleware.AdminOnly).Get("/genel/veritabanlari", genelH.Veritabanlari)
+				r.With(middleware.BayiVeUstu).Get("/genel/dns", genelH.DNS)
+				r.With(middleware.BayiVeUstu).Get("/genel/ssl", genelH.SSL)
+				r.With(middleware.BayiVeUstu).Get("/genel/mail", genelH.Mail)
+				r.With(middleware.BayiVeUstu).Get("/genel/veritabanlari", genelH.Veritabanlari)
 				// Domain askıya al / geri al (suspend)
 				r.With(middleware.AdminOnly).Post("/domains/{id}/askiya-al", domainsH.AskiyaAl)
 				r.With(middleware.AdminOnly).Post("/domains/{id}/askidan-al", domainsH.AskidanAl)
@@ -431,10 +431,10 @@ func main() {
 				r.With(middleware.BayiVeUstu).Post("/users/{id}/parola", usersH.ParolaSifirla)
 				r.With(middleware.BayiVeUstu).Post("/users/{id}/durum", usersH.DurumDegistir)
 				r.With(middleware.BayiVeUstu).Delete("/users/{id}", usersH.Sil)
-				r.With(middleware.AdminOnly).Get("/customers", accountsH.ListCustomers)
-				r.With(middleware.AdminOnly).Post("/customers", accountsH.CreateCustomer)
-				r.With(middleware.AdminOnly).Put("/customers/{id}", accountsH.UpdateCustomer)
-				r.With(middleware.AdminOnly).Delete("/customers/{id}", accountsH.DeleteCustomer)
+				r.With(middleware.BayiVeUstu).Get("/customers", accountsH.ListCustomers)
+				r.With(middleware.BayiVeUstu).Post("/customers", accountsH.CreateCustomer)
+				r.With(middleware.BayiVeUstu).Put("/customers/{id}", accountsH.UpdateCustomer)
+				r.With(middleware.BayiVeUstu).Delete("/customers/{id}", accountsH.DeleteCustomer)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backups", backupsH.List)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/backups", backupsH.Create)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backups/{bid}/indir", backupsH.Download)

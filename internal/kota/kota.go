@@ -13,6 +13,66 @@ type LimitHatasi struct {
 
 func (e *LimitHatasi) Error() string { return e.Mesaj }
 
+// ---------- Bayi limitleri (WHM "reseller limits" karşılığı) ----------
+//
+// reseller_limits tablosunda satırı olmayan bayi SINIRSIZDIR; 0 değeri de
+// sınırsız demektir (service_plans'taki mevcut kota sözleşmesiyle aynı).
+// Böylece limit tanımlamak opsiyonel kalır ve mevcut davranış değişmez.
+
+// CheckBayiMusteriEklenebilir: bayi yeni müşteri açabilir mi?
+func CheckBayiMusteriEklenebilir(ctx context.Context, db *sql.DB, bayiUserID int64) error {
+	maks, err := bayiLimiti(ctx, db, bayiUserID, "max_customer")
+	if err != nil || maks <= 0 {
+		return nil
+	}
+	var mevcut int
+	_ = db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM customers WHERE owner_user_id=?`, bayiUserID).Scan(&mevcut)
+	if mevcut >= maks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf("bayi limiti aşıldı: en fazla %d müşteri", maks)}
+	}
+	return nil
+}
+
+// CheckBayiDomainEklenebilir: bayinin toplam domain kotası dolmuş mu?
+//
+// Müşteri planının max_domain'inden ayrıdır: o tek müşteriyi, bu bayinin
+// tüm müşterilerinin toplamını sınırlar. İkisi de uygulanır.
+func CheckBayiDomainEklenebilir(ctx context.Context, db *sql.DB, bayiUserID int64) error {
+	maks, err := bayiLimiti(ctx, db, bayiUserID, "max_domain")
+	if err != nil || maks <= 0 {
+		return nil
+	}
+	var mevcut int
+	_ = db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM domains d JOIN customers c ON c.id = d.customer_id
+		WHERE c.owner_user_id = ?`, bayiUserID).Scan(&mevcut)
+	if mevcut >= maks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf("bayi limiti aşıldı: en fazla %d domain", maks)}
+	}
+	return nil
+}
+
+// bayiLimiti: reseller_limits'ten tek bir sayısal limiti okur.
+// Satır yoksa 0 (sınırsız) döner.
+func bayiLimiti(ctx context.Context, db *sql.DB, bayiUserID int64, kolon string) (int, error) {
+	// kolon adı yalnız bu paketten sabit string olarak gelir (SQL enjeksiyonu
+	// yüzeyi yok); yine de beklenen değerlerle sınırlanır.
+	switch kolon {
+	case "max_customer", "max_domain":
+	default:
+		return 0, fmt.Errorf("bilinmeyen limit kolonu: %s", kolon)
+	}
+	var v int
+	err := db.QueryRowContext(ctx,
+		`SELECT `+kolon+` FROM reseller_limits WHERE user_id=?`, bayiUserID).Scan(&v)
+	if err != nil {
+		return 0, nil // satır yok = sınırsız
+	}
+	return v, nil
+}
+
 // CheckDomainEklenebilir: customer_id varsa onun plan.max_domain'ine bak
 func CheckDomainEklenebilir(ctx context.Context, db *sql.DB, customerID *int64) error {
 	if customerID == nil {

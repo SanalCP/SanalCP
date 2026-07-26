@@ -20,6 +20,7 @@ import (
 	"sanalpanel/internal/kaynaklimit"
 	"sanalpanel/internal/kota"
 	"sanalpanel/internal/mail"
+	"sanalpanel/internal/middleware"
 	"sanalpanel/internal/provisioner"
 	"sanalpanel/internal/redis"
 
@@ -85,7 +86,12 @@ func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 }
 
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.QueryContext(r.Context(), selectAll+" ORDER BY d.id DESC")
+	// Kapsam daraltması sorgunun İÇİNDE yapılır: admin tüm domainleri görür,
+	// bayi yalnız kendi müşterilerininkini, müşteri yalnız kendi domainini.
+	// Satır satır sahiplik kontrolü burada işe yaramaz — filtrelenmemiş bir
+	// liste zaten tüm tenant adlarını sızdırırdı.
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	rows, err := h.DB.QueryContext(r.Context(), selectAll+kosul+" ORDER BY d.id DESC", arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı hatası: "+err.Error())
 		return
@@ -175,6 +181,23 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	if err := kota.CheckDomainEklenebilir(r.Context(), h.DB, nil); err != nil {
 		httpx.WriteError(w, http.StatusForbidden, err.Error())
 		return
+	}
+	// Bayi kotası: bayinin TÜM müşterilerindeki domain toplamını sınırlar
+	// (müşteri planındaki max_domain'den ayrı bir tavan).
+	if c := middleware.ClaimsFrom(r); c != nil && c.Role == middleware.RolBayi {
+		if err := kota.CheckBayiDomainEklenebilir(r.Context(), h.DB, c.UserID); err != nil {
+			httpx.WriteError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		// Bayi yalnız kendi müşterisine domain açabilir.
+		if req.CustomerID == nil {
+			httpx.WriteError(w, http.StatusBadRequest, "domain bir müşteriye bağlanmalı")
+			return
+		}
+		if !middleware.BayiMusterisiMi(r, c.UserID, *req.CustomerID) {
+			httpx.WriteError(w, http.StatusForbidden, "bu müşteriye erişim yok")
+			return
+		}
 	}
 	pr, err := provisioner.Provision(req.AlanAdi, req.PHPSurum)
 	if err != nil {
