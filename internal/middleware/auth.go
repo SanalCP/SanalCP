@@ -319,6 +319,16 @@ func KapsamSQL(r *http.Request, domainAlias string) (string, []any) {
 	return " WHERE 1 = 0", nil
 }
 
+// ClaimsContext: verilen context'e admin/bayi claim'lerini yerleştirir.
+//
+// RequireAuth bunu token doğruladıktan sonra kendisi yapar; bu dışa açık
+// biçim, kimlik bağlamını elle kurması gereken yerler içindir (başka
+// paketlerin yetki testleri gibi — claimsKey paket-özeldir ve dışarıdan
+// erişilemez). Üretim yolunda çağrılmaz.
+func ClaimsContext(ctx context.Context, c *auth.Claims) context.Context {
+	return context.WithValue(ctx, claimsKey, c)
+}
+
 func ClaimsFrom(r *http.Request) *auth.Claims {
 	v := r.Context().Value(claimsKey)
 	if v == nil {
