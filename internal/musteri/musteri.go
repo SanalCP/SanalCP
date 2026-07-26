@@ -140,7 +140,7 @@ func (h *Handlers) panelHesabiylaGiris(w http.ResponseWriter, r *http.Request, r
 
 	// Müşteri hesabının domainleri: kapsam token'a gömülmez, her istekte
 	// zincirden çözülür (bkz. middleware.MusteriKullanicisininDomainiMi).
-	// Buradaki liste yalnız arayüzün açılışta nereye gideceğini bilmesi için.
+	// Buradaki ilk domain yalnız arayüzün açılışta nereye gideceğini bilmesi için.
 	var ilkDomainID int64
 	var ilkAlanAdi string
 	_ = h.DB.QueryRowContext(r.Context(), `
@@ -149,6 +149,16 @@ func (h *Handlers) panelHesabiylaGiris(w http.ResponseWriter, r *http.Request, r
 		JOIN customers c ON c.id = d.customer_id
 		WHERE c.user_id = ?
 		ORDER BY d.id LIMIT 1`, uid).Scan(&ilkDomainID, &ilkAlanAdi)
+
+	// Hesabı var ama tanımlı hizmeti yok (ör. bayi hesabı açtı, henüz domain
+	// atamadı). Token verip arayüzü /abonelikler/0'a göndermek "domain
+	// bulunamadı" hatasıyla biterdi; nedeni açıkça söylemek daha doğru.
+	if ilkDomainID == 0 {
+		auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, false)
+		httpx.WriteError(w, http.StatusForbidden,
+			"hesabınıza tanımlı bir hizmet yok — sağlayıcınızla görüşün")
+		return true
+	}
 
 	tok, err := auth.Issue(h.Secret, 24*3600, uid, req.Kullanici, rol)
 	if err != nil {

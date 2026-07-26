@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
+import { useAuth } from '@/store/auth'
 import Breadcrumb from '@/components/Breadcrumb'
 import ListToolbar from '@/components/ListToolbar'
 import EmptyState from '@/components/EmptyState'
@@ -29,6 +30,7 @@ type Plan = {
 type Surum = { surum: string; aciklama?: string }
 
 export default function ServicePlansPage() {
+  const adminMi = useAuth((s) => s.kullanici?.rol) === 'admin'
   const [items, setItems] = useState<Plan[]>([])
   const [surumler, setSurumler] = useState<Surum[]>([])
   const [yuk, setYuk] = useState(true)
@@ -68,7 +70,7 @@ export default function ServicePlansPage() {
       </p>
 
       <ListToolbar
-        birincil={{ etiket: 'Plan Ekle', onClick: () => setModal({} as Plan) }}
+        birincil={adminMi ? { etiket: 'Plan Ekle', onClick: () => setModal({} as Plan) } : undefined}
         butonlar={[]}
       />
 
@@ -105,12 +107,16 @@ export default function ServicePlansPage() {
                 <Sat e="FTP" d={fmt(p.max_ftp, 'hesap')} />
               </dl>
 
-              <div className="mt-4 flex gap-2">
-                <Link to={`/araclar/paketler/${p.id}`} className="flex-1 text-center text-sm px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md">
-                  Detay & Kaynak Limitleri
-                </Link>
-                <button onClick={() => setSilinecek(p)} className="text-sm px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 rounded-md">Sil</button>
-              </div>
+              {/* Plan tanımı yöneticinin ürünüdür; bayi planları yalnız görür
+                  (sunucu tarafında da /plans yazma uçları AdminOnly). */}
+              {adminMi && (
+                <div className="mt-4 flex gap-2">
+                  <Link to={`/araclar/paketler/${p.id}`} className="flex-1 text-center text-sm px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md">
+                    Detay & Kaynak Limitleri
+                  </Link>
+                  <button onClick={() => setSilinecek(p)} className="text-sm px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 rounded-md">Sil</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
