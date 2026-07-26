@@ -40,6 +40,15 @@ const ROL_STIL: Record<string, string> = {
 type YeniHesap = { kullanici_adi: string; parola: string; eposta: string; ad_soyad: string; rol: string }
 const BOS: YeniHesap = { kullanici_adi: '', parola: '', eposta: '', ad_soyad: '', rol: 'user' }
 
+type BayiLimit = {
+  user_id: number
+  max_customer: number
+  max_domain: number
+  tanimli: boolean
+  mevcut_customer: number
+  mevcut_domain: number
+}
+
 export default function KullanicilarPage() {
   const benimRolum = useAuth((s) => s.kullanici?.rol)
   const benimID = useAuth((s) => s.kullanici?.id)
@@ -56,6 +65,9 @@ export default function KullanicilarPage() {
   const [parolaHedef, setParolaHedef] = useState<Kullanici | null>(null)
   const [yeniParola, setYeniParola] = useState('')
   const [silinecek, setSilinecek] = useState<Kullanici | null>(null)
+  const [limitHedef, setLimitHedef] = useState<Kullanici | null>(null)
+  const [limit, setLimit] = useState<BayiLimit | null>(null)
+  const [limitYukleniyor, setLimitYukleniyor] = useState(false)
 
   async function getir() {
     setYukleniyor(true)
@@ -104,6 +116,41 @@ export default function KullanicilarPage() {
       setYeniParola('')
     } catch (e) {
       setHata(apiHata(e, 'Parola sıfırlanamadı'))
+    } finally {
+      setKaydediliyor(false)
+    }
+  }
+
+  async function limitAc(k: Kullanici) {
+    setLimitHedef(k)
+    setLimit(null)
+    setLimitYukleniyor(true)
+    setHata(null)
+    try {
+      const r = await api.get<BayiLimit>(`/users/${k.id}/limitler`)
+      setLimit(r.data)
+    } catch (e) {
+      setHata(apiHata(e, 'Limitler okunamadı'))
+      setLimitHedef(null)
+    } finally {
+      setLimitYukleniyor(false)
+    }
+  }
+
+  async function limitKaydet() {
+    if (!limitHedef || !limit) return
+    setKaydediliyor(true)
+    setHata(null)
+    try {
+      await api.put(`/users/${limitHedef.id}/limitler`, {
+        max_customer: limit.max_customer,
+        max_domain: limit.max_domain,
+      })
+      setBasari(`${limitHedef.kullanici_adi} limitleri güncellendi.`)
+      setLimitHedef(null)
+      setLimit(null)
+    } catch (e) {
+      setHata(apiHata(e, 'Limitler kaydedilemedi'))
     } finally {
       setKaydediliyor(false)
     }
@@ -211,6 +258,12 @@ export default function KullanicilarPage() {
                         <button onClick={() => { setParolaHedef(k); setYeniParola('') }} className="text-xs text-brand-600 dark:text-brand-400 hover:underline mr-3">
                           Parola
                         </button>
+                        {/* Kota yalnız bayilerde anlamlı ve yalnız admin yönetir. */}
+                        {adminMiyim && k.rol === 'reseller' && (
+                          <button onClick={() => limitAc(k)} className="text-xs text-sky-600 dark:text-sky-400 hover:underline mr-3">
+                            Limitler
+                          </button>
+                        )}
                         {!korumali(k) && (
                           <>
                             <button onClick={() => durumDegistir(k)} className="text-xs text-amber-600 dark:text-amber-400 hover:underline mr-3">
@@ -326,6 +379,80 @@ export default function KullanicilarPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Bayi limitleri */}
+      <Modal acik={limitHedef !== null} baslik="Bayi Limitleri" onKapat={() => { setLimitHedef(null); setLimit(null) }}>
+        {limitYukleniyor ? (
+          <div className="py-8 text-center text-sm text-slate-400">Yükleniyor…</div>
+        ) : limit && limitHedef ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              <span className="font-mono">{limitHedef.kullanici_adi}</span> için üst sınırlar.
+              <span className="block mt-1 text-xs text-slate-500">
+                <strong>0 = sınırsız.</strong> İkisi de 0 ise limit kaydı tamamen kaldırılır.
+              </span>
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  En fazla müşteri
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={limit.max_customer}
+                  onChange={(e) => setLimit({ ...limit, max_customer: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  şu an {limit.mevcut_customer} kullanılıyor
+                  {limit.max_customer > 0 && limit.mevcut_customer > limit.max_customer && (
+                    <span className="text-amber-600 dark:text-amber-400"> — limit mevcut kullanımın altında</span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  En fazla domain
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={limit.max_domain}
+                  onChange={(e) => setLimit({ ...limit, max_domain: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  şu an {limit.mevcut_domain} kullanılıyor
+                  {limit.max_domain > 0 && limit.mevcut_domain > limit.max_domain && (
+                    <span className="text-amber-600 dark:text-amber-400"> — limit mevcut kullanımın altında</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {!limit.tanimli && (
+              <div className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
+                Bu bayi için tanımlı limit yok — şu anda sınırsız.
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400">
+              Limitin altına düşmek mevcut hesapları silmez; yalnız yeni ekleme engellenir.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => { setLimitHedef(null); setLimit(null) }} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                Vazgeç
+              </button>
+              <button onClick={limitKaydet} disabled={kaydediliyor} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
+                {kaydediliyor ? 'Kaydediliyor…' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       <ConfirmDialog

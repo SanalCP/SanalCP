@@ -431,6 +431,11 @@ func main() {
 				r.With(middleware.BayiVeUstu).Post("/users/{id}/parola", usersH.ParolaSifirla)
 				r.With(middleware.BayiVeUstu).Post("/users/{id}/durum", usersH.DurumDegistir)
 				r.With(middleware.BayiVeUstu).Delete("/users/{id}", usersH.Sil)
+				// Bayi kotaları: bayinin kendi limitini okumasına da izin
+				// verilmez — yazma yetki yükseltmesi, okuma ise o yükseltmenin
+				// hazırlığıdır; ikisi de admin'de kalır.
+				r.With(middleware.AdminOnly).Get("/users/{id}/limitler", usersH.LimitGetir)
+				r.With(middleware.AdminOnly).Put("/users/{id}/limitler", usersH.LimitKaydet)
 				r.With(middleware.BayiVeUstu).Get("/customers", accountsH.ListCustomers)
 				r.With(middleware.BayiVeUstu).Post("/customers", accountsH.CreateCustomer)
 				r.With(middleware.BayiVeUstu).Put("/customers/{id}", accountsH.UpdateCustomer)

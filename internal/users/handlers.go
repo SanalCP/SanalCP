@@ -435,6 +435,103 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "zincirleme": zincir})
 }
 
+// ---------- Bayi limitleri (reseller_limits) ----------
+//
+// 🔴 Bu iki uç YALNIZ ADMIN'e açıktır (bkz. cmd/server/main.go). Bayinin
+// kendi kotasını okuması zararsız görünse de yazması yetki yükseltmesidir;
+// ikisi de AdminOnly tutulur ki "okuma açık, yazma kapalı" gibi ince bir
+// ayrımın yanlış tarafına düşme riski olmasın.
+
+type BayiLimit struct {
+	UserID        int64 `json:"user_id"`
+	MaxMusteri    int   `json:"max_customer"`
+	MaxDomain     int   `json:"max_domain"`
+	TanimliMi     bool  `json:"tanimli"`         // reseller_limits satırı var mı
+	MevcutMusteri int   `json:"mevcut_customer"` // şu anki kullanım
+	MevcutDomain  int   `json:"mevcut_domain"`
+}
+
+// LimitGetir: GET /users/{id}/limitler
+func (h *Handlers) LimitGetir(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	var rol string
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT role FROM users WHERE id=?`, id).Scan(&rol); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "hesap bulunamadı")
+		return
+	}
+	if rol != middleware.RolBayi {
+		httpx.WriteError(w, http.StatusBadRequest, "limitler yalnız bayi hesapları için tanımlanır")
+		return
+	}
+
+	out := BayiLimit{UserID: id}
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT max_customer, max_domain FROM reseller_limits WHERE user_id=?`, id).
+		Scan(&out.MaxMusteri, &out.MaxDomain)
+	out.TanimliMi = err == nil // satır yoksa sınırsız
+
+	// Kullanım: limitin anlamlı olması için yanında gösterilir.
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM customers WHERE owner_user_id=?`, id).Scan(&out.MevcutMusteri)
+	_ = h.DB.QueryRowContext(r.Context(), `
+		SELECT COUNT(*) FROM domains d JOIN customers c ON c.id = d.customer_id
+		WHERE c.owner_user_id = ?`, id).Scan(&out.MevcutDomain)
+
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// LimitKaydet: PUT /users/{id}/limitler
+//
+// 0 = sınırsız (service_plans'taki kota sözleşmesiyle aynı). Her iki limit de
+// 0 verilirse satır silinir — "sınırsız" durumu tek biçimde (satır yok)
+// temsil edilsin, iki farklı gösterimi olmasın.
+func (h *Handlers) LimitKaydet(w http.ResponseWriter, r *http.Request) {
+	c := middleware.ClaimsFrom(r)
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+
+	var rol string
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT role FROM users WHERE id=?`, id).Scan(&rol); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "hesap bulunamadı")
+		return
+	}
+	if rol != middleware.RolBayi {
+		httpx.WriteError(w, http.StatusBadRequest, "limitler yalnız bayi hesapları için tanımlanır")
+		return
+	}
+
+	var b struct {
+		MaxMusteri int `json:"max_customer"`
+		MaxDomain  int `json:"max_domain"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
+	if b.MaxMusteri < 0 || b.MaxDomain < 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "limitler negatif olamaz (0 = sınırsız)")
+		return
+	}
+
+	if b.MaxMusteri == 0 && b.MaxDomain == 0 {
+		if _, err := h.DB.ExecContext(r.Context(),
+			`DELETE FROM reseller_limits WHERE user_id=?`, id); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "limitler kaldırılamadı")
+			return
+		}
+	} else if _, err := h.DB.ExecContext(r.Context(), `
+		INSERT INTO reseller_limits(user_id, max_customer, max_domain)
+		VALUES(?,?,?)
+		ON DUPLICATE KEY UPDATE max_customer=VALUES(max_customer), max_domain=VALUES(max_domain)`,
+		id, b.MaxMusteri, b.MaxDomain); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "limitler kaydedilemedi: "+err.Error())
+		return
+	}
+
+	auth.WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "bayi.limit", strconv.FormatInt(id, 10), true)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // Sil: DELETE /users/{id}
 func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	c := middleware.ClaimsFrom(r)
