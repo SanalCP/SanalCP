@@ -154,6 +154,21 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 					}
 					next.ServeHTTP(w, r)
 					return
+				case RolMusteri:
+					// users hesabıyla giren müşteri (Faz 5C). Eski FTP kimlikli
+					// oturumdan farkı: birden çok domaini olabilir, bu yüzden
+					// kapsam zincirden çözülür.
+					urlID, _ := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
+					if !MusteriKullanicisininDomainiMi(r, c.UserID, urlID) {
+						httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
+						return
+					}
+					if domainAskidaMi(r, urlID) {
+						httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
+						return
+					}
+					next.ServeHTTP(w, r)
+					return
 				default:
 					httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
 					return
@@ -172,13 +187,9 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 			// Askıya-alma zorlaması: askıdaki domain için müşteri token'ı (önceden
 			// verilmiş/hâlâ geçerli olsa bile) TÜM işlemlerde 403 alır. Admin bu
 			// bloktan önce (ClaimsFrom != nil) zaten geçmiştir; yönetici askıyı kaldırabilir.
-			if scopeDB != nil {
-				var askida int
-				if err := scopeDB.QueryRowContext(r.Context(),
-					`SELECT COALESCE(askida,0) FROM domains WHERE id=?`, mc.DomainID).Scan(&askida); err == nil && askida == 1 {
-					httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
-					return
-				}
+			if domainAskidaMi(r, mc.DomainID) {
+				httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
+				return
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -227,6 +238,45 @@ func BayiDomainiMi(r *http.Request, bayiUserID, domainID int64) bool {
 		FROM domains d
 		JOIN customers c ON c.id = d.customer_id
 		WHERE d.id = ? AND c.owner_user_id = ?`, domainID, bayiUserID).Scan(&n)
+	return err == nil && n > 0
+}
+
+// domainAskidaMi: domain askıya alınmış mı? Askı, müşteri tarafındaki TÜM
+// işlemleri kapatır (token önceden verilmiş ve hâlâ geçerli olsa bile).
+// Admin/bayi bu kontrolden önce geçer — askıyı kaldırabilmeleri gerekir.
+//
+// DB okunamazsa false döner: askı EK bir kısıttır, sahiplik doğrulaması zaten
+// yapılmıştır; burada fail-closed davranmak DB hıçkırığında tüm müşterileri
+// kilitlerdi.
+func domainAskidaMi(r *http.Request, domainID int64) bool {
+	if scopeDB == nil {
+		return false
+	}
+	var askida int
+	err := scopeDB.QueryRowContext(r.Context(),
+		`SELECT COALESCE(askida,0) FROM domains WHERE id=?`, domainID).Scan(&askida)
+	return err == nil && askida == 1
+}
+
+// MusteriKullanicisininDomainiMi: domain, verilen MÜŞTERİ HESABINA mi ait?
+//
+// Zincir: users.id -> customers.user_id -> domains.customer_id. Faz 5C'de
+// müşteriler users hesabına taşındı; eski FTP kimlikli oturumlar hâlâ tek bir
+// DomainID tasiyan MusteriClaims kullanir (bkz. MusteriScopeParam), ama users
+// hesabiyla giren bir musterinin BİRDEN ÇOK domaini olabilir — bu yuzden
+// kapsam token'dan degil zincirden cozulur.
+//
+// FAIL-CLOSED: DB okunamazsa false doner.
+func MusteriKullanicisininDomainiMi(r *http.Request, userID, domainID int64) bool {
+	if scopeDB == nil || userID <= 0 {
+		return false
+	}
+	var n int
+	err := scopeDB.QueryRowContext(r.Context(), `
+		SELECT COUNT(*)
+		FROM domains d
+		JOIN customers c ON c.id = d.customer_id
+		WHERE d.id = ? AND c.user_id = ?`, domainID, userID).Scan(&n)
 	return err == nil && n > 0
 }
 

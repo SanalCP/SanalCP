@@ -44,7 +44,19 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	// IP-başına pencereli kilide tabi.
 	ip := httpx.ClientIP(r)
 
-	// ftp_accounts'tan kontrol
+	// YOL 1 — panel hesabı (Faz 5C, users tablosu + bcrypt).
+	//
+	// Önce bu denenir; eşleşme yoksa aşağıdaki eski FTP yoluna düşülür.
+	// GEÇİŞ KÖPRÜSÜ: göçle üretilen hesapların password_hash'i boştur ve boş
+	// hash hiçbir parolayla eşleşmez, dolayısıyla parolası atanmamış müşteriler
+	// otomatik olarak FTP yoluna düşer. Panelden parola atandığı anda bu yol
+	// devreye girer — müşteri başına, kesintisiz geçiş.
+	if h.panelHesabiylaGiris(w, r, req, ip) {
+		return
+	}
+
+	// YOL 2 — eski FTP kimliği (Pure-FTPd cleartext). Bir sürüm daha korunacak,
+	// sonra kaldırılacak.
 	var ftpID, domainID int64
 	var passDB, alanAdi, status string
 	err := h.DB.QueryRowContext(r.Context(),
@@ -96,6 +108,65 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		"alan_adi":  alanAdi,
 		"kullanici": req.Kullanici,
 	})
+}
+
+// panelHesabiylaGiris: users tablosundaki müşteri hesabıyla giriş dener.
+//
+// false dönerse çağıran eski FTP yoluna düşer — yanıt YAZILMAMIŞ olur.
+// true dönerse yanıt yazılmıştır (başarı ya da hesap-askıda gibi kesin ret).
+//
+// Kimliği bulunamayan/parolası tutmayan hesap için sessizce false döner:
+// müşterinin panel hesabı henüz parolasızsa FTP kimliğiyle girmeye devam
+// edebilmelidir (geçiş köprüsü).
+func (h *Handlers) panelHesabiylaGiris(w http.ResponseWriter, r *http.Request, req loginReq, ip string) bool {
+	var (
+		uid     int64
+		hash    string
+		rol     string
+		durum   string
+		adSoyad string
+	)
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT id, password_hash, role, status, full_name FROM users WHERE username=?`,
+		req.Kullanici).Scan(&uid, &hash, &rol, &durum, &adSoyad)
+	if err != nil || rol != "user" || !auth.ParolaEslesiyorMu(hash, req.Parola) {
+		return false
+	}
+	if durum != "active" {
+		auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, false)
+		httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
+		return true
+	}
+
+	// Müşteri hesabının domainleri: kapsam token'a gömülmez, her istekte
+	// zincirden çözülür (bkz. middleware.MusteriKullanicisininDomainiMi).
+	// Buradaki liste yalnız arayüzün açılışta nereye gideceğini bilmesi için.
+	var ilkDomainID int64
+	var ilkAlanAdi string
+	_ = h.DB.QueryRowContext(r.Context(), `
+		SELECT d.id, d.alan_adi
+		FROM domains d
+		JOIN customers c ON c.id = d.customer_id
+		WHERE c.user_id = ?
+		ORDER BY d.id LIMIT 1`, uid).Scan(&ilkDomainID, &ilkAlanAdi)
+
+	tok, err := auth.Issue(h.Secret, 24*3600, uid, req.Kullanici, rol)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "token üretilemedi")
+		return true
+	}
+	auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, true)
+	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"token":        tok,
+		"bitis":        time.Now().Add(24 * time.Hour).Unix(),
+		"domain_id":    ilkDomainID,
+		"alan_adi":     ilkAlanAdi,
+		"kullanici":    req.Kullanici,
+		"panel_hesabi": true,
+	})
+	return true
 }
 
 // MusteriOnly: middleware — token tipi "musteri" ise ve domain_id path'le eşleşmiyorsa 403

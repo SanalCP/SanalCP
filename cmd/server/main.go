@@ -30,6 +30,7 @@ import (
 	"sanalpanel/internal/genelbakis"
 	"sanalpanel/internal/git"
 	githubpkg "sanalpanel/internal/github"
+	"sanalpanel/internal/gocis"
 	"sanalpanel/internal/guvenlikduvari"
 	"sanalpanel/internal/httpx"
 	"sanalpanel/internal/istatistik"
@@ -141,6 +142,11 @@ func main() {
 	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalpanel-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
 	mail.HealMailOnStartup(context.Background(), d)
+
+	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
+	// tenant yoksa sessizce çıkar. Üretilen panel hesapları parolasızdır, yani
+	// mevcut müşteriler FTP kimlikleriyle girmeye devam eder.
+	gocis.MusteriHesapGocu(context.Background(), d)
 
 	musteriH := &musteri.Handlers{DB: d, Secret: cfg.JWTSecret}
 	authH := &auth.Handlers{DB: d, Secret: cfg.JWTSecret, LifetimeSec: cfg.JWTLifetime}
