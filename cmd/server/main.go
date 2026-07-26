@@ -220,25 +220,32 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", usersH.Me)
-			r.With(middleware.AdminOnly).Put("/me", authH.ProfilGuncelle)
-			r.With(middleware.AdminOnly).Get("/dashboard-duzen", authH.DashboardDuzenGetir)
-			r.With(middleware.AdminOnly).Put("/dashboard-duzen", authH.DashboardDuzenKaydet)
-			r.With(middleware.AdminOnly).Post("/me/parola", authH.ParolaDegistir)
-			r.With(middleware.AdminOnly).Get("/me/2fa/setup", authH.TwoFASetup)
-			r.With(middleware.AdminOnly).Post("/me/2fa/enable", authH.TwoFAEnable)
-			r.With(middleware.AdminOnly).Post("/me/2fa/disable", authH.TwoFADisable)
+			// Kendi hesabı — her panel kullanıcısı (admin + bayi) kendi profilini,
+			// parolasını ve 2FA'sını yönetir. Kapsam sorusu yok: hedef daima
+			// token'daki kullanıcının kendisi.
+			r.With(middleware.BayiVeUstu).Put("/me", authH.ProfilGuncelle)
+			r.With(middleware.BayiVeUstu).Get("/dashboard-duzen", authH.DashboardDuzenGetir)
+			r.With(middleware.BayiVeUstu).Put("/dashboard-duzen", authH.DashboardDuzenKaydet)
+			r.With(middleware.BayiVeUstu).Post("/me/parola", authH.ParolaDegistir)
+			r.With(middleware.BayiVeUstu).Get("/me/2fa/setup", authH.TwoFASetup)
+			r.With(middleware.BayiVeUstu).Post("/me/2fa/enable", authH.TwoFAEnable)
+			r.With(middleware.BayiVeUstu).Post("/me/2fa/disable", authH.TwoFADisable)
+			// NOT: /domains listesi bayiye ancak kapsam filtresi (Faz 5D) geldikten
+			// sonra açılabilir — filtresiz açmak bayiye TÜM domainleri gösterir.
 			r.With(middleware.AdminOnly).Get("/domains", domainsH.List)
 			r.With(middleware.MusteriScope).Get("/domains/{id}", domainsH.Get)
-			r.With(middleware.AdminOnly).Get("/system/usage", system.Handler)
-			r.With(middleware.AdminOnly).Get("/system/servisler", system.ServisDurumlar)
+			// Salt-okunur sunucu durumu — bayi destek verebilsin diye görünür
+			// (kullanıcı kararı, Faz 5 planı); değiştiren uçlar AdminOnly'de kalır.
+			r.With(middleware.BayiVeUstu).Get("/system/usage", system.Handler)
+			r.With(middleware.BayiVeUstu).Get("/system/servisler", system.ServisDurumlar)
 			r.With(middleware.AdminOnly).Post("/system/servis-islem", system.ServisIslem)
-			r.With(middleware.AdminOnly).Get("/system/guncelleme", system.GuncellemeDurum)
+			r.With(middleware.BayiVeUstu).Get("/system/guncelleme", system.GuncellemeDurum)
 			r.With(middleware.AdminOnly).Post("/system/guncelleme/baslat", system.GuncellemeBaslat)
 			r.With(middleware.AdminOnly).Get("/system/guncelleme/log", system.GuncellemeLog)
-			r.With(middleware.AdminOnly).Get("/system/optimize", system.OptimizeDurum)
+			r.With(middleware.BayiVeUstu).Get("/system/optimize", system.OptimizeDurum)
 			r.With(middleware.AdminOnly).Post("/system/optimize/baslat", system.OptimizeBaslat)
 			r.With(middleware.AdminOnly).Get("/system/optimize/log", system.OptimizeLog)
-			r.With(middleware.AdminOnly).Get("/system/surum-kontrol", system.SurumKontrolDurum)
+			r.With(middleware.BayiVeUstu).Get("/system/surum-kontrol", system.SurumKontrolDurum)
 			r.With(middleware.AdminOnly).Post("/system/surum-kontrol/yenile", system.SurumKontrolYenile)
 			r.With(middleware.AdminOnly).Get("/system/cve", system.CveDurum)
 			r.With(middleware.AdminOnly).Post("/system/cve/guncelle", system.CveGuncelle)
@@ -250,8 +257,10 @@ func main() {
 			r.With(middleware.AdminOnly).Post("/system/panel-domain", panelAyarH.Kaydet)
 			r.With(middleware.AdminOnly).Delete("/system/panel-domain", panelAyarH.Kaldir)
 			eklentiH.Routes(r)
+			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
+			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.
 			r.With(middleware.AdminOnly).Get("/system/processes", monitor.Processes)
-			r.With(middleware.AdminOnly).Get("/system/load-history", monitorH.YukGecmisi)
+			r.With(middleware.BayiVeUstu).Get("/system/load-history", monitorH.YukGecmisi)
 			r.With(middleware.AdminOnly).Get("/admin/system/loglar", monitorH.SunucuLog)
 			r.With(middleware.MusteriScope).Get("/domains/{id}/health", monitorH.Health)
 
@@ -366,8 +375,10 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/logs/oku", logsH.Read)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/logs/canli", logsH.Tail)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/disk-hesapla", domainsH.DiskHesapla)
-				r.With(middleware.AdminOnly).Get("/plans", plansH.List)
-				r.With(middleware.AdminOnly).Get("/plans/{id}", plansH.Get)
+				// Plan okuma bayiye açık (müşterisine plan atayabilmesi için);
+				// plan oluşturma/düzenleme admin'in ürün tanımıdır.
+				r.With(middleware.BayiVeUstu).Get("/plans", plansH.List)
+				r.With(middleware.BayiVeUstu).Get("/plans/{id}", plansH.Get)
 				r.With(middleware.AdminOnly).Post("/plans", plansH.Create)
 				r.With(middleware.AdminOnly).Put("/plans/{id}", plansH.Update)
 				r.With(middleware.AdminOnly).Delete("/plans/{id}", plansH.Delete)
@@ -385,7 +396,7 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/dnssec", dnsH.GetDNSSEC)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/dnssec", dnsH.PostDNSSEC)
 				// Merkezi DNS şablonu (admin) — domain eklerken + "Şablonu Uygula" bunu okur
-				r.With(middleware.AdminOnly).Get("/dns-template", dnsH.GetTemplate)
+				r.With(middleware.BayiVeUstu).Get("/dns-template", dnsH.GetTemplate)
 				r.With(middleware.AdminOnly).Put("/dns-template", dnsH.PutTemplate)
 				// Sunucu geneli özet listeler (salt-okunur) — panelin sol menüsündeki
 				// DNS / SSL / E-posta / Veritabanları sayfaları bunları okur.
@@ -447,7 +458,9 @@ func main() {
 				r.With(middleware.AdminOnly).Put("/domains/{id}/vhost-ozel", nginxsetH.SetVhostOzel)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/waf", wafH.Goster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/waf", wafH.Kaydet)
-				r.With(middleware.AdminOnly).Get("/php-extensions", phpExtH.List)
+				// PHP sürüm/modül LİSTESİ bayiye açık (müşteri domaininin PHP
+				// ayarını yaparken gerekli); kurulum/kaldırma sunucu değiştirir.
+				r.With(middleware.BayiVeUstu).Get("/php-extensions", phpExtH.List)
 				r.With(middleware.AdminOnly).Put("/php-extensions/toggle", phpExtH.Toggle)
 				r.With(middleware.AdminOnly).Post("/php-extensions/pecl-install", phpExtH.PECLKur)
 				r.With(middleware.AdminOnly).Post("/php-extensions/pecl-uninstall", phpExtH.PECLSil)
@@ -460,7 +473,7 @@ func main() {
 				r.With(middleware.AdminOnly).Post("/paketler/kur", paketlerH.Kur)
 				r.With(middleware.AdminOnly).Post("/paketler/kaldir", paketlerH.Kaldir)
 				r.With(middleware.AdminOnly).Post("/paketler/guncelle", paketlerH.Guncelle)
-				r.With(middleware.AdminOnly).Get("/php-surumler", phpSurumH.Liste)
+				r.With(middleware.BayiVeUstu).Get("/php-surumler", phpSurumH.Liste)
 				r.With(middleware.AdminOnly).Post("/php-surumler/kur", phpSurumH.Kur)
 				r.With(middleware.AdminOnly).Post("/php-surumler/kaldir", phpSurumH.Kaldir)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/git", gitH.Sil)
