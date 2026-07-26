@@ -12,6 +12,7 @@ import (
 
 	"sanalpanel/internal/auth"
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/kota"
 	"sanalpanel/internal/middleware"
 )
 
@@ -199,6 +200,14 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusForbidden, "bayi yalnız müşteri hesabı açabilir")
 			return
 		}
+		// Kota TEK sayaçtan geçer: "müşteri" = customers kaydıdır. Bayinin
+		// açtığı her müşteri hesabı aşağıda kendi customers kaydını da ürettiği
+		// için burada da aynı limit sorulur; iki ayrı sayaç kullanmak bayinin
+		// limiti iki kapıdan (bir kayıt + bir hesap) aşmasına izin verirdi.
+		if err := kota.CheckBayiMusteriEklenebilir(r.Context(), h.DB, c.UserID); err != nil {
+			httpx.WriteError(w, http.StatusForbidden, err.Error())
+			return
+		}
 	default:
 		httpx.WriteError(w, http.StatusForbidden, "yetkiniz yok")
 		return
@@ -230,6 +239,29 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+
+	// Bayinin açtığı müşteri hesabı, sahiplik zincirinin tamamlanması için
+	// kendi customers kaydını da alır: domain -> customer -> bayi. Zincir
+	// kurulmazsa hesap açılır ama bayi ona domain bağlayamaz (Create,
+	// BayiMusterisiMi ile kendi müşterisini arar) ve kota sayacı da şaşar.
+	// Faz 5C göçünün ürettiği yapıyla aynı biçim.
+	if c.Role == middleware.RolBayi && b.Rol == middleware.RolMusteri {
+		ad := strings.TrimSpace(b.AdSoyad)
+		if ad == "" {
+			ad = b.KullaniciAdi
+		}
+		if _, err := h.DB.ExecContext(r.Context(),
+			`INSERT INTO customers(ad, eposta, durum, notlar, user_id, owner_user_id)
+			 VALUES(?,?, 'aktif', 'bayi tarafından oluşturuldu', ?, ?)`,
+			ad, strings.TrimSpace(b.Eposta), id, c.UserID); err != nil {
+			// Hesap açıldı ama zincir kurulamadı — sessiz bırakmak sonradan
+			// "domain bağlayamıyorum" olarak ortaya çıkardı.
+			httpx.WriteError(w, http.StatusInternalServerError,
+				"hesap açıldı ancak müşteri kaydı oluşturulamadı: "+err.Error())
+			return
+		}
+	}
+
 	auth.WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "user.olustur", b.KullaniciAdi, true)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
@@ -378,8 +410,29 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "durum değiştirilemedi")
 		return
 	}
+
+	// Zincirleme askı: bir bayi askıya alınınca altındaki müşteri hesapları da
+	// giriş yapamamalı — aksi hâlde bayi kapatılır ama müşterileri panele
+	// girmeye devam eder. Geri alma da zincirlemedir.
+	//
+	// NOT: Yalnız PANEL GİRİŞİ etkilenir. Sitelerin yayını domains.askida ile
+	// yönetilir ve buradan değiştirilmez; hizmeti kesmek ayrı ve bilinçli bir
+	// karardır.
+	var hedefRol string
+	_ = h.DB.QueryRowContext(r.Context(), `SELECT role FROM users WHERE id=?`, id).Scan(&hedefRol)
+	var zincir int64
+	if hedefRol == middleware.RolBayi {
+		res, err := h.DB.ExecContext(r.Context(),
+			`UPDATE users SET status=?, updated_at=NOW() WHERE reseller_id=?`, b.Durum, id)
+		if err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "bağlı hesapların durumu değiştirilemedi")
+			return
+		}
+		zincir, _ = res.RowsAffected()
+	}
+
 	auth.WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "user.durum", strconv.FormatInt(id, 10), true)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "zincirleme": zincir})
 }
 
 // Sil: DELETE /users/{id}
