@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -192,4 +193,92 @@ func WriteAudit(db *sql.DB, uid int64, username, ip, action, target string, ok b
 		`INSERT INTO audit_log(actor_user_id, actor_username, ip, action, target, ok)
 		 VALUES(?,?,?,?,?,?)`,
 		uidVal, username, ip, action, target, okv)
+}
+
+// AuditKayit — güvenlik günlüğü satırı (yalnız okuma).
+type AuditKayit struct {
+	ID        int64  `json:"id"`
+	Zaman     string `json:"zaman"`
+	Kullanici string `json:"kullanici"`
+	IP        string `json:"ip"`
+	Eylem     string `json:"eylem"`
+	Hedef     string `json:"hedef"`
+	Basarili  bool   `json:"basarili"`
+}
+
+// AuditListe: audit_log'u tersten (en yeni önce) döndürür.
+//
+// Tablo yıllardır yazılıyordu ama okunacak bir uç yoktu — başarısız giriş
+// denemelerini görmek için sunucuya SSH ile girip MySQL sorgulamak gerekiyordu.
+//
+// Filtreler: ?limit=N (varsayılan 200, tavan 1000), ?eylem=auth.login,
+// ?sadece_hata=1. Tarih aralığı yerine limit tercih edildi — bu ekranın işi
+// "son ne oldu", arşiv analizi değil.
+func (h *Handlers) AuditListe(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if s := r.URL.Query().Get("limit"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	q := `SELECT id, DATE_FORMAT(ts, '%Y-%m-%d %H:%i:%s'), actor_username, ip, action, target, ok
+	      FROM audit_log`
+	kosul := make([]string, 0, 2)
+	arg := make([]any, 0, 3)
+	if e := strings.TrimSpace(r.URL.Query().Get("eylem")); e != "" {
+		kosul = append(kosul, "action = ?")
+		arg = append(arg, e)
+	}
+	if r.URL.Query().Get("sadece_hata") == "1" {
+		kosul = append(kosul, "ok = 0")
+	}
+	if len(kosul) > 0 {
+		q += " WHERE " + strings.Join(kosul, " AND ")
+	}
+	q += " ORDER BY id DESC LIMIT ?"
+	arg = append(arg, limit)
+
+	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+
+	out := make([]AuditKayit, 0)
+	for rows.Next() {
+		var k AuditKayit
+		var okv int
+		if err := rows.Scan(&k.ID, &k.Zaman, &k.Kullanici, &k.IP, &k.Eylem, &k.Hedef, &okv); err != nil {
+			continue
+		}
+		k.Basarili = okv == 1
+		out = append(out, k)
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// AuditEylemler: filtre açılır listesini doldurmak için tablodaki farklı
+// eylem adları (sabit liste tutmak yerine — yeni eylem eklendikçe kendiliğinden
+// görünür).
+func (h *Handlers) AuditEylemler(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.DB.QueryContext(r.Context(),
+		`SELECT DISTINCT action FROM audit_log ORDER BY action`)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+	out := make([]string, 0)
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err == nil {
+			out = append(out, a)
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
 }

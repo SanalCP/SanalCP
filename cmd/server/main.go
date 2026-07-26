@@ -27,6 +27,7 @@ import (
 	"sanalpanel/internal/domains"
 	"sanalpanel/internal/eklenti"
 	"sanalpanel/internal/files"
+	"sanalpanel/internal/genelbakis"
 	"sanalpanel/internal/git"
 	githubpkg "sanalpanel/internal/github"
 	"sanalpanel/internal/guvenlikduvari"
@@ -150,6 +151,7 @@ func main() {
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
 	dnsH := &dns.Handlers{DB: d}
+	genelH := &genelbakis.Handlers{DB: d}
 	accountsH := &accounts.Handlers{DB: d}
 	backupsH := &backups.Handlers{DB: d}
 	backups.StartScheduler(d)
@@ -385,6 +387,12 @@ func main() {
 				// Merkezi DNS şablonu (admin) — domain eklerken + "Şablonu Uygula" bunu okur
 				r.With(middleware.AdminOnly).Get("/dns-template", dnsH.GetTemplate)
 				r.With(middleware.AdminOnly).Put("/dns-template", dnsH.PutTemplate)
+				// Sunucu geneli özet listeler (salt-okunur) — panelin sol menüsündeki
+				// DNS / SSL / E-posta / Veritabanları sayfaları bunları okur.
+				r.With(middleware.AdminOnly).Get("/genel/dns", genelH.DNS)
+				r.With(middleware.AdminOnly).Get("/genel/ssl", genelH.SSL)
+				r.With(middleware.AdminOnly).Get("/genel/mail", genelH.Mail)
+				r.With(middleware.AdminOnly).Get("/genel/veritabanlari", genelH.Veritabanlari)
 				// Domain askıya al / geri al (suspend)
 				r.With(middleware.AdminOnly).Post("/domains/{id}/askiya-al", domainsH.AskiyaAl)
 				r.With(middleware.AdminOnly).Post("/domains/{id}/askidan-al", domainsH.AskidanAl)
@@ -393,6 +401,10 @@ func main() {
 					n := istatistik.AggregateAll(d)
 					httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "islenen_domain": n})
 				})
+				// Güvenlik günlüğü (salt-okunur) — audit_log yıllardır yazılıyordu
+				// ama okunacak uç yoktu.
+				r.With(middleware.AdminOnly).Get("/audit", authH.AuditListe)
+				r.With(middleware.AdminOnly).Get("/audit/eylemler", authH.AuditEylemler)
 				r.With(middleware.AdminOnly).Get("/customers", accountsH.ListCustomers)
 				r.With(middleware.AdminOnly).Post("/customers", accountsH.CreateCustomer)
 				r.With(middleware.AdminOnly).Put("/customers/{id}", accountsH.UpdateCustomer)
