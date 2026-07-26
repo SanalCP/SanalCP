@@ -151,6 +151,15 @@ bekle 403 "bayi bayi hesabı açamaz" -X POST -H "$AA" -H 'Content-Type: applica
   -d '{"kullanici_adi":"zz_sahte_bayi","parola":"UzunParola123","rol":"reseller"}' "$URL/users"
 
 echo
+echo "== 5b. Bayi KENDİ kotasını okuyamaz/değiştiremez =="
+A_ID=$(mysql -N -B -e "SELECT id FROM users WHERE username='$BAYI_A'" "$DB")
+bekle 403 "bayi kendi limitini okuyamaz" -H "$AA" "$URL/users/$A_ID/limitler"
+bekle 403 "bayi kendi limitini yükseltemez" -X PUT -H "$AA" -H 'Content-Type: application/json' \
+  -d '{"max_customer":9999,"max_domain":9999}' "$URL/users/$A_ID/limitler"
+bekle 403 "bayi başka bayinin limitini göremez" -H "$AA" \
+  "$URL/users/$(mysql -N -B -e "SELECT id FROM users WHERE username='$BAYI_B'" "$DB")/limitler"
+
+echo
 echo "== 6. root hesabı dokunulmaz =="
 bekle 403 "bayi root'u silemez" -X DELETE -H "$AA" "$URL/users/1"
 bekle 403 "bayi root'u askıya alamaz" -X POST -H "$AA" -H 'Content-Type: application/json' \
