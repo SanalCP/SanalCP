@@ -81,11 +81,46 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 	}
 }
 
-// AdminOnly: yalnız admin token'ı geçer (müşteri olduğunda 403)
+// Rol sabitleri — users.role ENUM('admin','reseller','user') ile birebir.
+const (
+	RolAdmin   = "admin"
+	RolBayi    = "reseller"
+	RolMusteri = "user"
+)
+
+// AdminOnly: yalnız rol=admin geçer.
+//
+// 🔴 GÜVENLİK: Bu fonksiyon eskiden yalnız "admin tipi token var mı" diye
+// bakıyordu (ClaimsFrom(r) == nil), rolü hiç okumuyordu. Tek token tipi
+// üretildiği sürece (root → rol=admin) zararsızdı; ama bayi hesaplarına
+// auth.Claims verildiği anda 87 admin ucunun tamamı — güvenlik duvarı, servis
+// yeniden başlatma, paket kurulumu dahil — bayiye açılırdı. Rol kontrolü
+// çok kullanıcılı desteğin ÖNKOŞULUDUR, sonradan eklenecek bir iyileştirme
+// değil.
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ClaimsFrom(r) == nil {
+		c := ClaimsFrom(r)
+		if c == nil || c.Role != RolAdmin {
 			httpx.WriteError(w, http.StatusForbidden, "sadece yöneticiler için")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// BayiVeUstu: rol=admin veya rol=reseller geçer.
+//
+// İki tür uçta kullanılır:
+//   - Hesap işlemleri (domain, müşteri, DNS, SSL...) — bayi KENDİ kapsamında;
+//     kapsam daraltması ayrıca DomainKapsam/MusteriKapsam ile yapılır, bu
+//     middleware yalnız "rol yeterli mi" sorusunu yanıtlar.
+//   - Salt-okunur sunucu bilgisi (servis durumu, yük, sürüm) — bayinin destek
+//     verebilmesi için görünür, ama değiştiren uçlar AdminOnly'de kalır.
+func BayiVeUstu(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c := ClaimsFrom(r)
+		if c == nil || (c.Role != RolAdmin && c.Role != RolBayi) {
+			httpx.WriteError(w, http.StatusForbidden, "bu işlem için yetkiniz yok")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -101,9 +136,28 @@ func MusteriScope(next http.Handler) http.Handler {
 func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if ClaimsFrom(r) != nil {
-				next.ServeHTTP(w, r) // admin
-				return
+			// 🔴 GÜVENLİK: burada eskiden yalnız "ClaimsFrom(r) != nil" vardı,
+			// yani auth.Claims taşıyan HER token admin muamelesi görüp kapsam
+			// denetimini atlıyordu. Bayi token'ları da auth.Claims olduğu için
+			// bu, 141 müşteri-kapsamlı ucun tamamına kapsamsız erişim demekti —
+			// AdminOnly'deki aynı hatanın daha geniş yüzeyli ikizi.
+			if c := ClaimsFrom(r); c != nil {
+				switch c.Role {
+				case RolAdmin:
+					next.ServeHTTP(w, r) // admin: tüm domainler
+					return
+				case RolBayi:
+					urlID, _ := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
+					if !BayiDomainiMi(r, c.UserID, urlID) {
+						httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
+						return
+					}
+					next.ServeHTTP(w, r)
+					return
+				default:
+					httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
+					return
+				}
 			}
 			mc := MusteriClaimsFrom(r)
 			if mc == nil {
@@ -133,6 +187,7 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 
 // DomainSahibiMi: verilen domain ID cagirana ait mi? Merkezi sahiplik denetimi.
 //   - Admin token   => her zaman true (tum domainlere erisir).
+//   - Bayi token    => domain, bayinin yonettigi bir musteriye aitse true.
 //   - Musteri token => yalniz kendi DomainID'siyle eslesiyorsa true.
 //   - Kimlik yoksa   => false.
 //
@@ -140,13 +195,78 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 // bulunmayan (or. {dbId} gibi turev kaynak) uclarda, kaynagin domain_id'si DB'den
 // cozuldukten sonra bu fonksiyonla sahiplik dogrulanir.
 func DomainSahibiMi(r *http.Request, domainID int64) bool {
-	if ClaimsFrom(r) != nil {
-		return true // admin: tum domainlere erisir
+	if c := ClaimsFrom(r); c != nil {
+		if c.Role == RolAdmin {
+			return true // admin: tum domainlere erisir
+		}
+		if c.Role == RolBayi {
+			return BayiDomainiMi(r, c.UserID, domainID)
+		}
+		return false
 	}
 	if mc := MusteriClaimsFrom(r); mc != nil {
 		return mc.DomainID == domainID
 	}
 	return false
+}
+
+// BayiDomainiMi: domain, verilen bayinin yonettigi bir musteriye mi ait?
+//
+// Sahiplik zinciri tek yerde cozulur: domains.customer_id -> customers.owner_user_id.
+// Yetki karari her zaman DB'den okunur, token'daki bir listeden degil — bayi
+// bir musteriyi devrettiginde/kaybettiginde eski token aninda gecersizlesmelidir.
+//
+// FAIL-CLOSED: DB okunamazsa false doner (erisim reddedilir).
+func BayiDomainiMi(r *http.Request, bayiUserID, domainID int64) bool {
+	if scopeDB == nil || bayiUserID <= 0 {
+		return false
+	}
+	var n int
+	err := scopeDB.QueryRowContext(r.Context(), `
+		SELECT COUNT(*)
+		FROM domains d
+		JOIN customers c ON c.id = d.customer_id
+		WHERE d.id = ? AND c.owner_user_id = ?`, domainID, bayiUserID).Scan(&n)
+	return err == nil && n > 0
+}
+
+// BayiMusterisiMi: musteri kaydi verilen bayiye mi ait? (customers uzerinde
+// islem yapan uclar icin — domain zincirine girmeden.)
+func BayiMusterisiMi(r *http.Request, bayiUserID, customerID int64) bool {
+	if scopeDB == nil || bayiUserID <= 0 {
+		return false
+	}
+	var n int
+	err := scopeDB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM customers WHERE id = ? AND owner_user_id = ?`,
+		customerID, bayiUserID).Scan(&n)
+	return err == nil && n > 0
+}
+
+// KapsamSQL: liste uclari icin WHERE parcasi ve argumani uretir.
+//
+// Liste uclarinda tek tek sahiplik dogrulamak ise yaramaz — sorgunun kendisi
+// daraltilmali, yoksa bayi TUM kayitlari goren bir liste alir. Kullanim:
+//
+//	kosul, arg := middleware.KapsamSQL(r, "d")
+//	sorgu := "SELECT ... FROM domains d " + kosul
+//
+// Admin icin bos string doner (daraltma yok). Bayi icin customers JOIN'i
+// gerektiren bir EXISTS kosulu doner. Musteri/kimliksiz icin hicbir satirin
+// eslesmedigi bir kosul doner (fail-closed).
+func KapsamSQL(r *http.Request, domainAlias string) (string, []any) {
+	c := ClaimsFrom(r)
+	if c != nil && c.Role == RolAdmin {
+		return "", nil
+	}
+	if c != nil && c.Role == RolBayi {
+		return " WHERE EXISTS (SELECT 1 FROM customers kc WHERE kc.id = " +
+			domainAlias + ".customer_id AND kc.owner_user_id = ?)", []any{c.UserID}
+	}
+	if mc := MusteriClaimsFrom(r); mc != nil {
+		return " WHERE " + domainAlias + ".id = ?", []any{mc.DomainID}
+	}
+	return " WHERE 1 = 0", nil
 }
 
 func ClaimsFrom(r *http.Request) *auth.Claims {
