@@ -49,6 +49,12 @@ import CPanelGirisPage from '@/pages/CPanelGirisPage'
 import IstatistiklerPage from '@/pages/IstatistiklerPage'
 import IzlemePage from '@/pages/IzlemePage'
 import YakindaPage from '@/pages/YakindaPage'
+import DNSGenelPage from '@/pages/DNSGenelPage'
+import SSLGenelPage from '@/pages/SSLGenelPage'
+import MailGenelPage from '@/pages/MailGenelPage'
+import VeritabanlariGenelPage from '@/pages/VeritabanlariGenelPage'
+import MusterilerPage from '@/pages/MusterilerPage'
+import GuvenlikGunluguPage from '@/pages/GuvenlikGunluguPage'
 
 function GuardedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuth((s) => s.token)
@@ -108,6 +114,17 @@ export default function App() {
         <Route path="araclar/dns-sablonu"            element={<DNSSablonuPage />} />
         <Route path="abonelikler/:id/:slug" element={<ToolPage />} />
         <Route path="hizmet-planlari"      element={<ServicePlansPage />} />
+
+        {/* Sunucu geneli özet listeler (Faz 3) — domain kapsamlı sayfaların
+            karşılığı; düzenleme hâlâ /abonelikler/:id/* altında yapılır. */}
+        <Route path="dns"            element={<DNSGenelPage />} />
+        <Route path="ssl"            element={<SSLGenelPage />} />
+        <Route path="mail"           element={<MailGenelPage />} />
+        <Route path="veritabanlari"  element={<VeritabanlariGenelPage />} />
+
+        {/* Faz 4 — yönetim ekranları */}
+        <Route path="musteriler"        element={<MusterilerPage />} />
+        <Route path="guvenlik-gunlugu"  element={<GuvenlikGunluguPage />} />
 
         <Route path="araclar-ayarlar" element={<AraclarAyarlarPage />} />
         <Route path="istatistikler" element={<IstatistiklerPage />} />
