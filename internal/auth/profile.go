@@ -95,6 +95,10 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi: "+strings.TrimSpace(string(out)))
 			return
 		}
+		if _, err := h.DB.Exec(`UPDATE users SET auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, c.UserID); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "oturumlar sonlandırılamadı")
+			return
+		}
 		WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", true)
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
@@ -115,7 +119,7 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?`, yeniHash, c.UserID); err != nil {
+	if _, err := h.DB.Exec(`UPDATE users SET password_hash=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, yeniHash, c.UserID); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi")
 		return
 	}
@@ -164,7 +168,7 @@ func (h *Handlers) TwoFAEnable(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "kod doğrulanamadı — uygulamadaki 6 haneli kodu girin")
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET totp_secret=?, totp_enabled=1 WHERE id=?`, b.Secret, c.UserID); err != nil {
+	if _, err := h.DB.Exec(`UPDATE users SET totp_secret=?, totp_enabled=1, auth_version=auth_version+1 WHERE id=?`, b.Secret, c.UserID); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "kaydedilemedi")
 		return
 	}
@@ -189,7 +193,7 @@ func (h *Handlers) TwoFADisable(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "kod doğrulanamadı")
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET totp_secret='', totp_enabled=0 WHERE id=?`, c.UserID); err != nil {
+	if _, err := h.DB.Exec(`UPDATE users SET totp_secret='', totp_enabled=0, auth_version=auth_version+1 WHERE id=?`, c.UserID); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "kapatılamadı")
 		return
 	}

@@ -4,6 +4,7 @@ frontend/dist/
 frontend/.vite/
 npm-debug.log*
 yarn-error.log*
+/.tools/
 
 # --- Go build çıktıları (kök seviyede yerel derleme) ---
 /sanalpanel-server

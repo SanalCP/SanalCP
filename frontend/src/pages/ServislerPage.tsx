@@ -68,7 +68,7 @@ export default function ServislerPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="w-full max-w-[1600px] px-6 py-5">
       <Breadcrumb items={[
         { etiket: 'Araçlar & Ayarlar', href: '/araclar-ayarlar' },
         { etiket: 'Servisler' },

@@ -2,8 +2,10 @@ package backups
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,19 +19,26 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Restore: POST /api/v1/domains/:id/backups/:bid/geriyukle
-// tar -xzf .. + mysql import (eger dump.sql varsa).
-// Tehlikeli: mevcut public_html ezilir, DB tablolari yeniden olusur.
+type restoreRequest struct {
+	Scope    string `json:"scope"`    // full | files | file | database | email
+	Path     string `json:"path"`     // file: /home/<sk> altındaki göreli yol
+	Database string `json:"database"` // database: hedef DB adı
+}
+
+// Restore supports a complete account restore as well as web files, one file,
+// one database, or Maildir-only recovery. An empty body remains "full" for API
+// backwards compatibility.
 func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
 
-	var sk, dosya, alanAdi string
+	var sk, dosya, alanAdi, uzakDurum string
 	var isDemo int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT d.sistem_kullanici, d.alan_adi, d.is_demo, b.dosya FROM backups b
-		 JOIN domains d ON d.id=b.domain_id
-		 WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&sk, &alanAdi, &isDemo, &dosya)
+		`SELECT d.sistem_kullanici, d.alan_adi, d.is_demo, b.dosya, b.uzak_durum
+		 FROM backups b JOIN domains d ON d.id=b.domain_id
+		 WHERE b.id=? AND b.domain_id=?`, bid, id).
+		Scan(&sk, &alanAdi, &isDemo, &dosya, &uzakDurum)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
 		return
@@ -47,22 +56,35 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	abs := filepath.Join(BackupRoot, sk, dosya)
-	if _, err := os.Stat(abs); err != nil {
-		httpx.WriteError(w, http.StatusNotFound, "yedek dosyası diskte bulunamadı")
+	req := restoreRequest{Scope: "full"}
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			httpx.WriteError(w, http.StatusBadRequest, "geçersiz geri yükleme isteği")
+			return
+		}
+	}
+	if req.Scope == "" {
+		req.Scope = "full"
+	}
+	switch req.Scope {
+	case "full", "files", "file", "database", "email":
+	default:
+		httpx.WriteError(w, http.StatusBadRequest, "scope: full|files|file|database|email")
 		return
 	}
 
-	// Geçici extract dizini
-	tmpDir, _ := os.MkdirTemp("", "sanal-restore-*")
+	abs, err := ensureLocalBackup(r.Context(), h.DB, id, sk, dosya, uzakDurum)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	tmpDir, err := os.MkdirTemp("", "sanal-restore-*")
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	defer os.RemoveAll(tmpDir)
 
-	// GÜVENLİK: yedek arşivi ROOT olarak açılırsa, içindeki symlink üyeleri /root
-	// veya başka tenant'a yazma (jail-escape) vektörüdür. ORTAK güvenli-extract
-	// helper'ı kullan: (1) çıkarma tenant kullanıcısı (sk) olarak DAC altında,
-	// (2) üye-yolları önceden taranır, symlink/hardlink/jail-dışı üyeler reddedilir.
-	// tmpDir'i tenant'a devret ki tenant tar yazabilsin (arşiv root'ta okunup
-	// stdin'den akıtılır; tenant'ın yedek deposunu okumasına gerek yok).
 	_, _ = exec.Command("chown", sk+":"+sk, tmpDir).CombinedOutput()
 	if out, err := archivex.GuvenliCikar(abs, tmpDir, sk); err != nil {
 		msg := err.Error()
@@ -73,39 +95,205 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Home replace (mevcut /home/c_<user> üstüne yaz)
-	// Güvenli: yedeğin içinde c_<sk> klasörü var, onu kopyala
 	extractedHome := filepath.Join(tmpDir, sk)
-	if _, err := os.Stat(extractedHome); err == nil {
-		out, err := exec.Command("rsync", "-a", "--delete", extractedHome+"/", "/home/"+sk+"/").CombinedOutput()
-		if err != nil {
-			// rsync yoksa cp -af
-			_, _ = exec.Command("cp", "-af", extractedHome+"/.", "/home/"+sk+"/").CombinedOutput()
-			_ = out
+	result := ""
+	switch req.Scope {
+	case "full":
+		if err := restoreTree(extractedHome, filepath.Join("/home", sk), sk, true); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
 		}
-		_, _ = exec.Command("chown", "-R", sk+":"+sk, "/home/"+sk).CombinedOutput()
-		_, _ = exec.Command("restorecon", "-R", "/home/"+sk).CombinedOutput()
-	}
-
-	// DB dump varsa import et
-	dumpPath := filepath.Join(tmpDir, "dump.sql")
-	dbName := sk + "_main"
-	var dbImport string
-	if _, err := os.Stat(dumpPath); err == nil {
-		cmd := fmt.Sprintf("mysql %s < %s 2>&1", dbName, dumpPath)
-		out, err := exec.Command("bash", "-c", cmd).CombinedOutput()
+		imported, err := restoreAllDatabases(tmpDir, sk)
 		if err != nil {
-			dbImport = "DB import uyarı: " + strings.TrimSpace(string(out))
-		} else {
-			dbImport = "DB import OK (" + dbName + ")"
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
 		}
+		result = fmt.Sprintf("tüm hesap geri yüklendi; %d veritabanı içe aktarıldı", imported)
+	case "files":
+		if err := restoreTree(filepath.Join(extractedHome, "public_html"),
+			filepath.Join("/home", sk, "public_html"), sk, true); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result = "web dosyaları geri yüklendi"
+	case "email":
+		if err := restoreTree(filepath.Join(extractedHome, "mail"),
+			filepath.Join("/home", sk, "mail"), sk, true); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result = "e-posta kutuları geri yüklendi"
+	case "file":
+		rel, err := safeRestoreRelativePath(req.Path)
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := restoreSingle(filepath.Join(extractedHome, rel),
+			filepath.Join("/home", sk, rel), sk); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result = rel + " geri yüklendi"
+	case "database":
+		if !mysqlNameRE.MatchString(req.Database) {
+			httpx.WriteError(w, http.StatusBadRequest, "geçerli bir veritabanı seçin")
+			return
+		}
+		if err := authorizeDatabase(r, h.DB, id, sk, req.Database); err != nil {
+			httpx.WriteError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		dump, err := findDatabaseDump(tmpDir, req.Database)
+		if err != nil {
+			httpx.WriteError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		if err := importDatabase(dump, req.Database); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result = req.Database + " geri yüklendi"
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"ok":        true,
-		"alan_adi":  alanAdi,
-		"dosya":     dosya,
-		"db_import": dbImport,
-		"uyari":     "Mevcut dosyalar üzerine yazıldı, DB tabloları yeniden oluşturuldu.",
+		"ok": true, "alan_adi": alanAdi, "dosya": dosya,
+		"scope": req.Scope, "sonuc": result, "db_import": result,
 	})
+}
+
+func safeRestoreRelativePath(value string) (string, error) {
+	value = strings.TrimSpace(strings.TrimPrefix(value, "/"))
+	clean := filepath.Clean(value)
+	if clean == "." || clean == "" || clean == ".." || strings.HasPrefix(clean, "../") {
+		return "", fmt.Errorf("dosya yolu /home hesabına göre verilmelidir")
+	}
+	return clean, nil
+}
+
+func restoreTree(source, target, sk string, deleteMissing bool) error {
+	if info, err := os.Stat(source); err != nil || !info.IsDir() {
+		return fmt.Errorf("seçilen bölüm bu yedekte bulunamadı")
+	}
+	if err := os.MkdirAll(target, 0o750); err != nil {
+		return err
+	}
+	args := []string{"-a"}
+	if deleteMissing {
+		args = append(args, "--delete")
+	}
+	args = append(args, source+"/", target+"/")
+	if out, err := exec.Command("rsync", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("rsync: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	_, _ = exec.Command("chown", "-R", sk+":"+sk, target).CombinedOutput()
+	_, _ = exec.Command("restorecon", "-R", target).CombinedOutput()
+	return nil
+}
+
+func restoreSingle(source, target, sk string) error {
+	info, err := os.Lstat(source)
+	if err != nil {
+		return fmt.Errorf("seçilen dosya yedekte bulunamadı")
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("yalnız normal bir dosya geri yüklenebilir")
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		return err
+	}
+	in, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode().Perm())
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(out, in)
+	closeErr := out.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	_, _ = exec.Command("chown", sk+":"+sk, target).CombinedOutput()
+	_, _ = exec.Command("restorecon", target).CombinedOutput()
+	return nil
+}
+
+func restoreAllDatabases(tmpDir, sk string) (int, error) {
+	dbDir := filepath.Join(tmpDir, "databases")
+	entries, err := os.ReadDir(dbDir)
+	if err != nil {
+		// Legacy v1 backup: root-level *.sql was the default database.
+		matches, _ := filepath.Glob(filepath.Join(tmpDir, "*.sql"))
+		if len(matches) == 0 {
+			return 0, nil
+		}
+		if err := importDatabase(matches[0], sk+"_main"); err != nil {
+			return 0, err
+		}
+		return 1, nil
+	}
+	count := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".sql")
+		if !mysqlNameRE.MatchString(name) {
+			return count, fmt.Errorf("yedekte geçersiz veritabanı adı: %q", name)
+		}
+		if err := importDatabase(filepath.Join(dbDir, entry.Name()), name); err != nil {
+			return count, err
+		}
+		count++
+	}
+	return count, nil
+}
+
+func findDatabaseDump(tmpDir, name string) (string, error) {
+	current := filepath.Join(tmpDir, "databases", name+".sql")
+	if _, err := os.Stat(current); err == nil {
+		return current, nil
+	}
+	if name != "" && strings.HasSuffix(name, "_main") {
+		matches, _ := filepath.Glob(filepath.Join(tmpDir, "*.sql"))
+		if len(matches) > 0 {
+			return matches[0], nil
+		}
+	}
+	return "", fmt.Errorf("%s veritabanı bu yedekte bulunamadı", name)
+}
+
+func importDatabase(dumpPath, database string) error {
+	in, err := os.Open(dumpPath)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	cmd := exec.Command("mysql", database)
+	cmd.Stdin = in
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("mysql %s: %s: %w", database, strings.TrimSpace(stderr.String()), err)
+	}
+	return nil
+}
+
+func authorizeDatabase(r *http.Request, db *sql.DB, domainID int64, sk, database string) error {
+	if database == sk+"_main" {
+		return nil
+	}
+	var count int
+	if err := db.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`,
+		domainID, database).Scan(&count); err != nil || count == 0 {
+		return fmt.Errorf("veritabanı bu domaine ait değil")
+	}
+	return nil
 }

@@ -120,8 +120,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		k.TTL = 3600
 	}
 	ak := 1
-	if !k.Aktif && k.Aktif != true {
-		// JSON'da aktif false ise 0 yaz, default true (yeni eklemede çoğunlukla aktif)
+	if !k.Aktif {
+		ak = 0
 	}
 	k.Oncelik = oncelikNormalize(k.Tip, k.Oncelik)
 	if err := gecerliKayitAlanlari(k.Ad, k.Deger); err != nil {

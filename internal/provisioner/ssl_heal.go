@@ -205,8 +205,16 @@ func selfSignedUret(domain string) (certPath, keyPath string, err error) {
 // sslVhostYaz: verilen cert/key ile domain'in vhost'unu SSL-li render eder (443 blogu
 // dahil). renderAndReload nginx -t + rollback fail-safe'i icerir (bozuk config diske
 // kalmaz). Askiya-alma/per-tenant FPM tutarliligi renderAndReload icinde saglanir.
+//
+// 🔴 EK ALAN ADI AYRIMI: SSL yazan TUM yollar (issue, disable, fail-safe, otomatik
+// yenileme) buradan gecer — ayrim bu yuzden burada yapilir, cagiranlarda degil.
+// Ek alan adi ana alan adiyla ayni sk'yi paylastigi icin renderAndReload'a
+// dusmesi dom_<sk>.conf'u, yani ANA alan adinin vhost'unu ezer (bkz. ek_vhost.go).
 func sslVhostYaz(alanAdi, sk, phpSurum, backend, certPath, keyPath, kaynak string) error {
 	_, socket, _ := phpPoolPath(sk, phpSurum)
+	if docroot, ekMi := ekAlanAdiBilgi(alanAdi); ekMi {
+		return EkVhostYaz(alanAdi, sk, docroot, socket, certPath, keyPath)
+	}
 	home := "/home/" + sk
 	return renderAndReload(VhostOpts{
 		AlanAdi:   alanAdi,
@@ -287,6 +295,9 @@ func HealSSLVhost443OnStartup() {
 			continue // path guvenligi
 		}
 		vpath := "/etc/nginx/conf.d/dom_" + x.sk + ".conf"
+		if _, ekMi := ekAlanAdiBilgi(x.alanAdi); ekMi {
+			vpath = EkConfPath(x.sk, x.alanAdi)
+		}
 		data, rerr := os.ReadFile(vpath)
 		has443 := rerr == nil && strings.Contains(string(data), "listen 443")
 		certVar := certDosyaVar(x.cert) && certDosyaVar(x.key)

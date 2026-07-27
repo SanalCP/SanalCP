@@ -63,7 +63,6 @@ type Surum struct {
 var (
 	availMu     sync.Mutex
 	availCache  = map[string]bool{} // pkg -> kurulabilir mi (arka-plan sweep doldurur)
-	availAt     time.Time           // son başarılı sweep zamanı
 	sweeperOnce sync.Once
 	dnfProbe    = dnfPaketVar // test için enjekte edilebilir (varsayılan gerçek dnf)
 )
@@ -105,7 +104,6 @@ func sweepOnce() {
 	}
 	availMu.Lock()
 	availCache = yeni
-	availAt = time.Now()
 	availMu.Unlock()
 }
 

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -46,6 +45,8 @@ type Yedek struct {
 	BoyutB    int64  `json:"boyut_b"`
 	Notlar    string `json:"notlar"`
 	Olusturma string `json:"olusturma"`
+	UzakDurum string `json:"uzak_durum"`
+	UzakHata  string `json:"uzak_hata,omitempty"`
 }
 
 type Handlers struct {
@@ -65,7 +66,8 @@ func (h *Handlers) lookupDomain(r *http.Request) (id int64, alanAdi, sk string, 
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT id, domain_id, tip, dosya, boyut_b, notlar, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i')
+		`SELECT id, domain_id, tip, dosya, boyut_b, notlar,
+		        DATE_FORMAT(created_at,'%Y-%m-%d %H:%i'), uzak_durum, uzak_hata
 		 FROM backups WHERE domain_id=? ORDER BY id DESC`, id)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
@@ -75,7 +77,8 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	out := make([]Yedek, 0)
 	for rows.Next() {
 		var y Yedek
-		if err := rows.Scan(&y.ID, &y.DomainID, &y.Tip, &y.Dosya, &y.BoyutB, &y.Notlar, &y.Olusturma); err == nil {
+		if err := rows.Scan(&y.ID, &y.DomainID, &y.Tip, &y.Dosya, &y.BoyutB,
+			&y.Notlar, &y.Olusturma, &y.UzakDurum, &y.UzakHata); err == nil {
 			out = append(out, y)
 		}
 	}
@@ -173,32 +176,10 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	dosya := fmt.Sprintf("%s-%s.tar.gz", sk, stamp)
 	abs := filepath.Join(dir, dosya)
 
-	// DB dump
-	dbName := sk + "_main"
-	sqlDump := filepath.Join(dir, dosya+".sql")
-	if out, derr := exec.Command("bash", "-c",
-		fmt.Sprintf("mysqldump --single-transaction %s > %s 2>&1 || true", dbName, sqlDump)).CombinedOutput(); derr != nil {
-		_ = os.WriteFile(sqlDump+".err", out, 0600)
-	}
-
-	// tar + dump beraber
-	args := []string{
-		"czf", abs,
-		"-C", "/home", sk,
-		"-C", dir, dosya + ".sql",
-	}
-	if out, terr := exec.Command("tar", args...).CombinedOutput(); terr != nil {
-		_ = os.Remove(sqlDump)
-		httpx.WriteError(w, http.StatusInternalServerError,
-			"tar: "+strings.TrimSpace(string(out)))
+	boyut, err := createArchive(r.Context(), h.DB, id, alanAdi, sk, abs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "yedek oluşturma: "+err.Error())
 		return
-	}
-	_ = os.Remove(sqlDump)
-
-	st, _ := os.Stat(abs)
-	var boyut int64
-	if st != nil {
-		boyut = st.Size()
 	}
 
 	res, err := h.DB.ExecContext(r.Context(),
@@ -210,7 +191,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	yid, _ := res.LastInsertId()
 	// Uzak hedef varsa arkaplanda yükle (API cevabını bloke etme)
-	pushToDestinationAsync(h.DB, id, abs, dosya)
+	pushToDestinationAsync(h.DB, id, yid, abs, dosya)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
 		"ok":      true,
 		"id":      yid,
@@ -223,17 +204,18 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
-	var sk, dosya string
+	var sk, dosya, uzakDurum string
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT d.sistem_kullanici, b.dosya FROM backups b
+		`SELECT d.sistem_kullanici, b.dosya, b.uzak_durum FROM backups b
 		 JOIN domains d ON d.id=b.domain_id
-		 WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&sk, &dosya)
+		 WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&sk, &dosya, &uzakDurum)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
 		return
 	}
 	if err == nil {
 		_ = os.Remove(filepath.Join(BackupRoot, sk, dosya))
+		deleteRemoteBestEffort(h.DB, id, dosya, uzakDurum)
 	}
 	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM backups WHERE id=?`, bid)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -242,16 +224,20 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
-	var sk, dosya string
+	var sk, dosya, uzakDurum string
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT d.sistem_kullanici, b.dosya FROM backups b
+		`SELECT d.sistem_kullanici, b.dosya, b.uzak_durum FROM backups b
 		 JOIN domains d ON d.id=b.domain_id
-		 WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&sk, &dosya)
+		 WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&sk, &dosya, &uzakDurum)
 	if err != nil {
 		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
 		return
 	}
-	abs := filepath.Join(BackupRoot, sk, dosya)
+	abs, err := ensureLocalBackup(r.Context(), h.DB, id, sk, dosya, uzakDurum)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
 	f, err := os.Open(abs)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())

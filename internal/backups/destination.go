@@ -1,5 +1,4 @@
-// Backup off-site destinations: FTP/SFTP üzerinden uzak depolama yükleme.
-// lftp tek araç olarak hem FTP hem SFTP'yi tek komutla destekler.
+// Backup off-site destinations: FTP/SFTP ve S3 uyumlu uzak depolama.
 package backups
 
 import (
@@ -7,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -15,19 +15,27 @@ import (
 type Destination struct {
 	ID         int64  `json:"id"`
 	DomainID   int64  `json:"domain_id"`
-	Tip        string `json:"tip"`    // "ftp" | "sftp"
+	Tip        string `json:"tip"` // "ftp" | "sftp"
 	Host       string `json:"host"`
 	Port       int    `json:"port"`
 	Kullanici  string `json:"kullanici"`
 	Parola     string `json:"parola,omitempty"` // write-only: GET'te boş döner
 	UzakDizin  string `json:"uzak_dizin"`
+	Bucket     string `json:"bucket,omitempty"`
+	Region     string `json:"region,omitempty"`
+	Endpoint   string `json:"endpoint,omitempty"`
+	PathStyle  bool   `json:"path_style"`
 	Aktif      bool   `json:"aktif"`
 	SonYukleme string `json:"son_yukleme,omitempty"`
 	SonDurum   string `json:"son_durum,omitempty"`
 	SonHata    string `json:"son_hata,omitempty"`
 }
 
-func gecerliTip(t string) bool { return t == "ftp" || t == "sftp" }
+func gecerliTip(t string) bool {
+	return t == "ftp" || t == "sftp" || t == "s3" || t == "b2"
+}
+
+func objectStorageTip(t string) bool { return t == "s3" || t == "b2" }
 
 // readDestination: bir domain'in destinasyon kaydını döner (yoksa nil, nil).
 func readDestination(ctx context.Context, db *sql.DB, domainID int64) (*Destination, error) {
@@ -35,11 +43,13 @@ func readDestination(ctx context.Context, db *sql.DB, domainID int64) (*Destinat
 	var aktif int
 	var sonYuk sql.NullString
 	err := db.QueryRowContext(ctx,
-		`SELECT id, tip, host, port, kullanici, parola, uzak_dizin, aktif,
+		`SELECT id, tip, host, port, kullanici, parola, uzak_dizin,
+		        bucket, region, endpoint, path_style, aktif,
 		        DATE_FORMAT(son_yukleme,'%Y-%m-%d %H:%i'), son_durum, son_hata
 		 FROM backup_destinations WHERE domain_id=?`, domainID).
 		Scan(&d.ID, &d.Tip, &d.Host, &d.Port, &d.Kullanici, &d.Parola, &d.UzakDizin,
-			&aktif, &sonYuk, &d.SonDurum, &d.SonHata)
+			&d.Bucket, &d.Region, &d.Endpoint, &d.PathStyle, &aktif, &sonYuk,
+			&d.SonDurum, &d.SonHata)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -66,6 +76,9 @@ func lftpURL(d *Destination) string {
 func uploadToRemote(ctx context.Context, d *Destination, localPath, dosyaAdi string) error {
 	if !d.Aktif {
 		return nil // disable: sessizce skip
+	}
+	if objectStorageTip(d.Tip) {
+		return uploadS3Object(ctx, d, localPath, dosyaAdi)
 	}
 	url := lftpURL(d)
 	// cmd:fail-exit ile herhangi bir komut başarısız olursa lftp non-zero exit eder
@@ -102,6 +115,43 @@ func uploadToRemote(ctx context.Context, d *Destination, localPath, dosyaAdi str
 	return nil
 }
 
+func downloadFromRemote(ctx context.Context, d *Destination, dosyaAdi, localPath string) error {
+	if objectStorageTip(d.Tip) {
+		return downloadS3Object(ctx, d, dosyaAdi, localPath)
+	}
+	script := fmt.Sprintf(
+		`set cmd:fail-exit yes; set sftp:auto-confirm yes; `+
+			`set ssl:verify-certificate yes; set ftp:ssl-allow no; `+
+			`set net:max-retries 1; set net:timeout 15; `+
+			`open -u "%s","%s" %s; cd "%s"; get "%s" -o "%s"; bye`,
+		lftpEscape(d.Kullanici), lftpEscape(d.Parola), lftpURL(d),
+		lftpEscape(d.UzakDizin), lftpEscape(dosyaAdi), lftpEscape(localPath))
+	out, err := exec.CommandContext(ctx, "lftp", "-c", script).CombinedOutput()
+	if err != nil {
+		_ = os.Remove(localPath)
+		return fmt.Errorf("uzak indirme: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
+func deleteFromRemote(ctx context.Context, d *Destination, dosyaAdi string) error {
+	if objectStorageTip(d.Tip) {
+		return deleteS3Object(ctx, d, dosyaAdi)
+	}
+	script := fmt.Sprintf(
+		`set cmd:fail-exit yes; set sftp:auto-confirm yes; `+
+			`set ssl:verify-certificate yes; set ftp:ssl-allow no; `+
+			`set net:max-retries 1; set net:timeout 15; `+
+			`open -u "%s","%s" %s; cd "%s"; rm "%s"; bye`,
+		lftpEscape(d.Kullanici), lftpEscape(d.Parola), lftpURL(d),
+		lftpEscape(d.UzakDizin), lftpEscape(dosyaAdi))
+	out, err := exec.CommandContext(ctx, "lftp", "-c", script).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("uzak silme: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
 // lftpEscape: lftp komut satırı içinde çift tırnak içine konacak değerleri escape eder.
 func lftpEscape(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
@@ -112,6 +162,9 @@ func lftpEscape(s string) string {
 // testConnection: kimlik bilgilerini test eder.
 // SFTP için sshpass+ssh, FTP için curl — her ikisi de auth-specific exit kodu döner.
 func testConnection(ctx context.Context, d *Destination) error {
+	if objectStorageTip(d.Tip) {
+		return testS3Connection(ctx, d)
+	}
 	if d.Tip == "sftp" {
 		// sshpass parola passwd, ssh BatchMode=no + PreferredAuthentications=password
 		// publickey by-pass — kullanıcı parolasının gerçekten geçerli olduğunu garanti eder.
@@ -163,7 +216,7 @@ func testConnection(ctx context.Context, d *Destination) error {
 
 // pushToDestinationAsync: yedek başarıyla oluştuktan sonra arkaplanda upload tetikler.
 // Hata olsa bile API cevabını bloke etmez; son_durum/son_hata DB'ye yazılır.
-func pushToDestinationAsync(db *sql.DB, domainID int64, localPath, dosyaAdi string) {
+func pushToDestinationAsync(db *sql.DB, domainID, backupID int64, localPath, dosyaAdi string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
@@ -171,6 +224,7 @@ func pushToDestinationAsync(db *sql.DB, domainID int64, localPath, dosyaAdi stri
 		if err != nil || d == nil || !d.Aktif {
 			return
 		}
+		_, _ = db.Exec(`UPDATE backups SET uzak_durum='yukleniyor', uzak_hata='' WHERE id=?`, backupID)
 		if err := uploadToRemote(ctx, d, localPath, dosyaAdi); err != nil {
 			short := err.Error()
 			if len(short) > 500 {
@@ -179,12 +233,22 @@ func pushToDestinationAsync(db *sql.DB, domainID int64, localPath, dosyaAdi stri
 			_, _ = db.Exec(`UPDATE backup_destinations
 				SET son_durum='hata', son_hata=?, son_yukleme=NOW() WHERE domain_id=?`,
 				short, domainID)
+			_, _ = db.Exec(`UPDATE backups SET uzak_durum='hata', uzak_hata=? WHERE id=?`,
+				short, backupID)
 			log.Printf("backup destination upload domain=%d: %v", domainID, err)
 			return
 		}
 		_, _ = db.Exec(`UPDATE backup_destinations
 			SET son_durum='basarili', son_hata='', son_yukleme=NOW() WHERE domain_id=?`,
 			domainID)
+		remoteKey := strings.Trim(strings.TrimSpace(d.UzakDizin), "/")
+		if remoteKey != "" {
+			remoteKey += "/"
+		}
+		remoteKey += dosyaAdi
+		_, _ = db.Exec(`UPDATE backups
+			SET uzak_durum='basarili', uzak_anahtar=?, uzak_hata='' WHERE id=?`,
+			remoteKey, backupID)
 		log.Printf("backup destination upload domain=%d başarılı: %s", domainID, dosyaAdi)
 	}()
 }

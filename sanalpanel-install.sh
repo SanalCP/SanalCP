@@ -27,6 +27,13 @@ die(){ echo -e "  ${c_r}✗ $*${c_0}"; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "root gerekli"
 [ -d "$A" ] || die "assets/ bulunamadı ($A)"
+if [ -f "$A/SHA256SUMS" ]; then
+  (cd "$HERE" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
+    die "release asset bütünlük kontrolü başarısız"
+  ok "release SHA-256 bütünlüğü"
+else
+  die "assets/SHA256SUMS bulunamadı — eksik veya elle hazırlanmış release"
+fi
 grep -qiE "AlmaLinux|Rocky|Red Hat|CentOS" /etc/os-release || warn "AlmaLinux/RHEL10 bekleniyordu — devam ediliyor"
 
 PHP_VERS="74 80 81 82 83 84 85"

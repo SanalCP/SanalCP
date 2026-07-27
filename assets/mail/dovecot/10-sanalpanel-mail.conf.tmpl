@@ -31,6 +31,17 @@ service lmtp {
   }
 }
 
+# Pigeonhole/Sieve: panelin ürettiği kutu-başı filtre ve vacation betiği.
+protocol lmtp {
+  mail_plugins = $mail_plugins sieve
+}
+plugin {
+  sieve = file:~/sieve;active=~/.dovecot.sieve
+  sieve_vacation_min_period = 1d
+  sieve_vacation_default_period = 7d
+  sieve_vacation_max_period = 30d
+}
+
 # Varsayılan sertifika: panelin kendi self-signed sertifikası (kurulumda zaten üretiliyor).
 # Belirli bir müşteri domaininde gerçek Let's Encrypt sertifikasıyla IMAP/webmail sunmak
 # istersen bir local_name { } bloğuyla /etc/pki/sanalpanel/<domain>/... yoluna SNI

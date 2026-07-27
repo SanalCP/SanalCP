@@ -443,15 +443,13 @@ const denyBlocksNginx = `    # ---- Yurutme engeli: CGI / betik yorumlayicilari 
 `
 
 // buildSecurityHeaders: opts toggle'larina + SSL durumuna gore guvenlik add_header
-// bloklarini uretir (her satir "always"). X-Frame-Options ve CSP-Report-Only DAIMA
-// eklenir (yeni koruma, DB kolonu yok). HSTS + CSP-upgrade YALNIZ HTTPS'te uygulanir.
+// bloklarini uretir (her satir "always"). Clickjacking korumasi CSP frame-ancestors
+// ile uygulanir; kendi origin'i ve panel onizlemesi disindakiler engellenir.
 func buildSecurityHeaders(o VhostOpts) string {
 	var b strings.Builder
 	if o.HdrXContentType {
 		b.WriteString("    add_header X-Content-Type-Options \"nosniff\" always;\n")
 	}
-	// Clickjacking korumasi — daima (SAMEORIGIN: ayni-kaynak cerceveleme serbest).
-	b.WriteString("    add_header X-Frame-Options \"SAMEORIGIN\" always;\n")
 	if o.HdrXXSS {
 		b.WriteString("    add_header X-XSS-Protection \"1; mode=block\" always;\n")
 	}
@@ -461,12 +459,11 @@ func buildSecurityHeaders(o VhostOpts) string {
 	if o.HdrPermissions {
 		b.WriteString("    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n")
 	}
-	// Tenant CSP: GEVSEK Report-Only — musteri sitesini KIRMAZ (yalniz raporlar), her
-	// kaynaga izin verir; sadece frame-ancestors 'self' ile gozlem/sinyal saglar.
-	b.WriteString("    add_header Content-Security-Policy-Report-Only \"default-src 'self' https: http: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self';\" always;\n")
-	if o.SSL() && o.HdrCSPUpgrade {
-		b.WriteString("    add_header Content-Security-Policy \"upgrade-insecure-requests\" always;\n")
-	}
+	// frame-ancestors ENFORCE edilir; default-src ise müşteri sitesini kırmamak için
+	// yalnız report-only kalır. X-Frame-Options farklı panel origin'ine güvenli izin
+	// veremediğinden kasıtlı olarak üretilmez.
+	fmt.Fprintf(&b, "    add_header Content-Security-Policy-Report-Only \"default-src 'self' https: http: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors %s;\" always;\n", panelFrameAncestors())
+	b.WriteString(framePolicyHeader("    ", o.SSL() && o.HdrCSPUpgrade))
 	if o.SSL() && o.HdrHSTS {
 		sd := ""
 		if o.HSTSSubdomains {
@@ -984,6 +981,10 @@ func Deprovision(alanAdi, sk string) error {
 	if !strings.HasPrefix(sk, "c_") {
 		return fmt.Errorf("güvenlik: c_ prefix'li olmayan kullanıcı silinmez")
 	}
+	// userdel -r AlmaLinux'ta tenant crontab'ını her zaman kaldırmıyor. Aktarım
+	// rollback'i ve normal domain silme sonrasında görevlerin yetim çalışmasını önle.
+	_ = os.Remove(filepath.Join("/var/spool/cron", sk))
+	_ = os.Remove(filepath.Join("/var/lib/sanalpanel/cron-suspended", sk))
 	if userExists(sk) {
 		_, _ = exec.Command("userdel", "-r", sk).CombinedOutput()
 	}
@@ -1146,10 +1147,16 @@ func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath
 }
 
 // DisableSSL: vhost'u SSL'siz hale döndür, cert dosyalarını silme (ileride yeniden açılabilir)
+//
+// sslVhostYaz'daki ile aynı ek alan adı ayrımı: aksi halde bir ek alan adında
+// SSL'i kapatmak ana alan adının vhost'unu (dom_<sk>.conf) ezerdi.
 func DisableSSL(alanAdi, sk, phpSurum, backend string) error {
 	phpSurum = normalizePHP(phpSurum)
 	home := "/home/" + sk
 	_, socket, _ := phpPoolPath(sk, phpSurum)
+	if docroot, ekMi := ekAlanAdiBilgi(alanAdi); ekMi {
+		return EkVhostYaz(alanAdi, sk, docroot, socket, "", "")
+	}
 	return renderAndReload(VhostOpts{
 		AlanAdi:   alanAdi,
 		WebRoot:   filepath.Join(home, "public_html"),
@@ -1491,12 +1498,15 @@ func welcomeHTML(domain string) string {
 // ApplyVhostForDomain: domainID'ye gore nginx vhost'unu yeniden render eder.
 // PHP versiyonu/socket degisikliklerinden sonra cagrilir; SSL bilgilerini DB'den okur.
 func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error {
-	var alanAdi, sk, certPath, keyPath, sslKaynak, backend string
+	var alanAdi, sk, certPath, keyPath, sslKaynak, backend, webRoot string
 	var askida, cacheVersion int
+	var anaDomainID sql.NullInt64
 	if err := db.QueryRow(
-		`SELECT alan_adi, sistem_kullanici, COALESCE(cert_path,''), COALESCE(key_path,''), COALESCE(ssl_kaynak,''), COALESCE(web_backend,'php-fpm'), COALESCE(askida,0), COALESCE(cache_version,0)
+		`SELECT alan_adi, sistem_kullanici, COALESCE(cert_path,''), COALESCE(key_path,''),
+		        COALESCE(ssl_kaynak,''), COALESCE(web_backend,'php-fpm'),
+		        COALESCE(askida,0), COALESCE(cache_version,0), COALESCE(web_root,''), ana_domain_id
 		 FROM domains WHERE id=?`, domainID).
-		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion); err != nil {
+		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion, &webRoot, &anaDomainID); err != nil {
 		return fmt.Errorf("domain bilgi cek: %w", err)
 	}
 	// 🔴 Per-tenant FPM (Seçenek A) aktifse socket'i DAİMA per-tenant socket'e zorla —
@@ -1505,6 +1515,12 @@ func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error
 	// tenant'ta 502 üretmez.
 	if TenantFPMActive(sk) {
 		socket = tenantSocket(sk)
+	}
+	// Ek/parked domain ana domainle aynı sk'yi paylaşır. Normal render yolu
+	// dom_<sk>.conf'a yazarak ana vhost'u ezeceği için her merkezi yeniden-render
+	// çağrısını ek domaine ait ayrı dosyaya yönlendir.
+	if anaDomainID.Valid {
+		return EkVhostYaz(alanAdi, sk, webRoot, socket, certPath, keyPath)
 	}
 	home := "/home/" + sk
 
@@ -1761,7 +1777,30 @@ func HealPanelVhostHeadersOnStartup() {
 	}
 	s := string(orig)
 	if strings.Contains(s, panelSecSentinel) {
-		return // zaten sertlestirilmis
+		// Eski v2 kurulumlarinda domain onizleme iframe'i icin frame-src yoktu.
+		// Sentinel mevcut olsa bile CSP'yi geriye donuk olarak guncelle.
+		const eski = "connect-src 'self'; frame-ancestors 'self'"
+		const yeni = "connect-src 'self'; frame-src https: http:; frame-ancestors 'self'"
+		newS := strings.ReplaceAll(s, eski, yeni)
+		if newS == s {
+			return // zaten guncel
+		}
+		if e := os.WriteFile(panelVhostPath, []byte(newS), 0644); e != nil {
+			log.Printf("panel sec heal: CSP guncellenemedi: %v", e)
+			return
+		}
+		if out, e := exec.Command("nginx", "-t").CombinedOutput(); e != nil {
+			_ = os.WriteFile(panelVhostPath, orig, 0644)
+			log.Printf("panel sec heal: CSP nginx -t basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
+			return
+		}
+		if out, e := exec.Command("systemctl", "reload", "nginx").CombinedOutput(); e != nil {
+			_ = os.WriteFile(panelVhostPath, orig, 0644)
+			log.Printf("panel sec heal: CSP nginx reload basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
+			return
+		}
+		log.Printf("panel sec heal: CSP domain onizlemesi icin guncellendi + nginx reload OK")
+		return
 	}
 	anchor := "server_name _;"
 	idx := strings.Index(s, anchor)
@@ -1776,7 +1815,7 @@ func HealPanelVhostHeadersOnStartup() {
 		"    add_header X-Frame-Options \"SAMEORIGIN\" always;\n" +
 		"    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" +
 		"    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n" +
-		"    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
+		"    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
 		"    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\n"
 
 	insertAt := idx + len(anchor)
@@ -1836,7 +1875,7 @@ func HealPanelIndexNoCacheOnStartup() {
 		"        add_header X-Frame-Options \"SAMEORIGIN\" always;\n" +
 		"        add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" +
 		"        add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n" +
-		"        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
+		"        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
 		"        add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\n" +
 		"        try_files $uri $uri/ /index.html;\n" +
 		"    }"

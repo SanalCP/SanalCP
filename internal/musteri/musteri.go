@@ -60,10 +60,11 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		hash  string
 		rol   string
 		durum string
+		surum uint64
 	)
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT id, password_hash, role, status FROM users WHERE username=?`,
-		req.Kullanici).Scan(&uid, &hash, &rol, &durum)
+		`SELECT id, password_hash, role, status, auth_version FROM users WHERE username=?`,
+		req.Kullanici).Scan(&uid, &hash, &rol, &durum, &surum)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -103,7 +104,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tok, err := auth.Issue(h.Secret, 24*3600, uid, req.Kullanici, rol)
+	tok, err := auth.Issue(h.Secret, 24*3600, uid, req.Kullanici, rol, surum)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "token üretilemedi")
 		return

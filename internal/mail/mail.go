@@ -316,7 +316,9 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.DB.ExecContext(r.Context(),
-		`UPDATE mailboxes SET status=? WHERE id=? AND domain_id=?`, req.Status, mid, id)
+		`UPDATE mailboxes SET status=?,
+		   spam_suspended_at=IF(?='active',NULL,spam_suspended_at)
+		 WHERE id=? AND domain_id=?`, req.Status, req.Status, mid, id)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "güncellenemedi")
 		return
