@@ -45,10 +45,14 @@ smtpd_client_connection_rate_limit = 30
 smtpd_client_message_rate_limit = 60
 anvil_rate_time_unit = 60s
 
-# OpenDKIM milter (assets/mail/opendkim/opendkim.conf.tmpl ile birlikte) — imzalama +
-# doğrulama. dns.EnsureDKIM zaten anahtarları üretip /etc/opendkim/keys altına yazıyor;
-# bu blok yalnızca Postfix'in milter'a bağlanmasını sağlar.
+# SanalPanel policy servisi SMTP AUTH kullanıcısını saatlik/günlük limitlerle
+# denetler; limit aşımında hesabı otomatik askıya alır. Kimlik doğrulamasız gelen
+# posta için DUNNO döner ve normal alım akışına dokunmaz.
+smtpd_end_of_data_restrictions = check_policy_service inet:127.0.0.1:10040
+smtpd_policy_service_default_action = DUNNO
+
+# OpenDKIM imzalama + Rspamd içerik/spam tarama milter zinciri.
 milter_protocol = 6
 milter_default_action = accept
-smtpd_milters = inet:127.0.0.1:8891
-non_smtpd_milters = inet:127.0.0.1:8891
+smtpd_milters = inet:127.0.0.1:8891, inet:127.0.0.1:11332
+non_smtpd_milters = inet:127.0.0.1:8891, inet:127.0.0.1:11332

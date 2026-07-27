@@ -143,6 +143,7 @@ func main() {
 	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalpanel-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
 	mail.HealMailOnStartup(context.Background(), d)
+	mail.StartPolicyServer(d, "127.0.0.1:10040")
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
 	// tenant yoksa sessizce çıkar. Üretilen panel hesapları PAROLASIZDIR ve
@@ -301,6 +302,18 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/aliases", mailH.AliasEkle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/aliases/{aid}", mailH.AliasSil)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/aliases/{aid}/durum", mailH.AliasDurumDegistir)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/spam", mailH.SpamGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/spam", mailH.SpamPut)
+				r.With(middleware.AdminOnly).Get("/admin/mail/queue", mailH.QueueList)
+				r.With(middleware.AdminOnly).Post("/admin/mail/queue", mailH.QueueAction)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderPut)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderDelete)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/filters", mailH.FilterList)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/filters", mailH.FilterCreate)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/filters/{fid}", mailH.FilterDelete)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/{mid}/send-limits", mailH.SendLimitsGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/{mid}/send-limits", mailH.SendLimitsPut)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/koruma", korumaH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/koruma", korumaH.Ekle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/koruma/{kid}", korumaH.Sil)
