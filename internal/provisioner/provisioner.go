@@ -984,6 +984,10 @@ func Deprovision(alanAdi, sk string) error {
 	if !strings.HasPrefix(sk, "c_") {
 		return fmt.Errorf("güvenlik: c_ prefix'li olmayan kullanıcı silinmez")
 	}
+	// userdel -r AlmaLinux'ta tenant crontab'ını her zaman kaldırmıyor. Aktarım
+	// rollback'i ve normal domain silme sonrasında görevlerin yetim çalışmasını önle.
+	_ = os.Remove(filepath.Join("/var/spool/cron", sk))
+	_ = os.Remove(filepath.Join("/var/lib/sanalpanel/cron-suspended", sk))
 	if userExists(sk) {
 		_, _ = exec.Command("userdel", "-r", sk).CombinedOutput()
 	}

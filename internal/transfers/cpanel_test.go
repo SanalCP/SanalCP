@@ -46,7 +46,7 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 		testEntry{name: "backup-demo/homedir/mail/example.com/a", body: "mail"},
 		testEntry{name: "backup-demo/homedir/etc/example.com/shadow", body: "info:$6$hash:1::::\ndestek:$6$hash:1::::\n"},
 		testEntry{name: "backup-demo/va/example.com", body: "sales: external@example.net\n"},
-		testEntry{name: "backup-demo/cron", body: "* * * * * true"},
+		testEntry{name: "backup-demo/cron", body: "# WordPress görevi\n*/5 * * * * /usr/bin/php /home/demo/public_html/wp-cron.php\nMAILTO=demo@example.com\n@reboot /bin/true\n"},
 	)
 	got, err := AnalyzeCPanel(r)
 	if err != nil {
@@ -60,6 +60,13 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 	}
 	if len(got.Mailboxes) != 2 || got.AliasCount != 1 {
 		t.Fatalf("unexpected mail inventory: %+v", got)
+	}
+	if len(got.CronJobs) != 1 || got.CronJobs[0].Minute != "*/5" ||
+		got.CronJobs[0].Command != "/usr/bin/php /home/demo/public_html/wp-cron.php" {
+		t.Fatalf("unexpected cron inventory: %+v", got)
+	}
+	if !strings.Contains(strings.Join(got.Warnings, " "), "2 cron satırı") {
+		t.Fatalf("unsupported cron warning missing: %+v", got.Warnings)
 	}
 }
 
@@ -97,5 +104,16 @@ func TestDatabaseMappingsAreNamespacedAndUnique(t *testing.T) {
 		if !strings.HasPrefix(m.Target, "c_example_com_") || len(m.Target) > 64 {
 			t.Fatalf("unsafe target: %+v", m)
 		}
+	}
+}
+
+func TestParseCronJobsCapsAndPreservesFiveFieldTasks(t *testing.T) {
+	var body strings.Builder
+	for i := 0; i < 101; i++ {
+		body.WriteString("0 2 * * 1 /bin/echo ok\n")
+	}
+	got, skipped := parseCronJobs(body.String())
+	if len(got) != 100 || skipped != 1 {
+		t.Fatalf("unexpected cron cap: jobs=%d skipped=%d", len(got), skipped)
 	}
 }
