@@ -93,6 +93,7 @@ const NAV: NavGroup[] = [
   { baslik: 'Yönetim', items: [
     { to: '/kullanicilar',         etiket: 'Kullanıcılar',      ikon: ICONS.bayi },
     { to: '/musteriler',           etiket: 'Müşteriler',        ikon: ICONS.musteri },
+    { to: '/hesap-aktarimi',       etiket: 'Hesap Aktarımı',    ikon: ICONS.kopya },
     { to: '/guvenlik-gunlugu',     etiket: 'Güvenlik Günlüğü',  ikon: ICONS.log },
     { to: '/araclar-ayarlar',      etiket: 'Araçlar ve Ayarlar', ikon: ICONS.araclar },
   ]},

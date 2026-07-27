@@ -57,6 +57,7 @@ import MusterilerPage from '@/pages/MusterilerPage'
 import GuvenlikGunluguPage from '@/pages/GuvenlikGunluguPage'
 import KullanicilarPage from '@/pages/KullanicilarPage'
 import SunucuDurumuPage from '@/pages/SunucuDurumuPage'
+import HesapAktarimiPage from '@/pages/HesapAktarimiPage'
 
 function GuardedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuth((s) => s.token)
@@ -136,6 +137,7 @@ export default function App() {
         <Route path="wordpress" element={<WordPressPage />} />
         <Route path="firewall" element={<FirewallPage />} />
         <Route path="backup-yonetimi" element={<BackupYonetimiPage />} />
+        <Route path="hesap-aktarimi" element={<HesapAktarimiPage />} />
         <Route path="izleme" element={<IzlemePage />} />
 
         <Route path="profil"          element={<SettingsPage />} />
