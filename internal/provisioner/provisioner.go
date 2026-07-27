@@ -1150,10 +1150,16 @@ func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath
 }
 
 // DisableSSL: vhost'u SSL'siz hale döndür, cert dosyalarını silme (ileride yeniden açılabilir)
+//
+// sslVhostYaz'daki ile aynı ek alan adı ayrımı: aksi halde bir ek alan adında
+// SSL'i kapatmak ana alan adının vhost'unu (dom_<sk>.conf) ezerdi.
 func DisableSSL(alanAdi, sk, phpSurum, backend string) error {
 	phpSurum = normalizePHP(phpSurum)
 	home := "/home/" + sk
 	_, socket, _ := phpPoolPath(sk, phpSurum)
+	if docroot, ekMi := ekAlanAdiBilgi(alanAdi); ekMi {
+		return EkVhostYaz(alanAdi, sk, docroot, socket, "", "")
+	}
 	return renderAndReload(VhostOpts{
 		AlanAdi:   alanAdi,
 		WebRoot:   filepath.Join(home, "public_html"),
@@ -1495,12 +1501,15 @@ func welcomeHTML(domain string) string {
 // ApplyVhostForDomain: domainID'ye gore nginx vhost'unu yeniden render eder.
 // PHP versiyonu/socket degisikliklerinden sonra cagrilir; SSL bilgilerini DB'den okur.
 func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error {
-	var alanAdi, sk, certPath, keyPath, sslKaynak, backend string
+	var alanAdi, sk, certPath, keyPath, sslKaynak, backend, webRoot string
 	var askida, cacheVersion int
+	var anaDomainID sql.NullInt64
 	if err := db.QueryRow(
-		`SELECT alan_adi, sistem_kullanici, COALESCE(cert_path,''), COALESCE(key_path,''), COALESCE(ssl_kaynak,''), COALESCE(web_backend,'php-fpm'), COALESCE(askida,0), COALESCE(cache_version,0)
+		`SELECT alan_adi, sistem_kullanici, COALESCE(cert_path,''), COALESCE(key_path,''),
+		        COALESCE(ssl_kaynak,''), COALESCE(web_backend,'php-fpm'),
+		        COALESCE(askida,0), COALESCE(cache_version,0), COALESCE(web_root,''), ana_domain_id
 		 FROM domains WHERE id=?`, domainID).
-		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion); err != nil {
+		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion, &webRoot, &anaDomainID); err != nil {
 		return fmt.Errorf("domain bilgi cek: %w", err)
 	}
 	// 🔴 Per-tenant FPM (Seçenek A) aktifse socket'i DAİMA per-tenant socket'e zorla —
@@ -1509,6 +1518,12 @@ func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error
 	// tenant'ta 502 üretmez.
 	if TenantFPMActive(sk) {
 		socket = tenantSocket(sk)
+	}
+	// Ek/parked domain ana domainle aynı sk'yi paylaşır. Normal render yolu
+	// dom_<sk>.conf'a yazarak ana vhost'u ezeceği için her merkezi yeniden-render
+	// çağrısını ek domaine ait ayrı dosyaya yönlendir.
+	if anaDomainID.Valid {
+		return EkVhostYaz(alanAdi, sk, webRoot, socket, certPath, keyPath)
 	}
 	home := "/home/" + sk
 
