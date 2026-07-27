@@ -42,8 +42,12 @@ type destPutReq struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
 	Kullanici string `json:"kullanici"`
-	Parola    string `json:"parola"`     // boş ise mevcut korunur
+	Parola    string `json:"parola"` // boş ise mevcut korunur
 	UzakDizin string `json:"uzak_dizin"`
+	Bucket    string `json:"bucket"`
+	Region    string `json:"region"`
+	Endpoint  string `json:"endpoint"`
+	PathStyle bool   `json:"path_style"`
 	Aktif     bool   `json:"aktif"`
 }
 
@@ -67,14 +71,36 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !gecerliTip(req.Tip) {
-		httpx.WriteError(w, http.StatusBadRequest, "tip: ftp|sftp")
+		httpx.WriteError(w, http.StatusBadRequest, "tip: ftp|sftp|s3|b2")
 		return
 	}
-	if req.Host == "" || req.Kullanici == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "host ve kullanıcı zorunlu")
+	if req.Kullanici == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "kullanıcı / access key zorunlu")
 		return
 	}
-	if req.Port == 0 {
+	if objectStorageTip(req.Tip) {
+		if req.Bucket == "" {
+			httpx.WriteError(w, http.StatusBadRequest, "bucket zorunlu")
+			return
+		}
+		if req.Region == "" {
+			req.Region = "us-east-1"
+		}
+		// Eski şemadaki NOT NULL host alanını anlamlı bir değerle doldur.
+		req.Host = req.Endpoint
+		probe := &Destination{
+			Tip: req.Tip, Bucket: req.Bucket, Region: req.Region,
+			Endpoint: req.Endpoint, PathStyle: req.PathStyle,
+		}
+		if _, err := s3Endpoint(probe); err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		req.Port = 443
+	} else if req.Host == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "host zorunlu")
+		return
+	} else if req.Port == 0 {
 		if req.Tip == "sftp" {
 			req.Port = 22
 		} else {
@@ -100,14 +126,19 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 		aktif = 1
 	}
 	_, err = h.DB.ExecContext(r.Context(),
-		`INSERT INTO backup_destinations(domain_id, tip, host, port, kullanici, parola, uzak_dizin, aktif)
-		 VALUES(?,?,?,?,?,?,?,?)
+		`INSERT INTO backup_destinations(
+		   domain_id, tip, host, port, kullanici, parola, uzak_dizin,
+		   bucket, region, endpoint, path_style, aktif)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
 		 ON DUPLICATE KEY UPDATE
 		   tip=VALUES(tip), host=VALUES(host), port=VALUES(port),
 		   kullanici=VALUES(kullanici), parola=VALUES(parola),
-		   uzak_dizin=VALUES(uzak_dizin), aktif=VALUES(aktif),
+		   uzak_dizin=VALUES(uzak_dizin), bucket=VALUES(bucket),
+		   region=VALUES(region), endpoint=VALUES(endpoint),
+		   path_style=VALUES(path_style), aktif=VALUES(aktif),
 		   son_durum='', son_hata=''`,
-		id, req.Tip, req.Host, req.Port, req.Kullanici, req.Parola, req.UzakDizin, aktif)
+		id, req.Tip, req.Host, req.Port, req.Kullanici, req.Parola, req.UzakDizin,
+		req.Bucket, req.Region, req.Endpoint, req.PathStyle, aktif)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB kayıt: "+err.Error())
 		return
@@ -154,7 +185,8 @@ func (h *Handlers) TestDestination(w http.ResponseWriter, r *http.Request) {
 
 	var d *Destination
 	var ad destPutReq
-	if json.NewDecoder(r.Body).Decode(&ad) == nil && ad.Host != "" {
+	if json.NewDecoder(r.Body).Decode(&ad) == nil &&
+		(ad.Host != "" || (objectStorageTip(ad.Tip) && ad.Bucket != "")) {
 		// Ad-hoc test (UI'dan kaydetmeden test): parola boşsa DB'den çek
 		mevcutParola := ""
 		_ = h.DB.QueryRowContext(r.Context(),
@@ -177,6 +209,8 @@ func (h *Handlers) TestDestination(w http.ResponseWriter, r *http.Request) {
 		d = &Destination{
 			DomainID: id, Tip: ad.Tip, Host: ad.Host, Port: port,
 			Kullanici: ad.Kullanici, Parola: ad.Parola, UzakDizin: dz, Aktif: true,
+			Bucket: ad.Bucket, Region: ad.Region, Endpoint: ad.Endpoint,
+			PathStyle: ad.PathStyle,
 		}
 	} else {
 		d, err = readDestination(r.Context(), h.DB, id)

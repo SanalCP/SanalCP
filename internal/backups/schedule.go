@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,14 +15,14 @@ import (
 )
 
 type Schedule struct {
-	Freq         string `json:"freq"`            // "none" | "daily" | "weekly"
-	Hour         int    `json:"hour"`            // 0-23
-	Retention    int    `json:"retention"`       // keep last N
-	LastBackupAt string `json:"last_backup_at"`  // RFC3339 or empty
+	Freq         string `json:"freq"`           // "none" | "daily" | "weekly" | "monthly"
+	Hour         int    `json:"hour"`           // 0-23
+	Retention    int    `json:"retention"`      // keep last N
+	LastBackupAt string `json:"last_backup_at"` // RFC3339 or empty
 }
 
 func gecerliFreq(f string) bool {
-	return f == "none" || f == "daily" || f == "weekly"
+	return f == "none" || f == "daily" || f == "weekly" || f == "monthly"
 }
 
 // StartScheduler: panel başlangıcında çağrılır, kendi goroutine'ini başlatır.
@@ -42,13 +41,13 @@ func StartScheduler(db *sql.DB) {
 }
 
 type dueDomain struct {
-	ID       int64
-	AlanAdi  string
-	SK       string
-	Freq     string
-	Hour     int
+	ID        int64
+	AlanAdi   string
+	SK        string
+	Freq      string
+	Hour      int
 	Retention int
-	IsDemo   int
+	IsDemo    int
 }
 
 // TickOnce: scheduler tick'i tek seferlik manuel çağrı (test + operatör force-run için).
@@ -90,6 +89,8 @@ func tickOnce(db *sql.DB) {
 		minSec := int64(23 * 3600)
 		if d.Freq == "weekly" {
 			minSec = int64(6*24*3600 + 12*3600)
+		} else if d.Freq == "monthly" {
+			minSec = int64(27*24*3600 + 12*3600)
 		}
 		if lastTs.Valid && (now.Unix()-lastTs.Int64) < minSec {
 			continue
@@ -123,35 +124,25 @@ func runOneBackup(db *sql.DB, d dueDomain) error {
 	_ = os.MkdirAll(dir, 0700)
 	dosya := fmt.Sprintf("%s-auto-%s.tar.gz", d.SK, stamp)
 	abs := filepath.Join(dir, dosya)
-	sqlDump := filepath.Join(dir, dosya+".sql")
-
-	dbName := d.SK + "_main"
-	_ = exec.Command("bash", "-c",
-		fmt.Sprintf("mysqldump --single-transaction %s > %s 2>&1 || true", dbName, sqlDump)).Run()
-
-	args := []string{"czf", abs, "-C", "/home", d.SK, "-C", dir, dosya + ".sql"}
-	if out, err := exec.Command("tar", args...).CombinedOutput(); err != nil {
-		_ = os.Remove(sqlDump)
-		return fmt.Errorf("tar: %s: %w", strings.TrimSpace(string(out)), err)
-	}
-	_ = os.Remove(sqlDump)
-
-	st, _ := os.Stat(abs)
-	var boyut int64
-	if st != nil {
-		boyut = st.Size()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	boyut, err := createArchive(ctx, db, d.ID, d.AlanAdi, d.SK, abs)
+	if err != nil {
+		return err
 	}
 
-	if _, err := db.Exec(
+	res, err := db.Exec(
 		`INSERT INTO backups(domain_id, tip, dosya, boyut_b, notlar) VALUES(?,?,?,?,?)`,
-		d.ID, "oto", dosya, boyut, "Otomatik yedek ("+d.Freq+")"); err != nil {
+		d.ID, "oto", dosya, boyut, "Otomatik yedek ("+d.Freq+")")
+	if err != nil {
 		return fmt.Errorf("DB kayıt: %w", err)
 	}
+	backupID, _ := res.LastInsertId()
 	if _, err := db.Exec(`UPDATE domains SET last_backup_at=NOW() WHERE id=?`, d.ID); err != nil {
 		log.Printf("last_backup_at güncellenemedi: %v", err)
 	}
 	// Uzak hedef varsa arkaplanda yükle
-	pushToDestinationAsync(db, d.ID, abs, dosya)
+	pushToDestinationAsync(db, d.ID, backupID, abs, dosya)
 	log.Printf("backup auto %s: dosya=%s boyut=%d", d.AlanAdi, dosya, boyut)
 	return nil
 }
@@ -162,7 +153,7 @@ func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 		retention = 1
 	}
 	rows, err := db.Query(
-		`SELECT id, dosya FROM backups
+		`SELECT id, dosya, uzak_durum FROM backups
 		 WHERE domain_id=? AND tip='oto'
 		 ORDER BY id DESC`, domainID)
 	if err != nil {
@@ -171,13 +162,14 @@ func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 	defer rows.Close()
 
 	type item struct {
-		ID    int64
-		Dosya string
+		ID        int64
+		Dosya     string
+		UzakDurum string
 	}
 	var all []item
 	for rows.Next() {
 		var it item
-		if err := rows.Scan(&it.ID, &it.Dosya); err != nil {
+		if err := rows.Scan(&it.ID, &it.Dosya, &it.UzakDurum); err != nil {
 			continue
 		}
 		all = append(all, it)
@@ -192,6 +184,7 @@ func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 	for _, it := range old {
 		yol := filepath.Join(BackupRoot, sk, it.Dosya)
 		_ = os.Remove(yol)
+		deleteRemoteBestEffort(db, domainID, it.Dosya, it.UzakDurum)
 		_, _ = db.Exec(`DELETE FROM backups WHERE id=?`, it.ID)
 	}
 	log.Printf("backup retention domain=%d: %d eski yedek silindi (keep %d)", domainID, len(old), retention)
