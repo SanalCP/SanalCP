@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"sort"
@@ -370,15 +369,4 @@ func statusFromErr(err error) int {
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
-}
-
-// chown helper — dosyayı domain user'ına ata + SELinux context'ini düzelt (restorecon).
-// restorecon ŞART: panel root olarak çalışır; oluşturduğu/değiştirdiği dosya doğru
-// SELinux context'i (httpd_sys_content_t) almazsa nginx/php-fpm erişemez ve
-// "dosya izinleri bozuldu" gibi görünür (SELinux Enforcing sunucularda).
-func chown(path, sistemKullanici string) {
-	if uu, err := userLookup(sistemKullanici); err == nil {
-		_ = osChown(path, uu.UID, uu.GID)
-	}
-	_, _ = exec.Command("restorecon", path).CombinedOutput()
 }

@@ -49,7 +49,7 @@ type ghUser struct {
 }
 
 type ghRepo struct {
-	FullName      string `json:"full_name"`   // owner/name
+	FullName      string `json:"full_name"` // owner/name
 	Name          string `json:"name"`
 	Description   string `json:"description"`
 	Private       bool   `json:"private"`
@@ -320,7 +320,7 @@ func (h *Handlers) Use(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Repo       string `json:"repo"`        // owner/name
+		Repo       string `json:"repo"` // owner/name
 		Branch     string `json:"branch"`
 		TargetDir  string `json:"target_dir"`
 		AutoDeploy bool   `json:"auto_deploy"`
@@ -388,7 +388,10 @@ func (h *Handlers) Use(w http.ResponseWriter, r *http.Request) {
 		hook.Config.URL = hookURL
 		hook.Config.ContentType = "json"
 		hook.Config.Secret = secret
-		hook.Config.InsecureSSL = "1" // self-signed cert için
+		// GitHub ile panel arasındaki TLS sertifikası doğrulansın. Self-signed
+		// kurulumlarda otomatik deploy, panel için geçerli sertifika alınana
+		// kadar bilinçli olarak başarısız olur.
+		hook.Config.InsecureSSL = "0"
 		body, st, err := ghCall(r.Context(), "POST", "/repos/"+req.Repo+"/hooks", pat, hook)
 		if err != nil || (st != 201 && st != 200) {
 			resp["webhook_ok"] = false

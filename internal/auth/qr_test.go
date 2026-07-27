@@ -28,7 +28,7 @@ func TestTwoFASetupQR(t *testing.T) {
 	key := []byte("test-jwt-secret-0123456789-abcdef")
 	h := &Handlers{Secret: key, LifetimeSec: 3600}
 
-	tok, err := Issue(key, 3600, 1, "root", "admin")
+	tok, err := Issue(key, 3600, 1, "root", "admin", 0)
 	if err != nil {
 		t.Fatalf("Issue: %v", err)
 	}

@@ -58,6 +58,9 @@ command -v nginx >/dev/null || die "nginx bulunamadi"
 NGVER=$(nginx -v 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 [ -n "$NGVER" ] || die "nginx surumu okunamadi"
 
+# Dizinleri erken olustur (ABI stamp connector adiminda buraya yazilir).
+mkdir -p "$MODSEC_DIR" "$DOMAINS_DIR" "$WORK_DIR" "$MODULE_DIR"
+
 # ---- durum ----
 have_lib() { [ -e "$MODSEC_PREFIX/lib/libmodsecurity.so" ]; }
 have_module() { [ -f "$MODULE" ]; }
@@ -124,7 +127,12 @@ if ! have_module || ! abi_ok || [ "$FORCE" = 1 ]; then
   cd "$SRC/nginx-$NGVER"
   export MODSECURITY_INC="$MODSEC_PREFIX/include"
   export MODSECURITY_LIB="$MODSEC_PREFIX/lib"
-  ./configure --with-compat --add-dynamic-module=../ModSecurity-nginx >/tmp/waf-configure.log 2>&1 \
+  # 🔴 el10/GCC 14+: implicit-function-declaration ARTIK HATA. nginx'in ModSecurity-nginx
+  # feature-probe'u <stdio.h>'suz printf() kullanir → probe HATA verir ve "ModSecurity library
+  # ... not found" der (kutuphane VAR olsa bile). -Wno-error=... probe'u uyariya dusurur.
+  ./configure --with-compat \
+    --with-cc-opt="-Wno-error=implicit-function-declaration" \
+    --add-dynamic-module=../ModSecurity-nginx >/tmp/waf-configure.log 2>&1 \
     || { tail -20 /tmp/waf-configure.log; die "connector configure basarisiz (bkz /tmp/waf-configure.log)"; }
   make modules >/tmp/waf-make.log 2>&1 \
     || { tail -20 /tmp/waf-make.log; die "make modules basarisiz (bkz /tmp/waf-make.log)"; }
@@ -216,9 +224,10 @@ else
   cp -a "$NGINX_CONF" "$NGINX_CONF.waf-bak"
   # include /usr/share/nginx/modules/*.conf; satirindan SONRA ekle; yoksa dosya basina.
   if grep -qE '^\s*include\s+/usr/share/nginx/modules/\*\.conf;' "$NGINX_CONF"; then
-    awk -v mark="$MARK" -v load="$LOADLINE" '
+    # NOT: gawk 'load' builtin adini degisken olarak kullanamaz → 'loadln'.
+    awk -v mark="$MARK" -v loadln="$LOADLINE" '
       { print }
-      $0 ~ /include \/usr\/share\/nginx\/modules\/\*\.conf;/ && !d { print mark; print load; d=1 }
+      $0 ~ /include \/usr\/share\/nginx\/modules\/\*\.conf;/ && !d { print mark; print loadln; d=1 }
     ' "$NGINX_CONF" > "$NGINX_CONF.wafnew"
   else
     { echo "$MARK"; echo "$LOADLINE"; cat "$NGINX_CONF"; } > "$NGINX_CONF.wafnew"

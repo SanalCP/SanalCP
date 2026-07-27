@@ -1,63 +1,68 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/store/auth'
 import LoginPage from '@/pages/LoginPage'
 import DashboardLayout from '@/components/DashboardLayout'
-import HomePage from '@/pages/HomePage'
-import DomainsPage from '@/pages/DomainsPage'
-import SubscriptionDetailPage from '@/pages/SubscriptionDetailPage'
-import ServicePlansPage from '@/pages/ServicePlansPage'
-import SettingsPage from '@/pages/SettingsPage'
-import PlaceholderPage from '@/pages/PlaceholderPage'
-import ToolPage from '@/pages/ToolPage'
-import DomainFilesPage from '@/pages/DomainFilesPage'
-import DomainSSLPage from '@/pages/DomainSSLPage'
-import DomainSSHPage from '@/pages/DomainSSHPage'
-import DomainStatsPage from '@/pages/DomainStatsPage'
-import DomainPerformansPage from '@/pages/DomainPerformansPage'
-import DomainComposerPage from '@/pages/DomainComposerPage'
-import DomainSifreKorumaPage from '@/pages/DomainSifreKorumaPage'
-import DomainAntivirusPage from '@/pages/DomainAntivirusPage'
-import DomainKopyaPage from '@/pages/DomainKopyaPage'
-import DomainCronPage from '@/pages/DomainCronPage'
-import DomainLogsPage from '@/pages/DomainLogsPage'
-import DomainDNSPage from '@/pages/DomainDNSPage'
-import RedisPage from '@/pages/RedisPage'
-import DomainConnectionPage from '@/pages/DomainConnectionPage'
-import DomainDatabasesPage from '@/pages/DomainDatabasesPage'
-import DomainFTPPage from '@/pages/DomainFTPPage'
-import DomainMailPage from '@/pages/DomainMailPage'
-import DomainPHPPage from '@/pages/DomainPHPPage'
-import DomainBackupsPage from '@/pages/DomainBackupsPage'
-import DomainGitPage from '@/pages/DomainGitPage'
-import DomainWebSunucuPage from '@/pages/DomainWebSunucuPage'
-import DomainWafPage from '@/pages/DomainWafPage'
-import PHPModuleriPage from '@/pages/PHPModuleriPage'
-import PaketlerPage from '@/pages/PaketlerPage'
-import PaketDetayPage from '@/pages/PaketDetayPage'
-import PHPSurumleriPage from '@/pages/PHPSurumleriPage'
-import AraclarAyarlarPage from '@/pages/AraclarAyarlarPage'
-import DNSSablonuPage from '@/pages/DNSSablonuPage'
-import ServislerPage from '@/pages/ServislerPage'
-import WordPressPage from '@/pages/WordPressPage'
-import FirewallPage from '@/pages/FirewallPage'
-import BackupYonetimiPage from '@/pages/BackupYonetimiPage'
-import DomainWordPressPage from '@/pages/DomainWordPressPage'
-import DomainSubdomainlerPage from '@/pages/DomainSubdomainlerPage'
-import DomainEkAlanlarPage from '@/pages/DomainEkAlanlarPage'
-import DomainErisimKontrolPage from '@/pages/DomainErisimKontrolPage'
 import CPanelGirisPage from '@/pages/CPanelGirisPage'
-import IstatistiklerPage from '@/pages/IstatistiklerPage'
-import IzlemePage from '@/pages/IzlemePage'
-import YakindaPage from '@/pages/YakindaPage'
-import DNSGenelPage from '@/pages/DNSGenelPage'
-import SSLGenelPage from '@/pages/SSLGenelPage'
-import MailGenelPage from '@/pages/MailGenelPage'
-import VeritabanlariGenelPage from '@/pages/VeritabanlariGenelPage'
-import MusterilerPage from '@/pages/MusterilerPage'
-import GuvenlikGunluguPage from '@/pages/GuvenlikGunluguPage'
-import KullanicilarPage from '@/pages/KullanicilarPage'
-import SunucuDurumuPage from '@/pages/SunucuDurumuPage'
-import HesapAktarimiPage from '@/pages/HesapAktarimiPage'
+
+// Giriş kabuğu küçük ve ilk ekranda gerekli; panel sayfalarının tamamı ise
+// yalnız ilgili route açıldığında indirilir. Böylece dosya yöneticisi, kod
+// editörü ve grafikler gibi ağır bağımlılıklar ilk panel bundle'ına girmez.
+const HomePage = lazy(() => import('@/pages/HomePage'))
+const DomainsPage = lazy(() => import('@/pages/DomainsPage'))
+const SubscriptionDetailPage = lazy(() => import('@/pages/SubscriptionDetailPage'))
+const ServicePlansPage = lazy(() => import('@/pages/ServicePlansPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'))
+const ToolPage = lazy(() => import('@/pages/ToolPage'))
+const DomainFilesPage = lazy(() => import('@/pages/DomainFilesPage'))
+const DomainSSLPage = lazy(() => import('@/pages/DomainSSLPage'))
+const DomainSSHPage = lazy(() => import('@/pages/DomainSSHPage'))
+const DomainStatsPage = lazy(() => import('@/pages/DomainStatsPage'))
+const DomainPerformansPage = lazy(() => import('@/pages/DomainPerformansPage'))
+const DomainComposerPage = lazy(() => import('@/pages/DomainComposerPage'))
+const DomainSifreKorumaPage = lazy(() => import('@/pages/DomainSifreKorumaPage'))
+const DomainAntivirusPage = lazy(() => import('@/pages/DomainAntivirusPage'))
+const DomainKopyaPage = lazy(() => import('@/pages/DomainKopyaPage'))
+const DomainCronPage = lazy(() => import('@/pages/DomainCronPage'))
+const DomainLogsPage = lazy(() => import('@/pages/DomainLogsPage'))
+const DomainDNSPage = lazy(() => import('@/pages/DomainDNSPage'))
+const RedisPage = lazy(() => import('@/pages/RedisPage'))
+const DomainConnectionPage = lazy(() => import('@/pages/DomainConnectionPage'))
+const DomainDatabasesPage = lazy(() => import('@/pages/DomainDatabasesPage'))
+const DomainFTPPage = lazy(() => import('@/pages/DomainFTPPage'))
+const DomainMailPage = lazy(() => import('@/pages/DomainMailPage'))
+const DomainPHPPage = lazy(() => import('@/pages/DomainPHPPage'))
+const DomainBackupsPage = lazy(() => import('@/pages/DomainBackupsPage'))
+const DomainGitPage = lazy(() => import('@/pages/DomainGitPage'))
+const DomainWebSunucuPage = lazy(() => import('@/pages/DomainWebSunucuPage'))
+const DomainWafPage = lazy(() => import('@/pages/DomainWafPage'))
+const PHPModuleriPage = lazy(() => import('@/pages/PHPModuleriPage'))
+const PaketlerPage = lazy(() => import('@/pages/PaketlerPage'))
+const PaketDetayPage = lazy(() => import('@/pages/PaketDetayPage'))
+const PHPSurumleriPage = lazy(() => import('@/pages/PHPSurumleriPage'))
+const AraclarAyarlarPage = lazy(() => import('@/pages/AraclarAyarlarPage'))
+const DNSSablonuPage = lazy(() => import('@/pages/DNSSablonuPage'))
+const ServislerPage = lazy(() => import('@/pages/ServislerPage'))
+const WordPressPage = lazy(() => import('@/pages/WordPressPage'))
+const FirewallPage = lazy(() => import('@/pages/FirewallPage'))
+const BackupYonetimiPage = lazy(() => import('@/pages/BackupYonetimiPage'))
+const DomainWordPressPage = lazy(() => import('@/pages/DomainWordPressPage'))
+const DomainSubdomainlerPage = lazy(() => import('@/pages/DomainSubdomainlerPage'))
+const DomainEkAlanlarPage = lazy(() => import('@/pages/DomainEkAlanlarPage'))
+const DomainErisimKontrolPage = lazy(() => import('@/pages/DomainErisimKontrolPage'))
+const IstatistiklerPage = lazy(() => import('@/pages/IstatistiklerPage'))
+const IzlemePage = lazy(() => import('@/pages/IzlemePage'))
+const YakindaPage = lazy(() => import('@/pages/YakindaPage'))
+const DNSGenelPage = lazy(() => import('@/pages/DNSGenelPage'))
+const SSLGenelPage = lazy(() => import('@/pages/SSLGenelPage'))
+const MailGenelPage = lazy(() => import('@/pages/MailGenelPage'))
+const VeritabanlariGenelPage = lazy(() => import('@/pages/VeritabanlariGenelPage'))
+const MusterilerPage = lazy(() => import('@/pages/MusterilerPage'))
+const GuvenlikGunluguPage = lazy(() => import('@/pages/GuvenlikGunluguPage'))
+const KullanicilarPage = lazy(() => import('@/pages/KullanicilarPage'))
+const SunucuDurumuPage = lazy(() => import('@/pages/SunucuDurumuPage'))
+const HesapAktarimiPage = lazy(() => import('@/pages/HesapAktarimiPage'))
 
 function GuardedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuth((s) => s.token)

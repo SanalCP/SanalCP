@@ -253,7 +253,7 @@ export default function DomainMailPage() {
 
   return (
     <div className="px-6 py-5">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-[1100px]">
         <Breadcrumb items={[
           { etiket: 'Anasayfa', href: '/' },
           { etiket: 'Domainler', href: '/domainler' },

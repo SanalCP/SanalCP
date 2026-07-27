@@ -1,7 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 // sp-mobil-v1
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useAuth } from '@/store/auth'
@@ -457,7 +457,13 @@ export default function DashboardLayout() {
 
         <main className="flex-1 min-w-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 flex flex-col">
           <div className="flex-1 min-w-0">
-            <Outlet />
+            <Suspense fallback={
+              <div className="px-6 py-10 text-sm text-slate-400 dark:text-slate-500" role="status">
+                Sayfa yükleniyor…
+              </div>
+            }>
+              <Outlet />
+            </Suspense>
           </div>
           <footer className="py-4 text-center text-xs text-slate-400 dark:text-slate-600">
             SanalPanel {surum?.mevcut ? `v${surum.mevcut}` : ''}

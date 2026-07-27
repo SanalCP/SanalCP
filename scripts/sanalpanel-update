@@ -67,6 +67,10 @@ SRC=$(find "$TMP" -maxdepth 1 -type d -name "*-$BRANCH" | head -1)
 A="$SRC/assets"
 NEWBIN="$A/sanalpanel-server"
 [ -f "$NEWBIN" ] || die "$A/sanalpanel-server yok (repo yapısı beklenenden farklı)"
+[ -f "$A/SHA256SUMS" ] || die "release bütünlük manifesti yok"
+(cd "$SRC" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
+  die "release asset SHA-256 doğrulaması başarısız"
+ok "release asset bütünlüğü doğrulandı"
 
 # 2) yeni binary'yi ÇALIŞTIRMADAN doğrula (ELF header) + değişiklik tespiti.
 # ÖNEMLİ: sadece binary'yi değil TÜM release'i (binary + frontend-dist + migrations)
