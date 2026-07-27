@@ -81,13 +81,28 @@ mysql -e "
         ('$BAYI_B','b@test.invalid','$HASH','reseller','ZZ Test Bayi B','active');
 " "$DB" || { kirmizi "test bayileri oluşturulamadı"; exit 1; }
 
-# Mevcut ilk iki domaini test bayilerine dağıt (geçici; çıkışta geri alınır).
+# Test bayilerine birer müşteri ata (geçici; çıkışta geri alınır).
+#
+# DOMAİNİ OLAN müşteriler seçilir. Eskiden MIN/MAX(customers.id) kullanılıyordu;
+# domaini olmayan bir müşteri kaydı (ör. domaini silinmiş artık kayıt) listenin
+# başına/sonuna denk geldiğinde yatay izolasyon testleri "0 kayıt" görüp
+# yetki hatası sanılan sahte başarısızlıklar üretiyordu.
 mysql -e "
   SET @a := (SELECT id FROM users WHERE username='$BAYI_A');
   SET @b := (SELECT id FROM users WHERE username='$BAYI_B');
-  UPDATE customers SET owner_user_id=@a WHERE id=(SELECT MIN(id) FROM (SELECT id FROM customers) t);
-  UPDATE customers SET owner_user_id=@b WHERE id=(SELECT MAX(id) FROM (SELECT id FROM customers) t);
+  SET @ca := (SELECT MIN(customer_id) FROM domains WHERE customer_id IS NOT NULL);
+  SET @cb := (SELECT MAX(customer_id) FROM domains WHERE customer_id IS NOT NULL);
+  UPDATE customers SET owner_user_id=@a WHERE id=@ca;
+  UPDATE customers SET owner_user_id=@b WHERE id=@cb AND @cb <> @ca;
 " "$DB"
+
+# Domaine bağlı müşteri sayısı — yatay testlerin ön koşulu.
+MUSTERILI_DOMAIN=$(mysql -N -e \
+  "SELECT COUNT(DISTINCT customer_id) FROM domains WHERE customer_id IS NOT NULL" "$DB")
+if [ "${MUSTERILI_DOMAIN:-0}" -lt 2 ]; then
+  kirmizi "UYARI: domaine bağlı yalnız $MUSTERILI_DOMAIN müşteri var —"
+  kirmizi "       yatay izolasyon testleri anlamlı çalışmaz (en az 2 gerekir)."
+fi
 
 giris() {
   curl -sk -X POST "$URL/auth/login" -H 'Content-Type: application/json' \

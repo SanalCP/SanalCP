@@ -21,6 +21,7 @@ type Kullanici = {
   durum: 'active' | 'suspended'
   bayi_id: number | null
   iki_fa: boolean
+  parolasiz: boolean
   son_giris: string
   son_giris_ip: string
   olusturma: string
@@ -248,6 +249,14 @@ export default function KullanicilarPage() {
                     {k.durum === 'active'
                       ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">Aktif</span>
                       : <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Askıda</span>}
+                    {/* Parolası olmayan hesap giriş yapamaz — "aktif" görünüp
+                        çalışmadığı için ayrı bir uyarı rozeti hak ediyor. */}
+                    {k.parolasiz && (
+                      <span
+                        title="Parola atanmamış — bu hesap giriş yapamaz"
+                        className="ml-1.5 px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+                      >Parola yok</span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-xs">
                     {k.iki_fa ? <span className="text-emerald-600 dark:text-emerald-400">Açık</span> : <span className="text-slate-400">Kapalı</span>}
@@ -365,8 +374,8 @@ export default function KullanicilarPage() {
               <span className="font-mono">{parolaHedef.kullanici_adi}</span> için yeni parola.
               {parolaHedef.rol === 'user' && (
                 <span className="block mt-1.5 text-xs text-slate-500">
-                  Bu müşterinin panel hesabı parolası. Atandıktan sonra müşteri, FTP kimliği yerine bu
-                  kullanıcı adı ve parolayla da giriş yapabilir.
+                  Bu müşterinin panel hesabı parolası. Müşteri panele yalnızca bu kullanıcı adı ve
+                  parolayla girebilir; parola atanmadan giriş yapamaz.
                 </span>
               )}
             </p>

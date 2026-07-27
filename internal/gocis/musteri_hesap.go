@@ -26,13 +26,16 @@ import (
 // Domain başına hesap üretmek aynı sistem kullanıcısı için birden çok panel
 // hesabı yaratırdı.
 //
-// 🔑 KRİTİK — GEÇİŞ KÖPRÜSÜ: üretilen users kayıtlarının password_hash'i BOŞ
+// 🔑 KRİTİK — PAROLASIZ ÜRETİLİR: users kayıtlarının password_hash'i BOŞ
 // bırakılır. Boş hash hiçbir parolayla eşleşmez (bkz. auth.ParolaEslesiyorMu),
-// yani bu hesaplar HENÜZ giriş yapamaz ve mevcut müşteriler eski FTP kimlikli
-// yollarını kullanmaya devam eder — göç kimseyi dışarıda bırakmaz. Yönetici
-// ya da bayi panelden parola atadığı anda o müşteri için yeni yol açılır.
-// Rastgele parola üretip kimseye söylememek yerine bu tercih edildi: sessizce
-// "parolası var ama kimse bilmiyor" hesaplar bırakmaz.
+// yani göçle üretilen hesap Kullanıcılar ekranından parola atanana kadar
+// GİRİŞ YAPAMAZ. Rastgele parola üretip kimseye söylememek yerine bu tercih
+// edildi: sessizce "parolası var ama kimse bilmiyor" hesaplar bırakmaz.
+//
+// 2026-07-27'ye kadar bunun bir telafisi vardı — müşteri eski FTP kimliğiyle
+// girebiliyordu (geçiş köprüsü). Köprü kaldırıldı (bkz. internal/musteri),
+// çünkü FTP parolaları veritabanında düz metin duruyor. Dolayısıyla göç
+// artık tek başına yeterli değil: yöneticinin parola ataması ŞART.
 func MusteriHesapGocu(ctx context.Context, db *sql.DB) {
 	// Zaten müşteri kaydına bağlanmamış domainleri olan tenant'lar.
 	rows, err := db.QueryContext(ctx, `
@@ -70,8 +73,8 @@ func MusteriHesapGocu(ctx context.Context, db *sql.DB) {
 		}
 		uretilen++
 	}
-	log.Printf("müşteri hesap göçü: %d tenant taşındı, %d atlandı (parola atanana kadar FTP girişi geçerli)",
-		uretilen, atlanan)
+	log.Printf("müşteri hesap göçü: %d tenant taşındı, %d atlandı — üretilen hesaplar PAROLASIZ, "+
+		"Kullanıcılar ekranından parola atanmadan giriş yapamazlar", uretilen, atlanan)
 }
 
 func tenantGocur(ctx context.Context, db *sql.DB, sistemKullanici, alanAdi string) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"sanalpanel/internal/auth"
@@ -14,13 +15,6 @@ func istekRol(rol string, uid int64) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	c := &auth.Claims{UserID: uid, Username: "t", Role: rol}
 	return r.WithContext(context.WithValue(r.Context(), claimsKey, c))
-}
-
-// istekMusteri: müşteri (auth.MusteriClaims) token'ı taşıyan istek üretir.
-func istekMusteri(domainID int64) *http.Request {
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	mc := &auth.MusteriClaims{DomainID: domainID}
-	return r.WithContext(context.WithValue(r.Context(), musteriClaimsKey, mc))
 }
 
 func TestAdminOnly(t *testing.T) {
@@ -42,9 +36,6 @@ func TestAdminOnly(t *testing.T) {
 	}
 	if kod := sar(istekRol(RolMusteri, 3)); kod != http.StatusForbidden {
 		t.Errorf("user rolü 403 almalıydı, kod=%d", kod)
-	}
-	if kod := sar(istekMusteri(5)); kod != http.StatusForbidden {
-		t.Errorf("müşteri token'ı 403 almalıydı, kod=%d", kod)
 	}
 	if kod := sar(httptest.NewRequest(http.MethodGet, "/", nil)); kod != http.StatusForbidden {
 		t.Errorf("kimliksiz 403 almalıydı, kod=%d", kod)
@@ -69,8 +60,8 @@ func TestBayiVeUstu(t *testing.T) {
 	if kod := sar(istekRol(RolMusteri, 3)); kod != http.StatusForbidden {
 		t.Errorf("user rolü 403 almalıydı, kod=%d", kod)
 	}
-	if kod := sar(istekMusteri(5)); kod != http.StatusForbidden {
-		t.Errorf("müşteri token'ı 403 almalıydı, kod=%d", kod)
+	if kod := sar(httptest.NewRequest(http.MethodGet, "/", nil)); kod != http.StatusForbidden {
+		t.Errorf("kimliksiz 403 almalıydı, kod=%d", kod)
 	}
 }
 
@@ -86,10 +77,14 @@ func TestKapsamSQL(t *testing.T) {
 		t.Errorf("bayi kapsamı hatalı: kosul=%q arg=%v", kosul, arg)
 	}
 
-	// Müşteri: yalnız kendi domaini.
-	kosul, arg = KapsamSQL(istekMusteri(42), "d")
-	if kosul == "" || len(arg) != 1 || arg[0] != int64(42) {
+	// Müşteri: aynı zincir, customers.user_id üzerinden.
+	kosul, arg = KapsamSQL(istekRol(RolMusteri, 42), "d")
+	if !strings.Contains(kosul, "kc.user_id") || len(arg) != 1 || arg[0] != int64(42) {
 		t.Errorf("müşteri kapsamı hatalı: kosul=%q arg=%v", kosul, arg)
+	}
+	// Bayi koşulu müşterininkiyle karışmamalı — owner_user_id ile daralmalı.
+	if kosulB, _ := KapsamSQL(istekRol(RolBayi, 7), "d"); !strings.Contains(kosulB, "kc.owner_user_id") {
+		t.Errorf("bayi kapsamı owner_user_id kullanmalı: %q", kosulB)
 	}
 
 	// Kimliksiz: fail-closed — hiçbir satır eşleşmemeli.
@@ -110,12 +105,13 @@ func TestDomainSahibiMiFailClosed(t *testing.T) {
 	if !DomainSahibiMi(istekRol(RolAdmin, 1), 99) {
 		t.Error("admin her domaine erişmeliydi")
 	}
-	// Müşteri yalnız kendi domainine.
-	if !DomainSahibiMi(istekMusteri(99), 99) {
-		t.Error("müşteri kendi domainine erişmeliydi")
+	// Müşteri de zincirden çözülür; DB yoksa reddedilir.
+	if DomainSahibiMi(istekRol(RolMusteri, 5), 99) {
+		t.Error("DB yokken müşteri erişimi reddedilmeliydi (fail-closed)")
 	}
-	if DomainSahibiMi(istekMusteri(98), 99) {
-		t.Error("müşteri başka domaine erişmemeliydi")
+	// Tanımsız rol hiçbir domaine erişemez.
+	if DomainSahibiMi(istekRol("bilinmeyen", 5), 99) {
+		t.Error("bilinmeyen rol reddedilmeliydi")
 	}
 }
 
