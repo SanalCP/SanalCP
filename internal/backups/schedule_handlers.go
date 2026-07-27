@@ -57,7 +57,7 @@ func (h *Handlers) SetSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !gecerliFreq(s.Freq) {
-		httpx.WriteError(w, http.StatusBadRequest, "freq: none|daily|weekly")
+		httpx.WriteError(w, http.StatusBadRequest, "freq: none|daily|weekly|monthly")
 		return
 	}
 	if s.Hour < 0 || s.Hour > 23 {

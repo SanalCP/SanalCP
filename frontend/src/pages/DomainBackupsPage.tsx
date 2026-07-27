@@ -8,13 +8,22 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import { T } from '@/lib/tablo'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
-type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string }
-type Schedule = { freq: 'none' | 'daily' | 'weekly'; hour: number; retention: number; last_backup_at?: string }
+type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string }
+type DB = { db_name: string }
+type RestoreScope = 'full' | 'files' | 'file' | 'database' | 'email'
+type Schedule = { freq: 'none' | 'daily' | 'weekly' | 'monthly'; hour: number; retention: number; last_backup_at?: string }
 type Destination = {
   yok?: boolean
-  id?: number; tip?: 'ftp' | 'sftp'; host?: string; port?: number
+  id?: number; tip?: DestTip; host?: string; port?: number
   kullanici?: string; uzak_dizin?: string; aktif?: boolean
+  bucket?: string; region?: string; endpoint?: string; path_style?: boolean
   son_yukleme?: string; son_durum?: string; son_hata?: string
+}
+type DestTip = 'ftp' | 'sftp' | 's3' | 'b2'
+const bosDestForm = {
+  tip: 'sftp' as DestTip, host: '', port: 22, kullanici: '', parola: '',
+  uzak_dizin: '/', bucket: '', region: 'us-east-1', endpoint: '',
+  path_style: true, aktif: true,
 }
 
 export default function DomainBackupsPage() {
@@ -27,12 +36,16 @@ export default function DomainBackupsPage() {
   const [isleniyor, setIsleniyor] = useState(false)
   const [silinecek, setSilinecek] = useState<Yedek | null>(null)
   const [geriYukle, setGeriYukle] = useState<Yedek | null>(null)
+  const [restoreScope, setRestoreScope] = useState<RestoreScope>('full')
+  const [restorePath, setRestorePath] = useState('public_html/index.php')
+  const [restoreDatabase, setRestoreDatabase] = useState('')
+  const [databases, setDatabases] = useState<DB[]>([])
 
   const [sched, setSched] = useState<Schedule>({ freq: 'none', hour: 3, retention: 7 })
   const [schedKayit, setSchedKayit] = useState(false)
 
   const [dest, setDest] = useState<Destination>({ yok: true })
-  const [destForm, setDestForm] = useState({ tip: 'sftp' as 'ftp'|'sftp', host: '', port: 22, kullanici: '', parola: '', uzak_dizin: '/', aktif: true })
+  const [destForm, setDestForm] = useState({ ...bosDestForm })
   const [destKayit, setDestKayit] = useState(false)
   const [destTest, setDestTest] = useState<{ ok: boolean; hata?: string } | null>(null)
 
@@ -43,18 +56,25 @@ export default function DomainBackupsPage() {
       api.get<Yedek[]>(`/domains/${id}/backups`),
       api.get<Schedule>(`/domains/${id}/backup-schedule`).catch(() => ({ data: { freq: 'none', hour: 3, retention: 7 } as Schedule })),
       api.get<Destination>(`/domains/${id}/backup-destination`).catch(() => ({ data: { yok: true } as Destination })),
-    ]).then(([y, s, d]) => {
+      api.get<DB[]>(`/domains/${id}/databases`).catch(() => ({ data: [] as DB[] })),
+    ]).then(([y, s, d, dbs]) => {
       setYedekler(y.data)
+      setDatabases(dbs.data)
+      if (!restoreDatabase && dbs.data.length) setRestoreDatabase(dbs.data[0].db_name)
       setSched(s.data)
       setDest(d.data)
       if (!d.data.yok) {
         setDestForm({
-          tip: (d.data.tip || 'sftp') as 'ftp'|'sftp',
+          tip: (d.data.tip || 'sftp') as DestTip,
           host: d.data.host || '',
           port: d.data.port || (d.data.tip === 'ftp' ? 21 : 22),
           kullanici: d.data.kullanici || '',
           parola: '',  // güvenlik: boş bırak, kullanıcı isterse yeniden girer
           uzak_dizin: d.data.uzak_dizin || '/',
+          bucket: d.data.bucket || '',
+          region: d.data.region || 'us-east-1',
+          endpoint: d.data.endpoint || '',
+          path_style: d.data.path_style ?? true,
           aktif: !!d.data.aktif,
         })
       }
@@ -96,7 +116,7 @@ export default function DomainBackupsPage() {
     try {
       await api.delete(`/domains/${id}/backup-destination`)
       setDest({ yok: true })
-      setDestForm({ tip: 'sftp', host: '', port: 22, kullanici: '', parola: '', uzak_dizin: '/', aktif: true })
+      setDestForm({ ...bosDestForm })
       setBasari('Uzak hedef silindi')
       setTimeout(() => setBasari(null), 4000)
     } catch (e) {
@@ -115,9 +135,10 @@ export default function DomainBackupsPage() {
     try {
       const r = await api.put<{ schedule: Schedule }>(`/domains/${id}/backup-schedule`, yeni)
       setSched(r.data.schedule)
+      const freqAd = yeni.freq === 'daily' ? 'Günlük' : yeni.freq === 'weekly' ? 'Haftalık' : 'Aylık'
       setBasari(yeni.freq === 'none'
         ? 'Otomatik yedek kapatıldı'
-        : `Otomatik yedek aktif: ${yeni.freq === 'daily' ? 'Günlük' : 'Haftalık'}, ${String(yeni.hour).padStart(2,'0')}:00, son ${yeni.retention} yedek tutulur`)
+        : `Otomatik yedek aktif: ${freqAd}, ${String(yeni.hour).padStart(2,'0')}:00, son ${yeni.retention} yedek tutulur`)
       setTimeout(() => setBasari(null), 5000)
     } catch (e) {
       setHata(apiHata(e, 'Plan kaydedilemedi'))
@@ -153,8 +174,12 @@ export default function DomainBackupsPage() {
     if (!geriYukle) return
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
-      const { data } = await api.post(`/domains/${id}/backups/${geriYukle.id}/geriyukle`)
-      setBasari(`Geri yüklendi: ${data.alan_adi} — ${data.db_import || ''}`)
+      const { data } = await api.post(`/domains/${id}/backups/${geriYukle.id}/geriyukle`, {
+        scope: restoreScope,
+        path: restoreScope === 'file' ? restorePath : '',
+        database: restoreScope === 'database' ? restoreDatabase : '',
+      })
+      setBasari(`Geri yüklendi: ${data.alan_adi} — ${data.sonuc || ''}`)
       setGeriYukle(null)
     } catch (e) {
       setHata(apiHata(e, 'Geri yükleme başarısız'))
@@ -188,7 +213,7 @@ export default function DomainBackupsPage() {
         <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
         {' · '}home + MySQL dump = tar.gz · {sched.freq === 'none'
           ? 'Otomatik yedek kapalı'
-          : `${sched.freq === 'daily' ? 'Günlük' : 'Haftalık'} ${String(sched.hour).padStart(2,'0')}:00 · son ${sched.retention} oto-yedek korunur`}
+          : `${sched.freq === 'daily' ? 'Günlük' : sched.freq === 'weekly' ? 'Haftalık' : 'Aylık'} ${String(sched.hour).padStart(2,'0')}:00 · son ${sched.retention} oto-yedek korunur`}
       </p>}
 
       {/* Otomatik Yedek Planı */}
@@ -204,13 +229,14 @@ export default function DomainBackupsPage() {
             <div className="text-xs text-slate-500 dark:text-slate-500">Son oto-yedek: <span className="font-mono">{sched.last_backup_at.replace('T',' ').replace('Z','')}</span></div>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['none','daily','weekly'] as const).map(f => {
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          {(['none','daily','weekly','monthly'] as const).map(f => {
             const aktif = sched.freq === f
             const meta: Record<string,{ad:string;ikon:string;aciklama:string;renk:string}> = {
               none: { ad:'Kapalı', ikon:'⏸', aciklama:'Otomatik yedek yok. Yalnız manuel "Şimdi Yedekle".', renk:'slate' },
               daily: { ad:'Günlük', ikon:'🌙', aciklama:'Her gün seçilen saatte yedek üretilir, son N tutulur.', renk:'emerald' },
               weekly: { ad:'Haftalık', ikon:'📅', aciklama:'Her 7 günde bir yedek, daha ekonomik disk kullanımı.', renk:'indigo' },
+              monthly: { ad:'Aylık', ikon:'🗓️', aciklama:'Yaklaşık her ay uzun dönem arşiv yedeği.', renk:'indigo' },
             }
             const m = meta[f]
             const renk: Record<string,string> = {
@@ -260,11 +286,11 @@ export default function DomainBackupsPage() {
         )}
       </div>
 
-      {/* Uzak Yedek Hedefi (FTP/SFTP) */}
+      {/* Uzak Yedek Hedefi */}
       <div className="mb-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Uzak Yedek Hedefi (FTP / SFTP)</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Uzak Yedek Hedefi</h3>
             <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
               Yedek üretildikten sonra arkaplanda uzak sunucuya yüklenir — disk arızasına karşı off-site koruma.
             </p>
@@ -288,47 +314,79 @@ export default function DomainBackupsPage() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 mb-3">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Protokol</label>
-            <div className="flex gap-2">
-              {(['sftp','ftp'] as const).map(t => {
+          <div className="sm:col-span-6">
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Sağlayıcı / protokol</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['sftp','ftp','s3','b2'] as const).map(t => {
                 const aktif = destForm.tip === t
+                const ad: Record<DestTip,string> = {
+                  sftp: '🔒 SFTP', ftp: '📡 FTP', s3: '☁️ Amazon S3', b2: '🗄️ Backblaze B2',
+                }
                 return (
                   <button key={t} type="button"
-                    onClick={() => setDestForm(f => ({...f, tip: t, port: t === 'sftp' ? 22 : 21}))}
+                    onClick={() => setDestForm(f => ({
+                      ...f, tip: t,
+                      port: t === 'sftp' ? 22 : t === 'ftp' ? 21 : 443,
+                      region: t === 'b2' && f.region === 'us-east-1' ? '' : f.region,
+                    }))}
                     className={`flex-1 text-xs px-3 py-2 rounded border ${aktif ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-semibold' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
-                    {t === 'sftp' ? '🔒 SFTP (port 22)' : '📡 FTP (port 21)'}
+                    {ad[t]}
                   </button>
                 )
               })}
             </div>
           </div>
-          <div className="sm:col-span-3">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Host</label>
-            <input type="text" value={destForm.host} placeholder="backup.firma.com"
-              onChange={e => setDestForm(f => ({...f, host: e.target.value}))}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
-          </div>
-          <div className="sm:col-span-1">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Port</label>
-            <input type="number" value={destForm.port}
-              onChange={e => setDestForm(f => ({...f, port: Number(e.target.value)||0}))}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
-          </div>
+          {(destForm.tip === 'ftp' || destForm.tip === 'sftp') ? <>
+            <div className="sm:col-span-5">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Host</label>
+              <input type="text" value={destForm.host} placeholder="backup.firma.com"
+                onChange={e => setDestForm(f => ({...f, host: e.target.value}))}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Port</label>
+              <input type="number" value={destForm.port}
+                onChange={e => setDestForm(f => ({...f, port: Number(e.target.value)||0}))}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            </div>
+          </> : <>
+            <div className="sm:col-span-3">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Bucket</label>
+              <input type="text" value={destForm.bucket} placeholder="firma-yedekleri"
+                onChange={e => setDestForm(f => ({...f, bucket: e.target.value.trim()}))}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            </div>
+            <div className="sm:col-span-3">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Bölge (region)</label>
+              <input type="text" value={destForm.region}
+                placeholder={destForm.tip === 'b2' ? 'us-west-004' : 'eu-central-1'}
+                onChange={e => setDestForm(f => ({...f, region: e.target.value.trim()}))}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            </div>
+            <div className="sm:col-span-6">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
+                S3 endpoint {destForm.tip === 's3' && <span className="text-[10px] text-slate-400">(Amazon S3 için boş bırakılabilir)</span>}
+              </label>
+              <input type="url" value={destForm.endpoint}
+                placeholder={destForm.tip === 'b2' ? 'https://s3.us-west-004.backblazeb2.com' : 'https://s3.eu-central-1.amazonaws.com'}
+                onChange={e => setDestForm(f => ({...f, endpoint: e.target.value.trim()}))}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            </div>
+          </>}
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Kullanıcı</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? 'Access Key ID' : 'Kullanıcı'}</label>
             <input type="text" value={destForm.kullanici} autoComplete="off"
               onChange={e => setDestForm(f => ({...f, kullanici: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Parola {!dest.yok && <span className="text-[10px] text-slate-400 dark:text-slate-500">(boş bırakırsanız mevcut korunur)</span>}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? 'Secret Access Key' : 'Parola'} {!dest.yok && <span className="text-[10px] text-slate-400 dark:text-slate-500">(boşsa mevcut korunur)</span>}</label>
             <input type="password" value={destForm.parola} autoComplete="new-password"
               onChange={e => setDestForm(f => ({...f, parola: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Uzak dizin</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? 'Nesne öneki (prefix)' : 'Uzak dizin'}</label>
             <input type="text" value={destForm.uzak_dizin}
               onChange={e => setDestForm(f => ({...f, uzak_dizin: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
@@ -348,11 +406,11 @@ export default function DomainBackupsPage() {
                 {destTest.ok ? '✓ Bağlantı OK' : '✗ ' + (destTest.hata?.slice(0, 80) || 'Hata')}
               </span>
             )}
-            <button type="button" onClick={destBaglantiTesti} disabled={destKayit || !destForm.host || !destForm.kullanici}
+            <button type="button" onClick={destBaglantiTesti} disabled={destKayit || !destForm.kullanici || ((destForm.tip === 's3' || destForm.tip === 'b2') ? !destForm.bucket || (destForm.tip === 'b2' && !destForm.endpoint) : !destForm.host)}
               className="text-xs px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-50">
               {destKayit ? 'Test ediliyor…' : 'Bağlantı Testi'}
             </button>
-            <button type="button" onClick={destKaydet} disabled={destKayit || !destForm.host || !destForm.kullanici}
+            <button type="button" onClick={destKaydet} disabled={destKayit || !destForm.kullanici || ((destForm.tip === 's3' || destForm.tip === 'b2') ? !destForm.bucket || (destForm.tip === 'b2' && !destForm.endpoint) : !destForm.host)}
               className="text-xs px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 rounded font-medium">
               Kaydet
             </button>
@@ -385,6 +443,7 @@ export default function DomainBackupsPage() {
             <tr>
               <th className={T.baslik}>Dosya</th>
               <th className={T.baslik}>Tip</th>
+              <th className={T.baslik}>Uzak kopya</th>
               <th className={T.baslik}>Boyut</th>
               <th className={T.baslik}>Oluşturulma</th>
               <th className={`${T.baslik} text-right`}>İşlemler</th>
@@ -398,6 +457,12 @@ export default function DomainBackupsPage() {
                   <span className={`text-xs px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold ${
                     y.tip === 'planli' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500'
                   }`}>{y.tip === 'planli' ? 'Planlı' : y.tip}</span>
+                </td>
+                <td className={T.hucre} data-etiket="Uzak kopya">
+                  {!y.uzak_durum ? <span className="text-xs text-slate-400">—</span> :
+                   y.uzak_durum === 'basarili' ? <span className="text-xs text-emerald-600 dark:text-emerald-400">✓ Uzakta</span> :
+                   y.uzak_durum === 'yukleniyor' ? <span className="text-xs text-sky-600 dark:text-sky-400">↑ Yükleniyor</span> :
+                   <span title={y.uzak_hata} className="text-xs text-red-600 dark:text-red-400">✗ Hata</span>}
                 </td>
                 <td className={T.hucre} data-etiket="Boyut"><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{formatBoyut(y.boyut_b)}</span></td>
                 <td className={T.hucre} data-etiket="Oluşturulma"><span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{y.olusturma}</span></td>
@@ -421,14 +486,53 @@ export default function DomainBackupsPage() {
         onIptal={() => setSilinecek(null)}
       />
 
-      <ConfirmDialog
-        acik={!!geriYukle}
-        baslik="Yedekten geri yükle"
-        mesaj={`"${geriYukle?.dosya}" geri yüklensin mi?\n\nUYARI: Mevcut public_html dosyaları üzerine yazılır, MySQL tabloları yeniden oluşturulur. Bu işlem geri alınamaz.`}
-        tehlikeli onayMetni="Evet, geri yükle"
-        onOnay={restore}
-        onIptal={() => setGeriYukle(null)}
-      />
+      {geriYukle && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-5">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Yedekten geri yükle</h3>
+            <p className="mt-1 text-xs text-slate-500 font-mono break-all">{geriYukle.dosya}</p>
+            <label className="block mt-4 text-xs font-medium text-slate-600 dark:text-slate-400">Geri yüklenecek bölüm</label>
+            <select value={restoreScope} onChange={e => setRestoreScope(e.target.value as RestoreScope)}
+              className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm">
+              <option value="full">Tüm hesap — dosyalar, veritabanları ve e-posta</option>
+              <option value="files">Yalnız web dosyaları (public_html)</option>
+              <option value="file">Tek dosya</option>
+              <option value="database">Tek veritabanı</option>
+              <option value="email">Yalnız e-posta kutuları</option>
+            </select>
+            {restoreScope === 'file' && (
+              <label className="block mt-3">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Hesap ana dizinine göre dosya yolu</span>
+                <input value={restorePath} onChange={e => setRestorePath(e.target.value)}
+                  placeholder="public_html/index.php"
+                  className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm"/>
+              </label>
+            )}
+            {restoreScope === 'database' && (
+              <label className="block mt-3">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Veritabanı</span>
+                <select value={restoreDatabase} onChange={e => setRestoreDatabase(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 font-mono text-sm">
+                  {!databases.length && <option value="">Veritabanı bulunamadı</option>}
+                  {databases.map(db => <option key={db.db_name} value={db.db_name}>{db.db_name}</option>)}
+                </select>
+              </label>
+            )}
+            <div className="mt-4 p-3 rounded bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-800 dark:text-amber-200">
+              Seçilen bölümdeki mevcut veriler yedekteki sürümle değiştirilir. Bu işlem geri alınamaz.
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setGeriYukle(null)} disabled={isleniyor}
+                className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded">İptal</button>
+              <button onClick={restore}
+                disabled={isleniyor || (restoreScope === 'file' && !restorePath.trim()) || (restoreScope === 'database' && !restoreDatabase)}
+                className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50">
+                {isleniyor ? 'Geri yükleniyor…' : 'Geri yükle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
