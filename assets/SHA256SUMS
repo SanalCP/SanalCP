@@ -1,4 +1,4 @@
-84e57519a502e7d548aea3e2904f8462ebfdedb09af260e48a779a44762975f9  assets/frontend-dist.tar.gz
+18ddd8711b622875423f4456fb98ba95f7299029b1a99caa0ee7db054e61344c  assets/frontend-dist.tar.gz
 24a115dd3e981aa0cb769b39f4c9b5a8aecada6b9318d01edcce82be0cc46d2a  assets/mail/dovecot/10-sanalpanel-mail.conf.tmpl
 c63bc9f526e9f922fec62dfc03432b1284a6535fc0c77b2b68944545978e97ea  assets/mail/dovecot/dovecot-sql.conf.ext.tmpl
 01ec070e7a92e75d539ca65ed24f083fcca92a01889d03f0773fb845c368bda2  assets/mail/opendkim/opendkim.conf.tmpl
