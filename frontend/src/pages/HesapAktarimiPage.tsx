@@ -31,6 +31,8 @@ type ImportResult = {
   mailboxes: { email: string; password: string }[]
   aliases: number
   cron_jobs: number
+  ssl_imported: boolean
+  ssl_expires?: string
   credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
 
@@ -211,6 +213,7 @@ export default function HesapAktarimiPage() {
             <h2 className="font-semibold text-emerald-800 dark:text-emerald-200">İçe aktarma tamamlandı</h2>
             <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{sonuc.domain} · {sonuc.web_files} web dosyası · {sonuc.databases.length} veritabanı</p>
             <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{sonuc.cron_jobs} cron görevi aktarıldı.</p>
+            {sonuc.ssl_imported && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">SSL sertifikası aktarıldı · son geçerlilik {sonuc.ssl_expires}</p>}
             {sonuc.databases.map(d => <p key={d.target} className="mt-1 text-xs font-mono text-emerald-700 dark:text-emerald-300">{d.source} → {d.target}</p>)}
             {sonuc.mailboxes.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-white/60 dark:bg-slate-900/40 p-3">
               <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">Yeni posta kutusu parolaları — şimdi kaydedin</p>
