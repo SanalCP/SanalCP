@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -70,5 +71,26 @@ func TestAnalyzeRejectsSymlink(t *testing.T) {
 	_, err := AnalyzeCPanel(r)
 	if !errors.Is(err, ErrUnsafeArchive) {
 		t.Fatalf("want ErrUnsafeArchive, got %v", err)
+	}
+}
+
+func TestDatabaseMappingsAreNamespacedAndUnique(t *testing.T) {
+	got := databaseMappings(
+		[]string{"old_wp", "old-shop", "old shop"},
+		"c_example_com", "c_example_com_main", "c_example_com_db",
+	)
+	if len(got) != 3 {
+		t.Fatalf("unexpected mappings: %+v", got)
+	}
+	if got[0].Target != "c_example_com_main" {
+		t.Fatalf("first DB must use default: %+v", got[0])
+	}
+	if got[1].Target != "c_example_com_old_shop" || got[2].Target != "c_example_com_old_shop_2" {
+		t.Fatalf("targets must be sanitized and unique: %+v", got)
+	}
+	for _, m := range got {
+		if !strings.HasPrefix(m.Target, "c_example_com_") || len(m.Target) > 64 {
+			t.Fatalf("unsafe target: %+v", m)
+		}
 	}
 }
