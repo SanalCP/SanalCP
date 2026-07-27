@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"sanalpanel/internal/domains"
+	"sanalpanel/internal/hesaplar"
 	"sanalpanel/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
@@ -72,15 +73,21 @@ type importResponse struct {
 	Domain      string    `json:"domain"`
 	SystemUser  string    `json:"system_user"`
 	WebFiles    int       `json:"web_files"`
-	Database    string    `json:"database,omitempty"`
+	Databases   []DBMap   `json:"databases"`
 	Credentials any       `json:"credentials"`
 	Skipped     []string  `json:"skipped"`
 	Source      Inventory `json:"source"`
 }
 
+type DBMap struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	User   string `json:"user"`
+}
+
 // Import creates a new SanalPanel domain and restores the web root plus a
-// single cPanel database. Unsupported multi-database accounts are rejected
-// before provisioning, so the operation cannot silently lose data.
+// cPanel databases. Additional databases share the domain's default DB user,
+// matching SanalPanel's supported one-user-to-many-databases model.
 func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	if h.Domains == nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "domain sağlayıcısı hazır değil")
@@ -121,11 +128,6 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	src.Close()
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if len(inv.Databases) > 1 {
-		httpx.WriteError(w, http.StatusUnprocessableEntity,
-			"bu hesapta birden fazla veritabanı var; kayıpsız çoklu veritabanı dönüşümü henüz desteklenmiyor")
 		return
 	}
 	domain := strings.ToLower(strings.TrimSpace(r.FormValue("domain")))
@@ -173,6 +175,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		AlanAdi         string `json:"alan_adi"`
 		SistemKullanici string `json:"sistem_kullanici"`
 		DBAdi           string `json:"db_adi"`
+		DBUser          string `json:"db_user"`
 		Parolalar       any    `json:"olusturulan_parolalar"`
 	}
 	if err := json.Unmarshal(cw.Body.Bytes(), &created); err != nil || created.ID <= 0 {
@@ -190,8 +193,15 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "web dosyaları aktarılamadı: "+err.Error())
 		return
 	}
-	if len(inv.Databases) == 1 {
-		if err := restoreDatabase(tmpPath, inv.ArchiveRoot, inv.Databases[0], created.DBAdi); err != nil {
+	dbMaps := databaseMappings(inv.Databases, created.SistemKullanici, created.DBAdi, created.DBUser)
+	for i, m := range dbMaps {
+		if i > 0 {
+			if err := hesaplar.MySQLCreateDBForUser(h.DB, created.ID, m.Target, created.DBUser); err != nil {
+				httpx.WriteError(w, http.StatusInternalServerError, "ek veritabanı oluşturulamadı: "+err.Error())
+				return
+			}
+		}
+		if err := restoreDatabase(tmpPath, inv.ArchiveRoot, m.Source, m.Target); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
 			return
 		}
@@ -200,9 +210,64 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, importResponse{
 		OK: true, DomainID: created.ID, Domain: created.AlanAdi,
 		SystemUser: created.SistemKullanici, WebFiles: inv.WebFiles,
-		Database: created.DBAdi, Credentials: created.Parolalar, Source: inv,
+		Databases: dbMaps, Credentials: created.Parolalar, Source: inv,
 		Skipped: []string{"E-posta kutuları, cron ve kaynak SSL sertifikaları bu ilk sürümde yalnız envanterlendi."},
 	})
+}
+
+func databaseMappings(sources []string, sk, defaultDB, dbUser string) []DBMap {
+	out := make([]DBMap, 0, len(sources))
+	used := map[string]bool{defaultDB: true}
+	for i, source := range sources {
+		target := defaultDB
+		if i > 0 {
+			suffix := dbSuffix(source)
+			maxSuffix := 64 - len(sk) - 1
+			if maxSuffix < 1 {
+				maxSuffix = 1
+			}
+			if len(suffix) > maxSuffix {
+				suffix = suffix[:maxSuffix]
+			}
+			target = sk + "_" + suffix
+			base := target
+			for n := 2; used[target]; n++ {
+				tail := "_" + strconv.Itoa(n)
+				limit := 64 - len(tail)
+				if len(base) > limit {
+					base = base[:limit]
+				}
+				target = base + tail
+			}
+		}
+		used[target] = true
+		out = append(out, DBMap{Source: source, Target: target, User: dbUser})
+	}
+	return out
+}
+
+func dbSuffix(source string) string {
+	s := strings.ToLower(source)
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range s {
+		ok := r >= 'a' && r <= 'z' || r >= '0' && r <= '9'
+		if ok {
+			b.WriteRune(r)
+			lastUnderscore = false
+		} else if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	s = strings.Trim(b.String(), "_")
+	if s == "" {
+		return "db"
+	}
+	if len(s) > 32 {
+		s = s[:32]
+	}
+	return strings.TrimRight(s, "_")
 }
 
 func requiredInt64(s string) (int64, error) {

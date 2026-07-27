@@ -24,7 +24,8 @@ type Customer = { id: number; ad: string; eposta: string; plan_id?: number | nul
 type Plan = { id: number; ad: string; php_surum?: string }
 type ImportResult = {
   domain_id: number; domain: string; system_user: string; web_files: number
-  database?: string; credentials?: { ftp?: string; db?: string }; skipped: string[]
+  databases: { source: string; target: string; user: string }[]
+  credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
 
 export default function HesapAktarimiPage() {
@@ -190,9 +191,8 @@ export default function HesapAktarimiPage() {
                 </select>
               </Field>
             </div>
-            {envanter.databases.length > 1 && <p className="mt-3 text-sm text-red-600 dark:text-red-400">Bu hesapta birden fazla veritabanı bulundu; ilk sürüm veri kaybını önlemek için importu reddeder.</p>}
             <button onClick={iceAktar}
-              disabled={aktariliyor || !customerID || !domain || envanter.databases.length > 1}
+              disabled={aktariliyor || !customerID || !domain}
               className="mt-5 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50">
               {aktariliyor ? `İçe aktarılıyor… %${ilerleme}` : 'Hesabı İçe Aktar'}
             </button>
@@ -200,7 +200,8 @@ export default function HesapAktarimiPage() {
 
           {sonuc && <div className="mt-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 p-5">
             <h2 className="font-semibold text-emerald-800 dark:text-emerald-200">İçe aktarma tamamlandı</h2>
-            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{sonuc.domain} · {sonuc.web_files} web dosyası · {sonuc.database || 'veritabanı yok'}</p>
+            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{sonuc.domain} · {sonuc.web_files} web dosyası · {sonuc.databases.length} veritabanı</p>
+            {sonuc.databases.map(d => <p key={d.target} className="mt-1 text-xs font-mono text-emerald-700 dark:text-emerald-300">{d.source} → {d.target}</p>)}
             {sonuc.skipped?.map(s => <p key={s} className="mt-1 text-xs text-amber-700 dark:text-amber-300">⚠ {s}</p>)}
             <Link to={`/abonelikler/${sonuc.domain_id}`} className="inline-block mt-3 text-sm font-medium text-brand-700 dark:text-brand-300">Domaini yönet →</Link>
           </div>}
