@@ -4,6 +4,7 @@
 // altındaki hesapları görür ve yalnız müşteri hesabı açabilir. Buradaki rol
 // kısıtları o kuralların arayüz yansımasıdır, güvenlik sınırı değildir.
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -55,6 +56,7 @@ type BayiLimit = {
 }
 
 export default function KullanicilarPage() {
+  const [aramaParam] = useSearchParams()
   const benimRolum = useAuth((s) => s.kullanici?.rol)
   const benimID = useAuth((s) => s.kullanici?.id)
   const adminMiyim = benimRolum === 'admin'
@@ -63,7 +65,9 @@ export default function KullanicilarPage() {
   const [yukleniyor, setYukleniyor] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
-  const [aranan, setAranan] = useState('')
+  const [aranan, setAranan] = useState(() => aramaParam.get('arama') || '')
+
+  useEffect(() => { setAranan(aramaParam.get('arama') || '') }, [aramaParam])
 
   const [yeni, setYeni] = useState<YeniHesap | null>(null)
   const [kaydediliyor, setKaydediliyor] = useState(false)

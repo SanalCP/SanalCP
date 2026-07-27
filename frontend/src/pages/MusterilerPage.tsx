@@ -6,6 +6,7 @@
 // hesabı users tablosundadır (rol='user') ve customers.user_id ile buraya
 // bağlanır; müşteri o hesapla /cp adresinden girer.
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
@@ -28,12 +29,15 @@ type Plan = { id: number; ad: string }
 const BOS: Musteri = { id: 0, ad: '', eposta: '', plan_id: null, durum: 'aktif', notlar: '', olusturma: '' }
 
 export default function MusterilerPage() {
+  const [aramaParam] = useSearchParams()
   const [liste, setListe] = useState<Musteri[]>([])
   const [planlar, setPlanlar] = useState<Plan[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
-  const [aranan, setAranan] = useState('')
+  const [aranan, setAranan] = useState(() => aramaParam.get('arama') || '')
+
+  useEffect(() => { setAranan(aramaParam.get('arama') || '') }, [aramaParam])
 
   const [duzenlenen, setDuzenlenen] = useState<Musteri | null>(null)
   const [kaydediliyor, setKaydediliyor] = useState(false)
