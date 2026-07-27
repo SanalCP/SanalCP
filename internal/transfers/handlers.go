@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalpanel/internal/cron"
 	"sanalpanel/internal/domains"
 	"sanalpanel/internal/hesaplar"
 	"sanalpanel/internal/httpx"
@@ -33,6 +34,7 @@ type Handlers struct {
 	DB      *sql.DB
 	Domains *domains.Handlers
 	Mail    *mail.Handlers
+	Cron    *cron.Handlers
 }
 
 // Analyze accepts a cPanel full backup and returns an inventory. It never
@@ -79,6 +81,7 @@ type importResponse struct {
 	Credentials any              `json:"credentials"`
 	Mailboxes   []MailCredential `json:"mailboxes"`
 	Aliases     int              `json:"aliases"`
+	CronJobs    int              `json:"cron_jobs"`
 	Skipped     []string         `json:"skipped"`
 	Source      Inventory        `json:"source"`
 }
@@ -220,14 +223,48 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "e-posta aktarılamadı: "+err.Error())
 		return
 	}
+	cronCount, err := h.importCron(r, inv, created.ID, created.SistemKullanici)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "cron görevleri aktarılamadı: "+err.Error())
+		return
+	}
 	committed = true
 	httpx.WriteJSON(w, http.StatusCreated, importResponse{
 		OK: true, DomainID: created.ID, Domain: created.AlanAdi,
 		SystemUser: created.SistemKullanici, WebFiles: inv.WebFiles,
 		Databases: dbMaps, Credentials: created.Parolalar, Mailboxes: mailCreds,
-		Aliases: aliasCount, Source: inv,
-		Skipped: []string{"Cron ve kaynak SSL sertifikaları bu sürümde yalnız envanterlendi."},
+		Aliases: aliasCount, CronJobs: cronCount, Source: inv,
+		Skipped: []string{"Kaynak SSL sertifikaları bu sürümde yalnız envanterlendi."},
 	})
+}
+
+func (h *Handlers) importCron(r *http.Request, inv Inventory, domainID int64, targetUser string) (int, error) {
+	if len(inv.CronJobs) == 0 {
+		return 0, nil
+	}
+	if h.Cron == nil {
+		return 0, errors.New("cron sağlayıcısı hazır değil")
+	}
+	created := 0
+	for _, job := range inv.CronJobs {
+		command := job.Command
+		if inv.Username != "" {
+			command = strings.ReplaceAll(command, "/home/"+inv.Username+"/", "/home/"+targetUser+"/")
+		}
+		body, _ := json.Marshal(map[string]string{
+			"dakika": job.Minute, "saat": job.Hour, "gun": job.Day,
+			"ay": job.Month, "hafta": job.Weekday,
+			"komut": command, "yorum": job.Comment,
+		})
+		req := domainRequest(r, http.MethodPost, "/cron", domainID, bytes.NewReader(body))
+		rr := httptest.NewRecorder()
+		h.Cron.Create(rr, req)
+		if rr.Code != http.StatusCreated {
+			return 0, fmt.Errorf("%d. görev: %s", created+1, strings.TrimSpace(rr.Body.String()))
+		}
+		created++
+	}
+	return created, nil
 }
 
 func (h *Handlers) importMail(r *http.Request, archivePath string, inv Inventory, domainID int64, targetDomain, sk string) ([]MailCredential, int, error) {

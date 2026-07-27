@@ -22,6 +22,7 @@ const (
 
 var domainRE = regexp.MustCompile(`(?i)^[a-z0-9](?:[a-z0-9-]{0,62}\.)+[a-z]{2,63}$`)
 var localPartRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
+var cronEnvRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=`)
 
 var (
 	ErrNotCPanel       = errors.New("arşiv bir cPanel tam hesap yedeği olarak tanınmadı")
@@ -30,22 +31,33 @@ var (
 )
 
 type Inventory struct {
-	Provider      string   `json:"provider"`
-	Username      string   `json:"username"`
-	PrimaryDomain string   `json:"primary_domain"`
-	ArchiveRoot   string   `json:"archive_root"`
-	EntryCount    int      `json:"entry_count"`
-	ExpandedBytes int64    `json:"expanded_bytes"`
-	WebFiles      int      `json:"web_files"`
-	WebBytes      int64    `json:"web_bytes"`
-	Databases     []string `json:"databases"`
-	DNSZones      []string `json:"dns_zones"`
-	MailFiles     int      `json:"mail_files"`
-	Mailboxes     []string `json:"mailboxes"`
-	AliasCount    int      `json:"alias_count"`
-	CronPresent   bool     `json:"cron_present"`
-	SSLCerts      int      `json:"ssl_certs"`
-	Warnings      []string `json:"warnings"`
+	Provider      string    `json:"provider"`
+	Username      string    `json:"username"`
+	PrimaryDomain string    `json:"primary_domain"`
+	ArchiveRoot   string    `json:"archive_root"`
+	EntryCount    int       `json:"entry_count"`
+	ExpandedBytes int64     `json:"expanded_bytes"`
+	WebFiles      int       `json:"web_files"`
+	WebBytes      int64     `json:"web_bytes"`
+	Databases     []string  `json:"databases"`
+	DNSZones      []string  `json:"dns_zones"`
+	MailFiles     int       `json:"mail_files"`
+	Mailboxes     []string  `json:"mailboxes"`
+	AliasCount    int       `json:"alias_count"`
+	CronPresent   bool      `json:"cron_present"`
+	CronJobs      []CronJob `json:"cron_jobs"`
+	SSLCerts      int       `json:"ssl_certs"`
+	Warnings      []string  `json:"warnings"`
+}
+
+type CronJob struct {
+	Minute  string `json:"minute"`
+	Hour    string `json:"hour"`
+	Day     string `json:"day"`
+	Month   string `json:"month"`
+	Weekday string `json:"weekday"`
+	Command string `json:"command"`
+	Comment string `json:"comment,omitempty"`
 }
 
 // AnalyzeCPanel reads a gzip-compressed cPanel full backup without extracting it.
@@ -57,10 +69,11 @@ func AnalyzeCPanel(src io.Reader) (Inventory, error) {
 	defer gz.Close()
 
 	tr := tar.NewReader(gz)
-	inv := Inventory{Provider: "cpanel", Databases: []string{}, DNSZones: []string{}, Mailboxes: []string{}, Warnings: []string{}}
+	inv := Inventory{Provider: "cpanel", Databases: []string{}, DNSZones: []string{}, Mailboxes: []string{}, CronJobs: []CronJob{}, Warnings: []string{}}
 	dbSet := map[string]bool{}
 	dnsSet := map[string]bool{}
 	seenCPanel := false
+	var cronBody string
 
 	for {
 		h, err := tr.Next()
@@ -130,6 +143,10 @@ func AnalyzeCPanel(src io.Reader) (Inventory, error) {
 				if b, e := io.ReadAll(io.LimitReader(tr, maxMetadataBytes)); e == nil {
 					inv.AliasCount += countAliases(string(b))
 				}
+			case rel == "cron":
+				if b, e := io.ReadAll(io.LimitReader(tr, maxMetadataBytes)); e == nil {
+					cronBody = string(b)
+				}
 			}
 		}
 	}
@@ -146,10 +163,55 @@ func AnalyzeCPanel(src io.Reader) (Inventory, error) {
 	if inv.WebFiles == 0 {
 		inv.Warnings = append(inv.Warnings, "public_html altında web dosyası bulunamadı.")
 	}
+	if cronBody != "" {
+		var skipped int
+		inv.CronJobs, skipped = parseCronJobs(cronBody)
+		if skipped > 0 {
+			inv.Warnings = append(inv.Warnings, fmt.Sprintf("%d cron satırı desteklenmediği için aktarılmayacak.", skipped))
+		}
+	}
 	sort.Strings(inv.Databases)
 	sort.Strings(inv.DNSZones)
 	sort.Strings(inv.Mailboxes)
 	return inv, nil
+}
+
+func parseCronJobs(body string) ([]CronJob, int) {
+	out := make([]CronJob, 0)
+	skipped := 0
+	comment := ""
+	for _, raw := range strings.Split(body, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			comment = ""
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			comment = strings.TrimSpace(strings.TrimPrefix(line, "#"))
+			if len(comment) > 200 {
+				comment = comment[:200]
+			}
+			continue
+		}
+		if cronEnvRE.MatchString(line) || strings.HasPrefix(line, "@") {
+			skipped++
+			comment = ""
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 6 || len(out) >= 100 {
+			skipped++
+			comment = ""
+			continue
+		}
+		out = append(out, CronJob{
+			Minute: fields[0], Hour: fields[1], Day: fields[2],
+			Month: fields[3], Weekday: fields[4],
+			Command: strings.Join(fields[5:], " "), Comment: comment,
+		})
+		comment = ""
+	}
+	return out, skipped
 }
 
 func unsafeMember(h *tar.Header) bool {

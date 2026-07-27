@@ -19,6 +19,7 @@ type Inventory = {
   mailboxes: string[]
   alias_count: number
   cron_present: boolean
+  cron_jobs: { minute: string; hour: string; day: string; month: string; weekday: string; command: string; comment?: string }[]
   ssl_certs: number
   warnings: string[]
 }
@@ -29,6 +30,7 @@ type ImportResult = {
   databases: { source: string; target: string; user: string }[]
   mailboxes: { email: string; password: string }[]
   aliases: number
+  cron_jobs: number
   credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
 
@@ -158,7 +160,7 @@ export default function HesapAktarimiPage() {
               ['Arşiv kökü', envanter.archive_root || '—'],
               ['Toplam üye', envanter.entry_count.toLocaleString('tr-TR')],
               ['Açılmış boyut', fmtByte(envanter.expanded_bytes)],
-              ['Cron', envanter.cron_present ? 'Var' : 'Yok'],
+              ['Cron görevleri', String(envanter.cron_jobs.length)],
               ['SSL dosyaları', String(envanter.ssl_certs)],
               ['Posta kutuları', String(envanter.mailboxes.length)],
               ['Yönlendirmeler', String(envanter.alias_count)],
@@ -166,6 +168,7 @@ export default function HesapAktarimiPage() {
             <div className="space-y-4">
               <List title="Veritabanları" values={envanter.databases} />
               <List title="DNS zoneları" values={envanter.dns_zones} />
+              <List title="Cron görevleri" values={envanter.cron_jobs.map(c => `${c.minute} ${c.hour} ${c.day} ${c.month} ${c.weekday}  ${c.command}`)} />
             </div>
           </div>
 
@@ -207,6 +210,7 @@ export default function HesapAktarimiPage() {
           {sonuc && <div className="mt-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 p-5">
             <h2 className="font-semibold text-emerald-800 dark:text-emerald-200">İçe aktarma tamamlandı</h2>
             <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{sonuc.domain} · {sonuc.web_files} web dosyası · {sonuc.databases.length} veritabanı</p>
+            <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{sonuc.cron_jobs} cron görevi aktarıldı.</p>
             {sonuc.databases.map(d => <p key={d.target} className="mt-1 text-xs font-mono text-emerald-700 dark:text-emerald-300">{d.source} → {d.target}</p>)}
             {sonuc.mailboxes.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-white/60 dark:bg-slate-900/40 p-3">
               <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">Yeni posta kutusu parolaları — şimdi kaydedin</p>
