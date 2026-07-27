@@ -17,8 +17,11 @@
 // Aynı sebeple provisioner.go'daki "sistem_kullanici=?" tabanlı askida/vhost_ozel
 // sorgularına "AND ana_domain_id IS NULL" guard'ı eklendi (bkz. 0045 migration notu).
 //
-// v1 kapsamı: HTTP-only vhost (subdomain.go'nun ilk hâliyle aynı), SSL desteği yok
-// (subdomain/ssl.go gibi ayrı bir alt sistem gerektirir, ileride eklenebilir).
+// SSL: ek alan adı kendi sertifikasını alabilir. Vhost'u ana alan adınınkinden
+// AYRI bir dosyada durur (ek_<sk>_<alan>.conf) ve SSL'li hâlini de aynı dosyaya
+// provisioner.EkVhostYaz yazar — normal SSL yolu dosya adını yalnız sk'den
+// türettiği için ek alan adında çağrılırsa ANA alan adının vhost'unu ezer
+// (canlıda yaşandı, bkz. internal/provisioner/ek_vhost.go başlığı).
 package domainek
 
 import (
@@ -84,9 +87,9 @@ func (h *Handlers) hedef(r *http.Request) (id int64, hb hedefBilgi, ok bool) {
 	return id, hb, true
 }
 
-func confPath(sk, alanAdi string) string {
-	return "/etc/nginx/conf.d/ek_" + sk + "_" + alanAdi + ".conf"
-}
+// confPath: tek kaynak provisioner.EkConfPath — SSL yolu da aynı dosyayı yazar,
+// iki yerde ayrı türetmek dosyaların ayrışmasına yol açardı.
+func confPath(sk, alanAdi string) string  { return provisioner.EkConfPath(sk, alanAdi) }
 func docrootOf(sk, alanAdi string) string { return "/home/" + sk + "/domains/" + alanAdi }
 
 // GET /domains/{id}/ek
@@ -189,7 +192,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	}
 
 	conf := confPath(hb.sk, alanAdi)
-	if err := os.WriteFile(conf, []byte(vhost(alanAdi, docroot, socket)), 0o644); err != nil {
+	if err := os.WriteFile(conf, []byte(provisioner.EkVhostIcerik(alanAdi, docroot, socket, "", "")), 0o644); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "vhost yazılamadı")
 		return
 	}
@@ -293,48 +296,4 @@ func DeleteEkDomain(ctx context.Context, db *sql.DB, ekID, parentID int64) error
 	// DNS zone temizliği DELETE'ten SONRA (bkz. internal/domains Delete() aynı sıralama notu).
 	_ = dns.DeleteZone(ctx, db, alanAdi)
 	return nil
-}
-
-func vhost(alanAdi, docroot, socket string) string {
-	return `server {
-    listen 80;
-    listen [::]:80;
-    server_name ` + alanAdi + `;
-
-    root ` + docroot + `;
-    index index.php index.html index.htm;
-
-    access_log /var/log/nginx/` + alanAdi + `.access.log;
-    error_log  /var/log/nginx/` + alanAdi + `.error.log warn;
-
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/_acme;
-        try_files $uri =404;
-    }
-
-    location / { try_files $uri $uri/ /index.php?$query_string; }
-
-    location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:` + socket + `;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_read_timeout 60s;
-    }
-
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2?|svg|webp|avif|pdf|zip|gz)$ {
-        expires 30d;
-        access_log off;
-    }
-
-    location ~ /\.(?!well-known) { deny all; }
-
-    # SanalPanel ek alan adı — ` + alanAdi + `
-}
-`
 }
