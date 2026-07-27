@@ -1761,7 +1761,30 @@ func HealPanelVhostHeadersOnStartup() {
 	}
 	s := string(orig)
 	if strings.Contains(s, panelSecSentinel) {
-		return // zaten sertlestirilmis
+		// Eski v2 kurulumlarinda domain onizleme iframe'i icin frame-src yoktu.
+		// Sentinel mevcut olsa bile CSP'yi geriye donuk olarak guncelle.
+		const eski = "connect-src 'self'; frame-ancestors 'self'"
+		const yeni = "connect-src 'self'; frame-src https: http:; frame-ancestors 'self'"
+		newS := strings.ReplaceAll(s, eski, yeni)
+		if newS == s {
+			return // zaten guncel
+		}
+		if e := os.WriteFile(panelVhostPath, []byte(newS), 0644); e != nil {
+			log.Printf("panel sec heal: CSP guncellenemedi: %v", e)
+			return
+		}
+		if out, e := exec.Command("nginx", "-t").CombinedOutput(); e != nil {
+			_ = os.WriteFile(panelVhostPath, orig, 0644)
+			log.Printf("panel sec heal: CSP nginx -t basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
+			return
+		}
+		if out, e := exec.Command("systemctl", "reload", "nginx").CombinedOutput(); e != nil {
+			_ = os.WriteFile(panelVhostPath, orig, 0644)
+			log.Printf("panel sec heal: CSP nginx reload basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
+			return
+		}
+		log.Printf("panel sec heal: CSP domain onizlemesi icin guncellendi + nginx reload OK")
+		return
 	}
 	anchor := "server_name _;"
 	idx := strings.Index(s, anchor)
