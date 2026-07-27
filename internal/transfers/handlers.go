@@ -24,6 +24,7 @@ import (
 	"sanalpanel/internal/hesaplar"
 	"sanalpanel/internal/httpx"
 	"sanalpanel/internal/mail"
+	"sanalpanel/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -82,6 +83,8 @@ type importResponse struct {
 	Mailboxes   []MailCredential `json:"mailboxes"`
 	Aliases     int              `json:"aliases"`
 	CronJobs    int              `json:"cron_jobs"`
+	SSLImported bool             `json:"ssl_imported"`
+	SSLExpires  string           `json:"ssl_expires,omitempty"`
 	Skipped     []string         `json:"skipped"`
 	Source      Inventory        `json:"source"`
 }
@@ -228,14 +231,100 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "cron görevleri aktarılamadı: "+err.Error())
 		return
 	}
+	sslImported, sslExpires, sslWarning, err := h.importSSL(
+		r, tmpPath, inv, created.ID, created.AlanAdi,
+	)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "SSL sertifikası aktarılamadı: "+err.Error())
+		return
+	}
+	skipped := []string{}
+	if sslWarning != "" {
+		skipped = append(skipped, sslWarning)
+	}
 	committed = true
 	httpx.WriteJSON(w, http.StatusCreated, importResponse{
 		OK: true, DomainID: created.ID, Domain: created.AlanAdi,
 		SystemUser: created.SistemKullanici, WebFiles: inv.WebFiles,
 		Databases: dbMaps, Credentials: created.Parolalar, Mailboxes: mailCreds,
-		Aliases: aliasCount, CronJobs: cronCount, Source: inv,
-		Skipped: []string{"Kaynak SSL sertifikaları bu sürümde yalnız envanterlendi."},
+		Aliases: aliasCount, CronJobs: cronCount, SSLImported: sslImported,
+		SSLExpires: sslExpires, Source: inv, Skipped: skipped,
 	})
+}
+
+func (h *Handlers) importSSL(r *http.Request, archivePath string, inv Inventory, domainID int64, targetDomain string) (bool, string, string, error) {
+	if inv.SSLCerts == 0 {
+		return false, "", "", nil
+	}
+	certPEM, keyPEM, err := readCPanelSSL(archivePath, inv.ArchiveRoot, inv.PrimaryDomain)
+	if errors.Is(err, errMemberNotFound) {
+		return false, "", "Kaynak SSL sertifikası için eşleşen özel anahtar bulunamadı; SSL aktarılmadı.", nil
+	}
+	if err != nil {
+		return false, "", "", err
+	}
+	certPath, keyPath, expires, err := provisioner.InstallImportedSSL(targetDomain, certPEM, keyPEM)
+	if errors.Is(err, provisioner.ErrImportedSSLInvalid) {
+		return false, "", err.Error() + "; SSL aktarılmadı.", nil
+	}
+	if err != nil {
+		return false, "", "", err
+	}
+	if _, err := h.DB.ExecContext(r.Context(),
+		`UPDATE domains SET ssl_aktif=1, ssl_kaynak='imported', cert_path=?, key_path=?, ssl_bitis=? WHERE id=?`,
+		certPath, keyPath, expires, domainID); err != nil {
+		return false, "", "", err
+	}
+	if err := provisioner.RerenderVhost(h.DB, domainID); err != nil {
+		return false, "", "", err
+	}
+	return true, expires.UTC().Format("2006-01-02"), "", nil
+}
+
+func readCPanelSSL(archivePath, root, domain string) ([]byte, []byte, error) {
+	if domain == "" {
+		return nil, nil, errMemberNotFound
+	}
+	certCandidates := []string{
+		root + "/sslcerts/" + domain + ".crt",
+		root + "/homedir/ssl/certs/" + domain + ".crt",
+		root + "/homedir/ssl/" + domain + ".crt",
+	}
+	keyCandidates := []string{
+		root + "/sslkeys/" + domain + ".key",
+		root + "/homedir/ssl/private/" + domain + ".key",
+		root + "/homedir/ssl/" + domain + ".key",
+	}
+	certPEM, err := readFirstTarMember(archivePath, certCandidates)
+	if err != nil {
+		return nil, nil, err
+	}
+	keyPEM, err := readFirstTarMember(archivePath, keyCandidates)
+	if err != nil {
+		return nil, nil, err
+	}
+	bundleCandidates := []string{
+		root + "/sslcerts/" + domain + ".cabundle",
+		root + "/homedir/ssl/certs/" + domain + ".cabundle",
+		root + "/homedir/ssl/" + domain + ".cabundle",
+	}
+	if bundle, bundleErr := readFirstTarMember(archivePath, bundleCandidates); bundleErr == nil && len(bundle) > 0 {
+		certPEM = append(append(certPEM, '\n'), bundle...)
+	}
+	return certPEM, keyPEM, nil
+}
+
+func readFirstTarMember(archivePath string, candidates []string) ([]byte, error) {
+	for _, candidate := range candidates {
+		body, err := readSmallTarMember(archivePath, candidate)
+		if err == nil {
+			return body, nil
+		}
+		if !errors.Is(err, errMemberNotFound) {
+			return nil, err
+		}
+	}
+	return nil, errMemberNotFound
 }
 
 func (h *Handlers) importCron(r *http.Request, inv Inventory, domainID int64, targetUser string) (int, error) {

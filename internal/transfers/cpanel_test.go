@@ -47,6 +47,7 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 		testEntry{name: "backup-demo/homedir/etc/example.com/shadow", body: "info:$6$hash:1::::\ndestek:$6$hash:1::::\n"},
 		testEntry{name: "backup-demo/va/example.com", body: "sales: external@example.net\n"},
 		testEntry{name: "backup-demo/cron", body: "# WordPress görevi\n*/5 * * * * /usr/bin/php /home/demo/public_html/wp-cron.php\nMAILTO=demo@example.com\n@reboot /bin/true\n"},
+		testEntry{name: "backup-demo/sslcerts/example.com.crt", body: "certificate"},
 	)
 	got, err := AnalyzeCPanel(r)
 	if err != nil {
@@ -60,6 +61,9 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 	}
 	if len(got.Mailboxes) != 2 || got.AliasCount != 1 {
 		t.Fatalf("unexpected mail inventory: %+v", got)
+	}
+	if got.SSLCerts != 1 {
+		t.Fatalf("unexpected SSL inventory: %+v", got)
 	}
 	if len(got.CronJobs) != 1 || got.CronJobs[0].Minute != "*/5" ||
 		got.CronJobs[0].Command != "/usr/bin/php /home/demo/public_html/wp-cron.php" {
