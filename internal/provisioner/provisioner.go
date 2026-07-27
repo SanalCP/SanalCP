@@ -443,15 +443,13 @@ const denyBlocksNginx = `    # ---- Yurutme engeli: CGI / betik yorumlayicilari 
 `
 
 // buildSecurityHeaders: opts toggle'larina + SSL durumuna gore guvenlik add_header
-// bloklarini uretir (her satir "always"). X-Frame-Options ve CSP-Report-Only DAIMA
-// eklenir (yeni koruma, DB kolonu yok). HSTS + CSP-upgrade YALNIZ HTTPS'te uygulanir.
+// bloklarini uretir (her satir "always"). Clickjacking korumasi CSP frame-ancestors
+// ile uygulanir; kendi origin'i ve panel onizlemesi disindakiler engellenir.
 func buildSecurityHeaders(o VhostOpts) string {
 	var b strings.Builder
 	if o.HdrXContentType {
 		b.WriteString("    add_header X-Content-Type-Options \"nosniff\" always;\n")
 	}
-	// Clickjacking korumasi — daima (SAMEORIGIN: ayni-kaynak cerceveleme serbest).
-	b.WriteString("    add_header X-Frame-Options \"SAMEORIGIN\" always;\n")
 	if o.HdrXXSS {
 		b.WriteString("    add_header X-XSS-Protection \"1; mode=block\" always;\n")
 	}
@@ -461,12 +459,11 @@ func buildSecurityHeaders(o VhostOpts) string {
 	if o.HdrPermissions {
 		b.WriteString("    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n")
 	}
-	// Tenant CSP: GEVSEK Report-Only — musteri sitesini KIRMAZ (yalniz raporlar), her
-	// kaynaga izin verir; sadece frame-ancestors 'self' ile gozlem/sinyal saglar.
-	b.WriteString("    add_header Content-Security-Policy-Report-Only \"default-src 'self' https: http: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self';\" always;\n")
-	if o.SSL() && o.HdrCSPUpgrade {
-		b.WriteString("    add_header Content-Security-Policy \"upgrade-insecure-requests\" always;\n")
-	}
+	// frame-ancestors ENFORCE edilir; default-src ise müşteri sitesini kırmamak için
+	// yalnız report-only kalır. X-Frame-Options farklı panel origin'ine güvenli izin
+	// veremediğinden kasıtlı olarak üretilmez.
+	fmt.Fprintf(&b, "    add_header Content-Security-Policy-Report-Only \"default-src 'self' https: http: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors %s;\" always;\n", panelFrameAncestors())
+	b.WriteString(framePolicyHeader("    ", o.SSL() && o.HdrCSPUpgrade))
 	if o.SSL() && o.HdrHSTS {
 		sd := ""
 		if o.HSTSSubdomains {

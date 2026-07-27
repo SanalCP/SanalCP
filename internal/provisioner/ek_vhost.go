@@ -42,7 +42,8 @@ func EkVhostIcerik(alanAdi, docroot, socket, certPath, keyPath string) string {
 	log := "    access_log /var/log/nginx/" + alanAdi + ".access.log;\n" +
 		"    error_log  /var/log/nginx/" + alanAdi + ".error.log warn;\n"
 	basliklar := "    add_header X-Content-Type-Options \"nosniff\" always;\n" +
-		"    add_header X-XSS-Protection \"1; mode=block\" always;\n"
+		"    add_header X-XSS-Protection \"1; mode=block\" always;\n" +
+		framePolicyHeader("    ", certPath != "")
 
 	govde := "    root " + docroot + ";\n" +
 		"    index index.php index.html index.htm;\n" +
