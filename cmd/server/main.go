@@ -57,6 +57,7 @@ import (
 	"sanalpanel/internal/sshaccess"
 	"sanalpanel/internal/subdomain"
 	"sanalpanel/internal/system"
+	"sanalpanel/internal/transfers"
 	"sanalpanel/internal/users"
 	"sanalpanel/internal/waf"
 	"sanalpanel/internal/wordpress"
@@ -185,6 +186,7 @@ func main() {
 	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
+	transfersH := &transfers.Handlers{DB: d, Domains: domainsH}
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
 	phpExtH := &phpext.Handlers{DB: d}
@@ -449,6 +451,8 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-schedule", backupsH.SetSchedule)
 				r.With(middleware.AdminOnly).Post("/admin/backups/tick", backupsH.TickNow)
 				r.With(middleware.BayiVeUstu).Get("/admin/backups/ozet", backupsH.Ozet)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/analyze", transfersH.Analyze)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/import", transfersH.Import)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-destination", backupsH.GetDestination)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-destination", backupsH.PutDestination)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/backup-destination", backupsH.DeleteDestination)
