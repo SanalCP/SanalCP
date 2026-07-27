@@ -2,12 +2,15 @@
 package git
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -406,9 +409,10 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// Webhook: GitHub'tan gelen push event'i, secret dogrulanir + git pull
+// Webhook: GitHub'tan gelen imzalı push event'i doğrulanır + git pull.
 // URL: POST /api/v1/git-webhook/:secret
-// Auth gerekmez (secret URL'de). GitHub kendisi imza da gonderir; biz sadece secret'i match ediyoruz.
+// URL secret'ı repo kaydını bulur; yetkilendirme kararı tek başına URL'ye
+// dayanmaz. Gövde ayrıca GitHub X-Hub-Signature-256 HMAC'iyle doğrulanır.
 func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	secret := chi.URLParam(r, "secret")
 	if len(secret) < 16 {
@@ -429,6 +433,50 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "webhook gövdesi çok büyük veya okunamadı", http.StatusRequestEntityTooLarge)
+		return
+	}
+	if !gecerliWebhookImzasi([]byte(secret), body, r.Header.Get("X-Hub-Signature-256")) {
+		http.Error(w, "webhook imzası geçersiz", http.StatusUnauthorized)
+		return
+	}
+	event := strings.TrimSpace(r.Header.Get("X-GitHub-Event"))
+	delivery := strings.TrimSpace(r.Header.Get("X-GitHub-Delivery"))
+	if delivery == "" || len(delivery) > 128 {
+		http.Error(w, "webhook teslimat kimliği eksik veya geçersiz", http.StatusBadRequest)
+		return
+	}
+	// GitHub her teslimata benzersiz bir kimlik verir. INSERT IGNORE + UNIQUE
+	// anahtar, aynı imzalı isteğin ağ üzerinden veya bilinçli olarak tekrar
+	// oynatılmasını atomik biçimde engeller.
+	res, err := h.DB.ExecContext(r.Context(),
+		`INSERT IGNORE INTO git_webhook_deliveries(delivery_id, git_repo_id, event)
+		 VALUES(?,?,?)`, delivery, gid, event)
+	if err != nil {
+		http.Error(w, "webhook teslimatı kaydedilemedi", http.StatusInternalServerError)
+		return
+	}
+	affected, err := res.RowsAffected()
+	if err != nil || affected != 1 {
+		http.Error(w, "webhook teslimatı daha önce işlendi", http.StatusConflict)
+		return
+	}
+	_, _ = h.DB.ExecContext(r.Context(),
+		`DELETE FROM git_webhook_deliveries WHERE received_at < NOW() - INTERVAL 30 DAY`)
+
+	if event == "ping" {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "pong": true})
+		return
+	}
+	if event != "push" {
+		http.Error(w, "desteklenmeyen webhook olayı", http.StatusBadRequest)
+		return
+	}
+
 	sha, log, perr := gitPull(sk, targetDir, branch)
 	durum := "basarili"
 	if perr != nil {
@@ -438,10 +486,28 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		`UPDATE git_repos SET son_sync=NOW(), son_commit=?, son_durum=? WHERE id=?`,
 		sha, durum, gid)
 	if perr != nil {
+		// GitHub geçici hatalarda aynı delivery kimliğiyle yeniden deneyebilir.
+		// Başarısız pull'u replay tablosunda kalıcı tutarsak meşru retry 409 alır.
+		_, _ = h.DB.ExecContext(r.Context(),
+			`DELETE FROM git_webhook_deliveries WHERE delivery_id=?`, delivery)
 		http.Error(w, "pull başarısız: "+perr.Error()+"\n"+log, http.StatusInternalServerError)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "commit": sha,
 	})
+}
+
+func gecerliWebhookImzasi(secret, body []byte, header string) bool {
+	const prefix = "sha256="
+	if len(secret) < 16 || !strings.HasPrefix(header, prefix) {
+		return false
+	}
+	gelen, err := hex.DecodeString(strings.TrimPrefix(header, prefix))
+	if err != nil || len(gelen) != sha256.Size {
+		return false
+	}
+	mac := hmac.New(sha256.New, secret)
+	_, _ = mac.Write(body)
+	return hmac.Equal(gelen, mac.Sum(nil))
 }

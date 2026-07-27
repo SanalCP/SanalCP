@@ -52,6 +52,22 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 				httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")
 				return
 			}
+			// İmza tek başına yeterli değildir: hesap silinmiş/askıya alınmış,
+			// rolü değiştirilmiş veya parola/2FA sonrası oturum sürümü artırılmış
+			// olabilir. DB okunamazsa güvenli tarafta kalıp erişimi reddet.
+			if scopeDB == nil {
+				httpx.WriteError(w, http.StatusServiceUnavailable, "oturum doğrulanamadı")
+				return
+			}
+			var durum, rol string
+			var surum uint64
+			err = scopeDB.QueryRowContext(r.Context(),
+				`SELECT status, role, auth_version FROM users WHERE id=?`, c.UserID).
+				Scan(&durum, &rol, &surum)
+			if err != nil || durum != "active" || rol != c.Role || surum != c.Version {
+				httpx.WriteError(w, http.StatusUnauthorized, "oturum geçersiz veya sona erdirilmiş")
+				return
+			}
 			ctx := context.WithValue(r.Context(), claimsKey, c)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

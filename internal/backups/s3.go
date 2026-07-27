@@ -28,7 +28,7 @@ func s3Endpoint(d *Destination) (*url.URL, error) {
 	raw := strings.TrimSpace(d.Endpoint)
 	if raw == "" {
 		if d.Tip == "b2" {
-			return nil, fmt.Errorf("Backblaze S3 endpoint zorunlu")
+			return nil, fmt.Errorf("backblaze S3 endpoint zorunlu")
 		}
 		region := d.Region
 		if region == "" {

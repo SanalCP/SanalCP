@@ -120,7 +120,7 @@ export default function MailGenelPage() {
           ]
         }}
       />
-      <div className="px-6 pb-8">
+      <div className="w-full max-w-[1600px] px-6 pb-8">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
           <div className="p-5 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700">
             <div>

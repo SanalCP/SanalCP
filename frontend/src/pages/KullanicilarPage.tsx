@@ -193,7 +193,7 @@ export default function KullanicilarPage() {
   const korumali = (k: Kullanici) => k.id === 1 || k.id === benimID
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="w-full max-w-[1600px] px-6 py-5">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Kullanıcılar' }]} />
 
       <div className="mb-5">
