@@ -1,11 +1,13 @@
 package cliapi
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"database/sql"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -14,6 +16,12 @@ import (
 )
 
 type Handlers struct{ DB *sql.DB }
+
+const maxDBImportBytes int64 = 2 << 30
+
+// Aynı anda tek büyük import: her istek sıkıştırılmış + açılmış geçici dosya
+// tutabildiği için paralel 2 GiB istekler RAM yerine bu kez diski tüketmesin.
+var dbImportGate = make(chan struct{}, 1)
 
 // GET /db/export?databaseName=...&file=...
 // "file" sadece uzantıya bakılıp gzip'lenip lenmeyeceğine karar vermek için kullanılır,
@@ -80,26 +88,81 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "bu veritabanı size ait değil")
 		return
 	}
+	select {
+	case dbImportGate <- struct{}{}:
+		defer func() { <-dbImportGate }()
+	case <-r.Context().Done():
+		httpx.WriteError(w, http.StatusRequestTimeout, "içe aktarma sırası beklenirken istek sona erdi")
+		return
+	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 2<<30)) // 2GiB ust sinir
-	if err != nil {
+	// İçe aktarmayı RAM'e alma. Önce 0600 geçici dosyada boyutu doğrula, ancak
+	// tamamı geçerliyse mysql'e ver. Doğrudan mysql'e sınırlı stream etmek,
+	// limit aşımında yarım dump uygulanmasına yol açardı.
+	body := bufio.NewReaderSize(r.Body, 32<<10)
+	magic, err := body.Peek(2)
+	if err != nil && err != io.EOF && err != bufio.ErrBufferFull {
 		httpx.WriteError(w, http.StatusBadRequest, "gövde okunamadı: "+err.Error())
 		return
 	}
 
-	var sqlReader io.Reader = bytes.NewReader(body)
-	if isGzip(body) {
-		gzr, err := gzip.NewReader(bytes.NewReader(body))
+	raw, err := os.CreateTemp("", "sanalpanel-db-import-*.upload")
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "geçici dosya oluşturulamadı")
+		return
+	}
+	rawName := raw.Name()
+	defer os.Remove(rawName)
+	defer raw.Close()
+	n, err := io.Copy(raw, io.LimitReader(body, maxDBImportBytes+1))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "gövde okunamadı: "+err.Error())
+		return
+	}
+	if n > maxDBImportBytes {
+		httpx.WriteError(w, http.StatusRequestEntityTooLarge, "veritabanı içe aktarma sınırı 2 GiB")
+		return
+	}
+	if _, err := raw.Seek(0, io.SeekStart); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "geçici dosya okunamadı")
+		return
+	}
+
+	var sqlFile *os.File = raw
+	if isGzip(magic) {
+		gzr, err := gzip.NewReader(raw)
 		if err != nil {
 			httpx.WriteError(w, http.StatusBadRequest, "gzip okunamadı: "+err.Error())
 			return
 		}
 		defer gzr.Close()
-		sqlReader = gzr
+
+		expanded, err := os.CreateTemp("", "sanalpanel-db-import-*.sql")
+		if err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "geçici SQL dosyası oluşturulamadı")
+			return
+		}
+		expandedName := expanded.Name()
+		defer os.Remove(expandedName)
+		defer expanded.Close()
+		n, err := io.Copy(expanded, io.LimitReader(gzr, maxDBImportBytes+1))
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "gzip açılamadı: "+err.Error())
+			return
+		}
+		if n > maxDBImportBytes {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "açılmış SQL sınırı 2 GiB")
+			return
+		}
+		if _, err := expanded.Seek(0, io.SeekStart); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "geçici SQL dosyası okunamadı")
+			return
+		}
+		sqlFile = expanded
 	}
 
 	cmd := exec.Command("mysql", dbName)
-	cmd.Stdin = sqlReader
+	cmd.Stdin = sqlFile
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

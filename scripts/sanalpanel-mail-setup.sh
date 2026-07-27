@@ -25,15 +25,36 @@ fi
 [ -d "$TMPL" ] || { log "✗ mail template dizini bulunamadı ($TMPL)"; exit 1; }
 ENV=/etc/sanalpanel/env
 
-echo "════ Postfix + Dovecot + OpenDKIM paketleri ════"
+echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # GERÇEK VPS'TE BULUNDU: postfix-mysql / dovecot-mysql AYRI paketler — temel postfix/dovecot
 # paketleri MySQL sorgu-harita desteğini İÇERMİYOR. Bunlar olmadan servisler "active" görünür
 # (systemctl başarıyla başlatır) ama her sorguda sessizce başarısız olur: Postfix
 # "unsupported dictionary type: mysql" der, Dovecot auth süreci "Unknown database driver
 # 'mysql'" ile crash-loop'a girer (auth soketi var ama arkasındaki süreç sürekli ölür) —
 # yani TÜM sanal posta kutusu doğrulaması sessizce bozuk kalır, hiçbir hata dışarı sızmaz.
-dnf install -y postfix postfix-mysql dovecot dovecot-mysql opendkim >/tmp/mail-setup.log 2>&1 \
-  && log "postfix(+mysql) + dovecot(+mysql) + opendkim kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
+dnf install -y postfix postfix-mysql dovecot dovecot-mysql dovecot-pigeonhole opendkim >/tmp/mail-setup.log 2>&1 \
+  && log "postfix(+mysql) + dovecot(+mysql/Sieve) + opendkim kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
+
+# Rspamd'ın resmi deposu EL 8/9/10 paketlerini yayınlıyor. EPEL bazı çalışma
+# bağımlılıklarını sağlar; repo dosyası yalnız yoksa eklenir.
+if ! command -v rspamadm >/dev/null 2>&1; then
+  dnf install -y epel-release >/tmp/rspamd-setup.log 2>&1 || true
+  . /etc/os-release
+  EL_VERSION=$(printf '%s' "${PLATFORM_ID:-platform:el9}" | sed 's/.*el//')
+  curl -fsSL -o /etc/yum.repos.d/rspamd.repo \
+    "https://rspamd.com/rpm-stable/centos-${EL_VERSION}/rspamd.repo"
+fi
+dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
+  || { log "✗ rspamd kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+# EL10 AppStream, Redis'in topluluk devamı olan protokol-uyumlu Valkey'i varsayılan
+# sunucu olarak sunuyor. Eski EL sürümlerinde redis, EL10'da valkey kullan.
+KV_SERVICE=redis
+if ! dnf install -y redis >>/tmp/rspamd-setup.log 2>&1; then
+  dnf install -y valkey >>/tmp/rspamd-setup.log 2>&1 \
+    || { log "✗ Redis/Valkey kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+  KV_SERVICE=valkey
+fi
+log "rspamd + ${KV_SERVICE} kuruldu"
 
 echo "════ mailro (salt-okunur) DB parolası ════"
 DBPASS=$(grep -oP '^PANEL_MAIL_DB_PASS=\K.*' "$ENV" 2>/dev/null)
@@ -94,6 +115,31 @@ cp "$TMPL/opendkim/opendkim.conf.tmpl" /etc/opendkim.conf
 chown root:opendkim /etc/opendkim.conf
 log "/etc/opendkim.conf + KeyTable/SigningTable/TrustedHosts (boş, panel DKIM ürettikçe dolar)"
 
+echo "════ Rspamd + Redis ════"
+mkdir -p /etc/rspamd/local.d
+for f in redis.conf actions.conf milter_headers.conf; do
+  cp "$TMPL/rspamd/$f" "/etc/rspamd/local.d/$f"
+  chown root:root "/etc/rspamd/local.d/$f"
+  chmod 644 "/etc/rspamd/local.d/$f"
+done
+touch /etc/rspamd/local.d/settings.conf
+chown root:root /etc/rspamd/local.d/settings.conf
+chmod 644 /etc/rspamd/local.d/settings.conf
+# Var olan kurulumları da düzelt: template bloğu daha önce yalnız OpenDKIM içeriyordu.
+postconf -e 'smtpd_milters=inet:127.0.0.1:8891, inet:127.0.0.1:11332'
+postconf -e 'non_smtpd_milters=inet:127.0.0.1:8891, inet:127.0.0.1:11332'
+postconf -e 'milter_protocol=6'
+postconf -e 'milter_default_action=accept'
+postconf -e 'smtpd_end_of_data_restrictions=check_policy_service inet:127.0.0.1:10040'
+postconf -e 'smtpd_policy_service_default_action=DUNNO'
+systemctl enable "$KV_SERVICE" rspamd >/dev/null 2>&1
+systemctl restart "$KV_SERVICE"
+if ! rspamadm configtest >/tmp/rspamd-configtest.log 2>&1; then
+  log "✗ Rspamd config geçersiz"; cat /tmp/rspamd-configtest.log; exit 1
+fi
+systemctl restart rspamd
+log "rspamd milter 127.0.0.1:11332 + Redis etkin"
+
 echo "════ Maildir kök dizinleri (mevcut aktif mail_domains için, varsa) ════"
 # GÜVENLİK/SIRALAMA: bu betik sanalpanel-install.sh'ta panel İLK KEZ başlatıldıktan
 # (migration'lar uygulandıktan) SONRA çağrılır — ftp-setup ile birebir aynı sebep: aşağıdaki
@@ -114,8 +160,8 @@ if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ]; t
       "'sanalpanel-repair --only mail' veya elle semanage/setsebool ile düzelt."
 fi
 
-echo "════ postfix + dovecot + opendkim enable + (re)start ════"
-systemctl enable postfix dovecot opendkim >/dev/null 2>&1
+echo "════ postfix + dovecot + opendkim + rspamd enable + (re)start ════"
+systemctl enable postfix dovecot opendkim rspamd "$KV_SERVICE" >/dev/null 2>&1
 if ! postfix check >/tmp/mail-postfix-check.log 2>&1; then
   log "✗ postfix check başarısız — /tmp/mail-postfix-check.log"; cat /tmp/mail-postfix-check.log
   exit 1
@@ -128,8 +174,10 @@ OK=1
 systemctl is-active --quiet postfix  || { log "✗ postfix başlatılamadı — journalctl -u postfix"; OK=0; }
 systemctl is-active --quiet dovecot  || { log "✗ dovecot başlatılamadı — journalctl -u dovecot"; OK=0; }
 systemctl is-active --quiet opendkim || { log "✗ opendkim başlatılamadı — journalctl -u opendkim"; OK=0; }
+systemctl is-active --quiet rspamd   || { log "✗ rspamd başlatılamadı — journalctl -u rspamd"; OK=0; }
+systemctl is-active --quiet "$KV_SERVICE" || { log "✗ ${KV_SERVICE} başlatılamadı"; OK=0; }
 if [ "$OK" = 1 ]; then
-  log "✓ postfix + dovecot + opendkim ACTIVE"
+  log "✓ postfix + dovecot + opendkim + rspamd + redis ACTIVE"
 else
   exit 1
 fi

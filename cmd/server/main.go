@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -57,6 +60,7 @@ import (
 	"sanalpanel/internal/sshaccess"
 	"sanalpanel/internal/subdomain"
 	"sanalpanel/internal/system"
+	"sanalpanel/internal/transfers"
 	"sanalpanel/internal/users"
 	"sanalpanel/internal/waf"
 	"sanalpanel/internal/wordpress"
@@ -93,8 +97,11 @@ func main() {
 	}
 	defer d.Close()
 
-	// migrations
-	runMigrations(d)
+	// Migration hatasıyla kısmi/uyumsuz şema üzerinde HTTP servisi açma.
+	// Güncelleme aracı DB yedeğini restart öncesi zaten alır.
+	if err := runMigrations(d); err != nil {
+		log.Fatalf("migration: %v", err)
+	}
 
 	provisioner.Init(d) // askıya-alma tutarlılığı için provisioner'a DB handle'ı ver
 	middleware.Init(d)  // musteri-scope askiya-alma kontrolu icin DB handle
@@ -142,6 +149,7 @@ func main() {
 	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalpanel-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
 	mail.HealMailOnStartup(context.Background(), d)
+	mail.StartPolicyServer(d, "127.0.0.1:10040")
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
 	// tenant yoksa sessizce çıkar. Üretilen panel hesapları PAROLASIZDIR ve
@@ -185,6 +193,7 @@ func main() {
 	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
+	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH}
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
 	phpExtH := &phpext.Handlers{DB: d}
@@ -299,6 +308,18 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/aliases", mailH.AliasEkle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/aliases/{aid}", mailH.AliasSil)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/aliases/{aid}/durum", mailH.AliasDurumDegistir)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/spam", mailH.SpamGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/spam", mailH.SpamPut)
+				r.With(middleware.AdminOnly).Get("/admin/mail/queue", mailH.QueueList)
+				r.With(middleware.AdminOnly).Post("/admin/mail/queue", mailH.QueueAction)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderPut)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/{mid}/autoresponder", mailH.AutoresponderDelete)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/filters", mailH.FilterList)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/filters", mailH.FilterCreate)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/filters/{fid}", mailH.FilterDelete)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/{mid}/send-limits", mailH.SendLimitsGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/{mid}/send-limits", mailH.SendLimitsPut)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/koruma", korumaH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/koruma", korumaH.Ekle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/koruma/{kid}", korumaH.Sil)
@@ -449,6 +470,8 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-schedule", backupsH.SetSchedule)
 				r.With(middleware.AdminOnly).Post("/admin/backups/tick", backupsH.TickNow)
 				r.With(middleware.BayiVeUstu).Get("/admin/backups/ozet", backupsH.Ozet)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/analyze", transfersH.Analyze)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/import", transfersH.Import)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-destination", backupsH.GetDestination)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-destination", backupsH.PutDestination)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/backup-destination", backupsH.DeleteDestination)
@@ -557,12 +580,18 @@ func main() {
 	}
 }
 
-func runMigrations(d *sql.DB) {
+func runMigrations(d *sql.DB) error {
 	dir := "/opt/sanalpanel/src/migrations"
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		log.Printf("migrations dir okunamadı: %v", err)
-		return
+		return fmt.Errorf("dizin okunamadı: %w", err)
+	}
+	if _, err := d.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		name VARCHAR(255) NOT NULL PRIMARY KEY,
+		checksum CHAR(64) NOT NULL,
+		applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	) ENGINE=InnoDB`); err != nil {
+		return fmt.Errorf("takip tablosu oluşturulamadı: %w", err)
 	}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
@@ -570,7 +599,20 @@ func runMigrations(d *sql.DB) {
 		}
 		body, err := os.ReadFile(dir + "/" + e.Name())
 		if err != nil {
+			return fmt.Errorf("%s okunamadı: %w", e.Name(), err)
+		}
+		sum := sha256.Sum256(body)
+		checksum := hex.EncodeToString(sum[:])
+		var onceki string
+		err = d.QueryRow(`SELECT checksum FROM schema_migrations WHERE name=?`, e.Name()).Scan(&onceki)
+		if err == nil {
+			if onceki != checksum {
+				return fmt.Errorf("%s daha önce uygulanmış ancak içeriği değiştirilmiş", e.Name())
+			}
 			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("%s takip durumu okunamadı: %w", e.Name(), err)
 		}
 		log.Printf("migration: %s", e.Name())
 		// Önce yorum satırlarını çıkar
@@ -589,10 +631,15 @@ func runMigrations(d *sql.DB) {
 				continue
 			}
 			if _, err := d.Exec(s); err != nil {
-				log.Printf("  - hata (%s): %v", e.Name(), err)
+				return fmt.Errorf("%s uygulanamadı: %w", e.Name(), err)
 			}
 		}
+		if _, err := d.Exec(`INSERT INTO schema_migrations(name, checksum) VALUES(?,?)`,
+			e.Name(), checksum); err != nil {
+			return fmt.Errorf("%s takip kaydı yazılamadı: %w", e.Name(), err)
+		}
 	}
+	return nil
 }
 
 func detectIPv4() string {

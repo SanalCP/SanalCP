@@ -132,6 +132,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		kadi    string
 		rol     string
 		adSoyad string
+		surum   uint64
 	)
 
 	if KullaniciRootMu(req.Kullanici) {
@@ -174,7 +175,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		var en int
 		var sec string
 		var sonAdim int64
-		if err := h.DB.QueryRow(`SELECT totp_enabled, totp_secret, totp_last_step FROM users WHERE id=?`, uid).Scan(&en, &sec, &sonAdim); err != nil {
+		if err := h.DB.QueryRow(`SELECT totp_enabled, totp_secret, totp_last_step, auth_version FROM users WHERE id=?`, uid).Scan(&en, &sec, &sonAdim, &surum); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "2FA durumu doğrulanamadı")
 			return
 		}
@@ -197,7 +198,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tok, err := Issue(h.Secret, h.LifetimeSec, uid, kadi, rol)
+	tok, err := Issue(h.Secret, h.LifetimeSec, uid, kadi, rol, surum)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "token üretilemedi")
 		return

@@ -318,7 +318,7 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if b.Rol != nil {
-		if _, err := h.DB.ExecContext(r.Context(), `UPDATE users SET role=?, updated_at=NOW() WHERE id=?`, *b.Rol, id); err != nil {
+		if _, err := h.DB.ExecContext(r.Context(), `UPDATE users SET role=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, *b.Rol, id); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "güncellenemedi")
 			return
 		}
@@ -365,7 +365,7 @@ func (h *Handlers) ParolaSifirla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.DB.ExecContext(r.Context(),
-		`UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?`, hash, id); err != nil {
+		`UPDATE users SET password_hash=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, hash, id); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "parola sıfırlanamadı")
 		return
 	}
@@ -403,7 +403,7 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if _, err := h.DB.ExecContext(r.Context(),
-		`UPDATE users SET status=?, updated_at=NOW() WHERE id=?`, b.Durum, id); err != nil {
+		`UPDATE users SET status=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, b.Durum, id); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "durum değiştirilemedi")
 		return
 	}
@@ -420,7 +420,7 @@ func (h *Handlers) DurumDegistir(w http.ResponseWriter, r *http.Request) {
 	var zincir int64
 	if hedefRol == middleware.RolBayi {
 		res, err := h.DB.ExecContext(r.Context(),
-			`UPDATE users SET status=?, updated_at=NOW() WHERE reseller_id=?`, b.Durum, id)
+			`UPDATE users SET status=?, auth_version=auth_version+1, updated_at=NOW() WHERE reseller_id=?`, b.Durum, id)
 		if err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "bağlı hesapların durumu değiştirilemedi")
 			return

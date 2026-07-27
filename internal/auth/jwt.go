@@ -11,15 +11,17 @@ type Claims struct {
 	UserID   int64  `json:"uid"`
 	Username string `json:"usr"`
 	Role     string `json:"rol"`
+	Version  uint64 `json:"ver"`
 	jwt.RegisteredClaims
 }
 
-func Issue(secret []byte, lifetimeSec int, uid int64, username, role string) (string, error) {
+func Issue(secret []byte, lifetimeSec int, uid int64, username, role string, version uint64) (string, error) {
 	now := time.Now()
 	c := Claims{
 		UserID:   uid,
 		Username: username,
 		Role:     role,
+		Version:  version,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(lifetimeSec) * time.Second)),
