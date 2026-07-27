@@ -85,6 +85,13 @@ log "5 mysql-virtual-*.cf dosyası yazıldı (root:postfix 0640)"
 
 echo "════ Postfix: main.cf / master.cf ════"
 if ! grep -q 'sanalpanel-mail' /etc/postfix/main.cf; then
+  # Alma/RHEL stok main.cf bu dört anahtarı zaten tanımlar. Aynı anahtarları alta
+  # eklemek çalışsa da her postconf/postfix çağrısında "overriding earlier entry"
+  # üretir; önce stok tanımları kaldırıp tek bir kanonik blok yaz.
+  postconf -X inet_interfaces
+  postconf -X mydestination
+  postconf -X smtpd_tls_cert_file
+  postconf -X smtpd_tls_key_file
   cat "$TMPL/postfix/main.cf.append" >> /etc/postfix/main.cf
   log "main.cf'e sanalpanel-mail bloğu eklendi"
 fi
