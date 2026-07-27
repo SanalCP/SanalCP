@@ -24,6 +24,13 @@ step(){ echo -e "\n${c_b}══ $* ══${c_0}"; }
 ok(){ echo -e "  ${c_g}✓${c_0} $*"; }
 warn(){ echo -e "  ${c_y}!${c_0} $*"; }
 die(){ echo -e "  ${c_r}✗ $*${c_0}"; exit 1; }
+# Bazı VPS ağlarında AAAA kaydı çözümlenirken IPv6 çıkışı çalışmıyor. curl önce
+# IPv6'yı seçtiğinde indirme sessizce boş kalmasın: normal denemeden sonra IPv4'e düş.
+download(){
+  local url="$1" out="$2"
+  curl -fsSL --retry 3 --connect-timeout 15 -o "$out" "$url" ||
+    curl -4fsSL --retry 3 --connect-timeout 15 -o "$out" "$url"
+}
 
 [ "$(id -u)" = 0 ] || die "root gerekli"
 [ -d "$A" ] || die "assets/ bulunamadı ($A)"
@@ -296,8 +303,12 @@ fi
 # LE geçerli email ister (@ + nokta). admin@local gibi geçersizse contact'sız kaydet.
 AEMAIL="$ADMIN_EPOSTA"; echo "$AEMAIL" | grep -qE '@[^@]+\.[^@]+$' || AEMAIL=""
 if [ ! -x /root/.acme.sh/acme.sh ]; then
-  if [ -n "$AEMAIL" ]; then curl -fsSL https://get.acme.sh 2>/dev/null | sh -s email="$AEMAIL" >/dev/null 2>&1 || true
-  else curl -fsSL https://get.acme.sh 2>/dev/null | sh >/dev/null 2>&1 || true; fi
+  ACME_INSTALLER=$(mktemp)
+  if download https://get.acme.sh "$ACME_INSTALLER"; then
+    if [ -n "$AEMAIL" ]; then sh "$ACME_INSTALLER" email="$AEMAIL" >/dev/null 2>&1 || true
+    else sh "$ACME_INSTALLER" >/dev/null 2>&1 || true; fi
+  fi
+  rm -f "$ACME_INSTALLER"
 fi
 if [ -x /root/.acme.sh/acme.sh ]; then
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
@@ -340,7 +351,11 @@ fi
 
 # ---- composer (per-domain PHP bağımlılık yönetimi) ----
 if [ ! -x /usr/local/bin/composer ]; then
-  curl -sS https://getcomposer.org/installer 2>/dev/null | php -- --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1
+  COMPOSER_INSTALLER=$(mktemp --suffix=.php)
+  if download https://getcomposer.org/installer "$COMPOSER_INSTALLER"; then
+    php "$COMPOSER_INSTALLER" --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1 || true
+  fi
+  rm -f "$COMPOSER_INSTALLER"
 fi
 [ -x /usr/local/bin/composer ] && ok "composer ($(/usr/local/bin/composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))" || warn "composer kurulamadı"
 
