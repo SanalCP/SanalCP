@@ -7,6 +7,7 @@ import PanelGuncelleme from '@/components/PanelGuncelleme'
 import SunucuOptimize from '@/components/SunucuOptimize'
 import PanelDomain from '@/components/PanelDomain'
 import SunucuYenidenBaslat from '@/components/SunucuYenidenBaslat'
+import HostnameAyari from '@/components/HostnameAyari'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -204,6 +205,7 @@ export default function AraclarAyarlarPage() {
         </div>
         <div className="space-y-3">
           <PanelGuncelleme />
+          <HostnameAyari />
           <PanelDomain />
           <SunucuOptimize />
         </div>
