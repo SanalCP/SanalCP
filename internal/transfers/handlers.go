@@ -22,6 +22,7 @@ import (
 	"sanalpanel/internal/domains"
 	"sanalpanel/internal/hesaplar"
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/mail"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -31,6 +32,7 @@ const MaxUploadBytes = int64(20 << 30)
 type Handlers struct {
 	DB      *sql.DB
 	Domains *domains.Handlers
+	Mail    *mail.Handlers
 }
 
 // Analyze accepts a cPanel full backup and returns an inventory. It never
@@ -68,15 +70,22 @@ func (h *Handlers) Analyze(w http.ResponseWriter, r *http.Request) {
 }
 
 type importResponse struct {
-	OK          bool      `json:"ok"`
-	DomainID    int64     `json:"domain_id"`
-	Domain      string    `json:"domain"`
-	SystemUser  string    `json:"system_user"`
-	WebFiles    int       `json:"web_files"`
-	Databases   []DBMap   `json:"databases"`
-	Credentials any       `json:"credentials"`
-	Skipped     []string  `json:"skipped"`
-	Source      Inventory `json:"source"`
+	OK          bool             `json:"ok"`
+	DomainID    int64            `json:"domain_id"`
+	Domain      string           `json:"domain"`
+	SystemUser  string           `json:"system_user"`
+	WebFiles    int              `json:"web_files"`
+	Databases   []DBMap          `json:"databases"`
+	Credentials any              `json:"credentials"`
+	Mailboxes   []MailCredential `json:"mailboxes"`
+	Aliases     int              `json:"aliases"`
+	Skipped     []string         `json:"skipped"`
+	Source      Inventory        `json:"source"`
+}
+
+type MailCredential struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type DBMap struct {
@@ -206,13 +215,189 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	mailCreds, aliasCount, err := h.importMail(r, tmpPath, inv, created.ID, created.AlanAdi, created.SistemKullanici)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "e-posta aktarılamadı: "+err.Error())
+		return
+	}
 	committed = true
 	httpx.WriteJSON(w, http.StatusCreated, importResponse{
 		OK: true, DomainID: created.ID, Domain: created.AlanAdi,
 		SystemUser: created.SistemKullanici, WebFiles: inv.WebFiles,
-		Databases: dbMaps, Credentials: created.Parolalar, Source: inv,
-		Skipped: []string{"E-posta kutuları, cron ve kaynak SSL sertifikaları bu ilk sürümde yalnız envanterlendi."},
+		Databases: dbMaps, Credentials: created.Parolalar, Mailboxes: mailCreds,
+		Aliases: aliasCount, Source: inv,
+		Skipped: []string{"Cron ve kaynak SSL sertifikaları bu sürümde yalnız envanterlendi."},
 	})
+}
+
+func (h *Handlers) importMail(r *http.Request, archivePath string, inv Inventory, domainID int64, targetDomain, sk string) ([]MailCredential, int, error) {
+	if len(inv.Mailboxes) == 0 && inv.AliasCount == 0 && inv.MailFiles == 0 {
+		return []MailCredential{}, 0, nil
+	}
+	if h.Mail == nil {
+		return nil, 0, errors.New("mail sağlayıcısı hazır değil")
+	}
+	if err := mail.MailUygula(r.Context(), h.DB, domainID); err != nil {
+		return nil, 0, err
+	}
+	creds := make([]MailCredential, 0, len(inv.Mailboxes))
+	for _, local := range inv.Mailboxes {
+		body, _ := json.Marshal(map[string]string{"local_part": local})
+		req := domainRequest(r, http.MethodPost, "/mail", domainID, bytes.NewReader(body))
+		rr := httptest.NewRecorder()
+		h.Mail.Ekle(rr, req)
+		if rr.Code != http.StatusCreated {
+			return nil, 0, fmt.Errorf("%s kutusu: %s", local, strings.TrimSpace(rr.Body.String()))
+		}
+		var result struct {
+			Email  string `json:"email"`
+			Parola string `json:"parola"`
+		}
+		if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
+			return nil, 0, err
+		}
+		creds = append(creds, MailCredential{Email: result.Email, Password: result.Parola})
+		if inv.PrimaryDomain != "" {
+			if err := restoreMailbox(archivePath, inv.ArchiveRoot, inv.PrimaryDomain, local, sk); err != nil {
+				return nil, 0, fmt.Errorf("%s mesajları: %w", local, err)
+			}
+		}
+	}
+
+	aliases, err := readAliases(archivePath, inv.ArchiveRoot, inv.PrimaryDomain, targetDomain)
+	if err != nil {
+		return nil, 0, err
+	}
+	created := 0
+	for _, a := range aliases {
+		body, _ := json.Marshal(map[string]string{"local_part": a.Local, "destination": a.Destination})
+		req := domainRequest(r, http.MethodPost, "/mail/aliases", domainID, bytes.NewReader(body))
+		rr := httptest.NewRecorder()
+		h.Mail.AliasEkle(rr, req)
+		if rr.Code == http.StatusCreated {
+			created++
+			continue
+		}
+		return nil, 0, fmt.Errorf("%s aliası: %s", a.Local, strings.TrimSpace(rr.Body.String()))
+	}
+	return creds, created, nil
+}
+
+func domainRequest(parent *http.Request, method, url string, domainID int64, body io.Reader) *http.Request {
+	rc := chi.NewRouteContext()
+	rc.URLParams.Add("id", strconv.FormatInt(domainID, 10))
+	ctx := context.WithValue(parent.Context(), chi.RouteCtxKey, rc)
+	req := httptest.NewRequest(method, url, body).WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func restoreMailbox(archivePath, root, sourceDomain, local, sk string) error {
+	target := "/home/" + sk + "/mail/" + local
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	member := root + "/homedir/mail/" + sourceDomain + "/" + local
+	cmd := exec.Command("runuser", "-u", sk, "--", "tar", "-xz", "-f", "-", "-C", target,
+		"--strip-components=5", member)
+	cmd.Stdin = f
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Metadata'da bulunan boş bir kutunun arşivde Maildir'i olmayabilir.
+		if strings.Contains(string(out), "Not found in archive") || strings.Contains(string(out), "Not found") {
+			return nil
+		}
+		return fmt.Errorf("tar: %s", strings.TrimSpace(string(out)))
+	}
+	_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
+	return nil
+}
+
+type aliasImport struct {
+	Local       string
+	Destination string
+}
+
+func readAliases(archivePath, root, sourceDomain, targetDomain string) ([]aliasImport, error) {
+	if sourceDomain == "" {
+		return []aliasImport{}, nil
+	}
+	body, err := readSmallTarMember(archivePath, root+"/va/"+sourceDomain)
+	if errors.Is(err, errMemberNotFound) {
+		return []aliasImport{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := []aliasImport{}
+	for _, line := range strings.Split(string(body), "\n") {
+		p := strings.SplitN(strings.TrimSpace(line), ":", 2)
+		if len(p) != 2 {
+			continue
+		}
+		source := strings.TrimSpace(p[0])
+		destRaw := strings.TrimSpace(p[1])
+		if source == "" || destRaw == "" || strings.HasPrefix(destRaw, ":") || strings.HasPrefix(destRaw, "|") {
+			continue
+		}
+		local := strings.TrimSuffix(strings.ToLower(source), "@"+strings.ToLower(sourceDomain))
+		if local == "*" {
+			local = ""
+		}
+		if local != "" && !localPartRE.MatchString(local) {
+			continue
+		}
+		var dests []string
+		for _, d := range strings.Split(destRaw, ",") {
+			d = strings.ToLower(strings.TrimSpace(d))
+			if d == "" {
+				continue
+			}
+			if !strings.Contains(d, "@") && localPartRE.MatchString(d) {
+				d += "@" + targetDomain
+			}
+			d = strings.ReplaceAll(d, "@"+strings.ToLower(sourceDomain), "@"+targetDomain)
+			if strings.Contains(d, "@") {
+				dests = append(dests, d)
+			}
+		}
+		if len(dests) > 0 {
+			out = append(out, aliasImport{Local: local, Destination: strings.Join(dests, ",")})
+		}
+	}
+	return out, nil
+}
+
+var errMemberNotFound = errors.New("arşiv üyesi bulunamadı")
+
+func readSmallTarMember(archivePath, want string) ([]byte, error) {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return nil, errMemberNotFound
+		}
+		if err != nil {
+			return nil, err
+		}
+		if path.Clean(h.Name) == path.Clean(want) {
+			if h.Size > maxMetadataBytes {
+				return nil, ErrArchiveTooLarge
+			}
+			return io.ReadAll(io.LimitReader(tr, maxMetadataBytes))
+		}
+	}
 }
 
 func databaseMappings(sources []string, sk, defaultDB, dbUser string) []DBMap {

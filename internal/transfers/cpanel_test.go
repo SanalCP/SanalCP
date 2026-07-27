@@ -44,6 +44,8 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 		testEntry{name: "backup-demo/mysql/demo_wp.sql", body: "CREATE TABLE x(id int);"},
 		testEntry{name: "backup-demo/dnszones/example.com.db", body: "$TTL 3600"},
 		testEntry{name: "backup-demo/homedir/mail/example.com/a", body: "mail"},
+		testEntry{name: "backup-demo/homedir/etc/example.com/shadow", body: "info:$6$hash:1::::\ndestek:$6$hash:1::::\n"},
+		testEntry{name: "backup-demo/va/example.com", body: "sales: external@example.net\n"},
 		testEntry{name: "backup-demo/cron", body: "* * * * * true"},
 	)
 	got, err := AnalyzeCPanel(r)
@@ -55,6 +57,9 @@ func TestAnalyzeCPanelInventory(t *testing.T) {
 	}
 	if got.WebFiles != 1 || len(got.Databases) != 1 || got.MailFiles != 1 || !got.CronPresent {
 		t.Fatalf("unexpected inventory: %+v", got)
+	}
+	if len(got.Mailboxes) != 2 || got.AliasCount != 1 {
+		t.Fatalf("unexpected mail inventory: %+v", got)
 	}
 }
 

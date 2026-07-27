@@ -186,7 +186,7 @@ func main() {
 	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
-	transfersH := &transfers.Handlers{DB: d, Domains: domainsH}
+	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH}
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
 	phpExtH := &phpext.Handlers{DB: d}
