@@ -23,13 +23,14 @@ func Init(db *sql.DB) { scopeDB = db }
 
 type ctxKey int
 
-const (
-	claimsKey        ctxKey = 1
-	musteriClaimsKey ctxKey = 2
-)
+const claimsKey ctxKey = 1
 
-// RequireAuth: hem admin (auth.Claims) hem müşteri (auth.MusteriClaims) token'larını kabul eder.
-// Müşteri ise context'e MusteriClaims, admin ise Claims yerleştirir.
+// RequireAuth: token'ı doğrular ve claim'leri context'e koyar.
+//
+// Tek token tipi vardır (auth.Claims); rol ayrımı claim içindeki Role
+// alanındadır. Müşteriye özel ikinci bir token tipi (auth.MusteriClaims)
+// 2026-07-27'de kaldırıldı — kapsamı token'a gömüyordu, oysa yetki artık
+// her istekte sahiplik zincirinden çözülüyor.
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,19 +47,13 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Önce admin claims dene
-			if c, err := auth.Parse(secret, tokenRaw); err == nil {
-				ctx := context.WithValue(r.Context(), claimsKey, c)
-				next.ServeHTTP(w, r.WithContext(ctx))
+			c, err := auth.Parse(secret, tokenRaw)
+			if err != nil {
+				httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")
 				return
 			}
-			// Sonra müşteri claims dene
-			if mc, err := auth.ParseMusteri(secret, tokenRaw); err == nil {
-				ctx := context.WithValue(r.Context(), musteriClaimsKey, mc)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-			httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")
+			ctx := context.WithValue(r.Context(), claimsKey, c)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
@@ -155,9 +150,8 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 					next.ServeHTTP(w, r)
 					return
 				case RolMusteri:
-					// users hesabıyla giren müşteri (Faz 5C). Eski FTP kimlikli
-					// oturumdan farkı: birden çok domaini olabilir, bu yüzden
-					// kapsam zincirden çözülür.
+					// Müşterinin birden çok domaini olabilir; kapsam token'dan
+					// değil sahiplik zincirinden çözülür.
 					urlID, _ := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
 					if !MusteriKullanicisininDomainiMi(r, c.UserID, urlID) {
 						httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
@@ -174,24 +168,7 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 					return
 				}
 			}
-			mc := MusteriClaimsFrom(r)
-			if mc == nil {
-				httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
-				return
-			}
-			urlID, _ := strconv.ParseInt(chi.URLParam(r, param), 10, 64)
-			if urlID != mc.DomainID {
-				httpx.WriteError(w, http.StatusForbidden, "bu domain'e erişim yok")
-				return
-			}
-			// Askıya-alma zorlaması: askıdaki domain için müşteri token'ı (önceden
-			// verilmiş/hâlâ geçerli olsa bile) TÜM işlemlerde 403 alır. Admin bu
-			// bloktan önce (ClaimsFrom != nil) zaten geçmiştir; yönetici askıyı kaldırabilir.
-			if domainAskidaMi(r, mc.DomainID) {
-				httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
-				return
-			}
-			next.ServeHTTP(w, r)
+			httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
 		})
 	}
 }
@@ -199,24 +176,24 @@ func MusteriScopeParam(param string) func(http.Handler) http.Handler {
 // DomainSahibiMi: verilen domain ID cagirana ait mi? Merkezi sahiplik denetimi.
 //   - Admin token   => her zaman true (tum domainlere erisir).
 //   - Bayi token    => domain, bayinin yonettigi bir musteriye aitse true.
-//   - Musteri token => yalniz kendi DomainID'siyle eslesiyorsa true.
+//   - Musteri token => domain, musterinin hesabina bagli bir musteri kaydina aitse true.
 //   - Kimlik yoksa   => false.
 //
 // MusteriScope middleware'inin handler-ici eslenigi: URL'de {id} domain param'i
 // bulunmayan (or. {dbId} gibi turev kaynak) uclarda, kaynagin domain_id'si DB'den
 // cozuldukten sonra bu fonksiyonla sahiplik dogrulanir.
 func DomainSahibiMi(r *http.Request, domainID int64) bool {
-	if c := ClaimsFrom(r); c != nil {
-		if c.Role == RolAdmin {
-			return true // admin: tum domainlere erisir
-		}
-		if c.Role == RolBayi {
-			return BayiDomainiMi(r, c.UserID, domainID)
-		}
+	c := ClaimsFrom(r)
+	if c == nil {
 		return false
 	}
-	if mc := MusteriClaimsFrom(r); mc != nil {
-		return mc.DomainID == domainID
+	switch c.Role {
+	case RolAdmin:
+		return true // admin: tum domainlere erisir
+	case RolBayi:
+		return BayiDomainiMi(r, c.UserID, domainID)
+	case RolMusteri:
+		return MusteriKullanicisininDomainiMi(r, c.UserID, domainID)
 	}
 	return false
 }
@@ -260,11 +237,9 @@ func domainAskidaMi(r *http.Request, domainID int64) bool {
 
 // MusteriKullanicisininDomainiMi: domain, verilen MÜŞTERİ HESABINA mi ait?
 //
-// Zincir: users.id -> customers.user_id -> domains.customer_id. Faz 5C'de
-// müşteriler users hesabına taşındı; eski FTP kimlikli oturumlar hâlâ tek bir
-// DomainID tasiyan MusteriClaims kullanir (bkz. MusteriScopeParam), ama users
-// hesabiyla giren bir musterinin BİRDEN ÇOK domaini olabilir — bu yuzden
-// kapsam token'dan degil zincirden cozulur.
+// Zincir: users.id -> customers.user_id -> domains.customer_id. Bir musterinin
+// BİRDEN ÇOK domaini olabilir ve sahiplik degisebilir — bu yuzden kapsam
+// token'a gomulmez, her istekte zincirden cozulur.
 //
 // FAIL-CLOSED: DB okunamazsa false doner.
 func MusteriKullanicisininDomainiMi(r *http.Request, userID, domainID int64) bool {
@@ -301,20 +276,24 @@ func BayiMusterisiMi(r *http.Request, bayiUserID, customerID int64) bool {
 //	kosul, arg := middleware.KapsamSQL(r, "d")
 //	sorgu := "SELECT ... FROM domains d " + kosul
 //
-// Admin icin bos string doner (daraltma yok). Bayi icin customers JOIN'i
-// gerektiren bir EXISTS kosulu doner. Musteri/kimliksiz icin hicbir satirin
-// eslesmedigi bir kosul doner (fail-closed).
+// Admin icin bos string doner (daraltma yok). Bayi ve musteri icin customers
+// uzerinden EXISTS kosulu doner — ikisi de ayni zinciri kullanir, yalnizca
+// eslestikleri sutun farklidir (owner_user_id / user_id). Kimliksiz istek icin
+// hicbir satirin eslesmedigi bir kosul doner (fail-closed).
 func KapsamSQL(r *http.Request, domainAlias string) (string, []any) {
 	c := ClaimsFrom(r)
-	if c != nil && c.Role == RolAdmin {
-		return "", nil
+	if c == nil {
+		return " WHERE 1 = 0", nil
 	}
-	if c != nil && c.Role == RolBayi {
+	switch c.Role {
+	case RolAdmin:
+		return "", nil
+	case RolBayi:
 		return " WHERE EXISTS (SELECT 1 FROM customers kc WHERE kc.id = " +
 			domainAlias + ".customer_id AND kc.owner_user_id = ?)", []any{c.UserID}
-	}
-	if mc := MusteriClaimsFrom(r); mc != nil {
-		return " WHERE " + domainAlias + ".id = ?", []any{mc.DomainID}
+	case RolMusteri:
+		return " WHERE EXISTS (SELECT 1 FROM customers kc WHERE kc.id = " +
+			domainAlias + ".customer_id AND kc.user_id = ?)", []any{c.UserID}
 	}
 	return " WHERE 1 = 0", nil
 }
@@ -335,14 +314,5 @@ func ClaimsFrom(r *http.Request) *auth.Claims {
 		return nil
 	}
 	c, _ := v.(*auth.Claims)
-	return c
-}
-
-func MusteriClaimsFrom(r *http.Request) *auth.MusteriClaims {
-	v := r.Context().Value(musteriClaimsKey)
-	if v == nil {
-		return nil
-	}
-	c, _ := v.(*auth.MusteriClaims)
 	return c
 }

@@ -2,9 +2,9 @@
 // başından beri vardı ama arayüzü hiç yazılmamıştı; müşteri eklemek yalnız
 // API'den mümkündü. Domainler bu kayıtlara domains.customer_id ile bağlanır.
 //
-// NOT: Bunlar panel giriş hesabı DEĞİLDİR — fatura/iletişim kaydıdır. Panel
-// girişi tek admindir (root); müşteriler kendi domainlerine FTP kimliğiyle
-// /cp adresinden girer.
+// NOT: Bunlar panel giriş hesabı DEĞİLDİR — fatura/iletişim kaydıdır. Giriş
+// hesabı users tablosundadır (rol='user') ve customers.user_id ile buraya
+// bağlanır; müşteri o hesapla /cp adresinden girer.
 import { useEffect, useMemo, useState } from 'react'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'

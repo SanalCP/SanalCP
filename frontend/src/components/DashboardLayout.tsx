@@ -264,9 +264,9 @@ export default function DashboardLayout() {
   // müşteri kendi sabit menüsünde kalır.
   const domainKipi = !isMusteri && aktifDomainID !== ''
 
-  // Menü rolden türetilir. isMusteri, FTP kimlikli eski oturumların bayrağı;
-  // panel hesabıyla giren müşteri (Faz 5C) rol='user' olarak gelir — ikisi de
-  // aynı müşteri menüsünü görür.
+  // Menü rolden türetilir. isMusteri, /cp'den giren oturumun localStorage
+  // bayrağıdır ve rol='user' /me yanıtı gelmeden önce de bilinir; ikisi de
+  // aynı müşteri menüsünü gösterir.
   const aktifNav = isMusteri || rol === 'user'
     ? MUSTERI_NAV
     : domainKipi

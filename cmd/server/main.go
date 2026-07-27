@@ -144,8 +144,8 @@ func main() {
 	mail.HealMailOnStartup(context.Background(), d)
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
-	// tenant yoksa sessizce çıkar. Üretilen panel hesapları parolasızdır, yani
-	// mevcut müşteriler FTP kimlikleriyle girmeye devam eder.
+	// tenant yoksa sessizce çıkar. Üretilen panel hesapları PAROLASIZDIR ve
+	// FTP köprüsü kaldırıldığı için parola atanmadan giriş yapamazlar.
 	gocis.MusteriHesapGocu(context.Background(), d)
 
 	musteriH := &musteri.Handlers{DB: d, Secret: cfg.JWTSecret}

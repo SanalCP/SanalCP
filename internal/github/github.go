@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -122,10 +121,8 @@ func patHataMesaji(status int, b []byte) string {
 }
 
 func (h *Handlers) lookupDomain(r *http.Request) (id int64, sk string, demo bool, err error) {
-	mc := middleware.MusteriClaimsFrom(r)
 	idStr := chi.URLParam(r, "id")
 	_, _ = fmt.Sscanf(idStr, "%d", &id)
-	_ = mc
 	var dmo int
 	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).

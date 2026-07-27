@@ -161,14 +161,20 @@ func TestKapsamSQLIzolasyon(t *testing.T) {
 	}
 }
 
-// TestKapsamSQLMusteriKendiDomaini: müşteri koşulu doğrudan domain kimliğine
-// bağlanır (FTP oturumu; panel hesabı zincirden çözülür).
+// TestKapsamSQLMusteriKendiDomaini: müşteri koşulu da sahiplik zincirinden
+// (customers.user_id) türer — domain kimliği token'a gömülmez, çünkü bir
+// müşterinin birden çok domaini olabilir.
 func TestKapsamSQLMusteriKendiDomaini(t *testing.T) {
-	kosul, arg := KapsamSQL(istekMusteri(42), "d")
+	kosul, arg := KapsamSQL(istekRol(RolMusteri, 42), "d")
 	if len(arg) != 1 || arg[0] != int64(42) {
 		t.Fatalf("müşteri argümanı yanlış: %v", arg)
 	}
-	if !regexp.MustCompile(`d\.id = \?`).MatchString(kosul) {
-		t.Errorf("müşteri koşulu beklenen biçimde değil: %q", kosul)
+	if !regexp.MustCompile(`kc\.user_id = \?`).MatchString(kosul) {
+		t.Errorf("müşteri koşulu sahiplik zincirini kullanmıyor: %q", kosul)
+	}
+	// Bayi sütunuyla karışmamalı: müşteri owner_user_id ile daralırsa kendi
+	// domainlerini göremez, başkasınınkini görebilir.
+	if regexp.MustCompile(`owner_user_id`).MatchString(kosul) {
+		t.Errorf("müşteri koşulu bayi sütununu kullanıyor: %q", kosul)
 	}
 }

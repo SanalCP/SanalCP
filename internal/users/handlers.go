@@ -33,17 +33,6 @@ type meResp struct {
 }
 
 func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
-	// Müşteri (FTP) oturumu — DB lookup'a gerek yok, claim'den synthetic döner.
-	if mc := middleware.MusteriClaimsFrom(r); mc != nil {
-		httpx.WriteJSON(w, http.StatusOK, meResp{
-			ID:      0,
-			Adi:     mc.Kullanici,
-			Rol:     "musteri",
-			AdSoyad: mc.AlanAdi,
-			Durum:   "active",
-		})
-		return
-	}
 	c := middleware.ClaimsFrom(r)
 	if c == nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "oturum yok")
@@ -85,6 +74,11 @@ type KullaniciSatir struct {
 	SonGiris     string `json:"son_giris"`
 	SonGirisIP   string `json:"son_giris_ip"`
 	Olusturma    string `json:"olusturma"`
+	// Parolasiz: password_hash boş — hesap var ama GİRİŞ YAPAMAZ. Göçle
+	// üretilen müşteri hesapları böyle doğar (bkz. gocis.MusteriHesapGocu);
+	// eskiden FTP köprüsü telafi ediyordu, artık etmiyor, bu yüzden
+	// yöneticinin bu hesapları listede görebilmesi gerekir.
+	Parolasiz bool `json:"parolasiz"`
 }
 
 const rootID = int64(1)
@@ -121,7 +115,9 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 
 	q := `SELECT id, username, email, full_name, role, status, reseller_id, totp_enabled,
 	             COALESCE(DATE_FORMAT(last_login_at,'%Y-%m-%d %H:%i'),''), last_login_ip,
-	             COALESCE(DATE_FORMAT(created_at,'%Y-%m-%d'),'')
+	             COALESCE(DATE_FORMAT(created_at,'%Y-%m-%d'),''),
+	             CASE WHEN username = 'root' THEN 0
+	                  WHEN COALESCE(password_hash,'') = '' THEN 1 ELSE 0 END
 	      FROM users`
 	var arg []any
 	if c.Role == middleware.RolBayi {
@@ -140,12 +136,13 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	out := make([]KullaniciSatir, 0)
 	for rows.Next() {
 		var s KullaniciSatir
-		var iki int
+		var iki, parolasiz int
 		if err := rows.Scan(&s.ID, &s.KullaniciAdi, &s.Eposta, &s.AdSoyad, &s.Rol, &s.Durum,
-			&s.BayiID, &iki, &s.SonGiris, &s.SonGirisIP, &s.Olusturma); err != nil {
+			&s.BayiID, &iki, &s.SonGiris, &s.SonGirisIP, &s.Olusturma, &parolasiz); err != nil {
 			continue
 		}
 		s.IkiFA = iki == 1
+		s.Parolasiz = parolasiz == 1
 		out = append(out, s)
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
