@@ -381,10 +381,17 @@ func sieveMultiline(value string) string {
 	return strings.Join(lines, "\n")
 }
 
+// sieveQuote — değeri Sieve quoted-string olarak kaçışlar (RFC 5228 §2.4.2).
+//
+// Satır sonu boşluğa çevrilir: quoted-string içinde satır sonunu temsil eden bir
+// kaçış YOKTUR — ters bölü yalnız kendisinden sonraki karakteri harfi harfine
+// alır, yani `\n` "n" demektir. Eskiden üretilen `\n`, çok satırlı bir eşleşme
+// değerini sessizce "…n…" hâline getiriyordu.
 func sieveQuote(value string) string {
+	value = strings.ReplaceAll(value, "\r\n", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
 	value = strings.ReplaceAll(value, `\`, `\\`)
 	value = strings.ReplaceAll(value, `"`, `\"`)
-	value = strings.ReplaceAll(value, "\r", "")
-	value = strings.ReplaceAll(value, "\n", `\n`)
 	return `"` + value + `"`
 }

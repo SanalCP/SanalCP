@@ -1,6 +1,9 @@
 package mail
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestSieveEscaping(t *testing.T) {
 	if got := sieveQuote("a\"b\\c"); got != `"a\"b\\c"` {
@@ -8,6 +11,18 @@ func TestSieveEscaping(t *testing.T) {
 	}
 	if got := sieveMultiline("bir\n.nokta\r\nson"); got != "bir\n..nokta\nson" {
 		t.Fatalf("sieveMultiline = %q", got)
+	}
+}
+
+// Sieve quoted-string'de satır sonu kaçışı yoktur — `\n` yazmak "n" harfine
+// çözülür ve eşleşme değerini sessizce bozardı. Boşluğa çevrilmeli.
+func TestSieveQuoteSatirSonu(t *testing.T) {
+	got := sieveQuote("bir\r\niki\nüç\rdört")
+	if want := `"bir iki üç dört"`; got != want {
+		t.Fatalf("sieveQuote = %s, beklenen %s", got, want)
+	}
+	if strings.Contains(got, `\n`) {
+		t.Fatalf("çıktıda geçersiz \\n kaçışı kaldı: %s", got)
 	}
 }
 

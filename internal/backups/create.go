@@ -111,9 +111,7 @@ func domainDatabases(ctx context.Context, db *sql.DB, domainID int64, sk string)
 
 	// Eski kurulumlarda metadata satırı olmadan oluşturulmuş varsayılan DB'yi de koru.
 	mainName := sk + "_main"
-	var exists int
-	if err := db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=?`, mainName).Scan(&exists); err == nil && exists > 0 {
+	if semaVar(ctx, mainName) {
 		found := false
 		for _, name := range names {
 			if name == mainName {
@@ -126,4 +124,25 @@ func domainDatabases(ctx context.Context, db *sql.DB, domainID int64, sk string)
 		}
 	}
 	return names, nil
+}
+
+// semaVar — verilen şema sunucuda duruyor mu?
+//
+// 🔴 PANEL DSN'İ İLE SORGULANAMAZ: panel kullanıcısının tek yetkisi
+// `GRANT ALL ON panel.*`'dır ve MySQL information_schema'yı yetkiye göre SESSİZCE
+// filtreler — hata dönmez, müşteri şemasına ait satır hiç görünmez. Bu kontrol
+// panel bağlantısı üzerinden yapılırsa her zaman "yok" der ve db_accounts kaydı
+// olmayan varsayılan veritabanı yedeğe hiç girmez (sessiz veri kaybı).
+// Panelin geri kalanıyla aynı desen: servis root çalıştığı için `mysql` istemcisi
+// unix soketiyle tam yetkili bağlanır.
+func semaVar(ctx context.Context, sema string) bool {
+	if !mysqlNameRE.MatchString(sema) {
+		return false
+	}
+	out, err := exec.CommandContext(ctx, "mysql", "-N", "-B", "-e",
+		"SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='"+sema+"'").Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) == sema
 }

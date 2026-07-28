@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -36,15 +37,59 @@ func StartPolicyServer(db *sql.DB, address string) {
 	}
 	log.Printf("mail gönderim policy servisi %s üzerinde", address)
 	go func() {
+		defer listener.Close()
+		// Accept hatasında koşulsuz `continue` etmek, listener kalıcı olarak
+		// bozulduğunda (kapanmış fd) sonsuz bir CPU döngüsü yaratır. Kapanma
+		// kalıcıdır → çık; geçici hatalarda (fd/bellek baskısı) kısa bir geri
+		// çekilmeyle devam et, art arda hatada süreyi ikiye katla.
+		bekleme := 5 * time.Millisecond
+		const enFazlaBekleme = time.Second
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					log.Printf("mail policy dinleyici kapandı: %v", err)
+					return
+				}
 				log.Printf("mail policy accept: %v", err)
+				time.Sleep(bekleme)
+				if bekleme < enFazlaBekleme {
+					bekleme *= 2
+				}
 				continue
 			}
+			bekleme = 5 * time.Millisecond
 			go handlePolicyConnection(db, conn)
 		}
 	}()
+	go gonderimGunluguTemizle(db)
+}
+
+// gonderimGunluguTemizle — mail_send_log her giden posta için bir satır yazar ve
+// hiçbir şey silmezse aylar içinde milyonlarca satıra çıkar; policy her mailde bu
+// tablo üzerinde iki SUM koşturduğu için maliyet doğrudan gönderim gecikmesine
+// yansır. Limit pencereleri 1 saat ve 1 gün olduğundan 2 gün fazlasıyla yeterli
+// (git_webhook_deliveries'teki 30 günlük temizlikle aynı desen).
+func gonderimGunluguTemizle(db *sql.DB) {
+	const parti = 50000
+	for {
+		// Tek DELETE ile milyonlarca satır silmek InnoDB'de uzun kilit demektir;
+		// partiler halinde sil ve biriken geçmişi ilk turda tamamen tüket.
+		for tur := 0; tur < 200; tur++ {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			res, err := db.ExecContext(ctx,
+				`DELETE FROM mail_send_log WHERE ts < NOW()-INTERVAL 2 DAY LIMIT ?`, parti)
+			cancel()
+			if err != nil {
+				log.Printf("mail_send_log temizliği: %v", err)
+				break
+			}
+			if n, err := res.RowsAffected(); err != nil || n < parti {
+				break
+			}
+		}
+		time.Sleep(time.Hour)
+	}
 }
 
 func handlePolicyConnection(db *sql.DB, conn net.Conn) {

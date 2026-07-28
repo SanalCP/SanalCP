@@ -103,7 +103,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		imported, err := restoreAllDatabases(tmpDir, sk)
+		imported, err := restoreAllDatabases(r, h.DB, id, tmpDir, sk)
 		if err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -224,7 +224,14 @@ func restoreSingle(source, target, sk string) error {
 	return nil
 }
 
-func restoreAllDatabases(tmpDir, sk string) (int, error) {
+// restoreAllDatabases — "full" kapsamında yedekteki bütün dump'ları geri yükler.
+//
+// 🔴 HER DUMP AYRI AYRI YETKİLENDİRİLİR: adın yalnızca biçimsel olarak geçerli
+// olması yetmez. Arşiv adı ne olursa olsun `mysql <ad>` root yetkisiyle çalışır;
+// hedef bu domaine ait değilse başka bir kiracının (hatta panelin kendi) şemasını
+// ezerdi. Tekil geri yüklemedeki authorizeDatabase kontrolünün aynısı burada da
+// uygulanır — eşleşmeyen dump atlanır ve çağırana bildirilir.
+func restoreAllDatabases(r *http.Request, db *sql.DB, domainID int64, tmpDir, sk string) (int, error) {
 	dbDir := filepath.Join(tmpDir, "databases")
 	entries, err := os.ReadDir(dbDir)
 	if err != nil {
@@ -239,6 +246,7 @@ func restoreAllDatabases(tmpDir, sk string) (int, error) {
 		return 1, nil
 	}
 	count := 0
+	var atlanan []string
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
 			continue
@@ -247,10 +255,18 @@ func restoreAllDatabases(tmpDir, sk string) (int, error) {
 		if !mysqlNameRE.MatchString(name) {
 			return count, fmt.Errorf("yedekte geçersiz veritabanı adı: %q", name)
 		}
+		if err := authorizeDatabase(r, db, domainID, sk, name); err != nil {
+			atlanan = append(atlanan, name)
+			continue
+		}
 		if err := importDatabase(filepath.Join(dbDir, entry.Name()), name); err != nil {
 			return count, err
 		}
 		count++
+	}
+	if len(atlanan) > 0 {
+		return count, fmt.Errorf("bu domaine ait olmayan veritabanları geri yüklenmedi: %s",
+			strings.Join(atlanan, ", "))
 	}
 	return count, nil
 }
