@@ -350,12 +350,24 @@ if [ -f /etc/httpd/conf/httpd.conf ]; then
 fi
 
 # ---- composer (per-domain PHP bağımlılık yönetimi) ----
+# Yükleyici, root olarak çalıştırılan bir PHP betiğidir; imzası DOĞRULANMADAN
+# çalıştırılmamalı. Beklenen SHA-384 composer.github.io'dan (GitHub Pages) gelir —
+# getcomposer.org'dan farklı bir kaynak olduğu için tek bir sunucunun ele
+# geçirilmesi sessizce zararlı yükleyici çalıştırmaya yetmez.
 if [ ! -x /usr/local/bin/composer ]; then
   COMPOSER_INSTALLER=$(mktemp --suffix=.php)
-  if download https://getcomposer.org/installer "$COMPOSER_INSTALLER"; then
-    php "$COMPOSER_INSTALLER" --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1 || true
+  COMPOSER_SIG=$(mktemp)
+  if download https://getcomposer.org/installer "$COMPOSER_INSTALLER" &&
+     download https://composer.github.io/installer.sig "$COMPOSER_SIG"; then
+    beklenen=$(tr -d '[:space:]' < "$COMPOSER_SIG")
+    gercek=$(php -r "echo hash_file('sha384', '$COMPOSER_INSTALLER');" 2>/dev/null)
+    if [ -n "$beklenen" ] && [ "$beklenen" = "$gercek" ]; then
+      php "$COMPOSER_INSTALLER" --install-dir=/usr/local/bin --filename=composer >/dev/null 2>&1 || true
+    else
+      warn "composer yükleyici imzası doğrulanamadı — kurulum atlandı"
+    fi
   fi
-  rm -f "$COMPOSER_INSTALLER"
+  rm -f "$COMPOSER_INSTALLER" "$COMPOSER_SIG"
 fi
 [ -x /usr/local/bin/composer ] && ok "composer ($(/usr/local/bin/composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))" || warn "composer kurulamadı"
 

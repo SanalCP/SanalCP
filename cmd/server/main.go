@@ -75,7 +75,38 @@ const version = "0.3.0-f2"
 // -X main.buildDate=...). Kaynağından `go build` ile elle derlenirse "gelistirme" kalır.
 var buildDate = "gelistirme"
 
+// geciciDizinAyarla — panelin bütün büyük geçici dosyalarını kalıcı diske taşır.
+//
+// 🔴 AlmaLinux 10 (RHEL 10 varsayılanı) /tmp'i tmpfs olarak bağlar, yani RAM'dir.
+// Panelin os.CreateTemp("", ...) / os.MkdirTemp("", ...) çağrıları oraya düşerse
+// cPanel hesap aktarımı (20 GiB'e kadar arşiv, üstelik multipart kopyasıyla 2×),
+// veritabanı içe aktarma (2 GiB ham + 2 GiB açılmış) ve yedek geri yükleme
+// sunucuyu OOM'a sürükler — servis yavaşlamaz, aniden ölür.
+//
+// TMPDIR alt süreçlere de miras kalır (tar, mysql, mysqldump, rsync), dolayısıyla
+// tek nokta bütün akışları düzeltir. Dışarıdan TMPDIR verilmişse ona dokunulmaz.
+func geciciDizinAyarla() {
+	if strings.TrimSpace(os.Getenv("TMPDIR")) != "" {
+		return
+	}
+	const dizin = "/var/lib/sanalpanel/tmp"
+	if err := os.MkdirAll(dizin, 0o700); err != nil {
+		log.Printf("geçici dizin oluşturulamadı (%s), /tmp kullanılacak: %v", dizin, err)
+		return
+	}
+	if err := os.Chmod(dizin, 0o700); err != nil {
+		log.Printf("geçici dizin izinleri ayarlanamadı: %v", err)
+	}
+	if err := os.Setenv("TMPDIR", dizin); err != nil {
+		log.Printf("TMPDIR ayarlanamadı: %v", err)
+		return
+	}
+	log.Printf("geçici dosya dizini: %s", dizin)
+}
+
 func main() {
+	geciciDizinAyarla()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config: %v", err)
