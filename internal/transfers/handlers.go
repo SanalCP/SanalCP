@@ -11,11 +11,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -42,20 +44,36 @@ type Handlers struct {
 // extracts or persists archive contents.
 func (h *Handlers) Analyze(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "arşiv yüklenemedi veya boyut sınırı aşıldı")
+	// Envanter arşivi baştan sona sıralı okur, dolayısıyla yüklemeyi diske almaya
+	// gerek yok: ParseMultipartForm 20 GiB'e kadar dosyayı geçici dizine kopyalardı.
+	// MultipartReader gövdeyi doğrudan akış olarak verir.
+	mr, err := r.MultipartReader()
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "çok parçalı (multipart) gövde gerekli")
 		return
 	}
-	if r.MultipartForm != nil {
-		defer r.MultipartForm.RemoveAll()
+	var f *multipart.Part
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "arşiv yüklenemedi veya boyut sınırı aşıldı")
+			return
+		}
+		if part.FormName() == "archive" {
+			f = part
+			break
+		}
+		_ = part.Close()
 	}
-	f, hdr, err := r.FormFile("archive")
-	if err != nil {
+	if f == nil {
 		httpx.WriteError(w, http.StatusBadRequest, "archive alanında cPanel .tar.gz yedeği gerekli")
 		return
 	}
 	defer f.Close()
-	low := strings.ToLower(hdr.Filename)
+	low := strings.ToLower(f.FileName())
 	if !strings.HasSuffix(low, ".tar.gz") && !strings.HasSuffix(low, ".tgz") {
 		httpx.WriteError(w, http.StatusBadRequest, "ilk sürüm yalnız cPanel .tar.gz/.tgz tam yedeklerini destekliyor")
 		return
@@ -130,7 +148,9 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
-	if _, err := io.Copy(tmp, f); err != nil || tmp.Close() != nil {
+	_, copyErr := io.Copy(tmp, f)
+	closeErr := tmp.Close() // hata yolunda da kapat: yoksa fd sızar
+	if copyErr != nil || closeErr != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "arşiv kaydedilemedi")
 		return
 	}
@@ -204,6 +224,14 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Arşivin küçük yardımcı üyeleri (SSL çifti + alias tablosu) tek geçişte
+	// okunur; aşağıdaki adımların hiçbiri arşivi yeniden taramaz.
+	ekler, err := okuArsivEkleri(tmpPath, inv)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "arşiv yardımcı dosyaları okunamadı: "+err.Error())
+		return
+	}
+
 	if err := restoreWeb(tmpPath, inv.ArchiveRoot, created.SistemKullanici); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "web dosyaları aktarılamadı: "+err.Error())
 		return
@@ -216,12 +244,12 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if err := restoreDatabase(tmpPath, inv.ArchiveRoot, m.Source, m.Target); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
-			return
-		}
 	}
-	mailCreds, aliasCount, err := h.importMail(r, tmpPath, inv, created.ID, created.AlanAdi, created.SistemKullanici)
+	if err := restoreDatabases(tmpPath, inv.ArchiveRoot, dbMaps); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
+		return
+	}
+	mailCreds, aliasCount, err := h.importMail(r, tmpPath, ekler, inv, created.ID, created.AlanAdi, created.SistemKullanici)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "e-posta aktarılamadı: "+err.Error())
 		return
@@ -232,7 +260,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sslImported, sslExpires, sslWarning, err := h.importSSL(
-		r, tmpPath, inv, created.ID, created.AlanAdi,
+		r, ekler, inv, created.ID, created.AlanAdi,
 	)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "SSL sertifikası aktarılamadı: "+err.Error())
@@ -252,11 +280,11 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handlers) importSSL(r *http.Request, archivePath string, inv Inventory, domainID int64, targetDomain string) (bool, string, string, error) {
+func (h *Handlers) importSSL(r *http.Request, ekler arsivEkler, inv Inventory, domainID int64, targetDomain string) (bool, string, string, error) {
 	if inv.SSLCerts == 0 {
 		return false, "", "", nil
 	}
-	certPEM, keyPEM, err := readCPanelSSL(archivePath, inv.ArchiveRoot, inv.PrimaryDomain)
+	certPEM, keyPEM, err := ekler.sslCifti()
 	if errors.Is(err, errMemberNotFound) {
 		return false, "", "Kaynak SSL sertifikası için eşleşen özel anahtar bulunamadı; SSL aktarılmadı.", nil
 	}
@@ -281,50 +309,73 @@ func (h *Handlers) importSSL(r *http.Request, archivePath string, inv Inventory,
 	return true, expires.UTC().Format("2006-01-02"), "", nil
 }
 
-func readCPanelSSL(archivePath, root, domain string) ([]byte, []byte, error) {
+// arsivEkler — arşivin küçük yardımcı üyeleri (SSL çifti, alias tablosu). Hepsi
+// tek geçişte okunur; bkz. readSmallTarMembers.
+type arsivEkler struct {
+	certAdaylari   []string
+	keyAdaylari    []string
+	bundleAdaylari []string
+	aliasUyesi     string
+	uyeler         map[string][]byte
+}
+
+func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
+	e := arsivEkler{uyeler: map[string][]byte{}}
+	root, domain := inv.ArchiveRoot, inv.PrimaryDomain
 	if domain == "" {
-		return nil, nil, errMemberNotFound
+		return e, nil
 	}
-	certCandidates := []string{
+	e.certAdaylari = []string{
 		root + "/sslcerts/" + domain + ".crt",
 		root + "/homedir/ssl/certs/" + domain + ".crt",
 		root + "/homedir/ssl/" + domain + ".crt",
 	}
-	keyCandidates := []string{
+	e.keyAdaylari = []string{
 		root + "/sslkeys/" + domain + ".key",
 		root + "/homedir/ssl/private/" + domain + ".key",
 		root + "/homedir/ssl/" + domain + ".key",
 	}
-	certPEM, err := readFirstTarMember(archivePath, certCandidates)
-	if err != nil {
-		return nil, nil, err
-	}
-	keyPEM, err := readFirstTarMember(archivePath, keyCandidates)
-	if err != nil {
-		return nil, nil, err
-	}
-	bundleCandidates := []string{
+	e.bundleAdaylari = []string{
 		root + "/sslcerts/" + domain + ".cabundle",
 		root + "/homedir/ssl/certs/" + domain + ".cabundle",
 		root + "/homedir/ssl/" + domain + ".cabundle",
 	}
-	if bundle, bundleErr := readFirstTarMember(archivePath, bundleCandidates); bundleErr == nil && len(bundle) > 0 {
-		certPEM = append(append(certPEM, '\n'), bundle...)
+	e.aliasUyesi = root + "/va/" + domain
+
+	istekler := append([]string{}, e.certAdaylari...)
+	istekler = append(istekler, e.keyAdaylari...)
+	istekler = append(istekler, e.bundleAdaylari...)
+	istekler = append(istekler, e.aliasUyesi)
+	uyeler, err := readSmallTarMembers(archivePath, istekler)
+	if err != nil {
+		return e, err
 	}
-	return certPEM, keyPEM, nil
+	e.uyeler = uyeler
+	return e, nil
 }
 
-func readFirstTarMember(archivePath string, candidates []string) ([]byte, error) {
-	for _, candidate := range candidates {
-		body, err := readSmallTarMember(archivePath, candidate)
-		if err == nil {
-			return body, nil
-		}
-		if !errors.Is(err, errMemberNotFound) {
-			return nil, err
+func (e arsivEkler) ilk(adaylar []string) ([]byte, bool) {
+	for _, aday := range adaylar {
+		if body, ok := e.uyeler[aday]; ok && len(body) > 0 {
+			return body, true
 		}
 	}
-	return nil, errMemberNotFound
+	return nil, false
+}
+
+func (e arsivEkler) sslCifti() ([]byte, []byte, error) {
+	certPEM, ok := e.ilk(e.certAdaylari)
+	if !ok {
+		return nil, nil, errMemberNotFound
+	}
+	keyPEM, ok := e.ilk(e.keyAdaylari)
+	if !ok {
+		return nil, nil, errMemberNotFound
+	}
+	if bundle, ok := e.ilk(e.bundleAdaylari); ok {
+		certPEM = append(append(append([]byte{}, certPEM...), '\n'), bundle...)
+	}
+	return certPEM, keyPEM, nil
 }
 
 func (h *Handlers) importCron(r *http.Request, inv Inventory, domainID int64, targetUser string) (int, error) {
@@ -356,7 +407,7 @@ func (h *Handlers) importCron(r *http.Request, inv Inventory, domainID int64, ta
 	return created, nil
 }
 
-func (h *Handlers) importMail(r *http.Request, archivePath string, inv Inventory, domainID int64, targetDomain, sk string) ([]MailCredential, int, error) {
+func (h *Handlers) importMail(r *http.Request, archivePath string, ekler arsivEkler, inv Inventory, domainID int64, targetDomain, sk string) ([]MailCredential, int, error) {
 	if len(inv.Mailboxes) == 0 && inv.AliasCount == 0 && inv.MailFiles == 0 {
 		return []MailCredential{}, 0, nil
 	}
@@ -367,6 +418,7 @@ func (h *Handlers) importMail(r *http.Request, archivePath string, inv Inventory
 		return nil, 0, err
 	}
 	creds := make([]MailCredential, 0, len(inv.Mailboxes))
+	yerelAdlar := make([]string, 0, len(inv.Mailboxes))
 	for _, local := range inv.Mailboxes {
 		body, _ := json.Marshal(map[string]string{"local_part": local})
 		req := domainRequest(r, http.MethodPost, "/mail", domainID, bytes.NewReader(body))
@@ -383,17 +435,15 @@ func (h *Handlers) importMail(r *http.Request, archivePath string, inv Inventory
 			return nil, 0, err
 		}
 		creds = append(creds, MailCredential{Email: result.Email, Password: result.Parola})
-		if inv.PrimaryDomain != "" {
-			if err := restoreMailbox(archivePath, inv.ArchiveRoot, inv.PrimaryDomain, local, sk); err != nil {
-				return nil, 0, fmt.Errorf("%s mesajları: %w", local, err)
-			}
+		yerelAdlar = append(yerelAdlar, local)
+	}
+	if inv.PrimaryDomain != "" && len(yerelAdlar) > 0 {
+		if err := restoreMailboxes(archivePath, inv.ArchiveRoot, inv.PrimaryDomain, yerelAdlar, sk); err != nil {
+			return nil, 0, fmt.Errorf("posta mesajları: %w", err)
 		}
 	}
 
-	aliases, err := readAliases(archivePath, inv.ArchiveRoot, inv.PrimaryDomain, targetDomain)
-	if err != nil {
-		return nil, 0, err
-	}
+	aliases := readAliases(ekler, inv.PrimaryDomain, targetDomain)
 	created := 0
 	for _, a := range aliases {
 		body, _ := json.Marshal(map[string]string{"local_part": a.Local, "destination": a.Destination})
@@ -418,20 +468,32 @@ func domainRequest(parent *http.Request, method, url string, domainID int64, bod
 	return req
 }
 
-func restoreMailbox(archivePath, root, sourceDomain, local, sk string) error {
-	target := "/home/" + sk + "/mail/" + local
+// restoreMailboxes — bütün Maildir'leri TEK tar çağrısıyla çıkarır.
+//
+// Kutu başına ayrı çağrı, 20 GiB'lık arşivi kutu sayısı kadar baştan açıyordu.
+// Üye yolu root/homedir/mail/<kaynak-domain>/<local> olduğundan 4 bileşen atılıp
+// hedef /home/<sk>/mail seçilirse her kutu tam da kendi dizinine düşer.
+func restoreMailboxes(archivePath, root, sourceDomain string, locals []string, sk string) error {
+	if !strings.HasPrefix(sk, "c_") || root == "" {
+		return errors.New("güvensiz hedef")
+	}
+	target := "/home/" + sk + "/mail"
 	f, err := os.Open(archivePath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	member := root + "/homedir/mail/" + sourceDomain + "/" + local
-	cmd := exec.Command("runuser", "-u", sk, "--", "tar", "-xz", "-f", "-", "-C", target,
-		"--strip-components=5", member)
+	args := []string{"-u", sk, "--", "tar", "-xz", "-f", "-", "-C", target, "--strip-components=4"}
+	for _, local := range locals {
+		args = append(args, root+"/homedir/mail/"+sourceDomain+"/"+local)
+	}
+	cmd := exec.Command("runuser", args...)
 	cmd.Stdin = f
 	if out, err := cmd.CombinedOutput(); err != nil {
-		// Metadata'da bulunan boş bir kutunun arşivde Maildir'i olmayabilir.
+		// Metadata'da görünen boş bir kutunun arşivde Maildir'i olmayabilir; tar
+		// bunu ölümcül saymaz ama çıkış kodunu bozar. Diğer kutular yine açılmıştır.
 		if strings.Contains(string(out), "Not found in archive") || strings.Contains(string(out), "Not found") {
+			_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
 			return nil
 		}
 		return fmt.Errorf("tar: %s", strings.TrimSpace(string(out)))
@@ -445,18 +507,15 @@ type aliasImport struct {
 	Destination string
 }
 
-func readAliases(archivePath, root, sourceDomain, targetDomain string) ([]aliasImport, error) {
-	if sourceDomain == "" {
-		return []aliasImport{}, nil
-	}
-	body, err := readSmallTarMember(archivePath, root+"/va/"+sourceDomain)
-	if errors.Is(err, errMemberNotFound) {
-		return []aliasImport{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
+func readAliases(ekler arsivEkler, sourceDomain, targetDomain string) []aliasImport {
 	out := []aliasImport{}
+	if sourceDomain == "" {
+		return out
+	}
+	body, ok := ekler.uyeler[ekler.aliasUyesi]
+	if !ok {
+		return out
+	}
 	for _, line := range strings.Split(string(body), "\n") {
 		p := strings.SplitN(strings.TrimSpace(line), ":", 2)
 		if len(p) != 2 {
@@ -492,12 +551,28 @@ func readAliases(archivePath, root, sourceDomain, targetDomain string) ([]aliasI
 			out = append(out, aliasImport{Local: local, Destination: strings.Join(dests, ",")})
 		}
 	}
-	return out, nil
+	return out
 }
 
 var errMemberNotFound = errors.New("arşiv üyesi bulunamadı")
 
-func readSmallTarMember(archivePath, want string) ([]byte, error) {
+// readSmallTarMembers — istenen küçük üyeleri TEK arşiv geçişinde toplar.
+//
+// 🔴 NEDEN TOPLU: arşiv gzip'tir, yani rastgele erişim yoktur — her arama tüm
+// dosyayı baştan açar. Üye başına ayrı çağrı yapmak 20 GiB'lık bir cPanel
+// yedeğinde aktarımı saatlere çıkarıyordu (yalnız SSL için 9 aday × tam
+// decompress). Bulunamayan üyeler sonuç haritasında hiç yer almaz.
+func readSmallTarMembers(archivePath string, wants []string) (map[string][]byte, error) {
+	aranan := make(map[string]string, len(wants)) // temizlenmiş ad -> orijinal istek
+	for _, w := range wants {
+		if w != "" {
+			aranan[path.Clean(w)] = w
+		}
+	}
+	found := make(map[string][]byte, len(aranan))
+	if len(aranan) == 0 {
+		return found, nil
+	}
 	f, err := os.Open(archivePath)
 	if err != nil {
 		return nil, err
@@ -509,21 +584,28 @@ func readSmallTarMember(archivePath, want string) ([]byte, error) {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	for {
+	for len(found) < len(aranan) {
 		h, err := tr.Next()
 		if err == io.EOF {
-			return nil, errMemberNotFound
+			break
 		}
 		if err != nil {
 			return nil, err
 		}
-		if path.Clean(h.Name) == path.Clean(want) {
-			if h.Size > maxMetadataBytes {
-				return nil, ErrArchiveTooLarge
-			}
-			return io.ReadAll(io.LimitReader(tr, maxMetadataBytes))
+		istek, ok := aranan[path.Clean(h.Name)]
+		if !ok || h.Typeflag != tar.TypeReg {
+			continue
 		}
+		if h.Size > maxMetadataBytes {
+			return nil, ErrArchiveTooLarge
+		}
+		body, err := io.ReadAll(io.LimitReader(tr, maxMetadataBytes))
+		if err != nil {
+			return nil, err
+		}
+		found[istek] = body
 	}
+	return found, nil
 }
 
 func databaseMappings(sources []string, sk, defaultDB, dbUser string) []DBMap {
@@ -637,7 +719,15 @@ func restoreWeb(archivePath, root, sk string) error {
 	return nil
 }
 
-func restoreDatabase(archivePath, root, sourceDB, targetDB string) error {
+// restoreDatabases — bütün SQL dump'larını TEK arşiv geçişinde içe aktarır.
+//
+// Dump başına ayrı geçiş, veritabanı sayısı kadar tam gzip decompress demekti.
+// Arşiv sıralı okunur; hangi üyeye denk gelinirse ilgili hedefe aktarılır.
+func restoreDatabases(archivePath, root string, maps []DBMap) error {
+	hedef := make(map[string]string, len(maps)) // arşiv üyesi -> hedef DB
+	for _, m := range maps {
+		hedef[path.Clean(root+"/mysql/"+m.Source+".sql")] = m.Target
+	}
 	f, err := os.Open(archivePath)
 	if err != nil {
 		return err
@@ -649,54 +739,79 @@ func restoreDatabase(archivePath, root, sourceDB, targetDB string) error {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	want := root + "/mysql/" + sourceDB + ".sql"
-	for {
+	kalan := len(hedef)
+	for kalan > 0 {
 		h, err := tr.Next()
 		if err == io.EOF {
-			return errors.New("SQL dump arşivde bulunamadı")
+			break
 		}
 		if err != nil {
 			return err
 		}
-		if path.Clean(h.Name) != want {
+		targetDB, ok := hedef[path.Clean(h.Name)]
+		if !ok || h.Typeflag != tar.TypeReg {
 			continue
 		}
-		cmd := exec.Command("mysql", targetDB)
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
+		delete(hedef, path.Clean(h.Name))
+		kalan--
+		if err := dumpAktar(tr, targetDB); err != nil {
 			return err
 		}
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		if err := cmd.Start(); err != nil {
-			return err
+	}
+	if kalan > 0 {
+		eksik := make([]string, 0, kalan)
+		for _, targetDB := range hedef {
+			eksik = append(eksik, targetDB)
 		}
-		bw := bufio.NewWriter(stdin)
-		br := bufio.NewReader(tr)
-		for {
-			line, readErr := br.ReadString('\n')
-			upper := strings.ToUpper(strings.TrimSpace(line))
-			if !strings.HasPrefix(upper, "CREATE DATABASE ") && !strings.HasPrefix(upper, "USE ") {
-				if _, err := bw.WriteString(line); err != nil {
-					_ = stdin.Close()
-					_ = cmd.Wait()
-					return err
-				}
-			}
-			if readErr == io.EOF {
-				break
-			}
-			if readErr != nil {
+		sort.Strings(eksik)
+		return fmt.Errorf("SQL dump arşivde bulunamadı: %s", strings.Join(eksik, ", "))
+	}
+	return nil
+}
+
+// dumpAktar — tek bir dump'ı hedef veritabanına akıtır. Kaynak dump'taki
+// CREATE DATABASE / USE satırları atılır; aksi halde içe aktarma hedef yerine
+// cPanel'deki özgün veritabanı adına yazardı.
+func dumpAktar(src io.Reader, targetDB string) error {
+	cmd := exec.Command("mysql", targetDB)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	bw := bufio.NewWriter(stdin)
+	br := bufio.NewReader(src)
+	for {
+		line, readErr := br.ReadString('\n')
+		upper := strings.ToUpper(strings.TrimSpace(line))
+		if !strings.HasPrefix(upper, "CREATE DATABASE ") && !strings.HasPrefix(upper, "USE ") {
+			if _, err := bw.WriteString(line); err != nil {
 				_ = stdin.Close()
 				_ = cmd.Wait()
-				return readErr
+				return err
 			}
 		}
-		_ = bw.Flush()
-		_ = stdin.Close()
-		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("mysql: %s", strings.TrimSpace(stderr.String()))
+		if readErr == io.EOF {
+			break
 		}
-		return nil
+		if readErr != nil {
+			_ = stdin.Close()
+			_ = cmd.Wait()
+			return readErr
+		}
 	}
+	if err := bw.Flush(); err != nil {
+		_ = stdin.Close()
+		_ = cmd.Wait()
+		return err
+	}
+	_ = stdin.Close()
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("mysql %s: %s", targetDB, strings.TrimSpace(stderr.String()))
+	}
+	return nil
 }
