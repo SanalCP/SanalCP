@@ -70,7 +70,7 @@ export default function SunucuDurumuPage() {
     : null
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="w-full px-4 py-6">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Sunucu Durumu' }]} />
 
       <div className="mb-5">

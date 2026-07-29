@@ -120,7 +120,7 @@ export default function MusterilerPage() {
     id === null ? '—' : (planlar.find((p) => p.id === id)?.ad ?? `#${id}`)
 
   return (
-    <div className="w-full max-w-[1600px] px-6 py-5">
+    <div className="w-full px-6 py-5">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Müşteriler' }]} />
 
       <div className="mb-5">

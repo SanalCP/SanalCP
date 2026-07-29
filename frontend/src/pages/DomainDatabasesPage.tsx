@@ -67,7 +67,7 @@ export default function DomainDatabasesPage() {
   )
 
   return (
-    <div className="px-6 py-5 max-w-[1300px]">
+    <div className="w-full px-6 py-5">
       <Breadcrumb items={[
         { etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' },
         { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },

@@ -37,7 +37,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="px-6 py-5 max-w-[1600px]">
+    <div className="w-full px-6 py-5">
       <div className="mb-5 flex items-baseline justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Pano</h1>

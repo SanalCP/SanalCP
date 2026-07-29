@@ -70,7 +70,7 @@ export default function DomainAntivirusPage() {
 
   return (
     <div className="px-6 py-5">
-      <div className="max-w-4xl mx-auto">
+      <div>
         <Breadcrumb items={[
           { etiket: 'Anasayfa', href: '/' },
           { etiket: 'Domainler', href: '/domainler' },
