@@ -4,6 +4,7 @@ package kota
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -96,6 +97,83 @@ func CheckBayiTrafikKotasi(ctx context.Context, db *sql.DB, bayiUserID int64) er
 	if kullanilanMB >= maks {
 		return &LimitHatasi{Mesaj: fmt.Sprintf(
 			"bayi trafik kotası dolu: %d MB / %d MB", kullanilanMB, maks)}
+	}
+	return nil
+}
+
+// CheckBayiPlanIzinli: bayi, verilen hizmet planını (service_plans.id) bir
+// müşteriye atayabilir mi? reseller_limits.izinli_planlar NULL/boşsa (satır
+// yoksa dahil) kısıt yoktur — tüm planlar serbesttir. Dolu ise plan bu listede
+// olmalıdır (bkz. migrations/0056, internal/users LimitKaydet).
+func CheckBayiPlanIzinli(ctx context.Context, db *sql.DB, bayiUserID, planID int64) error {
+	if planID <= 0 {
+		return nil
+	}
+	var izinliJSON sql.NullString
+	if err := db.QueryRowContext(ctx,
+		`SELECT izinli_planlar FROM reseller_limits WHERE user_id=?`, bayiUserID).Scan(&izinliJSON); err != nil {
+		return nil // satır yok → kısıt yok
+	}
+	if !izinliJSON.Valid || izinliJSON.String == "" {
+		return nil
+	}
+	var izinli []int64
+	if err := json.Unmarshal([]byte(izinliJSON.String), &izinli); err != nil || len(izinli) == 0 {
+		return nil
+	}
+	for _, id := range izinli {
+		if id == planID {
+			return nil
+		}
+	}
+	return &LimitHatasi{Mesaj: "bu hizmet planını kullanma yetkiniz yok"}
+}
+
+// CheckBayiTaahhutKotasi: bayi "fazla satış" (overselling) KAPALIYSA (bkz.
+// migrations/0057), bir domain'e yeni plan atanırken bayinin müşterilerine
+// atadığı TÜM hizmet planı kotalarının toplamı (taahhüt) kendi disk/trafik
+// limitini aşamaz. Varsayılan fazla_satis=1'dir (WHM "Overselling Allowed"
+// karşılığı) — o zaman bu fonksiyon hep nil döner, taahhüt hiç kontrol edilmez
+// ve yalnız gerçek kullanım (CheckBayiDiskKotasi/TrafikKotasi) sınırlar; bu,
+// satır yoksa (bayi hiç tanımlanmamışsa) da geçerlidir. newPlanID<=0 ise
+// (plansız domain) taahhüde katkısı olmadığından kontrol atlanır.
+func CheckBayiTaahhutKotasi(ctx context.Context, db *sql.DB, bayiUserID, newPlanID int64) error {
+	if newPlanID <= 0 {
+		return nil
+	}
+	var fazlaSatis sql.NullBool
+	var diskMaks, trafikMaks int64
+	if err := db.QueryRowContext(ctx,
+		`SELECT fazla_satis, disk_kota_mb, trafik_kota_mb FROM reseller_limits WHERE user_id=?`, bayiUserID).
+		Scan(&fazlaSatis, &diskMaks, &trafikMaks); err != nil {
+		return nil // satır yok → sınırsız/fazla satışa açık
+	}
+	if !fazlaSatis.Valid || fazlaSatis.Bool {
+		return nil
+	}
+	if diskMaks <= 0 && trafikMaks <= 0 {
+		return nil
+	}
+	var yeniDiskMB, yeniTrafikMB int64
+	_ = db.QueryRowContext(ctx,
+		`SELECT COALESCE(disk_kota_mb,0), COALESCE(trafik_kota_mb,0) FROM service_plans WHERE id=?`, newPlanID).
+		Scan(&yeniDiskMB, &yeniTrafikMB)
+
+	var taahhutDiskMB, taahhutTrafikMB int64
+	_ = db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(COALESCE(p.disk_kota_mb,0)),0), COALESCE(SUM(COALESCE(p.trafik_kota_mb,0)),0)
+		FROM domains d JOIN customers c ON c.id = d.customer_id LEFT JOIN service_plans p ON p.id = d.plan_id
+		WHERE c.owner_user_id = ?`, bayiUserID).Scan(&taahhutDiskMB, &taahhutTrafikMB)
+
+	if diskMaks > 0 && taahhutDiskMB+yeniDiskMB > diskMaks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf(
+			"bayi taahhüt kotası dolu: bu plan eklenirse disk taahhüdü %d MB / %d MB olur (fazla satış kapalı)",
+			taahhutDiskMB+yeniDiskMB, diskMaks)}
+	}
+	if trafikMaks > 0 && taahhutTrafikMB+yeniTrafikMB > trafikMaks {
+		return &LimitHatasi{Mesaj: fmt.Sprintf(
+			"bayi taahhüt kotası dolu: bu plan eklenirse trafik taahhüdü %d MB / %d MB olur (fazla satış kapalı)",
+			taahhutTrafikMB+yeniTrafikMB, trafikMaks)}
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/middleware"
 	"sanalpanel/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
@@ -92,6 +93,28 @@ func scan(rs interface{ Scan(...any) error }) (Plan, error) {
 	return p, err
 }
 
+// izinliPlanlar: bayinin reseller_limits.izinli_planlar kısıtını okur.
+// nil dönerse kısıt yok (tüm planlar serbest) — çağıran taraf bunu ayırt eder.
+func (h *Handlers) izinliPlanlar(r *http.Request, bayiUserID int64) map[int64]bool {
+	var izinliJSON sql.NullString
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT izinli_planlar FROM reseller_limits WHERE user_id=?`, bayiUserID).Scan(&izinliJSON); err != nil {
+		return nil
+	}
+	if !izinliJSON.Valid || izinliJSON.String == "" {
+		return nil
+	}
+	var ids []int64
+	if err := json.Unmarshal([]byte(izinliJSON.String), &ids); err != nil || len(ids) == 0 {
+		return nil
+	}
+	m := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		m[id] = true
+	}
+	return m
+}
+
 func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(), selectAll+" ORDER BY varsayilan DESC, id ASC")
 	if err != nil {
@@ -99,10 +122,19 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
+	// Bayi izinli_planlar ile kısıtlanmış olabilir (bkz. migrations/0056) — kısıtlıysa
+	// dropdown'da göstermenin bile anlamı yok, seçilse Create tarafında zaten reddedilir.
+	var izinli map[int64]bool
+	if c := middleware.ClaimsFrom(r); c != nil && c.Role == middleware.RolBayi {
+		izinli = h.izinliPlanlar(r, c.UserID)
+	}
 	out := make([]Plan, 0)
 	for rows.Next() {
 		p, err := scan(rows)
 		if err != nil {
+			continue
+		}
+		if izinli != nil && !izinli[p.ID] {
 			continue
 		}
 		out = append(out, p)

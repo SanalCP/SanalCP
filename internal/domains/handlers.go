@@ -51,6 +51,10 @@ type Domain struct {
 	PlanAd          string `json:"plan_ad,omitempty"`
 	SshErisim       bool   `json:"ssh_erisim"`
 	Askida          bool   `json:"askida"`
+	// BayiAdi: domain'in bağlı olduğu müşterinin sahibi bayi kullanıcı adı —
+	// boş = doğrudan admin'e ait (bkz. migrations/0048 "NULL = doğrudan admin").
+	BayiAdi      string `json:"bayi_adi,omitempty"`
+	BayiPaketAdi string `json:"bayi_paket_adi,omitempty"` // bayinin bağlı olduğu bayi paketi (varsa)
 }
 
 type Handlers struct {
@@ -62,8 +66,14 @@ const selectAll = `SELECT d.id, d.alan_adi, d.sistem_kullanici, d.php_surum, d.s
   COALESCE(DATE_FORMAT(d.ssl_bitis,'%Y-%m-%d'),''), d.durum, d.ipv4, d.ftp_host, d.ftp_user,
   d.db_host, d.db_user, d.db_adi, d.web_root, d.boyut_kb, d.trafik_kb, d.is_demo,
   COALESCE(d.notlar,''), DATE_FORMAT(d.olusturulma,'%Y-%m-%d'),
-  d.plan_id, COALESCE(p.ad,''), d.ssh_erisim, COALESCE(d.askida,0)
-  FROM domains d LEFT JOIN service_plans p ON p.id=d.plan_id`
+  d.plan_id, COALESCE(p.ad,''), d.ssh_erisim, COALESCE(d.askida,0),
+  COALESCE(bu.username,''), COALESCE(brp.ad,'')
+  FROM domains d
+  LEFT JOIN service_plans p ON p.id=d.plan_id
+  LEFT JOIN customers cu ON cu.id = d.customer_id
+  LEFT JOIN users bu ON bu.id = cu.owner_user_id
+  LEFT JOIN reseller_limits brl ON brl.user_id = bu.id
+  LEFT JOIN reseller_plans brp ON brp.id = brl.reseller_plan_id`
 
 func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 	var d Domain
@@ -73,7 +83,8 @@ func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 		&d.SSLBitis, &d.Durum, &d.IPv4, &d.FTPHost, &d.FTPUser,
 		&d.DBHost, &d.DBUser, &d.DBAdi, &d.WebRoot, &d.BoyutKB, &d.TrafikKB, &demo,
 		&d.Notlar, &d.Olusturulma,
-		&planID, &d.PlanAd, &sshE, &askida)
+		&planID, &d.PlanAd, &sshE, &askida,
+		&d.BayiAdi, &d.BayiPaketAdi)
 	d.SSL = ssl == 1
 	d.IsDemo = demo == 1
 	d.SshErisim = sshE == 1
@@ -207,6 +218,21 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		if !middleware.BayiMusterisiMi(r, c.UserID, *req.CustomerID) {
 			httpx.WriteError(w, http.StatusForbidden, "bu müşteriye erişim yok")
 			return
+		}
+		// Bayi izinli_planlar ile belirli hizmet planlarına kısıtlanmış olabilir
+		// (bkz. migrations/0056, internal/users LimitKaydet).
+		if req.PlanID != nil {
+			if err := kota.CheckBayiPlanIzinli(r.Context(), h.DB, c.UserID, *req.PlanID); err != nil {
+				httpx.WriteError(w, http.StatusForbidden, err.Error())
+				return
+			}
+			// Fazla satış kapalıysa (bkz. migrations/0057) taahhüt toplamı da
+			// kendi disk/trafik limitini aşamaz — açıksa (varsayılan) bu adım
+			// no-op'tur, yalnız yukarıdaki gerçek kullanım kontrolleri geçerlidir.
+			if err := kota.CheckBayiTaahhutKotasi(r.Context(), h.DB, c.UserID, *req.PlanID); err != nil {
+				httpx.WriteError(w, http.StatusForbidden, err.Error())
+				return
+			}
 		}
 	}
 	pr, err := provisioner.Provision(req.AlanAdi, req.PHPSurum)

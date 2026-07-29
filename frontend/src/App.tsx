@@ -61,6 +61,8 @@ const VeritabanlariGenelPage = lazy(() => import('@/pages/VeritabanlariGenelPage
 const MusterilerPage = lazy(() => import('@/pages/MusterilerPage'))
 const GuvenlikGunluguPage = lazy(() => import('@/pages/GuvenlikGunluguPage'))
 const KullanicilarPage = lazy(() => import('@/pages/KullanicilarPage'))
+const BayiPaketleriPage = lazy(() => import('@/pages/BayiPaketleriPage'))
+const BayiOzetPage = lazy(() => import('@/pages/BayiOzetPage'))
 const SunucuDurumuPage = lazy(() => import('@/pages/SunucuDurumuPage'))
 const HesapAktarimiPage = lazy(() => import('@/pages/HesapAktarimiPage'))
 
@@ -132,6 +134,8 @@ export default function App() {
 
         {/* Faz 4 — yönetim ekranları */}
         <Route path="kullanicilar"      element={<KullanicilarPage />} />
+        <Route path="bayi-paketleri"    element={<BayiPaketleriPage />} />
+        <Route path="bayi-ozet"         element={<BayiOzetPage />} />
         <Route path="sunucu-durumu"     element={<SunucuDurumuPage />} />
         <Route path="musteriler"        element={<MusterilerPage />} />
         <Route path="guvenlik-gunlugu"  element={<GuvenlikGunluguPage />} />

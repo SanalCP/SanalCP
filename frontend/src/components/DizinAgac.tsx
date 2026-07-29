@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 
 type Entry = { adi: string; yol: string; tip: 'klasor' | 'dosya' | 'sembolik' }
@@ -46,6 +46,7 @@ function TreeNode({
   const [klasorler, setKlasorler] = useState<Entry[]>([])
   const [yuklendi, setYuklendi] = useState(false)
   const [yukleniyor, setYukleniyor] = useState(false)
+  const satirRef = useRef<HTMLDivElement>(null)
 
   function fetchAlt() {
     setYukleniyor(true)
@@ -64,6 +65,27 @@ function TreeNode({
     if (yuklendi) fetchAlt()
   }, [yenileme]) // eslint-disable-line
 
+  const seciliNorm = secili === '' ? '/' : secili
+  const altUzanti = yol === '/' ? '/' : yol + '/'
+  const dahilMi = seciliNorm === yol || seciliNorm.startsWith(altUzanti)
+
+  // Sağdaki panelden bir klasöre girilince (secili değişince) bu düğüm o
+  // yolun üstünde veya tam kendisiyse otomatik açılır — aksi halde sağda
+  // gezilen klasör solda hiç görünmez (henüz çekilmemiş/kapalı kalırdı).
+  useEffect(() => {
+    if (dahilMi && !acik) {
+      setAcik(true)
+      if (!yuklendi) fetchAlt()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secili])
+
+  // Hedef klasörün kendisi (ağaçtaki karşılığı) görünüme kayar — derin
+  // ağaçlarda sağdan girilen klasör ekran dışında kalmasın.
+  useEffect(() => {
+    if (yol === seciliNorm) satirRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [secili]) // eslint-disable-line
+
   function chevronTikla(e: React.MouseEvent) {
     e.stopPropagation()
     if (!acik && !yuklendi) fetchAlt()
@@ -76,6 +98,7 @@ function TreeNode({
   return (
     <div>
       <div
+        ref={satirRef}
         onClick={() => onSec(yol)}
         className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer transition ${
           seciliMi ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300' : 'hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'

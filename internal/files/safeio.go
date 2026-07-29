@@ -352,6 +352,60 @@ func chownAt(dirfd int, name string, uid, gid int) error {
 	return nil
 }
 
+// chmodTreeBeneath: symlink-güvenli özyinelemeli chmod. Dizinler dirMode, dosyalar fileMode
+// alır; symlink'ler ATLANIR — Linux'ta symlink'in kendi izin bitleri anlamsızdır/ayarlanamaz
+// ve fchmodat sembolik BAĞI TAKİP EDER (AT_SYMLINK_NOFOLLOW desteklemez), bu yüzden hiç
+// çağrılmaz — jail-dışı (ör. public_html/link -> /etc/passwd) bir hedefin chmod'lanması
+// böylece imkânsızdır.
+func chmodTreeBeneath(home, rel string, dirMode, fileMode uint32) error {
+	pfd, leaf, err := safeParentFd(home, rel)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(pfd)
+	return chmodAt(pfd, leaf, dirMode, fileMode)
+}
+
+func chmodAt(dirfd int, name string, dirMode, fileMode uint32) error {
+	var st unix.Stat_t
+	if err := unix.Fstatat(dirfd, name, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+		if err == unix.ENOENT {
+			return nil
+		}
+		return err
+	}
+	switch st.Mode & unix.S_IFMT {
+	case unix.S_IFLNK:
+		return nil
+	case unix.S_IFDIR:
+		if err := unix.Fchmodat(dirfd, name, dirMode, 0); err != nil {
+			return err
+		}
+		cfd, err := unix.Openat(dirfd, name, dirOpenFlags, 0)
+		if err != nil {
+			return nil
+		}
+		names, rerr := readdirnamesFd(cfd)
+		if rerr != nil {
+			unix.Close(cfd)
+			return rerr
+		}
+		for _, n := range names {
+			if n == "." || n == ".." {
+				continue
+			}
+			if e := chmodAt(cfd, n, dirMode, fileMode); e != nil {
+				unix.Close(cfd)
+				return e
+			}
+		}
+		unix.Close(cfd)
+		return nil
+	default:
+		return unix.Fchmodat(dirfd, name, fileMode, 0)
+	}
+}
+
 // copyTreeBeneath: symlink-güvenli özyinelemeli kopya. Kaynak ve hedef PARENT'ları pinler;
 // dosyaları O_NOFOLLOW ile kopyalar (jail-dışı symlink İÇERİĞİ okunmaz → bilgi sızması yok),
 // symlink'leri (readlink+symlinkat ile) OLDUĞU gibi yeniden kurar, dizinleri özyineler.

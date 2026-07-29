@@ -78,6 +78,9 @@ export default function DomainFilesPage() {
     yuzde: number
   } | null>(null)
   const [renameFor, setRenameFor] = useState<Entry | null>(null)
+  const [izinSifirlaOnay, setIzinSifirlaOnay] = useState(false)
+  const [izinSifirlaniyor, setIzinSifirlaniyor] = useState(false)
+  const [izinSifirlaSonuc, setIzinSifirlaSonuc] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -94,6 +97,21 @@ export default function DomainFilesPage() {
   }
   useEffect(tara, [id, yol])
   useEffect(() => { setSeciliSet(new Set()) }, [yol])
+
+  async function izinleriSifirla() {
+    if (!id) return
+    setIzinSifirlaOnay(false); setIzinSifirlaniyor(true); setHata(null)
+    try {
+      await api.post(`/domains/${id}/files/izin-sifirla`)
+      setAgacYenileme(x => x + 1)
+      tara()
+      setIzinSifirlaSonuc(true)
+    } catch (e) {
+      setHata(apiHata(e, 'İzinler sıfırlanamadı'))
+    } finally {
+      setIzinSifirlaniyor(false)
+    }
+  }
 
   function git(yeni: string) {
     setYol(yeni)
@@ -571,6 +589,15 @@ export default function DomainFilesPage() {
           Yenile
         </button>
 
+        {/* Dosya İzinlerini Sıfırla — CloudPanel'in "clpctl system:permissions:reset" karşılığı */}
+        <button onClick={() => setIzinSifirlaOnay(true)} disabled={izinSifirlaniyor} title="public_html'i klasör 750 / dosya 644 varsayılanına döndürür"
+          className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded disabled:opacity-60">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          {izinSifirlaniyor ? 'Sıfırlanıyor…' : 'Dosya İzinlerini Sıfırla'}
+        </button>
+
         <div className="flex-1" />
 
         {/* Arama */}
@@ -774,6 +801,38 @@ export default function DomainFilesPage() {
             <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">{boyutSonuc.boyut.toLocaleString('tr-TR')} bayt</div>
             <div className="mt-4 flex justify-end">
               <button onClick={() => setBoyutSonuc(null)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">Tamam</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {izinSifirlaOnay && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaOnay(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-amber-700 dark:text-amber-300 mb-2">⚠ Dosya İzinlerini Sıfırla</h3>
+            <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
+              <span className="font-mono">public_html</span> altındaki <strong>tüm</strong> klasör ve dosyaların izinleri
+              varsayılana döndürülecek: klasörler <span className="font-mono">750</span>, dosyalar <span className="font-mono">644</span>,
+              sahiplik <span className="font-mono">{domain?.sistem_kullanici}</span>. Elle özelleştirdiğiniz izinler
+              (ör. bir betiği çalıştırılabilir yaptıysanız) kaybolur.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIzinSifirlaOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+              <button onClick={izinleriSifirla} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded font-medium">Evet, Sıfırla</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {izinSifirlaSonuc && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaSonuc(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-2">✓ İzinler Sıfırlandı</h3>
+            <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
+              <span className="font-mono">public_html</span> altındaki tüm klasör ve dosyalar varsayılana döndürüldü:
+              klasörler <span className="font-mono">750</span>, dosyalar <span className="font-mono">644</span>,
+              sahiplik <span className="font-mono">{domain?.sistem_kullanici}</span>.
+            </p>
+            <div className="flex justify-end">
+              <button onClick={() => setIzinSifirlaSonuc(false)} className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded font-medium">Tamam</button>
             </div>
           </div>
         </div>

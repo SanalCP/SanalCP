@@ -20,6 +20,7 @@ import (
 	"sanalpanel/internal/antivirus"
 	"sanalpanel/internal/auth"
 	"sanalpanel/internal/backups"
+	"sanalpanel/internal/bayipaketleri"
 	"sanalpanel/internal/cliapi"
 	"sanalpanel/internal/composer"
 	"sanalpanel/internal/config"
@@ -195,6 +196,7 @@ func main() {
 	cronH := &cron.Handlers{DB: d}
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
+	bayiPaketleriH := &bayipaketleri.Handlers{DB: d}
 	dnsH := &dns.Handlers{DB: d}
 	genelH := &genelbakis.Handlers{DB: d}
 	accountsH := &accounts.Handlers{DB: d}
@@ -276,6 +278,10 @@ func main() {
 			r.With(middleware.BayiVeUstu).Get("/me/2fa/setup", authH.TwoFASetup)
 			r.With(middleware.BayiVeUstu).Post("/me/2fa/enable", authH.TwoFAEnable)
 			r.With(middleware.BayiVeUstu).Post("/me/2fa/disable", authH.TwoFADisable)
+			// Bayi özet paneli: yalnız bayinin KENDİ kaynak durumu (admin'in
+			// karşılığı yok — admin zaten tüm bayileri /users + /bayi-paketleri
+			// üzerinden görür).
+			r.With(middleware.RequireRole(middleware.RolBayi)).Get("/bayi/ozet", usersH.Ozet)
 			// NOT: /domains listesi bayiye ancak kapsam filtresi (Faz 5D) geldikten
 			// sonra açılabilir — filtresiz açmak bayiye TÜM domainleri gösterir.
 			r.With(middleware.BayiVeUstu).Get("/domains", domainsH.List)
@@ -418,6 +424,7 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/yaz", filesH.Yaz)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/rename", filesH.Rename)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/chmod", filesH.Chmod)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/files/izin-sifirla", filesH.IzinSifirla)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/extract", filesH.Extract)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/copy", filesH.Copy)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/move", filesH.Move)
@@ -490,6 +497,13 @@ func main() {
 				// hazırlığıdır; ikisi de admin'de kalır.
 				r.With(middleware.AdminOnly).Get("/users/{id}/limitler", usersH.LimitGetir)
 				r.With(middleware.AdminOnly).Put("/users/{id}/limitler", usersH.LimitKaydet)
+				// Bayi paket kataloğu: yalnız admin görür/düzenler — bayi bu
+				// kataloğu değil, ondan doldurulmuş kendi limitini görür.
+				r.With(middleware.AdminOnly).Get("/bayi-paketleri", bayiPaketleriH.Liste)
+				r.With(middleware.AdminOnly).Get("/bayi-paketleri/{id}", bayiPaketleriH.Getir)
+				r.With(middleware.AdminOnly).Post("/bayi-paketleri", bayiPaketleriH.Olustur)
+				r.With(middleware.AdminOnly).Put("/bayi-paketleri/{id}", bayiPaketleriH.Guncelle)
+				r.With(middleware.AdminOnly).Delete("/bayi-paketleri/{id}", bayiPaketleriH.Sil)
 				r.With(middleware.BayiVeUstu).Get("/customers", accountsH.ListCustomers)
 				r.With(middleware.BayiVeUstu).Post("/customers", accountsH.CreateCustomer)
 				r.With(middleware.BayiVeUstu).Put("/customers/{id}", accountsH.UpdateCustomer)
