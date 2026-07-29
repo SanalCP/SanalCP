@@ -44,16 +44,23 @@ const BOS: YeniHesap = { kullanici_adi: '', parola: '', eposta: '', ad_soyad: ''
 
 type BayiLimit = {
   user_id: number
+  paket_id: number | null
+  paket_ad: string
   max_customer: number
   max_domain: number
   disk_kota_mb: number
   trafik_kota_mb: number
+  izinli_planlar: number[] | null
+  fazla_satis: boolean
   tanimli: boolean
   mevcut_customer: number
   mevcut_domain: number
   mevcut_disk_mb: number
   mevcut_trafik_mb: number
 }
+
+type BayiPaketOzet = { id: number; ad: string; max_customer: number; max_domain: number; disk_kota_mb: number; trafik_kota_mb: number; fazla_satis: boolean }
+type HizmetPlanOzet = { id: number; ad: string }
 
 export default function KullanicilarPage() {
   const [aramaParam] = useSearchParams()
@@ -77,6 +84,8 @@ export default function KullanicilarPage() {
   const [limitHedef, setLimitHedef] = useState<Kullanici | null>(null)
   const [limit, setLimit] = useState<BayiLimit | null>(null)
   const [limitYukleniyor, setLimitYukleniyor] = useState(false)
+  const [bayiPaketleri, setBayiPaketleri] = useState<BayiPaketOzet[]>([])
+  const [hizmetPlanlari, setHizmetPlanlari] = useState<HizmetPlanOzet[]>([])
 
   async function getir() {
     setYukleniyor(true)
@@ -135,6 +144,12 @@ export default function KullanicilarPage() {
     setLimit(null)
     setLimitYukleniyor(true)
     setHata(null)
+    if (bayiPaketleri.length === 0) {
+      api.get<BayiPaketOzet[]>('/bayi-paketleri').then(r => setBayiPaketleri(r.data || [])).catch(() => {})
+    }
+    if (hizmetPlanlari.length === 0) {
+      api.get<HizmetPlanOzet[]>('/plans').then(r => setHizmetPlanlari(r.data || [])).catch(() => {})
+    }
     try {
       const r = await api.get<BayiLimit>(`/users/${k.id}/limitler`)
       setLimit(r.data)
@@ -146,16 +161,46 @@ export default function KullanicilarPage() {
     }
   }
 
+  function paketUygula(paketID: number) {
+    if (!limit) return
+    if (paketID === 0) {
+      setLimit({ ...limit, paket_id: null, paket_ad: '' })
+      return
+    }
+    const p = bayiPaketleri.find(x => x.id === paketID)
+    if (!p) return
+    setLimit({
+      ...limit,
+      paket_id: p.id,
+      paket_ad: p.ad,
+      max_customer: p.max_customer,
+      max_domain: p.max_domain,
+      disk_kota_mb: p.disk_kota_mb,
+      trafik_kota_mb: p.trafik_kota_mb,
+      fazla_satis: p.fazla_satis,
+    })
+  }
+
+  function izinliPlanToggle(planID: number) {
+    if (!limit) return
+    const mevcut = limit.izinli_planlar || []
+    const yeni = mevcut.includes(planID) ? mevcut.filter(id => id !== planID) : [...mevcut, planID]
+    setLimit({ ...limit, izinli_planlar: yeni })
+  }
+
   async function limitKaydet() {
     if (!limitHedef || !limit) return
     setKaydediliyor(true)
     setHata(null)
     try {
       await api.put(`/users/${limitHedef.id}/limitler`, {
+        paket_id: limit.paket_id || 0,
         max_customer: limit.max_customer,
         max_domain: limit.max_domain,
         disk_kota_mb: limit.disk_kota_mb,
         trafik_kota_mb: limit.trafik_kota_mb,
+        izinli_planlar: limit.izinli_planlar || [],
+        fazla_satis: limit.fazla_satis,
       })
       setBasari(`${limitHedef.kullanici_adi} limitleri güncellendi.`)
       setLimitHedef(null)
@@ -413,6 +458,27 @@ export default function KullanicilarPage() {
               </span>
             </p>
 
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                Bayi paketi
+              </label>
+              <select
+                value={limit.paket_id ?? 0}
+                onChange={(e) => paketUygula(Number(e.target.value))}
+                className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              >
+                <option value={0}>Elle gir</option>
+                {bayiPaketleri.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
+              </select>
+              {limit.paket_id ? (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Aşağıdaki 4 alan "{limit.paket_ad}" paketinden dolduruldu; değiştirmek için "Elle gir"i seçin.
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-slate-400">Bir paket seçmezseniz limitleri elle girersiniz.</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
@@ -421,9 +487,10 @@ export default function KullanicilarPage() {
                 <input
                   type="number"
                   min={0}
+                  disabled={!!limit.paket_id}
                   value={limit.max_customer}
                   onChange={(e) => setLimit({ ...limit, max_customer: Math.max(0, Number(e.target.value) || 0) })}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
                   şu an {limit.mevcut_customer} kullanılıyor
@@ -439,9 +506,10 @@ export default function KullanicilarPage() {
                 <input
                   type="number"
                   min={0}
+                  disabled={!!limit.paket_id}
                   value={limit.max_domain}
                   onChange={(e) => setLimit({ ...limit, max_domain: Math.max(0, Number(e.target.value) || 0) })}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
                   şu an {limit.mevcut_domain} kullanılıyor
@@ -460,9 +528,10 @@ export default function KullanicilarPage() {
                 <input
                   type="number"
                   min={0}
+                  disabled={!!limit.paket_id}
                   value={limit.disk_kota_mb}
                   onChange={(e) => setLimit({ ...limit, disk_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_disk_mb} MB kullanılıyor</p>
               </div>
@@ -473,12 +542,54 @@ export default function KullanicilarPage() {
                 <input
                   type="number"
                   min={0}
+                  disabled={!!limit.paket_id}
                   value={limit.trafik_kota_mb}
                   onChange={(e) => setLimit({ ...limit, trafik_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_trafik_mb} MB kullanılıyor</p>
               </div>
+            </div>
+
+            <label className={`flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 ${limit.paket_id ? 'opacity-60' : 'cursor-pointer'}`}>
+              <input
+                type="checkbox"
+                disabled={!!limit.paket_id}
+                checked={limit.fazla_satis}
+                onChange={(e) => setLimit({ ...limit, fazla_satis: e.target.checked })}
+                className="rounded"
+              />
+              Fazla satışa izin ver
+            </label>
+            <p className="text-[11px] text-slate-400 -mt-2">
+              Kapatılırsa bayi, müşterilerine atadığı disk/trafik taahhüdü toplamında disk/trafik
+              kotasını aşamaz (WHM'in "Overselling" ayarının karşılığı).
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                Müşteriye atayabileceği hizmet planları
+              </label>
+              {hizmetPlanlari.length === 0 ? (
+                <p className="text-[11px] text-slate-400">Hizmet planı tanımlı değil.</p>
+              ) : (
+                <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-slate-200 dark:border-slate-800 p-2">
+                  {hizmetPlanlari.map(p => (
+                    <label key={p.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={(limit.izinli_planlar || []).includes(p.id)}
+                        onChange={() => izinliPlanToggle(p.id)}
+                      />
+                      {p.ad}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="mt-1 text-[11px] text-slate-400">
+                Hiçbiri işaretli değilse kısıt yok — bayi tüm hizmet planlarını kullanabilir.
+              </p>
             </div>
 
             {!limit.tanimli && (

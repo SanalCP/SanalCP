@@ -13,10 +13,14 @@ type Domain = {
   boyut_kb: number; trafik_kb: number; durum: string
   php_surum?: string; is_demo?: boolean
   olusturulma?: string; plan_id?: number; plan_ad?: string
+  ssl?: boolean; ssl_bitis?: string
+  bayi_adi?: string; bayi_paket_adi?: string
+  ipv4?: string
 }
 type Plan = { id: number; ad: string; disk_kota_mb?: number }
 type PHPVer = { surum: string; aciklama?: string }
 type OlusturmaSonuc = {
+  id: number
   alan_adi: string; sistem_kullanici: string; ftp_user: string; ftp_host: string
   db_host: string; db_user: string; db_adi: string
   olusturulan_parolalar: { ftp: string; db: string }
@@ -49,6 +53,7 @@ export default function DomainsPage() {
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
   const [fPlanID, setFPlanID] = useState<number | ''>('')
+  const [fSSL, setFSSL] = useState(false)
 
   // Liste yalnızca /domains'e bağlıdır. /plans + /php/versions (yavaş olabilen dnf keşfi)
   // listeyi BLOKLAMAZ — modal açılınca lazy çekilir. Böylece dnf yavaş/kilitliyken bile
@@ -102,7 +107,7 @@ export default function DomainsPage() {
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
-    setFAlanAdi(''); setFPHPSurum('8.3'); setFPlanID(varsayilan ? varsayilan.id : '')
+    setFAlanAdi(''); setFPHPSurum('8.3'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false)
     setOlusturAcik(true)
     modalVeriYukle() // lazy: plan/php sürümleri henüz gelmediyse şimdi çek (listeyi bloklamaz)
   }
@@ -122,7 +127,18 @@ export default function DomainsPage() {
       const r = await api.post<OlusturmaSonuc>('/domains', body)
       setOlusturAcik(false)
       setOlusturmaSonuc(r.data)
-      setBasari(`✓ "${alanAdi}" oluşturuldu — Linux user, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL DB ve DNS zone hazır.`)
+      let mesaj = `✓ "${alanAdi}" oluşturuldu — Linux user, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL DB ve DNS zone hazır.`
+      if (fSSL) {
+        try {
+          const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' })
+          mesaj += sslR.data.uyari
+            ? ` ⚠ ${sslR.data.uyari}`
+            : ` ✓ Let's Encrypt SSL sertifikası kuruldu.`
+        } catch (e) {
+          mesaj += ` ⚠ SSL kurulamadı — Abonelik → SSL sayfasından tekrar deneyebilirsiniz.`
+        }
+      }
+      setBasari(mesaj)
       setTimeout(() => setBasari(null), 8000)
       yukle()
     } catch (e: any) {
@@ -151,7 +167,8 @@ export default function DomainsPage() {
   const filtreli = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return items
-    return items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s))
+    return items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
+      || (d.bayi_adi || '').toLowerCase().includes(s))
   }, [items, q])
 
   function togga(id: number) {
@@ -204,7 +221,7 @@ export default function DomainsPage() {
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex-1 max-w-md">
           <input type="text" value={q} onChange={e => setQ(e.target.value)}
-            placeholder="🔍 Domain ara..."
+            placeholder="🔍 Domain, kullanıcı veya bayi ara..."
             className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none" />
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-500">{filtreli.length} / {items.length}</span>
@@ -258,6 +275,7 @@ export default function DomainsPage() {
                   </th>
                   <th className={T.baslik}>Domain Adı</th>
                   <th className={T.baslik}>Sistem Kullanıcısı</th>
+                  <th className={T.baslik}>Bayi</th>
                   <th className={T.baslik}>Plan</th>
                   <th className={T.baslik}>PHP</th>
                   <th className={T.baslik}>Disk</th>
@@ -275,13 +293,48 @@ export default function DomainsPage() {
                           onChange={() => togga(d.id)} className="cursor-pointer" />
                       </td>
                       <td className={T.hucreBaslikSecimli}>
-                        <Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">
-                          {d.alan_adi}
-                        </Link>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">
+                            {d.alan_adi}
+                          </Link>
+                          <a
+                            href={`https://${d.alan_adi}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Siteyi yeni sekmede aç"
+                            onClick={e => e.stopPropagation()}
+                            className="text-slate-300 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 transition"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                          <span title={d.ssl ? `SSL aktif${d.ssl_bitis ? ` — bitiş ${d.ssl_bitis}` : ''}` : 'SSL yok'}>
+                            {d.ssl ? (
+                              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM9 11V7a3 3 0 016 0" />
+                              </svg>
+                            )}
+                          </span>
+                        </span>
                         {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">DEMO</span>}
                       </td>
                       <td className={T.hucre} data-etiket="Sistem Kullanıcısı">
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.sistem_kullanici}</span>
+                      </td>
+                      <td className={T.hucre} data-etiket="Bayi">
+                        {d.bayi_adi ? (
+                          <span className="inline-flex flex-col leading-tight">
+                            <span className="text-[11px] font-medium bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded w-fit">{d.bayi_adi}</span>
+                            {d.bayi_paket_adi && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{d.bayi_paket_adi}</span>}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded w-fit">Admin</span>
+                        )}
                       </td>
                       <td className={T.hucre} data-etiket="Plan">
                         {d.plan_ad ? <span className="text-slate-700 dark:text-slate-300">{d.plan_ad}</span> : <span className="text-slate-400 dark:text-slate-500 italic">—</span>}
@@ -376,6 +429,21 @@ export default function DomainsPage() {
                     <option key={p.id} value={p.id}>{p.ad}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={fSSL} onChange={e => setFSSL(e.target.checked)} disabled={olusturuluyor} className="rounded" />
+                  Let's Encrypt SSL kur
+                </label>
+                {fSSL && (
+                  <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                    ⚠ Alan adının DNS A kaydı, sertifika alınmadan önce bu sunucunun IP adresini
+                    {items[0]?.ipv4 ? <> (<span className="font-mono">{items[0].ipv4}</span>)</> : null} göstermelidir
+                    — aksi hâlde Let's Encrypt doğrulaması başarısız olur ve site geçici olarak self-signed
+                    sertifikayla kurulur (DNS düzelince Abonelik → SSL sayfasından tekrar deneyebilirsiniz).
+                  </p>
+                )}
               </div>
             </div>
 

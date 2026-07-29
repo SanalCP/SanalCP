@@ -1359,10 +1359,11 @@ func hardenHomePerms(home, sk string, uid, gid int) {
 	_ = os.Chmod(ph, 0o755)
 }
 
-// hardenHomePermsRecursive: MEVCUT public_html içeriğini per-user ACL modeline dönüştürür
+// HardenHomePermsRecursive: MEVCUT public_html içeriğini per-user ACL modeline dönüştürür
 // (nginx okuma erişimi + default-ACL tüm alt dizinlere). O(dosya) — HealHomePerms'te sentinel
-// ile YALNIZ BİR KEZ çağrılır. Sonraki yeni dosyalar default-ACL'den miras alır.
-func hardenHomePermsRecursive(ph string) {
+// ile bir kez, internal/files.IzinSifirla'da (kullanıcı tetikli "İzinleri Sıfırla") her
+// çağrıda kullanılır. Sonraki yeni dosyalar default-ACL'den miras alır.
+func HardenHomePermsRecursive(ph string) {
 	if !aclVar() {
 		return
 	}
@@ -1412,7 +1413,7 @@ func HealHomePerms() {
 		}
 		hardenHomePerms(home, sk, uid, gid) // üst dizin izinleri + ACL (her boot, O(1))
 		if donustur {
-			hardenHomePermsRecursive(filepath.Join(home, "public_html")) // mevcut içerik (bir kez)
+			HardenHomePermsRecursive(filepath.Join(home, "public_html")) // mevcut içerik (bir kez)
 		}
 		n++
 	}

@@ -92,6 +92,7 @@ const NAV: NavGroup[] = [
   ]},
   { baslik: 'Yönetim', items: [
     { to: '/kullanicilar',         etiket: 'Kullanıcılar',      ikon: ICONS.bayi },
+    { to: '/bayi-paketleri',       etiket: 'Bayi Paketleri',    ikon: ICONS.plan },
     { to: '/musteriler',           etiket: 'Müşteriler',        ikon: ICONS.musteri },
     { to: '/hesap-aktarimi',       etiket: 'Hesap Aktarımı',    ikon: ICONS.kopya },
     { to: '/guvenlik-gunlugu',     etiket: 'Güvenlik Günlüğü',  ikon: ICONS.log },
@@ -118,6 +119,7 @@ const BAYI_NAV: NavGroup[] = [
     { to: '/wordpress',      etiket: 'WordPress',      ikon: ICONS.wp },
   ]},
   { baslik: 'Hesaplarım', items: [
+    { to: '/bayi-ozet',      etiket: 'Kaynak Özetim',     ikon: ICONS.istatistik },
     { to: '/kullanicilar',   etiket: 'Müşteri Hesapları', ikon: ICONS.bayi },
     { to: '/musteriler',     etiket: 'Müşteri Kayıtları', ikon: ICONS.musteri },
   ]},

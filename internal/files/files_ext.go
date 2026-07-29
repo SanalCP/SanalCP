@@ -17,6 +17,7 @@ import (
 
 	"sanalpanel/internal/archivex"
 	"sanalpanel/internal/httpx"
+	"sanalpanel/internal/provisioner"
 )
 
 // jailJoinStrict: symlink-aware. Parent dizini EvalSymlinks ile resolve eder,
@@ -166,6 +167,35 @@ func (h *Handlers) Chmod(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = chownTreeBeneath(home, req.Yol, sk) // sahiplik domain user'ında kalsın (symlink-güvenli)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "yol": req.Yol, "mod": req.Mod})
+}
+
+// IzinSifirla: POST /domains/{id}/files/izin-sifirla — CloudPanel'in
+// "clpctl system:permissions:reset" karşılığı. public_html'i (kök klasör + tüm alt
+// klasör/dosyalar) sağlama sırasında kullanılan CANONICAL izinlere döndürür: dizinler
+// 0750, dosyalar 0644, sahiplik sitenin kendi kullanıcısı (bkz. provisioner.Provision,
+// aynı değerler). Symlink'ler chmod/chown'lanmaz (bkz. safeio.go chmodTreeBeneath —
+// jail-dışı bir hedefe symlink varsa dokunulmadan atlanır).
+//
+// Yalnız public_html hedeflenir: home'un kardeşleri (logs/tmp/ssl/.cron) panelin kendi
+// yönettiği dizinlerdir, kullanıcı dosya bozulmasından etkilenmez ve burada sıfırlanmaz.
+func (h *Handlers) IzinSifirla(w http.ResponseWriter, r *http.Request) {
+	home, sk, err := h.home(r)
+	if err != nil {
+		httpx.WriteError(w, statusFromErr(err), err.Error())
+		return
+	}
+	if err := chownTreeBeneath(home, "public_html", sk); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "sahiplik sıfırlanamadı: "+err.Error())
+		return
+	}
+	if err := chmodTreeBeneath(home, "public_html", 0750, 0644); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "izinler sıfırlanamadı: "+err.Error())
+		return
+	}
+	// nginx erişim ACL'i (u:nginx:rX + default-ACL) chmod'un ardından yeniden uygulanır —
+	// olası bir yedek geri-yükleme/rsync --acls'siz işlem ACL'leri silmiş olabilir.
+	provisioner.HardenHomePermsRecursive(filepath.Join(home, "public_html"))
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 var _ = errors.New // keep import
