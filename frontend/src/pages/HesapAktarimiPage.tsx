@@ -107,7 +107,7 @@ export default function HesapAktarimiPage() {
   }
 
   return (
-    <div className="px-6 py-5 max-w-6xl">
+    <div className="w-full px-6 py-5">
       <Breadcrumb items={[
         { etiket: 'Anasayfa', href: '/' },
         { etiket: 'Yönetim' },

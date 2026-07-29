@@ -39,7 +39,7 @@ export default function DomainComposerPage() {
 
   return (
     <div className="px-6 py-5">
-      <div className="max-w-3xl mx-auto">
+      <div>
         <Breadcrumb items={[
           { etiket: 'Anasayfa', href: '/' },
           { etiket: 'Domainler', href: '/domainler' },

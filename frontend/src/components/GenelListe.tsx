@@ -53,7 +53,7 @@ export default function GenelListe<T>({
   const rozetler = ozet && liste.length > 0 ? ozet(liste) : []
 
   return (
-    <div className="w-full max-w-[1600px] px-6 py-5">
+    <div className="w-full px-6 py-5">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: baslik }]} />
 
       <div className="mb-5">
