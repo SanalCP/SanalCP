@@ -210,7 +210,7 @@ export default function HomePage() {
   const servisDown = servisToplam - servisAktif
 
   const ad = (kullanici?.ad_soyad || kullanici?.adi || '').trim()
-  const saglik = hesaplaSaglik(s, servisDown)
+  const saglik = hesaplaSaglik(s, servisDown, kotaUyariKapali)
 
   // en yeni yedek zamanı (YYYY-MM-DD HH:MM leksikografik sıralanır)
   const sonYedek = yedek?.domainler?.reduce((a, r) => (r.son_yedek > a ? r.son_yedek : a), '') || ''
@@ -526,7 +526,7 @@ export default function HomePage() {
             <p className="mt-1 text-[12px] leading-snug text-slate-500 dark:text-slate-400">{s ? saglik.aciklama : 'Sağlık verileri yükleniyor…'}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               <Cip renk={servisDown === 0 ? 'emerald' : 'amber'} metin={s ? `${servisAktif}/${servisToplam} servis` : '…'} />
-              {(s?.kota_reboot_gerekli || s?.kota_fs_uyumsuz) && <Cip renk="amber" metin="disk kotası dikkat" />}
+              {(s?.kota_reboot_gerekli || (s?.kota_fs_uyumsuz && !kotaUyariKapali)) && <Cip renk="amber" metin="disk kotası dikkat" />}
             </div>
           </div>
         </div>
@@ -801,11 +801,13 @@ const I = {
 
 /* ---------- sağlık türetimi ---------- */
 type Saglik = { skor: number; baslik: string; aciklama: string; renk: string; nokta: string }
-function hesaplaSaglik(s: Sistem | null, servisDown: number): Saglik {
+function hesaplaSaglik(s: Sistem | null, servisDown: number, kotaFsUyariKapali: boolean): Saglik {
   if (!s) return { skor: 0, baslik: '—', aciklama: '', renk: '#64748b', nokta: 'bg-slate-400' }
   const disk = s.diskler?.length ? Math.max(...s.diskler.map((d) => d.yuzde)) : s.disk.yuzde
   const enYuksek = Math.max(s.cpu.yuzde, s.bellek.yuzde, disk)
-  const kotaSorunu = !!s.kota_reboot_gerekli || !!s.kota_fs_uyumsuz
+  // kota_fs_uyumsuz kalıcıdır (reboot çözmez) — kullanıcı banner'ı kapattıysa sağlık skorunu/rozeti de etkilemesin.
+  // kota_reboot_gerekli geçicidir (reboot ile kendiliğinden düzelir), dismiss'ten etkilenmez.
+  const kotaSorunu = !!s.kota_reboot_gerekli || (!!s.kota_fs_uyumsuz && !kotaFsUyariKapali)
   let skor = 100 - Math.round(enYuksek * 0.32) - servisDown * 6 - (kotaSorunu ? 5 : 0)
   skor = Math.max(0, Math.min(100, skor))
   const kritik = enYuksek >= 85
