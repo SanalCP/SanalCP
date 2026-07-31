@@ -21,7 +21,11 @@ func main() {
 	user := flag.String("kullanici", "admin", "admin kullanıcı adı")
 	pass := flag.String("parola", "", "admin parolası (boşsa env PANEL_SEED_PAROLA)")
 	email := flag.String("eposta", "admin@local", "e-posta")
+	dil := flag.String("dil", "tr", "tercih dili (tr|en)")
 	flag.Parse()
+	if *dil != "en" {
+		*dil = "tr"
+	}
 
 	if *pass == "" {
 		*pass = os.Getenv("PANEL_SEED_PAROLA")
@@ -45,10 +49,10 @@ func main() {
 	}
 
 	res, err := db.Exec(
-		`INSERT INTO users(username, email, password_hash, role, full_name, status)
-		 VALUES(?,?,?, 'admin', 'Sistem Yöneticisi', 'active')
-		 ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role='admin', status='active'`,
-		*user, *email, string(hash))
+		`INSERT INTO users(username, email, password_hash, role, full_name, status, tercih_dil)
+		 VALUES(?,?,?, 'admin', 'Sistem Yöneticisi', 'active', ?)
+		 ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), role='admin', status='active', tercih_dil=VALUES(tercih_dil)`,
+		*user, *email, string(hash), *dil)
 	if err != nil {
 		log.Fatalf("insert: %v", err)
 	}

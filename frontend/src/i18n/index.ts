@@ -31,6 +31,11 @@ export function getLang(): Lang {
   return localStorage.getItem(KEY) === 'en' ? 'en' : 'tr'
 }
 
+function hasStoredLang(): boolean {
+  if (typeof window === 'undefined') return true
+  try { return localStorage.getItem(KEY) !== null } catch { return true }
+}
+
 export function setLang(lang: Lang) {
   try { localStorage.setItem(KEY, lang) } catch { /* yoksay */ }
   i18n.changeLanguage(lang)
@@ -51,6 +56,22 @@ i18n.use(initReactI18next).init({
 // Boot-time: main.tsx bootTheme ile aynı noktada çağırır (FOUC engelleme dahil değil, sadece <html lang>).
 export function bootLang() {
   document.documentElement.lang = getLang()
+}
+
+// Kullanıcı henüz HİÇ dil seçmemişse (localStorage boş — ilk ziyaret / login ekranı)
+// kurulumda seçilen sunucu-varsayılan dilini bir kerelik uygular. Daha önce dil
+// değiştirmiş ya da giriş yapmış kullanıcıyı asla geçersiz kılmaz (fetch, lib/api'deki
+// axios instance'ı değil ham fetch kullanır — @/lib/api bu dosyayı import ediyor,
+// tersi döngüsel import olurdu).
+export async function applyServerDefaultLang() {
+  if (hasStoredLang()) return
+  try {
+    const base = (import.meta.env.VITE_API_BASE as string) || '/api/v1'
+    const r = await fetch(`${base}/public/dil`)
+    if (!r.ok) return
+    const data = await r.json()
+    if (data?.dil === 'en' || data?.dil === 'tr') setLang(data.dil)
+  } catch { /* ağ hatası — TR varsayılanında kal */ }
 }
 
 export default i18n

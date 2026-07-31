@@ -264,6 +264,8 @@ func main() {
 		// Kaba-kuvvet koruması: giriş uçları IP başına hız-sınırlı (bkz. middleware.GirisLimiti)
 		r.With(middleware.GirisLimiti).Post("/auth/login", authH.Login)
 		r.With(middleware.GirisLimiti).Post("/musteri/login", musteriH.Login)
+		// Panelin sunucu-varsayılan dili — giriş ekranı (henüz auth yok) bunu okur.
+		r.Get("/public/dil", panelAyarH.Dil)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(cfg.JWTSecret))
@@ -310,6 +312,7 @@ func main() {
 			r.With(middleware.AdminOnly).Get("/system/panel-domain", panelAyarH.Durum)
 			r.With(middleware.AdminOnly).Post("/system/panel-domain", panelAyarH.Kaydet)
 			r.With(middleware.AdminOnly).Delete("/system/panel-domain", panelAyarH.Kaldir)
+			r.With(middleware.AdminOnly).Put("/system/panel-dil", panelAyarH.DilKaydet)
 			eklentiH.Routes(r)
 			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
 			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.

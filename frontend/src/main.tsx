@@ -4,11 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles.css'
 import { bootTheme } from '@/lib/theme'
-import { bootLang } from '@/i18n'
+import { bootLang, applyServerDefaultLang } from '@/i18n'
 import '@/i18n'
 
 bootTheme()
 bootLang()
+applyServerDefaultLang()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
