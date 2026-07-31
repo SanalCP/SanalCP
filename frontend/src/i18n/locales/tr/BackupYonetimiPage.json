@@ -1,0 +1,37 @@
+{
+  "title": "Backup Yöneticisi",
+  "subtitle": "Tüm domainlerin yedeklerini tek yerden görün; günlük otomatik yedekleme çalışır, S3/SFTP hedefleri domain bazında ayarlanır.",
+  "breadcrumb": {
+    "tools_settings": "Araçlar ve Ayarlar"
+  },
+  "success_triggered": "Planlı yedekleme tetiklendi — birkaç saniye içinde tamamlanır, sonra yenileyin.",
+  "error_trigger_failed": "Yedekleme tetiklenemedi",
+  "kpi": {
+    "total_size": "Toplam Yedek Boyutu",
+    "total_backups": "Toplam Yedek",
+    "domain_count": "Domain Sayısı",
+    "active_remote_target": "Aktif Uzak Hedef",
+    "s3_sftp": "S3 / SFTP"
+  },
+  "schedule": {
+    "label": "🕒 Otomatik yedekleme:",
+    "default_time": "Her gün 03:00",
+    "retention": "7 günlük saklama"
+  },
+  "buttons": {
+    "backup_now": "⏱ Tüm Domainleri Şimdi Yedekle",
+    "triggering": "Tetikleniyor…"
+  },
+  "table": {
+    "title": "Domain Yedekleri",
+    "backup_count": "Yedek Sayısı",
+    "total_size": "Toplam Boyut",
+    "last_backup": "Son Yedek",
+    "no_domain": "Domain yok.",
+    "never": "hiç",
+    "manage": "Yönet →",
+    "manage_text": "Yönet"
+  },
+  "info_note_before": "ℹ️ Yedekler ",
+  "info_note_after": " altında tutulur. Domain silinse bile yedekleri korunur (yanlış silme kurtarma). Tekil yedek indirme/geri yükleme/hedef ayarı için \"{{manage}}\"e girin."
+}

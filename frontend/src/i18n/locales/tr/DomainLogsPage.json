@@ -1,0 +1,42 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "logs": "Günlükler"
+  },
+  "title": "Günlükler",
+  "stream_not_started": "stream başlamadı (HTTP {{status}})",
+  "view": {
+    "table": "Tablo",
+    "raw": "Ham"
+  },
+  "auto_scroll": "Otomatik kaydır",
+  "live_stop": "■ Durdur",
+  "live_start": "▶ Canlı Takip",
+  "refresh_200": "↻ Son 200",
+  "clear": "Temizle",
+  "search_placeholder": "Ara — IP, yol, durum kodu, tarayıcı…",
+  "clear_search": "Aramayı temizle",
+  "matches": "{{count}} / {{total}} eşleşti",
+  "waiting_live": "Bekleniyor… yeni satırlar geldikçe akacak.",
+  "empty_log": "(log dosyası boş veya henüz oluşmadı)",
+  "no_match": "\"{{q}}\" aramasına uygun satır yok.",
+  "footer_lines": "{{count}} satır",
+  "footer_lines_filtered": "{{count}} / {{total}} satır (filtreli)",
+  "window_label": "pencere {{n}}",
+  "live_badge": "canlı yayın",
+  "access_table": {
+    "time": "Zaman",
+    "ip": "IP",
+    "method": "Method",
+    "path": "Yol",
+    "status": "Durum",
+    "size": "Boyut",
+    "browser": "Tarayıcı"
+  },
+  "error_table": {
+    "time": "Zaman",
+    "level": "Seviye",
+    "client": "İstemci",
+    "message": "Mesaj"
+  }
+}

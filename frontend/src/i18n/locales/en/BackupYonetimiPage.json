@@ -1,0 +1,37 @@
+{
+  "title": "Backup Manager",
+  "subtitle": "View all domain backups from a single place; daily automatic backup runs, S3/SFTP targets are configured per domain.",
+  "breadcrumb": {
+    "tools_settings": "Tools and Settings"
+  },
+  "success_triggered": "Scheduled backup triggered — it will complete in a few seconds, then refresh.",
+  "error_trigger_failed": "Could not trigger backup",
+  "kpi": {
+    "total_size": "Total Backup Size",
+    "total_backups": "Total Backups",
+    "domain_count": "Domain Count",
+    "active_remote_target": "Active Remote Target",
+    "s3_sftp": "S3 / SFTP"
+  },
+  "schedule": {
+    "label": "🕒 Automatic backup:",
+    "default_time": "Daily at 03:00",
+    "retention": "7-day retention"
+  },
+  "buttons": {
+    "backup_now": "⏱ Backup All Domains Now",
+    "triggering": "Triggering…"
+  },
+  "table": {
+    "title": "Domain Backups",
+    "backup_count": "Backup Count",
+    "total_size": "Total Size",
+    "last_backup": "Last Backup",
+    "no_domain": "No domains.",
+    "never": "never",
+    "manage": "Manage →",
+    "manage_text": "Manage"
+  },
+  "info_note_before": "ℹ️ Backups are kept under ",
+  "info_note_after": ". Even if a domain is deleted, its backups are preserved (accidental-deletion recovery). For single-backup download/restore/target settings, go to \"{{manage}}\"."
+}

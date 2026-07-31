@@ -1,0 +1,120 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "dns_settings": "DNS Settings"
+  },
+  "title": "DNS Settings",
+  "ip_label": "IP:",
+  "info": {
+    "label": "Info:",
+    "text1": "This server is ",
+    "authoritative_dns": "authoritative DNS",
+    "text2": " (BIND) — records are published as soon as they're saved. For the domain to work, point the NS records at your domain registrar to this server's ",
+    "your_domain": "yourdomain",
+    "after": " addresses."
+  },
+  "soa": {
+    "toggle_label": "⚙️ SOA Settings",
+    "toggle_hint": "(start of authority record — refresh/retry/expire/NS)",
+    "hide": "▲ hide",
+    "edit": "▼ edit",
+    "primary_ns": "Primary NS",
+    "hostmaster": "Hostmaster (email)",
+    "seconds_suffix": "(sec)",
+    "save": "Save SOA"
+  },
+  "dnssec": {
+    "status_signed": "signed",
+    "status_signing": "signing…",
+    "status_off": "off",
+    "desc": "Zone signing (BIND inline-signing). After enabling, enter the resulting DS record with your domain registrar.",
+    "refresh_status": "↻ Status",
+    "close": "Close",
+    "enable": "Enable",
+    "enabling": "Enabling…",
+    "ds_title": "DS Record — enter it with your registrar",
+    "ds_copy_hint": "Enter this DS record in the DNSSEC/DS field with your domain registrar. Propagation may take up to the TTL duration.",
+    "ds_pending": "Signing in progress; the DS record isn't ready yet. Click \"↻ Status\" in a few seconds.",
+    "enabled_msg": "DNSSEC enabled. Enter the DS record below with your domain registrar.",
+    "disabled_msg": "DNSSEC disabled.",
+    "update_failed": "DNSSEC could not be updated"
+  },
+  "actions": {
+    "add_record": "Add Record",
+    "apply_template": "📋 Apply Default Template",
+    "apply_template_tooltip": "Adds default A/MX/TXT/NS records (idempotent)",
+    "refresh": "↻ Refresh",
+    "record_count": "{{count}} records"
+  },
+  "selection": {
+    "selected_count": "{{count}} records selected",
+    "make_active": "Set Active",
+    "make_inactive": "Set Inactive",
+    "delete_selected": "Delete Selected ({{count}})",
+    "clear_selection": "Clear Selection"
+  },
+  "table": {
+    "select_all": "Select all",
+    "select_row": "select {{ad}} {{tip}}",
+    "name": "Name",
+    "type": "Type",
+    "value": "Value",
+    "ttl": "TTL",
+    "priority": "Priority",
+    "empty": "No DNS records yet."
+  },
+  "modal": {
+    "new_title": "New DNS Record",
+    "edit_title": "Edit DNS Record",
+    "name_label": "Name (subdomain)",
+    "name_hint": "\"@\" = root domain, \"www\", \"mail\" etc.",
+    "type_label": "Type",
+    "value_label": "Value",
+    "ttl_label": "TTL (sec)",
+    "priority_label": "Priority",
+    "active_label": "Active",
+    "update": "Update"
+  },
+  "value_hints": {
+    "A": "IPv4 address — e.g. 203.0.113.10",
+    "AAAA": "IPv6 address — e.g. 2a01:4f8:1c1c::1",
+    "CNAME": "Target domain — e.g. target.example.com",
+    "MX": "Mail server — e.g. mail.example.com (priority in a separate field)",
+    "TXT": "Free text — e.g. v=spf1 mx ~all",
+    "NS": "Name server — e.g. ns1.example.com",
+    "SRV": "weight port target — e.g. 5 5060 sip.example.com (priority in a separate field)",
+    "CAA": "flags tag \"value\" — e.g. 0 issue \"letsencrypt.org\"",
+    "PTR": "Target domain — e.g. host.example.com",
+    "DS": "keytag alg digest-type digest — e.g. 12345 13 2 49FD46E6C4B45C55D4AC…",
+    "TLSA": "usage selector matching data — e.g. 3 1 1 0B9FA5A59EED715C26C1020C…",
+    "SSHFP": "algorithm type fingerprint — e.g. 4 2 123456789ABCDEF…",
+    "NAPTR": "order pref \"flags\" \"service\" \"regexp\" replacement"
+  },
+  "confirm": {
+    "delete_title": "Delete DNS record",
+    "delete_msg": "Delete \"{{ad}} {{tip}} {{deger}}\"?",
+    "delete_confirm": "Yes, delete",
+    "bulk_delete_title": "Delete selected DNS records",
+    "bulk_delete_msg": "{{count}} DNS records will be permanently deleted. This action cannot be undone. Continue?",
+    "bulk_delete_confirm": "Yes, delete {{count}} records",
+    "dnssec_disable_title": "Disable DNSSEC",
+    "dnssec_disable_msg": "IMPORTANT: BEFORE disabling DNSSEC, DELETE the DS record with your domain registrar and wait for the TTL duration. Otherwise your domain will become unresolvable (SERVFAIL). If you've deleted the DS record, continue.",
+    "dnssec_disable_confirm": "I deleted the DS record, disable"
+  },
+  "errors": {
+    "bulk_delete_failed": "Bulk delete failed",
+    "bulk_update_failed": "Bulk update failed",
+    "soa_save_failed": "SOA could not be saved",
+    "template_apply_failed": "Template could not be applied",
+    "delete_failed": "Delete failed",
+    "record_save_failed": "Record save failed"
+  },
+  "success": {
+    "bulk_deleted": "{{count}} records deleted",
+    "bulk_updated": "{{count}} records set to {{durum}}",
+    "soa_saved": "SOA settings saved and zone rewritten.",
+    "template_applied": "{{count}} default records added"
+  },
+  "status_active": "active",
+  "status_inactive": "inactive"
+}

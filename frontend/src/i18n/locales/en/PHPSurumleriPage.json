@@ -1,0 +1,31 @@
+{
+  "breadcrumb": {
+    "tools_settings": "Tools & Settings",
+    "php_versions": "PHP Versions"
+  },
+  "title": "PHP Versions",
+  "desc": "Add or remove PHP versions on the server. Each version runs in its own PHP-FPM pool and can be selected per domain. Installation includes 14 packages (fpm, cli, mysqlnd, mbstring, bcmath, intl, gd, soap, opcache, pdo, xml, zip, pgsql, ldap).",
+  "install_confirm": "14 packages will be installed for PHP {{version}} ({{source}}) (fpm + cli + mysqlnd + 12 extensions). Continue?",
+  "install_done": "✓ PHP {{version}} installed",
+  "install_title": "PHP {{version}} installation",
+  "install_failed": "Installation failed",
+  "appstream_remove_blocked": "AppStream is the PHP system default and cannot be removed",
+  "remove_confirm": "PHP {{version}} (Remi) and ALL its extensions will be REMOVED.\nIf any domain uses this version, the operation will be rejected. Continue?",
+  "remove_done": "✓ PHP {{version}} removed",
+  "remove_title": "PHP {{version}} removal",
+  "remove_failed": "Removal failed",
+  "filter_label": "Filter:",
+  "filter_all": "All",
+  "filter_installed": "Installed ({{count}})",
+  "filter_installable": "Installable ({{count}})",
+  "installed_badge": "INSTALLED",
+  "eol_badge": "EOL",
+  "version_label": "Version:",
+  "module_label": "Modules:",
+  "service_label": "Service:",
+  "fixed_default": "Fixed (system default)",
+  "removing": "Removing…",
+  "remove": "🗑 Remove",
+  "installing": "⏳ Installing…",
+  "install": "⬇ Install"
+}

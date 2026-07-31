@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -28,13 +29,9 @@ type Yanit = {
 }
 
 const MEM_DEGER = ['64M', '128M', '256M', '384M', '512M', '768M', '1024M', '2048M']
-const PMS = [
-  { v: 'ondemand', t: 'ondemand (önerilen — boşken sıfır işlemci)' },
-  { v: 'dynamic',  t: 'dynamic (yüke göre)' },
-  { v: 'static',   t: 'static (sabit havuz)' },
-]
 
 export default function DomainPHPPage() {
+  const { t } = useTranslation(['DomainPHPPage'])
   const { id } = useParams()
   const [yanit, setYanit] = useState<Yanit | null>(null)
   const [secili, setSurum] = useState<string>('')
@@ -45,6 +42,12 @@ export default function DomainPHPPage() {
   const [isleniyor, setIsleniyor] = useState(false)
   const [dlog, setDlog] = useState<string[]>([])
   const [dlogYuk, setDlogYuk] = useState(false)
+
+  const PMS = [
+    { v: 'ondemand', t: t('DomainPHPPage:pm_ondemand') },
+    { v: 'dynamic',  t: t('DomainPHPPage:pm_dynamic') },
+    { v: 'static',   t: t('DomainPHPPage:pm_static') },
+  ]
 
   function yukle() {
     if (!id) return
@@ -61,10 +64,10 @@ export default function DomainPHPPage() {
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
       const { data } = await api.put(`/domains/${id}/php-settings`, { php_surum: secili, ayarlar: a })
-      setBasari(`✓ Kaydedildi. PHP ${data.php_surum}, socket: ${data.socket}`)
+      setBasari(t('DomainPHPPage:saved', { version: data.php_surum, socket: data.socket }))
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'Kaydetme başarısız'))
+      setHata(apiHata(e, t('DomainPHPPage:save_failed')))
     } finally {
       setIsleniyor(false)
     }
@@ -94,7 +97,7 @@ export default function DomainPHPPage() {
       await api.delete(`/domains/${id}/php/debug-log`)
       setDlog([])
     } catch (e) {
-      setHata(apiHata(e, 'Debug log temizlenemedi'))
+      setHata(apiHata(e, t('DomainPHPPage:debug_clear_failed')))
     } finally {
       setDlogYuk(false)
     }
@@ -103,30 +106,28 @@ export default function DomainPHPPage() {
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' },
+        { etiket: t('common:home'), href: '/' }, { etiket: t('common:domain'), href: '/domainler' },
         { etiket: yanit?.alan_adi || '...', href: `/abonelikler/${id}` },
-        { etiket: 'PHP Ayarları' },
+        { etiket: t('DomainPHPPage:breadcrumb_title') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">PHP Ayarları</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainPHPPage:title')}</h1>
       {yanit && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
         <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{yanit.alan_adi}</Link>
-        {' · Sistem kullanıcısı: '}<code className="font-mono">{yanit.sk}</code>
+        {' · '}{t('DomainPHPPage:sk_label')} <code className="font-mono">{yanit.sk}</code>
       </p>}
 
       <div className="mb-5 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-200">
-        Burada belirlediğiniz ayarlar PHP-FPM havuzuna (<code className="font-mono">php_admin_value/flag</code>) yazılır.
-        Web sitesindeki <code className="font-mono">.htaccess</code>, <code className="font-mono">.user.ini</code> bunları override edebilir.
-        Kaydedince PHP-FPM otomatik yeniden başlatılır — site indirilmez.
+        {t('DomainPHPPage:info_box')}
       </div>
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
 
-      {yuk || !a || !yanit ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div> : (
+      {yuk || !a || !yanit ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div> : (
         <>
           {/* PHP Sürümü — kompakt segmented pill */}
-          <Kart baslik="PHP Sürümü">
+          <Kart baslik={t('DomainPHPPage:php_version')}>
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-1">
                 {yanit.surumler.map(s => {
@@ -140,7 +141,7 @@ export default function DomainPHPPage() {
                           : 'text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100 hover:bg-white dark:bg-slate-800/60'
                       }`}>
                       <span className="font-semibold">PHP {s.surum}</span>
-                      {akt && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Aktif" />}
+                      {akt && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title={t('DomainPHPPage:active_dot_title')} />}
                     </button>
                   )
                 })}
@@ -153,9 +154,9 @@ export default function DomainPHPPage() {
                   <span className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-2">
                     <span>{s.aciklama}</span>
                     {akt ? (
-                      <span className="text-[10px] uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-semibold">Aktif</span>
+                      <span className="text-[10px] uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-semibold">{t('DomainPHPPage:active_label')}</span>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">Kaydet ile uygula</span>
+                      <span className="text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">{t('DomainPHPPage:apply_on_save')}</span>
                     )}
                   </span>
                 )
@@ -164,107 +165,102 @@ export default function DomainPHPPage() {
           </Kart>
 
           {/* Performance & Security */}
-          <Kart baslik="Performans ve Güvenlik">
+          <Kart baslik={t('DomainPHPPage:performance_security')}>
             <Grid>
-              <Sec etiket="memory_limit" yardim="Bir scriptin ayırabileceği maksimum bellek (byte). Örn: 256M.">
+              <Sec etiket="memory_limit" yardim={t('memory_limit_help')}>
                 <SecveOzel value={a.memory_limit} options={MEM_DEGER} onChange={v => P('memory_limit', v)} />
               </Sec>
-              <Saytec etiket="max_execution_time" suffix="sn" yardim="Maks. çalışma süresi (saniye)" value={a.max_execution_time} onChange={v => P('max_execution_time', v)} />
-              <Saytec etiket="max_input_time" suffix="sn" yardim="POST/GET verisini ayrıştırma süresi (saniye)" value={a.max_input_time} onChange={v => P('max_input_time', v)} />
-              <Sec etiket="post_max_size" yardim="POST verisi maksimum büyüklük. upload_max'tan büyük olmalı.">
+              <Saytec etiket="max_execution_time" suffix="sn" yardim={t('max_execution_time_help')} value={a.max_execution_time} onChange={v => P('max_execution_time', v)} />
+              <Saytec etiket="max_input_time" suffix="sn" yardim={t('max_input_time_help')} value={a.max_input_time} onChange={v => P('max_input_time', v)} />
+              <Sec etiket="post_max_size" yardim={t('post_max_size_help')}>
                 <SecveOzel value={a.post_max_size} options={MEM_DEGER} onChange={v => P('post_max_size', v)} />
               </Sec>
-              <Sec etiket="upload_max_filesize" yardim="Tek dosya yükleme limiti">
+              <Sec etiket="upload_max_filesize" yardim={t('upload_max_filesize_help')}>
                 <SecveOzel value={a.upload_max_filesize} options={MEM_DEGER} onChange={v => P('upload_max_filesize', v)} />
               </Sec>
-              <Bayrak etiket="opcache.enable" yardim="OPcache opcode cache (önerilen: AÇIK)" value={a.opcache_enable} onChange={v => P('opcache_enable', v)} />
+              <Bayrak etiket="opcache.enable" yardim={t('opcache_help')} value={a.opcache_enable} onChange={v => P('opcache_enable', v)} />
             </Grid>
             <div className="mt-4">
-              <Etiket>disable_functions <Ipucu t="Devre dışı bırakılacak PHP fonksiyonları (virgülle ayrılmış)" /></Etiket>
+              <Etiket>disable_functions <Ipucu t={t('disable_functions_help')} /></Etiket>
               <Txt value={a.disable_functions} onChange={v => P('disable_functions', v)} mono />
             </div>
           </Kart>
 
           {/* Common */}
-          <Kart baslik="Genel">
+          <Kart baslik={t('DomainPHPPage:common')}>
             <Grid>
-              <Bayrak etiket="display_errors" yardim="Hataları çıktıya yazdır (canlıda kapalı tut)" value={a.display_errors} onChange={v => P('display_errors', v)} />
-              <Bayrak etiket="log_errors" yardim="Hata loglamayı aç" value={a.log_errors} onChange={v => P('log_errors', v)} />
-              <Bayrak etiket="allow_url_fopen" yardim="HTTP/FTP üzerinden dosya açma" value={a.allow_url_fopen} onChange={v => P('allow_url_fopen', v)} />
-              <Bayrak etiket="file_uploads" yardim="HTTP dosya yükleme" value={a.file_uploads} onChange={v => P('file_uploads', v)} />
-              <Bayrak etiket="short_open_tag" yardim="<? ?> kısa tag desteği" value={a.short_open_tag} onChange={v => P('short_open_tag', v)} />
+              <Bayrak etiket="display_errors" yardim={t('display_errors_help')} value={a.display_errors} onChange={v => P('display_errors', v)} />
+              <Bayrak etiket="log_errors" yardim={t('log_errors_help')} value={a.log_errors} onChange={v => P('log_errors', v)} />
+              <Bayrak etiket="allow_url_fopen" yardim={t('allow_url_fopen_help')} value={a.allow_url_fopen} onChange={v => P('allow_url_fopen', v)} />
+              <Bayrak etiket="file_uploads" yardim={t('file_uploads_help')} value={a.file_uploads} onChange={v => P('file_uploads', v)} />
+              <Bayrak etiket="short_open_tag" yardim={t('short_open_tag_help')} value={a.short_open_tag} onChange={v => P('short_open_tag', v)} />
             </Grid>
-            <Tek e="error_reporting" h="Hata raporlama seviyesi (örn: E_ALL & ~E_DEPRECATED)">
+            <Tek e="error_reporting" h={t('error_reporting_help')}>
               <Txt value={a.error_reporting} onChange={v => P('error_reporting', v)} mono />
             </Tek>
-            <Tek e="include_path" h="Script include dizinleri (Linux: : ile ayır)">
+            <Tek e="include_path" h={t('include_path_help')}>
               <Txt value={a.include_path} onChange={v => P('include_path', v)} mono />
             </Tek>
-            <Tek e="open_basedir" h="PHP'nin erişebileceği dizinler (boş = sınır yok). : ile ayır">
-              <Txt value={a.open_basedir} onChange={v => P('open_basedir', v)} mono placeholder="örn: /home/kullanici/:/tmp/" />
+            <Tek e="open_basedir" h={t('open_basedir_help')}>
+              <Txt value={a.open_basedir} onChange={v => P('open_basedir', v)} mono placeholder="e.g.: /home/user/:/tmp/" />
             </Tek>
-            <Tek e="session.save_path" h="Session dosyaları dizini (boş = /home/{sk}/tmp)">
+            <Tek e="session.save_path" h={t('session_save_path_help')}>
               <Txt value={a.session_save_path} onChange={v => P('session_save_path', v)} mono />
             </Tek>
-            <Tek e="mail.force_extra_parameters" h="mail() fonksiyonu için ek parametreler">
+            <Tek e="mail.force_extra_parameters" h={t('mail_force_extra_parameters_help')}>
               <Txt value={a.mail_force_extra_parameters} onChange={v => P('mail_force_extra_parameters', v)} mono />
             </Tek>
           </Kart>
 
           {/* PHP Debug Modu — master switch */}
-          <Kart baslik="PHP Debug Modu">
+          <Kart baslik={t('DomainPHPPage:php_debug_mode')}>
             <div className="flex items-start gap-4">
               <button onClick={() => P('debug_mode', !a.debug_mode)}
                 className={`flex-shrink-0 mt-0.5 relative inline-flex h-6 w-11 items-center rounded-full transition ${a.debug_mode ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                title={a.debug_mode ? 'Debug modunu kapat' : 'Debug modunu ac'}>
+                title={a.debug_mode ? t('DomainPHPPage:debug_turn_off') : t('DomainPHPPage:debug_turn_on')}>
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${a.debug_mode ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Debug modu</span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainPHPPage:debug_mode_label')}</span>
                   <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${a.debug_mode ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                    {a.debug_mode ? 'Acik' : 'Kapali'}
+                    {a.debug_mode ? t('DomainPHPPage:debug_on') : t('DomainPHPPage:debug_off')}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 leading-relaxed">
-                  Acikken PHP hatalarini ekrana yazdirir ve olumcul (fatal) hatalari guvenilir sekilde yakalayip
-                  <code className="font-mono"> .gpanel/php_debug.log</code>'a kaydeder. Uygulama kendi <code className="font-mono">error_reporting(0)</code>'ini
-                  cagirsa bile fatal hatalar yine yakalanir.
+                  {t('DomainPHPPage:debug_desc_on')}
                 </p>
               </div>
             </div>
             {a.debug_mode && (
               <div className="mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-200">
-                ⚠️ Debug modu acikken <strong>display_errors</strong> ve <strong>error_reporting = E_ALL</strong> zorlanir; hata detaylari ziyaretcilere gorunebilir.
-                Yalnizca sorun giderirken acin, canli sitede <strong>kapatin</strong>. Degisiklik <strong>Kaydet</strong>'ten sonra uygulanir.
+                {t('DomainPHPPage:debug_warning')}
               </div>
             )}
           </Kart>
 
           {/* Son Hatalar — debug log paneli */}
-          <Kart baslik="Son Hatalar (Debug Log)">
+          <Kart baslik={t('DomainPHPPage:recent_errors')}>
             <div className="flex items-center justify-between gap-3 mb-3">
               <p className="text-xs text-slate-500 dark:text-slate-500 min-w-0 break-all">
-                En yeni fatal hatalar ustte. Kaynak: <code className="font-mono">/home/{yanit.sk}/.gpanel/php_debug.log</code> (son 200 satir).
+                {t('DomainPHPPage:recent_errors_desc', { sk: yanit.sk })}
               </p>
               <div className="flex gap-2 flex-shrink-0">
                 <button onClick={debugLogYukle} disabled={dlogYuk}
                   className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-md disabled:opacity-60">
-                  ↻ Yenile
+                  {t('DomainPHPPage:refresh')}
                 </button>
                 <button onClick={debugLogTemizle} disabled={dlogYuk || dlog.length === 0}
                   className="px-3 py-1.5 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs rounded-md disabled:opacity-40">
-                  🗑 Temizle
+                  {t('DomainPHPPage:clear')}
                 </button>
               </div>
             </div>
             {dlogYuk ? (
-              <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">Yukleniyor…</div>
+              <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">{t('common:loading')}</div>
             ) : dlog.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                {a.debug_mode
-                  ? 'Henuz kayitli fatal hata yok. Bir hata olusursa burada gorunur.'
-                  : 'Debug modu kapali. Fatal hatalarin kaydedilmesi icin yukaridan debug modunu acip kaydedin.'}
+                {a.debug_mode ? t('DomainPHPPage:debug_log_empty') : t('DomainPHPPage:debug_off_hint')}
               </div>
             ) : (
               <div className="max-h-80 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-950">
@@ -280,30 +276,30 @@ export default function DomainPHPPage() {
           </Kart>
 
           {/* PHP-FPM */}
-          <Kart baslik="PHP-FPM Havuzu">
+          <Kart baslik={t('DomainPHPPage:php_fpm_pool')}>
             <Grid>
-              <Sec etiket="pm" yardim="Process manager stratejisi">
+              <Sec etiket="pm" yardim={t('pm_help')}>
                 <select value={a.pm_strategy} onChange={e => P('pm_strategy', e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono">
                   {PMS.map(p => <option key={p.v} value={p.v}>{p.t}</option>)}
                 </select>
               </Sec>
-              <Saytec etiket="pm.max_children" yardim="Aynı anda en çok kaç PHP worker" value={a.pm_max_children} onChange={v => P('pm_max_children', v)} />
-              <Saytec etiket="pm.max_requests" yardim="Worker'ı kaç istek sonra yeniden başlat (memory leak önler)" value={a.pm_max_requests} onChange={v => P('pm_max_requests', v)} />
-              <Saytec etiket="pm.start_servers" yardim="Başlangıçta açılacak worker sayısı (dynamic için)" value={a.pm_start_servers} onChange={v => P('pm_start_servers', v)} />
-              <Saytec etiket="pm.min_spare_servers" yardim="Bekleyen minimum worker sayısı" value={a.pm_min_spare_servers} onChange={v => P('pm_min_spare_servers', v)} />
-              <Saytec etiket="pm.max_spare_servers" yardim="Bekleyen maksimum worker sayısı" value={a.pm_max_spare_servers} onChange={v => P('pm_max_spare_servers', v)} />
+              <Saytec etiket="pm.max_children" yardim={t('pm_max_children_help')} value={a.pm_max_children} onChange={v => P('pm_max_children', v)} />
+              <Saytec etiket="pm.max_requests" yardim={t('pm_max_requests_help')} value={a.pm_max_requests} onChange={v => P('pm_max_requests', v)} />
+              <Saytec etiket="pm.start_servers" yardim={t('pm_start_servers_help')} value={a.pm_start_servers} onChange={v => P('pm_start_servers', v)} />
+              <Saytec etiket="pm.min_spare_servers" yardim={t('pm_min_spare_servers_help')} value={a.pm_min_spare_servers} onChange={v => P('pm_min_spare_servers', v)} />
+              <Saytec etiket="pm.max_spare_servers" yardim={t('pm_max_spare_servers_help')} value={a.pm_max_spare_servers} onChange={v => P('pm_max_spare_servers', v)} />
             </Grid>
           </Kart>
 
           {/* PHP Modülleri (read-only, sunucu seviyesi) */}
-          <Kart baslik="Kurulu PHP Modülleri">
+          <Kart baslik={t('DomainPHPPage:installed_modules')}>
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-xs text-slate-500 dark:text-slate-500">
-                PHP {yanit.php_surum} için yüklü <strong>{yanit.moduller?.length || 0}</strong> modül. Modüller sunucu seviyesindedir — tek bir domain için ayrı kapatılamaz, server-wide yönetilir.
+                {t('DomainPHPPage:modules_desc', { version: yanit.php_surum, count: yanit.moduller?.length || 0 })}
               </p>
               <Link to="/araclar/php-modulleri" className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium whitespace-nowrap">
-                ↗ Sunucu Modüllerini Yönet
+                {t('DomainPHPPage:manage_server_modules')}
               </Link>
             </div>
             <div className="flex flex-wrap gap-1">
@@ -316,28 +312,27 @@ export default function DomainPHPPage() {
           </Kart>
 
           {/* Tehlikeli Fonksiyonlar — per-domain disable_functions toggle */}
-          <Kart baslik="Tehlikeli Fonksiyonları Devre Dışı Bırak">
+          <Kart baslik={t('DomainPHPPage:disable_dangerous')}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">
-              Bu fonksiyonlar shell injection, RCE, malware riski oluşturur. Kategori bazlı toggle ile <code className="font-mono">disable_functions</code>'a yazılır. <strong>Açık = aktif</strong> (engellenmemiş), <strong>kapalı = bloke</strong>.
+              {t('DomainPHPPage:disable_functions_desc')}
             </p>
             {(() => {
               const gruplar = [
-                { ad: 'Shell yürütme', renk: 'red',
+                { ad: t('DomainPHPPage:dangerous_shell'), renk: 'red',
                   fonk: ['exec', 'passthru', 'shell_exec', 'system', 'proc_open', 'popen', 'pcntl_exec'] },
-                { ad: 'Dosya çalıştırma', renk: 'orange',
+                { ad: t('DomainPHPPage:dangerous_file'), renk: 'orange',
                   fonk: ['assert', 'create_function'] },
-                { ad: 'Ağ erişimi (riskli)', renk: 'amber',
+                { ad: t('DomainPHPPage:dangerous_net'), renk: 'amber',
                   fonk: ['fsockopen', 'pfsockopen', 'stream_socket_client', 'curl_multi_exec'] },
-                { ad: 'Sistem keşfi', renk: 'sky',
+                { ad: t('DomainPHPPage:dangerous_info'), renk: 'sky',
                   fonk: ['phpinfo', 'posix_kill', 'posix_setuid', 'posix_setgid', 'posix_setpgid'] },
-                { ad: 'Modül yükleme', renk: 'violet',
+                { ad: t('DomainPHPPage:dangerous_module'), renk: 'violet',
                   fonk: ['dl', 'putenv', 'pcntl_signal', 'pcntl_fork'] },
               ]
               const mevcutDis = (a.disable_functions || '').split(',').map(s => s.trim()).filter(Boolean)
               const mevcutSet = new Set(mevcutDis)
 
               function grupAktif(g: typeof gruplar[0]) {
-                // Hepsi disable edilmişse → bloke. Hepsi yoksa → aktif. Karışıksa → karışık.
                 const tum = g.fonk.every(f => mevcutSet.has(f))
                 const hicbiri = g.fonk.every(f => !mevcutSet.has(f))
                 if (tum) return 'blokeli'
@@ -348,10 +343,8 @@ export default function DomainPHPPage() {
                 const yeni = new Set(mevcutSet)
                 const tum = g.fonk.every(f => yeni.has(f))
                 if (tum) {
-                  // Tum fonksiyonlari cikar (aktif et)
                   g.fonk.forEach(f => yeni.delete(f))
                 } else {
-                  // Hepsini ekle (blokela)
                   g.fonk.forEach(f => yeni.add(f))
                 }
                 P('disable_functions', Array.from(yeni).join(','))
@@ -377,7 +370,7 @@ export default function DomainPHPPage() {
                             className={`flex-shrink-0 mt-0.5 relative inline-flex h-5 w-9 items-center rounded-full transition ${
                               blokeli ? 'bg-red-500' : (karisik ? 'bg-amber-400' : 'bg-emerald-500')
                             }`}
-                            title={blokeli ? 'Tümünü aç (etkin yap)' : (karisik ? 'Tümünü kapat' : 'Tümünü kapat (engelle)')}>
+                            title={blokeli ? t('DomainPHPPage:dangerous_state_blocked') : (karisik ? t('DomainPHPPage:dangerous_state_mixed') : t('DomainPHPPage:dangerous_state_active'))}>
                             <span className={`inline-block h-3 w-3 transform rounded-full bg-white dark:bg-slate-800 shadow transition ${
                               blokeli ? 'translate-x-1' : 'translate-x-5'
                             }`} />
@@ -388,7 +381,7 @@ export default function DomainPHPPage() {
                               <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium ${
                                 blokeli ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : (karisik ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300')
                               }`}>
-                                {blokeli ? 'Bloke' : (karisik ? 'Karışık' : 'Aktif')}
+                                {blokeli ? t('DomainPHPPage:blocked') : (karisik ? t('DomainPHPPage:mixed') : t('common:active'))}
                               </span>
                             </div>
                             <div className="text-[11px] text-slate-600 dark:text-slate-400 dark:text-slate-500 font-mono mt-0.5 break-all">
@@ -404,17 +397,17 @@ export default function DomainPHPPage() {
             })()}
 
             <details className="mt-4">
-              <summary className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100">Manuel düzenle (ham disable_functions)</summary>
+              <summary className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100">{t('DomainPHPPage:manual_edit')}</summary>
               <input value={a.disable_functions} onChange={e => P('disable_functions', e.target.value)}
                 className="w-full mt-2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono" />
-              <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-1">Virgülle ayrılmış fonksiyon adları.</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-1">{t('DomainPHPPage:comma_separated')}</p>
             </details>
           </Kart>
 
           {/* Additional */}
-          <Kart baslik="Ek Yapılandırma Direktifleri">
+          <Kart baslik={t('DomainPHPPage:extra_directives')}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-2">
-              php.ini sözdizimini kullanarak ek parametreler tanımlayın. Örn: <code className="font-mono">extension=imagick.so</code>
+              {t('DomainPHPPage:extra_directives_desc')}
             </p>
             <textarea value={a.ek_direktifler} onChange={e => P('ek_direktifler', e.target.value)}
               rows={5}
@@ -426,11 +419,11 @@ export default function DomainPHPPage() {
           <div className="flex gap-3 mt-6">
             <button onClick={kaydet} disabled={isleniyor}
               className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-md">
-              {isleniyor ? 'Kaydediliyor…' : '💾 Kaydet ve Uygula'}
+              {isleniyor ? t('DomainPHPPage:saving') : t('DomainPHPPage:save_apply')}
             </button>
             <button onClick={yukle} disabled={isleniyor}
               className="px-4 py-2.5 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm rounded-md">
-              İptal / Yeniden Yükle
+              {t('DomainPHPPage:cancel_reload')}
             </button>
           </div>
         </>

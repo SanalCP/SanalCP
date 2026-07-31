@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { Domain } from './DomainList'
 import ToolCard from './ToolCard'
 
@@ -42,61 +43,62 @@ function Grup({ baslik, children }: { baslik: string; children: React.ReactNode 
 }
 
 export default function DomainPano({ domain }: { domain: Domain }) {
+  const { t } = useTranslation(['DomainPano'])
   const navigate = useNavigate()
   const git = (slug: string) => () => navigate(`/abonelikler/${domain.id}/${slug}`)
   return (
     <div>
-      <Grup baslik="Uygulamalar">
-        <ToolCard etiket="WordPress" aciklama="1-tıkla kurulum · yönetim" ikon={ICONS.wordpress} renk="sky" onClick={git('wordpress')} />
+      <Grup baslik={t('DomainPano:groups.apps')}>
+        <ToolCard etiket={t('DomainPano:items.wordpress')} aciklama={t('DomainPano:items.wordpress_desc')} ikon={ICONS.wordpress} renk="sky" onClick={git('wordpress')} />
       </Grup>
 
-      <Grup baslik="Alan Adı ve DNS">
-        <ToolCard etiket="DNS Yönetimi"          aciklama="A, MX, TXT, CNAME kayıtları" ikon={ICONS.dns}       renk="sky"  onClick={git('dns')} />
-        <ToolCard etiket="Subdomainler"          aciklama="Alt alan adları"   ikon={ICONS.subdomain} renk="teal" onClick={git('subdomainler')} />
-        <ToolCard etiket="Ek Alan Adları"        aciklama="Addon/parked domain · yönlendirme" ikon={ICONS.ekdomain} renk="indigo" onClick={git('ek-alanlar')} />
+      <Grup baslik={t('DomainPano:groups.domain_dns')}>
+        <ToolCard etiket={t('DomainPano:items.dns')}          aciklama={t('DomainPano:items.dns_desc')} ikon={ICONS.dns}       renk="sky"  onClick={git('dns')} />
+        <ToolCard etiket={t('DomainPano:items.subdomains')}          aciklama={t('DomainPano:items.subdomains_desc')}   ikon={ICONS.subdomain} renk="teal" onClick={git('subdomainler')} />
+        <ToolCard etiket={t('DomainPano:items.addon_domains')}        aciklama={t('DomainPano:items.addon_domains_desc')} ikon={ICONS.ekdomain} renk="indigo" onClick={git('ek-alanlar')} />
       </Grup>
 
-      <Grup baslik="E-posta">
-        <ToolCard etiket="E-posta Hesapları" aciklama="Postfix/Dovecot posta kutuları · SMTP" ikon={ICONS.posta} renk="indigo" onClick={git('mail')} />
+      <Grup baslik={t('DomainPano:groups.email')}>
+        <ToolCard etiket={t('DomainPano:items.mail_accounts')} aciklama={t('DomainPano:items.mail_accounts_desc')} ikon={ICONS.posta} renk="indigo" onClick={git('mail')} />
       </Grup>
 
-      <Grup baslik="Dosyalar ve Veritabanları">
-        <ToolCard etiket="Bağlantı Bilgisi"      aciklama="FTP, veri tabanı"  ikon={ICONS.baglanti} renk="emerald" onClick={git('baglanti')} />
-        <ToolCard etiket="Dosyalar"              aciklama="Dosya yöneticisi"  ikon={ICONS.dosyalar} renk="amber"   faz="F6"  onClick={git('dosyalar')} />
-        <ToolCard etiket="Veritabanları"         aciklama={domain.db_adi}     ikon={ICONS.db}       renk="violet"  faz="F5"  onClick={git('veritabanlari')} />
-        <ToolCard etiket="FTP"                   aciklama="FTP hesapları"     ikon={ICONS.ftp}      renk="sky"     faz="F4"  onClick={git('ftp')} />
-        <ToolCard etiket="Yedekle ve Geri Yükle" aciklama="Yedek yönetimi"    ikon={ICONS.yedek}    renk="rose"    faz="F12" onClick={git('yedekler')} />
-        <ToolCard etiket="Web Sitesini Kopyala"  aciklama="Klonlama"          ikon={ICONS.kopya}    renk="sky"     onClick={git('kopyala')} />
+      <Grup baslik={t('DomainPano:groups.files_db')}>
+        <ToolCard etiket={t('DomainPano:items.connection_info')}      aciklama={t('DomainPano:items.connection_info_desc')}  ikon={ICONS.baglanti} renk="emerald" onClick={git('baglanti')} />
+        <ToolCard etiket={t('DomainPano:items.files')}              aciklama={t('DomainPano:items.files_desc')}  ikon={ICONS.dosyalar} renk="amber"   faz="F6"  onClick={git('dosyalar')} />
+        <ToolCard etiket={t('DomainPano:items.databases')}         aciklama={domain.db_adi}     ikon={ICONS.db}       renk="violet"  faz="F5"  onClick={git('veritabanlari')} />
+        <ToolCard etiket={t('DomainPano:items.ftp')}                   aciklama={t('DomainPano:items.ftp_desc')}     ikon={ICONS.ftp}      renk="sky"     faz="F4"  onClick={git('ftp')} />
+        <ToolCard etiket={t('DomainPano:items.backup_restore')} aciklama={t('DomainPano:items.backup_restore_desc')}    ikon={ICONS.yedek}    renk="rose"    faz="F12" onClick={git('yedekler')} />
+        <ToolCard etiket={t('DomainPano:items.clone_site')}  aciklama={t('DomainPano:items.clone_site_desc')}          ikon={ICONS.kopya}    renk="sky"     onClick={git('kopyala')} />
       </Grup>
 
-      <Grup baslik="Geliştirme Araçları">
-        <ToolCard etiket="PHP"                   aciklama={`Sürüm ${domain.php_surum}`} ikon={ICONS.php}      renk="indigo" faz="F3" onClick={git('php')} />
-        <ToolCard etiket="Günlükler"             aciklama="access, error"  ikon={ICONS.log}      renk="slate"  faz="F10" onClick={git('gunlukler')} />
-        <ToolCard etiket="Zamanlanmış Görevler"  aciklama="Cron"            ikon={ICONS.cron}     renk="teal"   faz="F8"  onClick={git('cron')} />
-        <ToolCard etiket="Git"                   aciklama="Depo entegrasyonu" ikon={ICONS.git}    renk="orange" faz="F9"  onClick={git('git')} />
-        <ToolCard etiket="PHP Composer"          aciklama="Paket yöneticisi"  ikon={ICONS.composer} renk="amber" faz="F3"  onClick={git('composer')} />
-        <ToolCard etiket="Performans"            aciklama="Hızlandırıcılar"   ikon={ICONS.hizmet} renk="emerald" onClick={git('performans')} />
-        <ToolCard etiket="Redis Cache"           aciklama="İzole nesne cache · hızlandırıcı" ikon={ICONS.redis} renk="rose" onClick={git('redis')} />
+      <Grup baslik={t('DomainPano:groups.dev_tools')}>
+        <ToolCard etiket={t('DomainPano:items.php')}                   aciklama={t('DomainPano:items.php_version', { version: domain.php_surum })} ikon={ICONS.php}      renk="indigo" faz="F3" onClick={git('php')} />
+        <ToolCard etiket={t('DomainPano:items.logs')}             aciklama={t('DomainPano:items.logs_desc')}  ikon={ICONS.log}      renk="slate"  faz="F10" onClick={git('gunlukler')} />
+        <ToolCard etiket={t('DomainPano:items.cron')}  aciklama={t('DomainPano:items.cron_desc')}            ikon={ICONS.cron}     renk="teal"   faz="F8"  onClick={git('cron')} />
+        <ToolCard etiket={t('DomainPano:items.git')}                   aciklama={t('DomainPano:items.git_desc')} ikon={ICONS.git}    renk="orange" faz="F9"  onClick={git('git')} />
+        <ToolCard etiket={t('DomainPano:items.composer')}          aciklama={t('DomainPano:items.composer_desc')}  ikon={ICONS.composer} renk="amber" faz="F3"  onClick={git('composer')} />
+        <ToolCard etiket={t('DomainPano:items.performance')}            aciklama={t('DomainPano:items.performance_desc')}   ikon={ICONS.hizmet} renk="emerald" onClick={git('performans')} />
+        <ToolCard etiket={t('DomainPano:items.redis')}           aciklama={t('DomainPano:items.redis_desc')} ikon={ICONS.redis} renk="rose" onClick={git('redis')} />
       </Grup>
 
-      <Grup baslik="Güvenlik">
+      <Grup baslik={t('DomainPano:groups.security')}>
         <ToolCard
-          etiket="SSL/TLS Sertifikaları"
-          aciklama={domain.ssl ? `Bitiş: ${domain.ssl_bitis || '—'}` : 'Let’s Encrypt'}
+          etiket={t('DomainPano:items.ssl')}
+          aciklama={domain.ssl ? t('DomainPano:items.ssl_expires', { date: domain.ssl_bitis || '—' }) : t('DomainPano:items.ssl_letsencrypt')}
           ikon={ICONS.ssl}
           renk={domain.ssl ? 'emerald' : 'rose'}
           faz="F7"
-          uyari={!domain.ssl ? 'Alan adı korunmadı' : undefined}
+          uyari={!domain.ssl ? t('DomainPano:items.ssl_unprotected') : undefined}
           onClick={git('ssl')}
         />
-        <ToolCard etiket="WAF (Güvenlik Duvarı)"   aciklama="ModSecurity + OWASP CRS" ikon={ICONS.waf} renk="emerald" onClick={git('waf')} />
-        <ToolCard etiket="Erişim Kontrolü"          aciklama="Hotlink koruması · IP izin/engel" ikon={ICONS.erisim} renk="rose" onClick={git('erisim-kontrol')} />
-        <ToolCard etiket="Şifre Korumalı Dizinler" aciklama=".htpasswd"       ikon={ICONS.kilit}      renk="amber" faz="F7" onClick={git('sifre-koruma')} />
-        <ToolCard etiket="İstatistikler"            aciklama="Trafik analizi"  ikon={ICONS.istatistik} renk="indigo" faz="F10" onClick={git('istatistik')} />
-        <ToolCard etiket="Imunify"                  aciklama="Antivirüs"        ikon={ICONS.imunify}    renk="emerald" onClick={git('imunify')} />
+        <ToolCard etiket={t('DomainPano:items.waf')}   aciklama={t('DomainPano:items.waf_desc')} ikon={ICONS.waf} renk="emerald" onClick={git('waf')} />
+        <ToolCard etiket={t('DomainPano:items.access_control')}          aciklama={t('DomainPano:items.access_control_desc')} ikon={ICONS.erisim} renk="rose" onClick={git('erisim-kontrol')} />
+        <ToolCard etiket={t('DomainPano:items.password_protected')} aciklama=".htpasswd"       ikon={ICONS.kilit}      renk="amber" faz="F7" onClick={git('sifre-koruma')} />
+        <ToolCard etiket={t('DomainPano:items.statistics')}            aciklama={t('DomainPano:items.statistics_desc')}  ikon={ICONS.istatistik} renk="indigo" faz="F10" onClick={git('istatistik')} />
+        <ToolCard etiket={t('DomainPano:items.imunify')}                  aciklama={t('DomainPano:items.imunify_desc')}        ikon={ICONS.imunify}    renk="emerald" onClick={git('imunify')} />
         <ToolCard
-          etiket="SSH Erişimi"
-          aciklama={domain.ssh_erisim ? 'Açık' : 'Kapalı'}
+          etiket={t('DomainPano:items.ssh')}
+          aciklama={domain.ssh_erisim ? t('DomainPano:items.ssh_on') : t('DomainPano:items.ssh_off')}
           ikon={ICONS.ssh}
           renk={domain.ssh_erisim ? 'emerald' : 'slate'}
           onClick={git('ssh-erisim')}

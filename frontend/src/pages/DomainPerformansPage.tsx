@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -8,6 +9,7 @@ type Oneri = { metin: string; onem: string; ayar: string }
 type Ozet = { alan_adi: string; php_surum: string; skor: number; ogeler: Oge[]; oneriler: Oneri[] }
 
 export default function DomainPerformansPage() {
+  const { t } = useTranslation(['DomainPerformansPage', 'common'])
   const { id } = useParams()
   const navigate = useNavigate()
   const [o, setO] = useState<Ozet | null>(null)
@@ -21,8 +23,8 @@ export default function DomainPerformansPage() {
       .then(r => setO(r.data)).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
   }, [id])
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!o) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
+  if (!o) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainPerformansPage:not_found')}</div></div>
 
   const skorRenk = o.skor >= 80 ? 'emerald' : o.skor >= 60 ? 'amber' : 'rose'
   const skorHex: Record<string, string> = { emerald: '#10b981', amber: '#f59e0b', rose: '#f43f5e' }
@@ -33,13 +35,13 @@ export default function DomainPerformansPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('common:domain'), href: '/domainler' },
           { etiket: o.alan_adi, href: `/abonelikler/${id}` },
-          { etiket: 'Performans' },
+          { etiket: t('DomainPerformansPage:breadcrumb_title') },
         ]} />
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Performans ve Hızlandırıcılar</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5"><span className="font-mono">{o.alan_adi}</span> — mevcut hızlandırıcı durumu ve öneriler.</p>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainPerformansPage:title')}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-5"><span className="font-mono">{o.alan_adi}</span> {t('DomainPerformansPage:subtitle')}</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           {/* Skor halkası */}
@@ -55,12 +57,12 @@ export default function DomainPerformansPage() {
                 <span className="text-[10px] text-slate-400">/ 100</span>
               </div>
             </div>
-            <div className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">Performans Skoru</div>
+            <div className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">{t('DomainPerformansPage:performance_score')}</div>
           </div>
 
           {/* Hızlandırıcı durumları */}
           <div className="sm:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Hızlandırıcılar</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainPerformansPage:accelerators')}</h3>
             <div className="space-y-2">
               {o.ogeler.map(og => (
                 <div key={og.ad} className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-50 dark:border-slate-800 last:border-0">
@@ -72,7 +74,7 @@ export default function DomainPerformansPage() {
                     </div>
                     <p className="text-[11px] text-slate-400 ml-4 truncate">{og.aciklama}</p>
                   </div>
-                  {og.ayar && <button onClick={() => git(og.ayar)} className="shrink-0 text-xs text-brand-600 dark:text-brand-400 hover:underline">Ayarla →</button>}
+                  {og.ayar && <button onClick={() => git(og.ayar)} className="shrink-0 text-xs text-brand-600 dark:text-brand-400 hover:underline">{t('DomainPerformansPage:configure')}</button>}
                 </div>
               ))}
             </div>
@@ -81,19 +83,19 @@ export default function DomainPerformansPage() {
 
         {/* Öneriler */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Öneriler</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainPerformansPage:suggestions')}</h3>
           <ul className="space-y-2">
             {o.oneriler.map((n, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
                 <span className={`mt-0.5 ${onemRenk[n.onem] || 'text-slate-400'}`}>●</span>
                 <span className="text-slate-600 dark:text-slate-300 flex-1">{n.metin}</span>
-                {n.ayar && <button onClick={() => git(n.ayar)} className="shrink-0 text-xs text-brand-600 dark:text-brand-400 hover:underline">Git →</button>}
+                {n.ayar && <button onClick={() => git(n.ayar)} className="shrink-0 text-xs text-brand-600 dark:text-brand-400 hover:underline">{t('DomainPerformansPage:go')}</button>}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link></div>
+        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainPerformansPage:back_to_subscription')}</Link></div>
       </div>
     </div>
   )

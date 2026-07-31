@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 // sp-mobil-v1
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -33,6 +34,7 @@ function fmtKB(kb: number) {
 }
 
 export default function DomainsPage() {
+  const { t } = useTranslation(['DomainsPage', 'common'])
   const [items, setItems] = useState<Domain[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -117,7 +119,7 @@ export default function DomainsPage() {
     setHata(null)
     const alanAdi = fAlanAdi.trim().toLowerCase()
     if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(alanAdi)) {
-      setHata('Geçersiz alan adı. Örn: ornek.com veya panel.ornek.com')
+      setHata(t('DomainsPage:create_modal.validation_error'))
       return
     }
     setOlusturuluyor(true)
@@ -127,22 +129,22 @@ export default function DomainsPage() {
       const r = await api.post<OlusturmaSonuc>('/domains', body)
       setOlusturAcik(false)
       setOlusturmaSonuc(r.data)
-      let mesaj = `✓ "${alanAdi}" oluşturuldu — Linux user, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL DB ve DNS zone hazır.`
+      let mesaj = t('DomainsPage:create_modal.success', { name: alanAdi })
       if (fSSL) {
         try {
-          const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' })
+          const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' }, { timeout: 120_000 })
           mesaj += sslR.data.uyari
             ? ` ⚠ ${sslR.data.uyari}`
-            : ` ✓ Let's Encrypt SSL sertifikası kuruldu.`
+            : t('DomainsPage:create_modal.ssl_success')
         } catch (e) {
-          mesaj += ` ⚠ SSL kurulamadı — Abonelik → SSL sayfasından tekrar deneyebilirsiniz.`
+          mesaj += t('DomainsPage:create_modal.ssl_error')
         }
       }
       setBasari(mesaj)
       setTimeout(() => setBasari(null), 8000)
       yukle()
     } catch (e: any) {
-      setHata(apiHata(e, 'Domain oluşturulamadı'))
+      setHata(apiHata(e, t('DomainsPage:create_modal.create_error')))
     } finally {
       setOlusturuluyor(false)
     }
@@ -160,7 +162,7 @@ export default function DomainsPage() {
       document.body.appendChild(ta); ta.select(); document.execCommand('copy')
       document.body.removeChild(ta); return true
     } catch {}
-    try { window.prompt('Kopyalamak için Ctrl+C, sonra Enter:', metin); return true } catch {}
+    try { window.prompt(t('DomainsPage:result_modal.clipboard_prompt'), metin); return true } catch {}
     return false
   }
 
@@ -189,7 +191,7 @@ export default function DomainsPage() {
     for (const id of ids) {
       try { await api.delete(`/domains/${id}`); basarili++ } catch {}
     }
-    setSecili(new Set()); setBasari(`✓ ${basarili}/${ids.length} domain silindi`)
+    setSecili(new Set()); setBasari(t('DomainsPage:delete_modal.success', { success: basarili, total: ids.length }))
     setTimeout(() => setBasari(null), 4000)
     setIsleniyor(false); yukle()
   }
@@ -197,21 +199,22 @@ export default function DomainsPage() {
   async function durumDegistir(yeniDurum: 'aktif' | 'pasif') {
     setIsleniyor(true); setHata(null)
     const ids = Array.from(secili)
+    const statusLabel = yeniDurum === 'aktif' ? t('common:active') : t('common:inactive')
     try {
       await api.post('/domains/toplu/durum', { ids, durum: yeniDurum })
-      setBasari(`✓ ${ids.length} domain "${yeniDurum}" durumuna geçirildi`)
+      setBasari(t('DomainsPage:bulk.status_changed', { count: ids.length, status: statusLabel }))
       setTimeout(() => setBasari(null), 4000)
       setSecili(new Set()); yukle()
-    } catch (e) { setHata(apiHata(e, 'Durum değiştirme başarısız')) }
+    } catch (e) { setHata(apiHata(e, t('DomainsPage:bulk.status_error'))) }
     finally { setIsleniyor(false) }
   }
 
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler' }]} />
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">Domainler</h1>
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('DomainsPage:title') }]} />
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('DomainsPage:title')}</h1>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        Tüm kayıtlı domainlerinizi listeleyin, toplu seçim ile durum değiştirin veya silin.
+        {t('DomainsPage:subtitle')}
       </p>
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -221,45 +224,45 @@ export default function DomainsPage() {
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex-1 max-w-md">
           <input type="text" value={q} onChange={e => setQ(e.target.value)}
-            placeholder="🔍 Domain, kullanıcı veya bayi ara..."
+            placeholder={t('DomainsPage:search_placeholder')}
             className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none" />
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-500">{filtreli.length} / {items.length}</span>
         <button onClick={olusturAc}
           className="ml-auto inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md font-medium shadow-sm">
-          <span className="text-base leading-none">+</span> Yeni Domain
+          <span className="text-base leading-none">+</span> {t('DomainsPage:new_domain')}
         </button>
       </div>
 
       {/* Toplu işlem barı */}
       {secili.size > 0 && (
         <div className="mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-md flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{secili.size} seçili</span>
+          <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{t('DomainsPage:bulk.selected', { count: secili.size })}</span>
           <button onClick={() => durumDegistir('aktif')} disabled={isleniyor}
             className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded">
-            ▶ Aktif Et
+            {t('DomainsPage:bulk.activate')}
           </button>
           <button onClick={() => durumDegistir('pasif')} disabled={isleniyor}
             className="text-xs px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded">
-            ⏸ Pasif Et
+            {t('DomainsPage:bulk.deactivate')}
           </button>
           <button onClick={() => { setSilOnayMetin(''); setSilOnay(true) }} disabled={isleniyor}
             className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium">
-            🗑 Sil ({secili.size})
+            {t('DomainsPage:bulk.delete', { count: secili.size })}
           </button>
           <button onClick={() => setSecili(new Set())} disabled={isleniyor}
             className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 rounded">
-            Seçimi temizle
+            {t('DomainsPage:bulk.clear_selection')}
           </button>
         </div>
       )}
 
       {yuk ? (
-        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div>
       ) : items.length === 0 ? (
-        <EmptyState baslik="Henüz domain yok"
-          aciklama="İlk domain'inizi ekleyerek başlayın. Linux kullanıcı, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL veritabanı ve DNS zone otomatik oluşturulur."
-          buton={{ etiket: 'Domain Oluştur', onClick: olusturAc }} />
+        <EmptyState baslik={t('DomainsPage:empty.title')}
+          aciklama={t('DomainsPage:empty.desc')}
+          buton={{ etiket: t('DomainsPage:empty.button'), onClick: olusturAc }} />
       ) : (
         <div className="lg:bg-white dark:lg:bg-slate-800 lg:border lg:border-slate-200 dark:lg:border-slate-700 lg:rounded-2xl lg:overflow-hidden">
           <div className="lg:overflow-x-auto">
@@ -273,15 +276,15 @@ export default function DomainsPage() {
                       onChange={e => tumunuSec(e.target.checked)}
                       className="cursor-pointer" />
                   </th>
-                  <th className={T.baslik}>Domain Adı</th>
-                  <th className={T.baslik}>Sistem Kullanıcısı</th>
-                  <th className={T.baslik}>Bayi</th>
-                  <th className={T.baslik}>Plan</th>
-                  <th className={T.baslik}>PHP</th>
-                  <th className={T.baslik}>Disk</th>
-                  <th className={T.baslik}>Durum</th>
-                  <th className={T.baslik}>Oluşturulma</th>
-                  <th className={`${T.baslik} text-right`}>İşlemler</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.domain_name')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.system_user')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.reseller')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.plan')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.php')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.disk')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.status')}</th>
+                  <th className={T.baslik}>{t('DomainsPage:table.created')}</th>
+                  <th className={`${T.baslik} text-right`}>{t('DomainsPage:table.actions')}</th>
                 </tr>
               </thead>
               <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800`}>
@@ -301,7 +304,7 @@ export default function DomainsPage() {
                             href={`https://${d.alan_adi}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="Siteyi yeni sekmede aç"
+                            title={t('DomainsPage:table.open_site')}
                             onClick={e => e.stopPropagation()}
                             className="text-slate-300 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 transition"
                           >
@@ -309,7 +312,7 @@ export default function DomainsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
-                          <span title={d.ssl ? `SSL aktif${d.ssl_bitis ? ` — bitiş ${d.ssl_bitis}` : ''}` : 'SSL yok'}>
+                          <span title={d.ssl ? t('DomainsPage:table.ssl_active') + (d.ssl_bitis ? t('DomainsPage:table.ssl_expires', { date: d.ssl_bitis }) : '') : t('DomainsPage:table.ssl_none')}>
                             {d.ssl ? (
                               <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -321,41 +324,41 @@ export default function DomainsPage() {
                             )}
                           </span>
                         </span>
-                        {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">DEMO</span>}
+                        {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">{t('DomainsPage:table.demo')}</span>}
                       </td>
-                      <td className={T.hucre} data-etiket="Sistem Kullanıcısı">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.system_user')}>
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.sistem_kullanici}</span>
                       </td>
-                      <td className={T.hucre} data-etiket="Bayi">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.reseller')}>
                         {d.bayi_adi ? (
                           <span className="inline-flex flex-col leading-tight">
                             <span className="text-[11px] font-medium bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 px-1.5 py-0.5 rounded w-fit">{d.bayi_adi}</span>
                             {d.bayi_paket_adi && <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{d.bayi_paket_adi}</span>}
                           </span>
                         ) : (
-                          <span className="text-[11px] font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded w-fit">Admin</span>
+                          <span className="text-[11px] font-medium bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded w-fit">{t('DomainsPage:table.admin')}</span>
                         )}
                       </td>
-                      <td className={T.hucre} data-etiket="Plan">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.plan')}>
                         {d.plan_ad ? <span className="text-slate-700 dark:text-slate-300">{d.plan_ad}</span> : <span className="text-slate-400 dark:text-slate-500 italic">—</span>}
                       </td>
-                      <td className={T.hucre} data-etiket="PHP">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.php')}>
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.php_surum || '-'}</span>
                       </td>
-                      <td className={T.hucre} data-etiket="Disk">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.disk')}>
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{fmtKB(d.boyut_kb)}</span>
                       </td>
-                      <td className={T.hucre} data-etiket="Durum">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.status')}>
                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-semibold ${
                           d.durum === 'aktif' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500'
-                        }`}>{d.durum}</span>
+                        }`}>{d.durum === 'aktif' ? t('common:active') : t('common:inactive')}</span>
                       </td>
-                      <td className={T.hucre} data-etiket="Oluşturulma">
+                      <td className={T.hucre} data-etiket={t('DomainsPage:table.created')}>
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">{d.olusturulma || '-'}</span>
                       </td>
                       <td className={`${T.hucreAksiyon} lg:text-right`}>
-                        <Link to={`/abonelikler/${d.id}/subdomainler`} className="text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 lg:mr-3">+ Subdomain</Link>
-                        <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">Yönet →</Link>
+                        <Link to={`/abonelikler/${d.id}/subdomainler`} className="text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 lg:mr-3">{t('DomainsPage:table.add_subdomain')}</Link>
+                        <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('DomainsPage:table.manage')}</Link>
                       </td>
                     </tr>
                   )
@@ -370,33 +373,33 @@ export default function DomainsPage() {
       {olusturAcik && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !olusturuluyor && setOlusturAcik(false)}>
           <form onSubmit={olusturGonder} className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">Yeni Domain Oluştur</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainsPage:create_modal.title')}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
-              Linux kullanıcı, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL veritabanı ve DNS zone otomatik kurulur.
+              {t('DomainsPage:create_modal.desc')}
             </p>
 
             {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Alan adı <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainsPage:create_modal.domain_label')} <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={fAlanAdi}
                   onChange={e => setFAlanAdi(e.target.value)}
-                  placeholder="ornek.com"
+                  placeholder={t('DomainsPage:create_modal.domain_placeholder')}
                   autoFocus
                   required
                   disabled={olusturuluyor}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 outline-none"
                 />
-                <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Küçük harf, rakam, tire ve nokta. Örn: <span className="font-mono">site.com</span> veya <span className="font-mono">panel.site.com</span></div>
+                <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{t('DomainsPage:create_modal.domain_hint')}</div>
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
-                  PHP Sürümü
-                  {modalVeriYuk && phpSurumler.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">yükleniyor…</span>}
+                  {t('DomainsPage:create_modal.php_label')}
+                  {modalVeriYuk && phpSurumler.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">{t('common:loading')}</span>}
                 </label>
                 <select
                   value={fPHPSurum}
@@ -405,9 +408,9 @@ export default function DomainsPage() {
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800"
                 >
                   {phpSurumler.length === 0
-                    ? <option value="8.3">PHP 8.3 (varsayılan)</option>
+                    ? <option value="8.3">{t('DomainsPage:create_modal.php_default')}</option>
                     : phpSurumler.map(p => (
-                        <option key={p.surum} value={p.surum}>PHP {p.surum}{p.aciklama ? ` — ${p.aciklama}` : ''}</option>
+                        <option key={p.surum} value={p.surum}>{t('DomainsPage:create_modal.php_option', { version: p.surum, separator: p.aciklama ? t('DomainsPage:create_modal.php_separator') : '', description: p.aciklama || '' })}</option>
                       ))
                   }
                 </select>
@@ -415,8 +418,8 @@ export default function DomainsPage() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
-                  Hizmet Planı
-                  {modalVeriYuk && planlar.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">yükleniyor…</span>}
+                  {t('DomainsPage:create_modal.plan_label')}
+                  {modalVeriYuk && planlar.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">{t('common:loading')}</span>}
                 </label>
                 <select
                   value={fPlanID}
@@ -424,7 +427,7 @@ export default function DomainsPage() {
                   disabled={olusturuluyor}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800"
                 >
-                  <option value="">— (yok) —</option>
+                  <option value="">{t('DomainsPage:create_modal.plan_none')}</option>
                   {planlar.map(p => (
                     <option key={p.id} value={p.id}>{p.ad}</option>
                   ))}
@@ -434,14 +437,14 @@ export default function DomainsPage() {
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                   <input type="checkbox" checked={fSSL} onChange={e => setFSSL(e.target.checked)} disabled={olusturuluyor} className="rounded" />
-                  Let's Encrypt SSL kur
+                  {t('DomainsPage:create_modal.ssl_label')}
                 </label>
                 {fSSL && (
                   <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
-                    ⚠ Alan adının DNS A kaydı, sertifika alınmadan önce bu sunucunun IP adresini
-                    {items[0]?.ipv4 ? <> (<span className="font-mono">{items[0].ipv4}</span>)</> : null} göstermelidir
-                    — aksi hâlde Let's Encrypt doğrulaması başarısız olur ve site geçici olarak self-signed
-                    sertifikayla kurulur (DNS düzelince Abonelik → SSL sayfasından tekrar deneyebilirsiniz).
+                    {items[0]?.ipv4
+                      ? t('DomainsPage:create_modal.ssl_warning_with_ip', { ip: items[0].ipv4 })
+                      : t('DomainsPage:create_modal.ssl_warning_no_ip')
+                    }
                   </p>
                 )}
               </div>
@@ -449,7 +452,7 @@ export default function DomainsPage() {
 
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setOlusturAcik(false)} disabled={olusturuluyor}
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
               <button type="submit" disabled={olusturuluyor || !fAlanAdi.trim()}
                 className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded font-medium inline-flex items-center gap-2">
                 {olusturuluyor && (
@@ -458,7 +461,7 @@ export default function DomainsPage() {
                     <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3"/>
                   </svg>
                 )}
-                {olusturuluyor ? 'Oluşturuluyor…' : 'Oluştur'}
+                {olusturuluyor ? t('common:creating') : t('common:create')}
               </button>
             </div>
           </form>
@@ -469,35 +472,35 @@ export default function DomainsPage() {
       {olusturmaSonuc && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOlusturmaSonuc(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-1">✓ Domain Oluşturuldu</h3>
+            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-1">{t('DomainsPage:result_modal.title')}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
-              <span className="font-mono text-slate-700 dark:text-slate-300">{olusturmaSonuc.alan_adi}</span> sağlamlandı. Aşağıdaki parolalar <strong>sadece bir kez</strong> gösterilir — güvenli bir yere kaydedin.
+              <span className="font-mono text-slate-700 dark:text-slate-300">{olusturmaSonuc.alan_adi}</span>{t('DomainsPage:result_modal.desc_before')}<strong>{t('DomainsPage:result_modal.desc_strong')}</strong>{t('DomainsPage:result_modal.desc_after')}
             </p>
 
             <div className="space-y-3">
               <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">FTP</div>
-                <KopyaSatir e="Host" v={olusturmaSonuc.ftp_host || '—'} kopyala={panoYaz} />
-                <KopyaSatir e="Kullanıcı" v={olusturmaSonuc.ftp_user} kopyala={panoYaz} />
-                <KopyaSatir e="Parola" v={olusturmaSonuc.olusturulan_parolalar.ftp} kopyala={panoYaz} parola />
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.ftp')}</div>
+                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.ftp_host || '—'} kopyala={panoYaz} />
+                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.ftp_user} kopyala={panoYaz} />
+                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.ftp} kopyala={panoYaz} parola />
               </div>
 
               <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">MySQL Veritabanı</div>
-                <KopyaSatir e="Host" v={olusturmaSonuc.db_host || 'localhost'} kopyala={panoYaz} />
-                <KopyaSatir e="Veritabanı" v={olusturmaSonuc.db_adi} kopyala={panoYaz} />
-                <KopyaSatir e="Kullanıcı" v={olusturmaSonuc.db_user} kopyala={panoYaz} />
-                <KopyaSatir e="Parola" v={olusturmaSonuc.olusturulan_parolalar.db} kopyala={panoYaz} parola />
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.mysql')}</div>
+                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.db_host || 'localhost'} kopyala={panoYaz} />
+                <KopyaSatir e={t('DomainsPage:result_modal.database')} v={olusturmaSonuc.db_adi} kopyala={panoYaz} />
+                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.db_user} kopyala={panoYaz} />
+                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.db} kopyala={panoYaz} parola />
               </div>
 
               <div className="text-[11px] text-slate-500 dark:text-slate-500 italic">
-                Sistem kullanıcısı: <span className="font-mono">{olusturmaSonuc.sistem_kullanici}</span>
+                {t('DomainsPage:result_modal.system_user')} <span className="font-mono">{olusturmaSonuc.sistem_kullanici}</span>
               </div>
             </div>
 
             <div className="flex justify-end mt-5">
               <button onClick={() => setOlusturmaSonuc(null)}
-                className="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded">Tamam</button>
+                className="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded">{t('common:ok')}</button>
             </div>
           </div>
         </div>
@@ -507,24 +510,24 @@ export default function DomainsPage() {
       {silOnay && (() => {
         const tekId = secili.size === 1 ? Array.from(secili)[0] : undefined
         const tekDomain = tekId !== undefined ? items.find(x => x.id === tekId)?.alan_adi : undefined
-        const beklenenMetin = tekDomain || 'SİL'
+        const beklenenMetin = tekDomain || t('DomainsPage:delete_modal.confirm_word')
         const silOnaylandi = silOnayMetin === beklenenMetin
         return (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSilOnay(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">⚠ Toplu Domain Silme</h3>
+            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">{t('DomainsPage:delete_modal.title')}</h3>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
-              <span className="font-semibold">{secili.size}</span> domain ve tüm bağımlı kaynakları (Linux kullanıcı, ev dizini, DB, FTP, vhost, DNS zone) <strong>geri dönüşsüz</strong> silinecek.
+              {t('DomainsPage:delete_modal.desc', { count: secili.size })}
             </p>
             <ul className="text-xs font-mono text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded p-2 max-h-40 overflow-auto mb-4">
               {Array.from(secili).slice(0, 8).map(id => {
                 const d = items.find(x => x.id === id)
                 return <li key={id} className="truncate">{d?.alan_adi || '?'}</li>
               })}
-              {secili.size > 8 && <li className="text-slate-400 dark:text-slate-500 italic">+ {secili.size - 8} daha…</li>}
+              {secili.size > 8 && <li className="text-slate-400 dark:text-slate-500 italic">{t('DomainsPage:delete_modal.more', { count: secili.size - 8 })}</li>}
             </ul>
             <label className="block text-xs text-slate-500 dark:text-slate-500 mb-1.5">
-              Onaylamak için <span className="font-mono font-semibold text-red-700 dark:text-red-300">{beklenenMetin}</span> yazın:
+              {t('DomainsPage:delete_modal.confirm_label', { text: beklenenMetin })}
             </label>
             <input
               type="text"
@@ -539,10 +542,10 @@ export default function DomainsPage() {
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setSilOnay(false)}
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
               <button onClick={topluSil} disabled={isleniyor || !silOnaylandi}
                 className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded font-medium">
-                Evet, Sil
+                {t('DomainsPage:delete_modal.confirm_yes')}
               </button>
             </div>
           </div>
@@ -554,6 +557,7 @@ export default function DomainsPage() {
 }
 
 function KopyaSatir({ e, v, kopyala, parola }: { e: string; v: string; kopyala: (m: string) => Promise<boolean>; parola?: boolean }) {
+  const { t } = useTranslation('DomainsPage')
   const [kopyalandi, setKopyalandi] = useState(false)
   const [acik, setAcik] = useState(!parola)
   async function tikla() {
@@ -568,17 +572,17 @@ function KopyaSatir({ e, v, kopyala, parola }: { e: string; v: string; kopyala: 
         className={`flex-1 font-mono px-2 py-1 rounded border cursor-pointer select-all transition ${
           kopyalandi ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-400 text-slate-800 dark:text-slate-200'
         }`}
-        title="Tıklayarak kopyala"
+        title={t('DomainsPage:result_modal.copy_hint')}
       >
         {parola && !acik ? '••••••••••' : v}
       </code>
       {parola && (
         <button type="button" onClick={() => setAcik(s => !s)}
           className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">
-          {acik ? 'Gizle' : 'Göster'}
+          {acik ? t('DomainsPage:result_modal.hide') : t('DomainsPage:result_modal.show')}
         </button>
       )}
-      {kopyalandi && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Kopyalandı</span>}
+      {kopyalandi && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{t('DomainsPage:result_modal.copied')}</span>}
     </div>
   )
 }

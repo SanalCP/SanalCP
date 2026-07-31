@@ -1,5 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { useTranslation } from 'react-i18next'
+
 export type Domain = {
   id: number
   alan_adi: string
@@ -31,28 +33,29 @@ export default function DomainList({
   onSec: (id: number) => void
   yukleniyor?: boolean
 }) {
+  const { t } = useTranslation(['DomainList', 'common'])
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-          Domainler {!yukleniyor && <span className="text-slate-400 dark:text-slate-500 font-normal">({items.length})</span>}
+          {t('DomainList:title')} {!yukleniyor && <span className="text-slate-400 dark:text-slate-500 font-normal">({items.length})</span>}
         </h3>
         <button
           type="button"
           className="text-xs px-2 py-1 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded font-medium shadow-sm transition"
-          title="F2'de aktif olacak"
+          title={t('DomainList:add_domain_hint')}
           disabled
         >
-          + Domain Ekle
+          {t('DomainList:add_domain')}
         </button>
       </div>
 
       <ul className="max-h-[640px] overflow-auto divide-y divide-slate-100 dark:divide-slate-800">
         {yukleniyor && (
-          <li className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</li>
+          <li className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</li>
         )}
         {!yukleniyor && items.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-500">Henüz domain yok</li>
+          <li className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-500">{t('DomainList:empty')}</li>
         )}
         {items.map((d) => {
           const sec = d.id === seciliId
@@ -76,7 +79,7 @@ export default function DomainList({
                         : 'bg-slate-200 text-slate-600 dark:text-slate-400 dark:text-slate-500'
                     }`}
                   >
-                    {d.durum}
+                    {d.durum === 'aktif' ? t('common:active') : d.durum === 'pasif' ? t('common:inactive') : d.durum}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 dark:text-slate-500">
@@ -87,7 +90,7 @@ export default function DomainList({
                     </span>
                   ) : (
                     <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>SSL yok
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{t('DomainList:no_ssl')}
                     </span>
                   )}
                   <span className="ml-auto">{Math.round(d.boyut_kb / 1024)} MB</span>

@@ -1,0 +1,9 @@
+{
+  "title": "Müşteri Paneli",
+  "subtitle": "Kullanıcı bilgilerinizle giriş yapın",
+  "username": "Kullanıcı Adı",
+  "password": "Şifre",
+  "submit": "Giriş",
+  "submitting": "Giriş yapılıyor…",
+  "login_failed": "Giriş başarısız"
+}

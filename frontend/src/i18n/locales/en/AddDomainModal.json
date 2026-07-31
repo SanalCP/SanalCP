@@ -1,0 +1,21 @@
+{
+  "title": "Add New Domain",
+  "domain_label": "Domain Name",
+  "domain_placeholder": "example.com",
+  "domain_hint": "Example:",
+  "plan_label": "Plan (Package)",
+  "plan_none": "No plan selected",
+  "plan_default_suffix": " (default)",
+  "plan_hint": "Resource limits and default PHP version come from this plan.",
+  "php_label": "PHP Version",
+  "php_from_plan": "✓ From plan ({{ad}})",
+  "php_independent": "You can change it independently from the plan.",
+  "auto_box_title": "Will be done automatically:",
+  "auto_box_user": "Linux user",
+  "auto_box_middle": "+ home directory",
+  "auto_box_end": "+ nginx vhost + welcome page",
+  "created_success": "{{alan_adi}} was created successfully (system user: {{sistem_kullanici}})",
+  "create_failed": "Domain could not be added",
+  "provisioning": "Provisioning…",
+  "add_domain": "Add Domain"
+}

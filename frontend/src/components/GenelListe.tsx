@@ -4,6 +4,7 @@
 // ara, tabloda göster, satırdan ilgili domain sayfasına gönder. Kolon
 // tanımları dışında fark kalmadığı için ortak tutuldu.
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from './Breadcrumb'
 import EmptyState from './EmptyState'
@@ -29,6 +30,7 @@ export default function GenelListe<T>({
   bosMesaj: string
   ozet?: (liste: T[]) => Rozet[]
 }) {
+  const { t } = useTranslation(['GenelListe', 'common'])
   const [liste, setListe] = useState<T[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -39,7 +41,7 @@ export default function GenelListe<T>({
     setYukleniyor(true)
     api.get<T[]>(uc)
       .then((r) => { if (!iptal) { setListe(Array.isArray(r.data) ? r.data : []); setHata(null) } })
-      .catch((e) => { if (!iptal) setHata(apiHata(e, 'Liste alınamadı')) })
+      .catch((e) => { if (!iptal) setHata(apiHata(e, t('common:load_failed'))) })
       .finally(() => { if (!iptal) setYukleniyor(false) })
     return () => { iptal = true }
   }, [uc])
@@ -54,7 +56,7 @@ export default function GenelListe<T>({
 
   return (
     <div className="w-full px-6 py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: baslik }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: baslik }]} />
 
       <div className="mb-5">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{baslik}</h1>
@@ -86,7 +88,7 @@ export default function GenelListe<T>({
           <input
             value={aranan}
             onChange={(e) => setAranan(e.target.value)}
-            placeholder="Ara…"
+            placeholder={t('common:search_placeholder')}
             className="w-full sm:w-72 px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
@@ -99,11 +101,11 @@ export default function GenelListe<T>({
       )}
 
       {yukleniyor ? (
-        <div className="py-16 text-center text-sm text-slate-400">Yükleniyor…</div>
+        <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
       ) : liste.length === 0 && !hata ? (
         <EmptyState baslik={bosMesaj} />
       ) : suzulmus.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-400">Aramayla eşleşen kayıt yok.</div>
+        <div className="py-12 text-center text-sm text-slate-400">{t('GenelListe:no_search_results')}</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
           <table className="w-full text-sm">

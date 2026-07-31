@@ -1,0 +1,22 @@
+{
+  "title": "SSL Certificates",
+  "subtitle": "Certificate status and expiration dates for all domains. Soonest expiration first.",
+  "empty": "No domains yet",
+  "col_domain": "Domain",
+  "col_ssl": "SSL",
+  "col_expires": "Expires",
+  "col_remaining": "Remaining",
+  "col_domain_status": "Domain",
+  "ssl_active": "Active",
+  "ssl_none": "None",
+  "domain_active": "Active",
+  "domain_passive": "Passive",
+  "days_remaining": "{{n}} days",
+  "days_ago_expired": "expired {{n}} days ago",
+  "manage_link": "Manage",
+  "install_link": "Install",
+  "summary_active": "active certs",
+  "summary_expired": "expired",
+  "summary_expiring_soon": "<30 days",
+  "summary_no_ssl": "no SSL"
+}

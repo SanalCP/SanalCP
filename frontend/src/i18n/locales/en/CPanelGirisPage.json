@@ -1,0 +1,9 @@
+{
+  "title": "Customer Panel",
+  "subtitle": "Sign in with your account details",
+  "username": "Username",
+  "password": "Password",
+  "submit": "Sign In",
+  "submitting": "Signing in…",
+  "login_failed": "Sign-in failed"
+}

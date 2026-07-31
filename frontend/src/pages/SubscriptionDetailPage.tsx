@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -35,6 +36,7 @@ const ICONS = {
 }
 
 export default function SubscriptionDetailPage() {
+  const { t } = useTranslation(['SubscriptionDetailPage', 'common'])
   const { id } = useParams()
   const navigate = useNavigate()
   const [domain, setDomain] = useState<Domain | null>(null)
@@ -49,7 +51,7 @@ export default function SubscriptionDetailPage() {
     if (!id) return
     api.get<Domain>(`/domains/${id}`)
       .then(r => setDomain(r.data))
-      .catch(e => setHata(apiHata(e, 'Abonelik yüklenemedi')))
+      .catch(e => setHata(apiHata(e, t('SubscriptionDetailPage:subscription_load_failed'))))
   }
 
   useEffect(() => {
@@ -63,14 +65,14 @@ export default function SubscriptionDetailPage() {
   async function askiToggle() {
     if (!id || !domain) return
     const askiyaAl = !domain.askida
-    if (askiyaAl && !window.confirm(`"${domain.alan_adi}" askıya alınacak — site erişilemez olacak (503). Devam edilsin mi?`)) return
+    if (askiyaAl && !window.confirm(t('SubscriptionDetailPage:suspend_confirm', { domain: domain.alan_adi }))) return
     setMenuAcik(false); setIsleniyor(true); setHata(null); setBildirim(null)
     try {
       await api.post(`/domains/${id}/${askiyaAl ? 'askiya-al' : 'askidan-al'}`)
-      setBildirim(askiyaAl ? '✓ Hesap askıya alındı — site artık 503 bakım sayfası döndürüyor.' : '✓ Askı kaldırıldı — site tekrar erişilebilir.')
+      setBildirim(askiyaAl ? t('SubscriptionDetailPage:suspended_success') : t('SubscriptionDetailPage:unsuspended_success'))
       setTimeout(() => setBildirim(null), 6000)
       domainYukle()
-    } catch (e) { setHata(apiHata(e, 'İşlem başarısız')) }
+    } catch (e) { setHata(apiHata(e, t('SubscriptionDetailPage:operation_failed'))) }
     finally { setIsleniyor(false) }
   }
 
@@ -84,7 +86,7 @@ export default function SubscriptionDetailPage() {
   if (!domain) return (
     <div className="px-6 py-5">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' }]} />
-      <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+      <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('SubscriptionDetailPage:loading')}</div>
     </div>
   )
 
@@ -101,7 +103,7 @@ export default function SubscriptionDetailPage() {
         <button
           onClick={() => navigate('/abonelikler')}
           className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300"
-          title="Başka aboneliğe geç"
+          title={t('SubscriptionDetailPage:switch_subscription')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -110,7 +112,7 @@ export default function SubscriptionDetailPage() {
         {domain.askida ? (
           <span className="text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider flex items-center gap-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-            Askıda
+            {t('SubscriptionDetailPage:suspended')}
           </span>
         ) : (
           <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider flex items-center gap-1 ${
@@ -125,7 +127,7 @@ export default function SubscriptionDetailPage() {
             onClick={() => setMenuAcik(v => !v)}
             disabled={isleniyor}
             className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-50"
-            title="Daha fazla işlem">
+            title={t('SubscriptionDetailPage:more_actions')}>
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
             </svg>
@@ -140,12 +142,12 @@ export default function SubscriptionDetailPage() {
                   {domain.askida ? (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" /></svg>
-                      Askıdan Al (Geri Getir)
+                      {t('SubscriptionDetailPage:suspended')}n Al (Geri Getir)
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6M9 3h6a2 2 0 012 2v0H7v0a2 2 0 012-2z" /></svg>
-                      Hesabı Askıya Al
+                      {t('SubscriptionDetailPage:suspend')}
                     </>
                   )}
                 </button>
@@ -159,9 +161,9 @@ export default function SubscriptionDetailPage() {
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
       <div className="flex items-center gap-5 border-b border-slate-200 dark:border-slate-700 mb-5">
-        <TabBtn aktif={tab === 'dashboard'} onClick={() => setTab('dashboard')}>Pano</TabBtn>
-        <TabBtn aktif={tab === 'hosting'}   onClick={() => setTab('hosting')}>Barınma ve DNS</TabBtn>
-        <TabBtn aktif={tab === 'baslangic'} onClick={() => setTab('baslangic')}>Başlarken</TabBtn>
+        <TabBtn aktif={tab === 'dashboard'} onClick={() => setTab('dashboard')}>{t('SubscriptionDetailPage:dashboard')}</TabBtn>
+        <TabBtn aktif={tab === 'hosting'}   onClick={() => setTab('hosting')}>{t('SubscriptionDetailPage:hosting_dns')}</TabBtn>
+        <TabBtn aktif={tab === 'baslangic'} onClick={() => setTab('baslangic')}>{t('SubscriptionDetailPage:getting_started')}</TabBtn>
       </div>
 
       <div className="grid grid-cols-12 gap-5">
@@ -170,18 +172,18 @@ export default function SubscriptionDetailPage() {
 
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">İstatistikler</h3>
-              <button className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300" title="Yenile">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('SubscriptionDetailPage:statistics')}</h3>
+              <button className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300" title={t('SubscriptionDetailPage:refresh')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
             </div>
             <div className="space-y-2.5 text-sm">
-              <Stat e="Disk alanı"    d={diskMB != null ? `${diskMB} MB` : '…'} />
-              <Stat e="Aylık trafik"  d={`${Math.round(domain.trafik_kb / 1024)} MB`} />
-              <Stat e="Oluşturulma"   d={domain.olusturulma} />
-              <Stat e="PHP sürümü"    d={domain.php_surum} />
+              <Stat e={t('SubscriptionDetailPage:disk_space')}    d={diskMB != null ? `${diskMB} MB` : '…'} />
+              <Stat e={t('SubscriptionDetailPage:monthly_traffic')}  d={`${Math.round(domain.trafik_kb / 1024)} MB`} />
+              <Stat e={t('SubscriptionDetailPage:created')}   d={domain.olusturulma} />
+              <Stat e={t('SubscriptionDetailPage:php_version')}    d={domain.php_surum} />
             </div>
           </div>
         </aside>
@@ -195,9 +197,9 @@ export default function SubscriptionDetailPage() {
             <div className="flex items-center gap-4">
               <span>Web sitesi: <span className="font-mono text-slate-700 dark:text-slate-300">httpdocs</span></span>
               <span>IP: <span className="font-mono text-slate-700 dark:text-slate-300">{domain.ipv4}</span></span>
-              <span>Sistem kullanıcısı: <span className="font-mono text-slate-700 dark:text-slate-300">{domain.sistem_kullanici}</span></span>
+              <span>{t('SubscriptionDetailPage:system_user')}: <span className="font-mono text-slate-700 dark:text-slate-300">{domain.sistem_kullanici}</span></span>
             </div>
-            <button className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">Açıklama ekle</button>
+            <button className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('SubscriptionDetailPage:add_description')}</button>
           </div>
         </section>
 
@@ -210,6 +212,7 @@ export default function SubscriptionDetailPage() {
 }
 
 function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
+  const { t } = useTranslation('SubscriptionDetailPage')
   const url = `${ssl ? 'https' : 'http'}://${alanAdi}`
   const [previewVersion, setPreviewVersion] = useState(() => Date.now())
 
@@ -219,7 +222,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
     setPreviewVersion(Date.now())
   }, [alanAdi, ssl])
 
-  const previewURL = `${url}/?sanalpanel_preview=${previewVersion}`
+  const previewURL = `${url}/?sanalcp_preview=${previewVersion}`
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
       <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden">
@@ -228,7 +231,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
             <iframe
               key={previewVersion}
               src={previewURL}
-              title={`${alanAdi} önizleme`}
+              title={t('SubscriptionDetailPage:preview', { domain: alanAdi })}
               loading="lazy"
               sandbox="allow-scripts allow-same-origin"
               tabIndex={-1}
@@ -240,8 +243,8 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
             <svg className="w-9 h-9 text-white/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-            <div className="text-[11px] text-white/60">Önizleme yalnızca HTTPS sitelerde gösterilir</div>
-            <div className="text-[10px] text-white/40 mt-0.5">SSL etkinleştirilince otomatik görünür</div>
+            <div className="text-[11px] text-white/60">{t('SubscriptionDetailPage:https_only')}</div>
+            <div className="text-[10px] text-white/40 mt-0.5">{t('SubscriptionDetailPage:ssl_preview')}</div>
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 flex items-center justify-between gap-2">
@@ -251,7 +254,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
             <button type="button" onClick={() => setPreviewVersion(Date.now())} disabled={!ssl}
-              title={ssl ? 'Önizlemeyi yenile' : 'Önizleme için SSL gerekli'}
+              title={ssl ? t('SubscriptionDetailPage:refresh_preview') : t('SubscriptionDetailPage:ssl_required')}
               className="inline-flex items-center gap-1 text-[11px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded-md font-medium transition disabled:opacity-40 disabled:cursor-not-allowed">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.9 2M18.5 9A7 7 0 006.6 7" />
@@ -263,7 +266,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-            Aç
+            {t('SubscriptionDetailPage:open')}
             </a>
           </div>
         </div>
@@ -305,57 +308,60 @@ function Grup({ baslik, children }: { baslik: string; children: React.ReactNode 
 }
 
 function DashboardTabIcerik({ domain }: { domain: Domain }) {
+  const { t } = useTranslation('SubscriptionDetailPage')
   return (
     <div>
-      <Grup baslik="Dosyalar ve Veritabanları">
-        <ToolCard etiket="Bağlantı Bilgisi"     aciklama="FTP, veri tabanı"     ikon={ICONS.baglanti} renk="emerald" />
-        <ToolCard etiket="Dosyalar"              aciklama="Dosya yöneticisi"     ikon={ICONS.dosyalar} renk="amber"  faz="F6" />
-        <ToolCard etiket="Veritabanları"         aciklama={domain.db_adi}         ikon={ICONS.db}       renk="violet" faz="F5" />
-        <ToolCard etiket="FTP"                   aciklama="FTP hesapları"        ikon={ICONS.ftp}      renk="sky"    faz="F4" />
-        <ToolCard etiket="Yedekle ve Geri Yükle" aciklama="Yedek yönetimi"        ikon={ICONS.yedek}    renk="rose"   faz="F12" />
-        <ToolCard etiket="Web Sitesini Kopyala"  aciklama="Klonlama"              ikon={ICONS.kopya}    renk="sky" />
+      <Grup baslik={t('SubscriptionDetailPage:files_databases')}>
+        <ToolCard etiket={t('SubscriptionDetailPage:connection_info')}     aciklama={t('SubscriptionDetailPage:ftp_database')}     ikon={ICONS.baglanti} renk="emerald" />
+        <ToolCard etiket={t('SubscriptionDetailPage:files')}              aciklama={t('SubscriptionDetailPage:file_manager')}     ikon={ICONS.dosyalar} renk="amber"  faz="F6" />
+        <ToolCard etiket={t('SubscriptionDetailPage:databases')}         aciklama={domain.db_adi}         ikon={ICONS.db}       renk="violet" faz="F5" />
+        <ToolCard etiket="FTP"                   aciklama={t('SubscriptionDetailPage:ftp_accounts')}        ikon={ICONS.ftp}      renk="sky"    faz="F4" />
+        <ToolCard etiket={t('SubscriptionDetailPage:backup_restore')} aciklama={t('SubscriptionDetailPage:backup_management')}        ikon={ICONS.yedek}    renk="rose"   faz="F12" />
+        <ToolCard etiket={t('SubscriptionDetailPage:copy_website')}  aciklama={t('SubscriptionDetailPage:cloning')}              ikon={ICONS.kopya}    renk="sky" />
       </Grup>
 
-      <Grup baslik="Geliştirme Araçları">
-        <ToolCard etiket="PHP"                   aciklama={`Sürüm ${domain.php_surum}`} ikon={ICONS.php}      renk="indigo" faz="F3" />
-        <ToolCard etiket="Günlükler"             aciklama="access, error"        ikon={ICONS.log}      renk="slate"  faz="F10" />
-        <ToolCard etiket="Zamanlanmış Görevler"  aciklama="Cron"                  ikon={ICONS.cron}     renk="teal"   faz="F8" />
-        <ToolCard etiket="Git"                   aciklama="Depo entegrasyonu"     ikon={ICONS.git}      renk="orange" faz="F9" />
-        <ToolCard etiket="PHP Composer"          aciklama="Paket yöneticisi"      ikon={ICONS.composer} renk="amber" />
-        <ToolCard etiket="Performans"            aciklama="Hızlandırıcılar"       ikon={ICONS.hizmet}   renk="emerald" />
+      <Grup baslik={t('SubscriptionDetailPage:development_tools')}>
+        <ToolCard etiket={t('SubscriptionDetailPage:php_version')}                   aciklama={`Sürüm ${domain.php_surum}`} ikon={ICONS.php}      renk="indigo" faz="F3" />
+        <ToolCard etiket={t('SubscriptionDetailPage:logs')}             aciklama="access, error"        ikon={ICONS.log}      renk="slate"  faz="F10" />
+        <ToolCard etiket={t('SubscriptionDetailPage:scheduled_tasks')}  aciklama="Cron"                  ikon={ICONS.cron}     renk="teal"   faz="F8" />
+        <ToolCard etiket="Git"                   aciklama={t('SubscriptionDetailPage:repository_integration')}     ikon={ICONS.git}      renk="orange" faz="F9" />
+        <ToolCard etiket="PHP Composer"          aciklama={t('SubscriptionDetailPage:package_manager')}      ikon={ICONS.composer} renk="amber" />
+        <ToolCard etiket={t('SubscriptionDetailPage:performance')}            aciklama={t('SubscriptionDetailPage:accelerators')}       ikon={ICONS.hizmet}   renk="emerald" />
       </Grup>
 
-      <Grup baslik="Güvenlik">
+      <Grup baslik={t('SubscriptionDetailPage:security')}>
         <ToolCard
-          etiket="SSL/TLS Sertifikaları"
-          aciklama={domain.ssl ? `Bitiş: ${domain.ssl_bitis || '—'}` : 'Let’s Encrypt'}
+          etiket={t('SubscriptionDetailPage:ssl_certificates')}
+          aciklama={domain.ssl ? `Bitiş: ${domain.ssl_bitis || '—'}` : t('SubscriptionDetailPage:letsencrypt')}
           ikon={ICONS.ssl}
           renk={domain.ssl ? 'emerald' : 'rose'}
           faz="F7"
-          uyari={!domain.ssl ? 'Alan adı korunmadı' : undefined}
+          uyari={!domain.ssl ? t('SubscriptionDetailPage:domain_unprotected') : undefined}
         />
-        <ToolCard etiket="Şifre Korumalı Dizinler" aciklama=".htpasswd" ikon={ICONS.kilit} renk="amber" faz="F7" />
-        <ToolCard etiket="İstatistikler"            aciklama="Trafik analizi" ikon={ICONS.istatistik} renk="indigo" faz="F10" />
-        <ToolCard etiket="Imunify"                  aciklama="Antivirüs"      ikon={ICONS.imunify}    renk="emerald" />
+        <ToolCard etiket={t('SubscriptionDetailPage:password_directories')} aciklama=".htpasswd" ikon={ICONS.kilit} renk="amber" faz="F7" />
+        <ToolCard etiket={t('SubscriptionDetailPage:statistics')}            aciklama={t('SubscriptionDetailPage:traffic_analysis')} ikon={ICONS.istatistik} renk="indigo" faz="F10" />
+        <ToolCard etiket="Imunify"                  aciklama={t('SubscriptionDetailPage:antivirus')}      ikon={ICONS.imunify}    renk="emerald" />
       </Grup>
     </div>
   )
 }
 
 function HostingTab({ domain }: { domain: Domain }) {
+  const { t } = useTranslation('SubscriptionDetailPage')
   return (
-    <Grup baslik="Barınma Hizmetleri">
-      <ToolCard etiket="Barındırma Ayarları" aciklama="Document root, options" ikon={ICONS.hizmet} renk="indigo" to={`/abonelikler/${domain.id}/web-sunucu`} />
-      <ToolCard etiket="Apache ve nginx"     aciklama="Güvenlik başlıkları, ek direktifler"  ikon={ICONS.apache} renk="orange" to={`/abonelikler/${domain.id}/web-sunucu`} />
-      <ToolCard etiket="DNS Ayarları"        aciklama="A, CNAME, MX"            ikon={ICONS.dns}    renk="emerald" to={`/abonelikler/${domain.id}/dns`} />
+    <Grup baslik={t('SubscriptionDetailPage:hosting_services')}>
+      <ToolCard etiket={t('SubscriptionDetailPage:hosting_settings')} aciklama="Document root, options" ikon={ICONS.hizmet} renk="indigo" to={`/abonelikler/${domain.id}/web-sunucu`} />
+      <ToolCard etiket={t('SubscriptionDetailPage:apache_nginx')}     aciklama={t('SubscriptionDetailPage:security_headers')}  ikon={ICONS.apache} renk="orange" to={`/abonelikler/${domain.id}/web-sunucu`} />
+      <ToolCard etiket={t('SubscriptionDetailPage:dns_settings')}        aciklama={t('SubscriptionDetailPage:dns_records')}            ikon={ICONS.dns}    renk="emerald" to={`/abonelikler/${domain.id}/dns`} />
     </Grup>
   )
 }
 
 function BaslangicTab() {
+  const { t } = useTranslation('SubscriptionDetailPage')
   return (
     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-200">
-      <strong>Başlarken</strong> — bu sekme kurulum sihirbazlarını barındıracak (F2'de aktifleşecek).
+      <strong>{t('SubscriptionDetailPage:getting_started')}</strong> — {t('SubscriptionDetailPage:wizard_note')}
     </div>
   )
 }

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
 type Durum = { kurulu: boolean; surum: string; composer_json: boolean; kullanici: string; dizin: string }
 
 export default function DomainComposerPage() {
+  const { t } = useTranslation(['DomainComposerPage', 'common'])
   const { id } = useParams()
   const [d, setD] = useState<Durum | null>(null)
   const [yuk, setYuk] = useState(true)
@@ -22,18 +24,18 @@ export default function DomainComposerPage() {
   useEffect(yukle, [id])
 
   async function calistir(komut: string, pkt?: string) {
-    setCalisan(komut); setHata(null); setCikti(`$ composer ${komut}${pkt ? ' ' + pkt : ''}\n\nÇalışıyor…`)
+    setCalisan(komut); setHata(null); setCikti(`$ composer ${komut}${pkt ? ' ' + pkt : ''}\n\n${t('DomainComposerPage:running')}`)
     try {
       const { data } = await api.post(`/domains/${id}/composer`, { komut, paket: pkt || '' })
-      setCikti(`$ composer ${komut}${pkt ? ' ' + pkt : ''}\n\n${data.cikti || '(çıktı yok)'}\n\n${data.ok ? '✓ Tamamlandı' : '✗ Hata ile bitti'}`)
+      setCikti(`$ composer ${komut}${pkt ? ' ' + pkt : ''}\n\n${data.cikti || t('DomainComposerPage:output_no_output')}\n\n${data.ok ? t('DomainComposerPage:output_done') : t('DomainComposerPage:output_failed')}`)
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'Çalıştırılamadı')); setCikti('')
+      setHata(apiHata(e, t('DomainComposerPage:run_failed'))); setCikti('')
     } finally { setCalisan(null) }
   }
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
+  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainComposerPage:not_found')}</div></div>
 
   const btnBase = 'px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50'
 
@@ -41,20 +43,20 @@ export default function DomainComposerPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
-          { etiket: 'Composer' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('common:domain'), href: '/domainler' },
+          { etiket: t('DomainComposerPage:breadcrumb_title') },
         ]} />
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">PHP Composer</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainComposerPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          <span className="font-mono">{d.dizin}</span> dizininde <span className="font-mono">{d.kullanici}</span> olarak çalışır.
+          {t('DomainComposerPage:run_context', { dizin: d.dizin, kullanici: d.kullanici })}
         </p>
 
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
         {!d.kurulu ? (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-200">
-            Composer sunucuda kurulu değil. Yönetici tarafından kurulması gerekiyor.
+            {t('DomainComposerPage:not_installed')}
           </div>
         ) : (
           <>
@@ -63,7 +65,7 @@ export default function DomainComposerPage() {
                 <div>
                   <span className="text-xs font-mono text-slate-500">{d.surum}</span>
                   <span className={`ml-2 text-xs ${d.composer_json ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                    {d.composer_json ? '✓ composer.json bulundu' : 'composer.json yok'}
+                    {d.composer_json ? t('DomainComposerPage:composer_json_found') : t('DomainComposerPage:composer_json_missing')}
                   </span>
                 </div>
               </div>
@@ -75,7 +77,7 @@ export default function DomainComposerPage() {
                 <button disabled={!!calisan} onClick={() => calistir('show')} className={`${btnBase} border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800`}>show</button>
               </div>
               <div className="mt-3 flex gap-2">
-                <input value={paket} onChange={e => setPaket(e.target.value)} placeholder="vendor/paket veya vendor/paket:^1.2"
+                <input value={paket} onChange={e => setPaket(e.target.value)} placeholder={t('DomainComposerPage:package_placeholder')}
                   className="flex-1 px-3 py-1.5 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <button disabled={!!calisan || !paket.trim()} onClick={() => calistir('require', paket.trim())} className={`${btnBase} bg-emerald-600 hover:bg-emerald-700 text-white`}>require</button>
                 <button disabled={!!calisan || !paket.trim()} onClick={() => calistir('remove', paket.trim())} className={`${btnBase} border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20`}>remove</button>
@@ -90,7 +92,7 @@ export default function DomainComposerPage() {
           </>
         )}
 
-        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link></div>
+        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainComposerPage:back_to_subscription')}</Link></div>
       </div>
     </div>
   )

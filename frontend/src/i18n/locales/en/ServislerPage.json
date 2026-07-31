@@ -1,0 +1,22 @@
+{
+  "breadcrumb_settings": "Tools & Settings",
+  "breadcrumb_title": "Services",
+  "title": "Service Management",
+  "subtitle": "Restart web, database, DNS and PHP services from here. Useful after configuration changes.",
+  "load_failed": "Could not load services",
+  "loading": "Loading…",
+  "status_active": "● Running",
+  "status_inactive": "○ Stopped",
+  "status_failed": "✕ Failed",
+  "status_absent": "— Not installed",
+  "group_web": "Web Server",
+  "group_db_cache": "Database & Cache",
+  "group_dns": "DNS",
+  "group_php_fpm": "PHP-FPM",
+  "group_other": "Other",
+  "reloaded": "{{name}} reloaded.",
+  "restarted": "{{name}} restarted.",
+  "action_failed": "{{name}} action failed",
+  "btn_reload": "Reload",
+  "btn_restart": "Restart"
+}

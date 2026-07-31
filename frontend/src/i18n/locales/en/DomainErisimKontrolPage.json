@@ -1,0 +1,41 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "access_control": "Access Control"
+  },
+  "title": "Access Control",
+  "subtitle": "Hotlink protection and IP-based allow/deny list.",
+  "back_to_subscription": "← Back to subscription",
+  "hotlink": {
+    "title": "Hotlink Protection",
+    "active": "active",
+    "inactive": "off",
+    "desc": "Your images (jpg, png, gif, webp, svg…) cannot be shown via direct links (hotlinking) from other sites; only requests from your own domain and the addresses you allow below can access the images.",
+    "allowed_label": "Additional allowed domains (comma-separated, optional)",
+    "allowed_placeholder": "cdn.otherdomain.com, *.shared.com",
+    "saving": "Saving…",
+    "disable": "Disable",
+    "enable": "Enable",
+    "update_list": "Update Allowed List",
+    "enabled_msg": "Hotlink protection enabled.",
+    "disabled_msg": "Hotlink protection disabled.",
+    "save_failed": "Failed to save"
+  },
+  "ip": {
+    "title": "IP Allow/Deny List",
+    "desc": "Restrict access to this domain to specific IP addresses, or block malicious IPs.",
+    "mode_off": "Off",
+    "mode_block": "Block Listed",
+    "mode_allow": "Allow Listed Only",
+    "mode_updated": "Mode updated.",
+    "cidr_label": "IP or CIDR",
+    "cidr_placeholder": "1.2.3.4 or 1.2.3.0/24",
+    "add": "Add",
+    "add_failed": "Failed to add",
+    "delete": "Delete",
+    "delete_failed": "Failed to delete",
+    "empty_allow": "No rules yet — while the list is empty, this mode is considered disabled (the site won't be locked out).",
+    "empty_block": "No blocked IPs yet.",
+    "save_failed": "Failed to save"
+  }
+}

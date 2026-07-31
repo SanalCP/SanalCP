@@ -5,6 +5,7 @@
 // kısıtları o kuralların arayüz yansımasıdır, güvenlik sınırı değildir.
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -28,11 +29,6 @@ type Kullanici = {
   olusturma: string
 }
 
-const ROL_ETIKET: Record<string, string> = {
-  admin: 'Yönetici',
-  reseller: 'Bayi',
-  user: 'Müşteri',
-}
 const ROL_STIL: Record<string, string> = {
   admin: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
   reseller: 'bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300',
@@ -63,6 +59,12 @@ type BayiPaketOzet = { id: number; ad: string; max_customer: number; max_domain:
 type HizmetPlanOzet = { id: number; ad: string }
 
 export default function KullanicilarPage() {
+  const { t } = useTranslation(['KullanicilarPage', 'common'])
+  const ROL_ETIKET: Record<string, string> = {
+    admin: t('KullanicilarPage:roles.admin'),
+    reseller: t('KullanicilarPage:roles.reseller'),
+    user: t('KullanicilarPage:roles.user'),
+  }
   const [aramaParam] = useSearchParams()
   const benimRolum = useAuth((s) => s.kullanici?.rol)
   const benimID = useAuth((s) => s.kullanici?.id)
@@ -94,7 +96,7 @@ export default function KullanicilarPage() {
       setListe(Array.isArray(r.data) ? r.data : [])
       setHata(null)
     } catch (e) {
-      setHata(apiHata(e, 'Hesaplar alınamadı'))
+      setHata(apiHata(e, t('KullanicilarPage:error.load')))
     } finally {
       setYukleniyor(false)
     }
@@ -113,11 +115,11 @@ export default function KullanicilarPage() {
     setHata(null)
     try {
       await api.post('/users', yeni)
-      setBasari(`${yeni.kullanici_adi} hesabı oluşturuldu.`)
+      setBasari(t('KullanicilarPage:success.created', { name: yeni.kullanici_adi }))
       setYeni(null)
       await getir()
     } catch (e) {
-      setHata(apiHata(e, 'Hesap oluşturulamadı'))
+      setHata(apiHata(e, t('KullanicilarPage:error.create')))
     } finally {
       setKaydediliyor(false)
     }
@@ -129,11 +131,11 @@ export default function KullanicilarPage() {
     setHata(null)
     try {
       await api.post(`/users/${parolaHedef.id}/parola`, { yeni: yeniParola })
-      setBasari(`${parolaHedef.kullanici_adi} parolası güncellendi.`)
+      setBasari(t('KullanicilarPage:success.password_updated', { name: parolaHedef.kullanici_adi }))
       setParolaHedef(null)
       setYeniParola('')
     } catch (e) {
-      setHata(apiHata(e, 'Parola sıfırlanamadı'))
+      setHata(apiHata(e, t('KullanicilarPage:error.password_reset')))
     } finally {
       setKaydediliyor(false)
     }
@@ -154,7 +156,7 @@ export default function KullanicilarPage() {
       const r = await api.get<BayiLimit>(`/users/${k.id}/limitler`)
       setLimit(r.data)
     } catch (e) {
-      setHata(apiHata(e, 'Limitler okunamadı'))
+      setHata(apiHata(e, t('KullanicilarPage:error.limits_load')))
       setLimitHedef(null)
     } finally {
       setLimitYukleniyor(false)
@@ -202,11 +204,11 @@ export default function KullanicilarPage() {
         izinli_planlar: limit.izinli_planlar || [],
         fazla_satis: limit.fazla_satis,
       })
-      setBasari(`${limitHedef.kullanici_adi} limitleri güncellendi.`)
+      setBasari(t('KullanicilarPage:success.limits_updated', { name: limitHedef.kullanici_adi }))
       setLimitHedef(null)
       setLimit(null)
     } catch (e) {
-      setHata(apiHata(e, 'Limitler kaydedilemedi'))
+      setHata(apiHata(e, t('KullanicilarPage:error.limits_save')))
     } finally {
       setKaydediliyor(false)
     }
@@ -217,10 +219,12 @@ export default function KullanicilarPage() {
     setHata(null)
     try {
       await api.post(`/users/${k.id}/durum`, { durum: hedef })
-      setBasari(`${k.kullanici_adi} ${hedef === 'active' ? 'etkinleştirildi' : 'askıya alındı'}.`)
+      setBasari(hedef === 'active'
+        ? t('KullanicilarPage:success.activated', { name: k.kullanici_adi })
+        : t('KullanicilarPage:success.suspended', { name: k.kullanici_adi }))
       await getir()
     } catch (e) {
-      setHata(apiHata(e, 'Durum değiştirilemedi'))
+      setHata(apiHata(e, t('KullanicilarPage:error.status_change')))
     }
   }
 
@@ -228,11 +232,11 @@ export default function KullanicilarPage() {
     if (!silinecek) return
     try {
       await api.delete(`/users/${silinecek.id}`)
-      setBasari(`${silinecek.kullanici_adi} silindi.`)
+      setBasari(t('KullanicilarPage:success.deleted', { name: silinecek.kullanici_adi }))
       setSilinecek(null)
       await getir()
     } catch (e) {
-      setHata(apiHata(e, 'Silinemedi'))
+      setHata(apiHata(e, t('KullanicilarPage:error.delete')))
       setSilinecek(null)
     }
   }
@@ -243,19 +247,19 @@ export default function KullanicilarPage() {
 
   return (
     <div className="w-full px-6 py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Kullanıcılar' }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('KullanicilarPage:breadcrumb') }]} />
 
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Kullanıcılar</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('KullanicilarPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           {adminMiyim
-            ? 'Panel hesapları: yöneticiler, bayiler ve müşteriler.'
-            : 'Açtığınız müşteri hesapları.'}
+            ? t('KullanicilarPage:subtitle_admin')
+            : t('KullanicilarPage:subtitle_reseller')}
         </p>
       </div>
 
       <ListToolbar
-        birincil={{ etiket: adminMiyim ? 'Yeni Hesap' : 'Yeni Müşteri', onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
+        birincil={{ etiket: adminMiyim ? t('KullanicilarPage:new_account') : t('KullanicilarPage:new_customer'), onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
         aranan={aranan}
         arananSetter={setAranan}
       />
@@ -264,21 +268,21 @@ export default function KullanicilarPage() {
       {basari && <div className="mb-4 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-sm">{basari}</div>}
 
       {yukleniyor ? (
-        <div className="py-16 text-center text-sm text-slate-400">Yükleniyor…</div>
+        <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
       ) : liste.length === 0 ? (
         <EmptyState
-          baslik={adminMiyim ? 'Henüz başka hesap yok' : 'Henüz müşteri hesabınız yok'}
-          aciklama="Yeni hesap oluşturarak başlayın."
-          buton={{ etiket: 'Yeni Hesap', onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
+          baslik={adminMiyim ? t('KullanicilarPage:empty.title_admin') : t('KullanicilarPage:empty.title_reseller')}
+          aciklama={t('KullanicilarPage:empty.desc')}
+          buton={{ etiket: t('KullanicilarPage:new_account'), onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
         />
       ) : suzulmus.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-400">Aramayla eşleşen hesap yok.</div>
+        <div className="py-12 text-center text-sm text-slate-400">{t('KullanicilarPage:empty.no_search_results')}</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-900/60">
               <tr>
-                {['Kullanıcı', 'Ad Soyad', 'Rol', 'Durum', '2FA', 'Son Giriş', ''].map((b, i) => (
+                {[t('KullanicilarPage:table.user'), t('KullanicilarPage:table.full_name'), t('KullanicilarPage:table.role'), t('KullanicilarPage:table.status'), t('KullanicilarPage:table.twofa'), t('KullanicilarPage:table.last_login'), ''].map((b, i) => (
                   <th key={i} className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">{b}</th>
                 ))}
               </tr>
@@ -288,7 +292,7 @@ export default function KullanicilarPage() {
                 <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition">
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <span className="font-mono text-slate-900 dark:text-slate-100">{k.kullanici_adi}</span>
-                    {k.id === 1 && <span className="ml-1.5 text-[10px] text-slate-400">(sistem)</span>}
+                    {k.id === 1 && <span className="ml-1.5 text-[10px] text-slate-400">{t('KullanicilarPage:table.system_tag')}</span>}
                   </td>
                   <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{k.ad_soyad || '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
@@ -296,19 +300,19 @@ export default function KullanicilarPage() {
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {k.durum === 'active'
-                      ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">Aktif</span>
-                      : <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Askıda</span>}
+                      ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('KullanicilarPage:table.active')}</span>
+                      : <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{t('KullanicilarPage:table.suspended')}</span>}
                     {/* Parolası olmayan hesap giriş yapamaz — "aktif" görünüp
                         çalışmadığı için ayrı bir uyarı rozeti hak ediyor. */}
                     {k.parolasiz && (
                       <span
-                        title="Parola atanmamış — bu hesap giriş yapamaz"
+                        title={t('KullanicilarPage:table.no_password_title')}
                         className="ml-1.5 px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
-                      >Parola yok</span>
+                      >{t('KullanicilarPage:table.no_password')}</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-                    {k.iki_fa ? <span className="text-emerald-600 dark:text-emerald-400">Açık</span> : <span className="text-slate-400">Kapalı</span>}
+                    {k.iki_fa ? <span className="text-emerald-600 dark:text-emerald-400">{t('KullanicilarPage:table.twofa_on')}</span> : <span className="text-slate-400">{t('KullanicilarPage:table.twofa_off')}</span>}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">
                     {k.son_giris || '—'}
@@ -316,25 +320,25 @@ export default function KullanicilarPage() {
                   </td>
                   <td className="px-3 py-2.5 text-right whitespace-nowrap">
                     {k.id === 1 ? (
-                      <span className="text-xs text-slate-400">sistem hesabı</span>
+                      <span className="text-xs text-slate-400">{t('KullanicilarPage:table.system_account')}</span>
                     ) : (
                       <>
                         <button onClick={() => { setParolaHedef(k); setYeniParola('') }} className="text-xs text-brand-600 dark:text-brand-400 hover:underline mr-3">
-                          Parola
+                          {t('KullanicilarPage:table.password_btn')}
                         </button>
                         {/* Kota yalnız bayilerde anlamlı ve yalnız admin yönetir. */}
                         {adminMiyim && k.rol === 'reseller' && (
                           <button onClick={() => limitAc(k)} className="text-xs text-sky-600 dark:text-sky-400 hover:underline mr-3">
-                            Limitler
+                            {t('KullanicilarPage:table.limits_btn')}
                           </button>
                         )}
                         {!korumali(k) && (
                           <>
                             <button onClick={() => durumDegistir(k)} className="text-xs text-amber-600 dark:text-amber-400 hover:underline mr-3">
-                              {k.durum === 'active' ? 'Askıya al' : 'Etkinleştir'}
+                              {k.durum === 'active' ? t('KullanicilarPage:table.suspend') : t('KullanicilarPage:table.activate')}
                             </button>
                             <button onClick={() => setSilinecek(k)} className="text-xs text-red-600 dark:text-red-400 hover:underline">
-                              Sil
+                              {t('common:delete')}
                             </button>
                           </>
                         )}
@@ -349,46 +353,46 @@ export default function KullanicilarPage() {
       )}
 
       {/* Yeni hesap */}
-      <Modal acik={yeni !== null} baslik={adminMiyim ? 'Yeni Hesap' : 'Yeni Müşteri Hesabı'} onKapat={() => setYeni(null)}>
+      <Modal acik={yeni !== null} baslik={adminMiyim ? t('KullanicilarPage:modal_new.title_admin') : t('KullanicilarPage:modal_new.title_reseller')} onKapat={() => setYeni(null)}>
         {yeni && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Kullanıcı adı</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('KullanicilarPage:modal_new.username')}</label>
               <input
                 value={yeni.kullanici_adi}
                 onChange={(e) => setYeni({ ...yeni, kullanici_adi: e.target.value })}
-                placeholder="ornek_bayi"
+                placeholder={t('KullanicilarPage:modal_new.username_placeholder')}
                 className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
-              <p className="mt-1 text-[11px] text-slate-400">3-32 karakter, küçük harfle başlar; harf, rakam, _ ve - içerebilir.</p>
+              <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_new.username_hint')}</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Parola</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('KullanicilarPage:modal_new.password')}</label>
               <input
                 type="text"
                 value={yeni.parola}
                 onChange={(e) => setYeni({ ...yeni, parola: e.target.value })}
                 className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
-              <p className="mt-1 text-[11px] text-slate-400">En az 8 karakter. Parola yalnız şimdi görünür — kullanıcıya iletin.</p>
+              <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_new.password_hint')}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Rol</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('KullanicilarPage:modal_new.role')}</label>
                 <select
                   value={yeni.rol}
                   onChange={(e) => setYeni({ ...yeni, rol: e.target.value })}
                   disabled={!adminMiyim}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
-                  {adminMiyim && <option value="admin">Yönetici</option>}
-                  {adminMiyim && <option value="reseller">Bayi</option>}
-                  <option value="user">Müşteri</option>
+                  {adminMiyim && <option value="admin">{t('KullanicilarPage:roles.admin')}</option>}
+                  {adminMiyim && <option value="reseller">{t('KullanicilarPage:roles.reseller')}</option>}
+                  <option value="user">{t('KullanicilarPage:roles.user')}</option>
                 </select>
-                {!adminMiyim && <p className="mt-1 text-[11px] text-slate-400">Bayiler yalnız müşteri hesabı açabilir.</p>}
+                {!adminMiyim && <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_new.role_hint_reseller')}</p>}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">E-posta</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('common:email')}</label>
                 <input
                   type="email"
                   value={yeni.eposta}
@@ -398,7 +402,7 @@ export default function KullanicilarPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Ad Soyad</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('KullanicilarPage:modal_new.full_name')}</label>
               <input
                 value={yeni.ad_soyad}
                 onChange={(e) => setYeni({ ...yeni, ad_soyad: e.target.value })}
@@ -406,9 +410,9 @@ export default function KullanicilarPage() {
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setYeni(null)} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Vazgeç</button>
+              <button onClick={() => setYeni(null)} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">{t('common:giveUp')}</button>
               <button onClick={olustur} disabled={kaydediliyor} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
-                {kaydediliyor ? 'Oluşturuluyor…' : 'Oluştur'}
+                {kaydediliyor ? t('common:creating') : t('common:create')}
               </button>
             </div>
           </div>
@@ -416,15 +420,14 @@ export default function KullanicilarPage() {
       </Modal>
 
       {/* Parola sıfırlama */}
-      <Modal acik={parolaHedef !== null} baslik="Parola Belirle" onKapat={() => setParolaHedef(null)}>
+      <Modal acik={parolaHedef !== null} baslik={t('KullanicilarPage:modal_password.title')} onKapat={() => setParolaHedef(null)}>
         {parolaHedef && (
           <div className="space-y-3">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              <span className="font-mono">{parolaHedef.kullanici_adi}</span> için yeni parola.
+              <span className="font-mono">{parolaHedef.kullanici_adi}</span> {t('KullanicilarPage:modal_password.desc_suffix')}
               {parolaHedef.rol === 'user' && (
                 <span className="block mt-1.5 text-xs text-slate-500">
-                  Bu müşterinin panel hesabı parolası. Müşteri panele yalnızca bu kullanıcı adı ve
-                  parolayla girebilir; parola atanmadan giriş yapamaz.
+                  {t('KullanicilarPage:modal_password.user_hint')}
                 </span>
               )}
             </p>
@@ -432,13 +435,13 @@ export default function KullanicilarPage() {
               type="text"
               value={yeniParola}
               onChange={(e) => setYeniParola(e.target.value)}
-              placeholder="En az 8 karakter"
+              placeholder={t('KullanicilarPage:modal_password.placeholder')}
               className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setParolaHedef(null)} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Vazgeç</button>
+              <button onClick={() => setParolaHedef(null)} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">{t('common:giveUp')}</button>
               <button onClick={parolaSifirla} disabled={kaydediliyor || yeniParola.length < 8} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
-                {kaydediliyor ? 'Kaydediliyor…' : 'Parolayı Belirle'}
+                {kaydediliyor ? t('common:saving') : t('KullanicilarPage:modal_password.submit')}
               </button>
             </div>
           </div>
@@ -446,43 +449,43 @@ export default function KullanicilarPage() {
       </Modal>
 
       {/* Bayi limitleri */}
-      <Modal acik={limitHedef !== null} baslik="Bayi Limitleri" onKapat={() => { setLimitHedef(null); setLimit(null) }}>
+      <Modal acik={limitHedef !== null} baslik={t('KullanicilarPage:modal_limits.title')} onKapat={() => { setLimitHedef(null); setLimit(null) }}>
         {limitYukleniyor ? (
-          <div className="py-8 text-center text-sm text-slate-400">Yükleniyor…</div>
+          <div className="py-8 text-center text-sm text-slate-400">{t('common:loading')}</div>
         ) : limit && limitHedef ? (
           <div className="space-y-4">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              <span className="font-mono">{limitHedef.kullanici_adi}</span> için üst sınırlar.
+              <span className="font-mono">{limitHedef.kullanici_adi}</span> {t('KullanicilarPage:modal_limits.desc_suffix')}
               <span className="block mt-1 text-xs text-slate-500">
-                <strong>0 = sınırsız.</strong> İkisi de 0 ise limit kaydı tamamen kaldırılır.
+                <strong>{t('KullanicilarPage:modal_limits.zero_unlimited')}</strong> {t('KullanicilarPage:modal_limits.zero_hint')}
               </span>
             </p>
 
             <div>
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Bayi paketi
+                {t('KullanicilarPage:modal_limits.package')}
               </label>
               <select
                 value={limit.paket_id ?? 0}
                 onChange={(e) => paketUygula(Number(e.target.value))}
                 className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
               >
-                <option value={0}>Elle gir</option>
+                <option value={0}>{t('KullanicilarPage:modal_limits.manual_option')}</option>
                 {bayiPaketleri.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
               </select>
               {limit.paket_id ? (
                 <p className="mt-1 text-[11px] text-slate-400">
-                  Aşağıdaki 4 alan "{limit.paket_ad}" paketinden dolduruldu; değiştirmek için "Elle gir"i seçin.
+                  {t('KullanicilarPage:modal_limits.package_filled_hint', { name: limit.paket_ad })}
                 </p>
               ) : (
-                <p className="mt-1 text-[11px] text-slate-400">Bir paket seçmezseniz limitleri elle girersiniz.</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_limits.package_manual_hint')}</p>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  En fazla müşteri
+                  {t('KullanicilarPage:modal_limits.max_customer')}
                 </label>
                 <input
                   type="number"
@@ -493,15 +496,15 @@ export default function KullanicilarPage() {
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
-                  şu an {limit.mevcut_customer} kullanılıyor
+                  {t('KullanicilarPage:modal_limits.in_use', { n: limit.mevcut_customer })}
                   {limit.max_customer > 0 && limit.mevcut_customer > limit.max_customer && (
-                    <span className="text-amber-600 dark:text-amber-400"> — limit mevcut kullanımın altında</span>
+                    <span className="text-amber-600 dark:text-amber-400"> {t('KullanicilarPage:modal_limits.below_usage')}</span>
                   )}
                 </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  En fazla domain
+                  {t('KullanicilarPage:modal_limits.max_domain')}
                 </label>
                 <input
                   type="number"
@@ -512,9 +515,9 @@ export default function KullanicilarPage() {
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
-                  şu an {limit.mevcut_domain} kullanılıyor
+                  {t('KullanicilarPage:modal_limits.in_use', { n: limit.mevcut_domain })}
                   {limit.max_domain > 0 && limit.mevcut_domain > limit.max_domain && (
-                    <span className="text-amber-600 dark:text-amber-400"> — limit mevcut kullanımın altında</span>
+                    <span className="text-amber-600 dark:text-amber-400"> {t('KullanicilarPage:modal_limits.below_usage')}</span>
                   )}
                 </p>
               </div>
@@ -523,7 +526,7 @@ export default function KullanicilarPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  Disk kotası (MB)
+                  {t('KullanicilarPage:modal_limits.disk_quota')}
                 </label>
                 <input
                   type="number"
@@ -533,11 +536,11 @@ export default function KullanicilarPage() {
                   onChange={(e) => setLimit({ ...limit, disk_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
-                <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_disk_mb} MB kullanılıyor</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_limits.in_use_mb', { n: limit.mevcut_disk_mb })}</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  Trafik kotası (MB/ay)
+                  {t('KullanicilarPage:modal_limits.traffic_quota')}
                 </label>
                 <input
                   type="number"
@@ -547,7 +550,7 @@ export default function KullanicilarPage() {
                   onChange={(e) => setLimit({ ...limit, trafik_kota_mb: Math.max(0, Number(e.target.value) || 0) })}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-60"
                 />
-                <p className="mt-1 text-[11px] text-slate-400">şu an {limit.mevcut_trafik_mb} MB kullanılıyor</p>
+                <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_limits.in_use_mb', { n: limit.mevcut_trafik_mb })}</p>
               </div>
             </div>
 
@@ -559,19 +562,18 @@ export default function KullanicilarPage() {
                 onChange={(e) => setLimit({ ...limit, fazla_satis: e.target.checked })}
                 className="rounded"
               />
-              Fazla satışa izin ver
+              {t('KullanicilarPage:modal_limits.overselling')}
             </label>
             <p className="text-[11px] text-slate-400 -mt-2">
-              Kapatılırsa bayi, müşterilerine atadığı disk/trafik taahhüdü toplamında disk/trafik
-              kotasını aşamaz (WHM'in "Overselling" ayarının karşılığı).
+              {t('KullanicilarPage:modal_limits.overselling_hint')}
             </p>
 
             <div>
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Müşteriye atayabileceği hizmet planları
+                {t('KullanicilarPage:modal_limits.plans_label')}
               </label>
               {hizmetPlanlari.length === 0 ? (
-                <p className="text-[11px] text-slate-400">Hizmet planı tanımlı değil.</p>
+                <p className="text-[11px] text-slate-400">{t('KullanicilarPage:modal_limits.plans_empty')}</p>
               ) : (
                 <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-slate-200 dark:border-slate-800 p-2">
                   {hizmetPlanlari.map(p => (
@@ -588,27 +590,26 @@ export default function KullanicilarPage() {
                 </div>
               )}
               <p className="mt-1 text-[11px] text-slate-400">
-                Hiçbiri işaretli değilse kısıt yok — bayi tüm hizmet planlarını kullanabilir.
+                {t('KullanicilarPage:modal_limits.plans_hint')}
               </p>
             </div>
 
             {!limit.tanimli && (
               <div className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
-                Bu bayi için tanımlı limit yok — şu anda sınırsız.
+                {t('KullanicilarPage:modal_limits.no_limit_defined')}
               </div>
             )}
 
             <p className="text-[11px] text-slate-400">
-              Limitin altına düşmek mevcut hesapları silmez ve siteleri kesmez; yalnız yeni
-              müşteri/domain eklemeyi engeller. Disk ve trafik son ölçüme dayanır.
+              {t('KullanicilarPage:modal_limits.footer_hint')}
             </p>
 
             <div className="flex justify-end gap-2 pt-1">
               <button onClick={() => { setLimitHedef(null); setLimit(null) }} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-                Vazgeç
+                {t('common:giveUp')}
               </button>
               <button onClick={limitKaydet} disabled={kaydediliyor} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
-                {kaydediliyor ? 'Kaydediliyor…' : 'Kaydet'}
+                {kaydediliyor ? t('common:saving') : t('common:save')}
               </button>
             </div>
           </div>
@@ -617,9 +618,12 @@ export default function KullanicilarPage() {
 
       <ConfirmDialog
         acik={silinecek !== null}
-        baslik="Hesabı sil"
-        mesaj={`${silinecek?.kullanici_adi ?? ''} hesabı silinecek.${silinecek?.rol === 'reseller' ? ' Bu bayinin altındaki hesaplar silinmez, yöneticiye devredilir.' : ''}`}
-        onayMetni="Sil"
+        baslik={t('KullanicilarPage:confirm_delete.title')}
+        mesaj={t('KullanicilarPage:confirm_delete.message', {
+          name: silinecek?.kullanici_adi ?? '',
+          extra: silinecek?.rol === 'reseller' ? t('KullanicilarPage:confirm_delete.message_reseller_extra') : '',
+        })}
+        onayMetni={t('KullanicilarPage:confirm_delete.confirm')}
         tehlikeli
         onOnay={sil}
         onIptal={() => setSilinecek(null)}

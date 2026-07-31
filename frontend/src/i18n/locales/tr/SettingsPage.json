@@ -1,0 +1,61 @@
+{
+  "title": "Profil ve Tercihler",
+  "subtitle": "Hesap bilgileriniz, parola, iki adımlı doğrulama ve panel tercihleri.",
+  "account": {
+    "title": "Hesap Bilgileri",
+    "desc": "Ad soyad ve e-posta adresinizi düzenleyin.",
+    "username": "Kullanıcı adı",
+    "role_status": "Rol / Durum",
+    "full_name": "Ad Soyad",
+    "full_name_placeholder": "Adınız Soyadınız",
+    "email": "E-posta",
+    "email_placeholder": "ornek@site.com",
+    "saved": "Bilgiler kaydedildi.",
+    "save_failed": "Kaydedilemedi"
+  },
+  "password": {
+    "title": "Parola",
+    "desc": "Bu, sunucunun root parolasını değiştirir (SSH erişimi dahil).",
+    "current": "Mevcut parola",
+    "new": "Yeni parola",
+    "new_repeat": "Yeni parola (tekrar)",
+    "change": "Parolayı Değiştir",
+    "changing": "Değiştiriliyor…",
+    "changed": "Parola değiştirildi. (Sunucu root parolası güncellendi.)",
+    "change_failed": "Parola değiştirilemedi",
+    "too_short": "Yeni parola en az 8 karakter olmalı.",
+    "mismatch": "Yeni parolalar eşleşmiyor."
+  },
+  "twofa": {
+    "title": "İki Adımlı Doğrulama (2FA)",
+    "desc": "Girişte parolaya ek olarak authenticator uygulamasından 6 haneli kod ister.",
+    "status": "Durum:",
+    "active": "● Aktif",
+    "off": "○ Kapalı",
+    "enable": "2FA'yı Etkinleştir",
+    "disable": "2FA'yı Kapat",
+    "step1": "1) Authenticator uygulamanıza (Google Authenticator, Authy, Microsoft Authenticator) ekleyin:",
+    "scan_hint": "Authenticator uygulamanızla tarayın",
+    "manual_hint": "Tarayamıyorsanız, elle giriş için gizli anahtar:",
+    "or_link": "veya bağlantı:",
+    "step2": "2) Uygulamadaki 6 haneli kodu girin:",
+    "verify_enable": "Doğrula ve Aç",
+    "verifying": "Doğrulanıyor…",
+    "cancel": "İptal",
+    "disable_prompt": "Kapatmak için authenticator kodunu girin:",
+    "give_up": "Vazgeç",
+    "verify_failed": "Kod doğrulanamadı",
+    "verify_failed_generic": "Kod doğrulanamadı — uygulamadaki 6 haneli kodu girin",
+    "qr_alt": "2FA QR kodu"
+  },
+  "prefs": {
+    "title": "Tercihler",
+    "desc": "Panel görünüm ve dil tercihleri.",
+    "theme": "Tema",
+    "theme_system": "Sistem",
+    "theme_light": "Açık",
+    "theme_dark": "Koyu",
+    "language": "Dil",
+    "save": "Tercihleri Kaydet"
+  }
+}

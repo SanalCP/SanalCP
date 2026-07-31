@@ -2,10 +2,11 @@
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
-function panoYaz(text: string): boolean {
+function panoYaz(text: string, promptMesaj: string): boolean {
   // 1) Modern API (HTTPS / localhost only) — kullanıcı gesture içindeyse async ok
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -30,7 +31,7 @@ function panoYaz(text: string): boolean {
   } catch {}
   // 3) Son çare: prompt — kullanıcı Ctrl+C ile manuel kopyalar
   try {
-    window.prompt('Otomatik kopyalanamadı. Ctrl+C basıp Enter\'a tıklayın:', text)
+    window.prompt(promptMesaj, text)
     return true
   } catch {
     return false
@@ -47,6 +48,7 @@ type Domain = {
 }
 
 export default function DomainConnectionPage() {
+  const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [hata, setHata] = useState<string | null>(null)
@@ -59,7 +61,7 @@ export default function DomainConnectionPage() {
   }, [id])
 
   function kopyala(deg: string) {
-    panoYaz(deg)
+    panoYaz(deg, t('DomainConnectionPage:copy_prompt_fallback'))
     setKopya(deg)
     setTimeout(() => setKopya(null), 1800)
   }
@@ -67,47 +69,47 @@ export default function DomainConnectionPage() {
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Domainler', href: '/domainler' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('common:domain'), href: '/domainler' },
         { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
-        { etiket: 'Bağlantı Bilgisi' },
+        { etiket: t('DomainConnectionPage:breadcrumb_title') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Bağlantı Bilgisi</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainConnectionPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
           <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
-          {' · '}<span className="text-xs text-slate-400 dark:text-slate-500">Değer üstüne tıkla → otomatik kopyalanır</span>
+          {' · '}<span className="text-xs text-slate-400 dark:text-slate-500">{t('DomainConnectionPage:click_to_copy_hint')}</span>
         </p>
       )}
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
       {domain && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <Kart baslik="FTP / SFTP" renk="sky" ikon="M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z">
-            <Sat e="Sunucu" d={domain.ftp_host} onKopya={kopyala} kopya={kopya} />
-            <Sat e="Port" d="21" onKopya={kopyala} kopya={kopya} />
-            <Sat e="Kullanıcı adı" d={domain.ftp_user} onKopya={kopyala} kopya={kopya} mono />
-            <Parola e="Parola" id={id!} tip="ftp" onAc={() => setParolaModal({ tip: 'ftp' })} />
-            <Sat e="Ev dizini" d={`/home/${domain.sistem_kullanici}`} onKopya={kopyala} kopya={kopya} mono />
-            <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">FTP yönetimine git →</Link>
+          <Kart baslik={t('DomainConnectionPage:ftp_sftp')} renk="sky" ikon="M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z">
+            <Sat e={t('DomainConnectionPage:server')} d={domain.ftp_host} onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:port')} d="21" onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:username')} d={domain.ftp_user} onKopya={kopyala} kopya={kopya} mono />
+            <Parola e={t('DomainConnectionPage:password')} id={id!} tip="ftp" onAc={() => setParolaModal({ tip: 'ftp' })} />
+            <Sat e={t('DomainConnectionPage:home_dir')} d={`/home/${domain.sistem_kullanici}`} onKopya={kopyala} kopya={kopya} mono />
+            <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:ftp_manage_link')}</Link>
           </Kart>
 
-          <Kart baslik="MySQL / MariaDB" renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
-            <Sat e="Sunucu" d={domain.db_host} onKopya={kopyala} kopya={kopya} />
-            <Sat e="Port" d="3306" onKopya={kopyala} kopya={kopya} />
-            <Sat e="Veritabanı" d={domain.db_adi} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e="Kullanıcı adı" d={domain.db_user} onKopya={kopyala} kopya={kopya} mono />
-            <Parola e="Parola" id={id!} tip="db" onAc={() => setParolaModal({ tip: 'db' })} />
-            <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">Veritabanları yönetimine git →</Link>
+          <Kart baslik={t('DomainConnectionPage:mysql_mariadb')} renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
+            <Sat e={t('DomainConnectionPage:server')} d={domain.db_host} onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:port')} d="3306" onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:database')} d={domain.db_adi} onKopya={kopyala} kopya={kopya} mono />
+            <Sat e={t('DomainConnectionPage:username')} d={domain.db_user} onKopya={kopyala} kopya={kopya} mono />
+            <Parola e={t('DomainConnectionPage:password')} id={id!} tip="db" onAc={() => setParolaModal({ tip: 'db' })} />
+            <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:db_manage_link')}</Link>
           </Kart>
 
-          <Kart baslik="Web" renk="amber" ikon="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" cift>
-            <Sat e="Web kökü" d={domain.web_root} onKopya={kopyala} kopya={kopya} mono />
+          <Kart baslik={t('DomainConnectionPage:web')} renk="amber" ikon="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" cift>
+            <Sat e={t('DomainConnectionPage:web_root')} d={domain.web_root} onKopya={kopyala} kopya={kopya} mono />
             <Sat e="IPv4" d={domain.ipv4} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e="Sistem kullanıcısı" d={domain.sistem_kullanici} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e="HTTP URL" d={`http://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
-            <Sat e="HTTPS URL" d={`https://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:system_user')} d={domain.sistem_kullanici} onKopya={kopyala} kopya={kopya} mono />
+            <Sat e={t('DomainConnectionPage:http_url')} d={`http://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:https_url')} d={`https://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
           </Kart>
         </div>
       )}
@@ -148,6 +150,7 @@ function Kart({ baslik, renk, ikon, children, cift }: { baslik: string; renk: st
 }
 
 function Sat({ e, d, mono, onKopya, kopya }: { e: string; d: string; mono?: boolean; onKopya?: (s: string) => void; kopya?: string | null }) {
+  const { t } = useTranslation(['DomainConnectionPage'])
   const aktif = !!onKopya
   const kopyalandi = kopya === d
   return (
@@ -156,14 +159,14 @@ function Sat({ e, d, mono, onKopya, kopya }: { e: string; d: string; mono?: bool
       <dd
         onClick={() => aktif && onKopya!(d)}
         className={`text-right flex items-center gap-2 group ${aktif ? 'cursor-pointer' : ''}`}
-        title={aktif ? 'Tıkla → kopyala' : ''}
+        title={aktif ? t('DomainConnectionPage:click_to_copy_title') : ''}
       >
         <span className={`${mono ? 'font-mono text-xs' : 'text-sm'} ${aktif ? 'text-slate-800 dark:text-slate-200 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 transition' : 'text-slate-800 dark:text-slate-200'}`}>
           {d}
         </span>
         {kopyalandi && (
           <span className="text-[10px] uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-medium animate-pulse">
-            ✓ Kopyalandı
+            {t('DomainConnectionPage:copied')}
           </span>
         )}
       </dd>
@@ -172,6 +175,7 @@ function Sat({ e, d, mono, onKopya, kopya }: { e: string; d: string; mono?: bool
 }
 
 function Parola({ e, onAc }: { e: string; id: string; tip: string; onAc: () => void }) {
+  const { t } = useTranslation(['DomainConnectionPage'])
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
       <dt className="text-slate-500 dark:text-slate-500 text-xs uppercase tracking-wider">{e}</dt>
@@ -180,7 +184,7 @@ function Parola({ e, onAc }: { e: string; id: string; tip: string; onAc: () => v
           onClick={onAc}
           className="text-xs px-3 py-1 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded font-medium transition inline-flex items-center gap-1"
         >
-          🔑 Şifreyi Göster / Yenile
+          {t('DomainConnectionPage:show_refresh_password')}
         </button>
       </dd>
     </div>
@@ -189,6 +193,7 @@ function Parola({ e, onAc }: { e: string; id: string; tip: string; onAc: () => v
 
 function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }:
   { tip: 'ftp' | 'db'; domainId: string; ftpUser: string; dbUser: string; onKapat: () => void; onKopya: (s: string) => void }) {
+  const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const [yeni, setYeni] = useState<string | null>(null)
   const [isleniyor, setIsleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
@@ -200,15 +205,15 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
     if (!gosterMevcut) return
     if (tip === 'ftp') {
       api.get<{ ftp_pass_plain: string }>(`/domains/${domainId}/ftp/parola-goster`)
-        .then(r => setMevcutParola(r.data.ftp_pass_plain || '(saklanmıyor)'))
-        .catch(() => setMevcutParola('(yetki yok)'))
+        .then(r => setMevcutParola(r.data.ftp_pass_plain || t('DomainConnectionPage:not_stored')))
+        .catch(() => setMevcutParola(t('DomainConnectionPage:no_permission')))
     } else {
       api.get<any[]>(`/domains/${domainId}/databases`)
         .then(r => {
           const main = (r.data || [])[0]
-          setMevcutParola(main?.db_parola || main?.db_pass_plain || '(saklanmıyor)')
+          setMevcutParola(main?.db_parola || main?.db_pass_plain || t('DomainConnectionPage:not_stored'))
         })
-        .catch(() => setMevcutParola('(yetki yok)'))
+        .catch(() => setMevcutParola(t('DomainConnectionPage:no_permission')))
     }
   }, [gosterMevcut, tip, domainId])
 
@@ -222,26 +227,26 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
         // İlk DB id'sini al
         const dbs = await api.get<any[]>(`/domains/${domainId}/databases`)
         const main = (dbs.data || [])[0]
-        if (!main) throw new Error('veritabanı yok')
+        if (!main) throw new Error(t('DomainConnectionPage:no_database'))
         const r = await api.put<{ parola: string }>(`/databases/${main.id}/password`, {})
         setYeni(r.data.parola)
       }
-    } catch (e) { setHata(apiHata(e, 'Parola üretilemedi')) }
+    } catch (e) { setHata(apiHata(e, t('DomainConnectionPage:password_gen_failed'))) }
     finally { setIsleniyor(false) }
   }
 
   const user = tip === 'ftp' ? ftpUser : dbUser
-  const tipAd = tip === 'ftp' ? 'FTP' : 'Veritabanı'
+  const tipAd = tip === 'ftp' ? t('DomainConnectionPage:ftp_password_title') : t('DomainConnectionPage:db_password_title')
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onKapat}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={ev => ev.stopPropagation()}>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-2xl">🔑</span>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{tipAd} Parolası</h3>
+          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{tipAd}</h3>
         </div>
         <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-4 bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
-          <span className="text-slate-500 dark:text-slate-500">Kullanıcı:</span> <code className="font-mono text-slate-900 dark:text-slate-100">{user}</code>
+          <span className="text-slate-500 dark:text-slate-500">{t('DomainConnectionPage:user_label')}</span> <code className="font-mono text-slate-900 dark:text-slate-100">{user}</code>
         </div>
 
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-xs text-red-700 dark:text-red-300">{hata}</div>}
@@ -252,11 +257,11 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
             {!gosterMevcut ? (
               <button onClick={() => setGosterMevcut(true)}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded-md text-slate-700 dark:text-slate-300">
-                👁 Mevcut parolayı göster
+                {t('DomainConnectionPage:show_current_password')}
               </button>
             ) : (
               <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
-                <div className="text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300 mb-1">Mevcut parola</div>
+                <div className="text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300 mb-1">{t('DomainConnectionPage:current_password')}</div>
                 <div className="flex items-center gap-2">
                   <code className="font-mono text-sm text-slate-900 dark:text-slate-100 flex-1 break-all">{mevcutParola || '...'}</code>
                   {mevcutParola && mevcutParola.length > 5 && (
@@ -271,22 +276,22 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
         {/* Yeni parola */}
         {yeni && (
           <div className="mb-4 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded">
-            <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1">✓ Yeni parola üretildi</div>
+            <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1">{t('DomainConnectionPage:new_password_generated')}</div>
             <div className="flex items-center gap-2">
               <code className="font-mono text-sm text-slate-900 dark:text-slate-100 flex-1 break-all">{yeni}</code>
               <KopyaButton text={yeni} renk="emerald" />
             </div>
-            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-2">⚠ Parolayı şimdi kopyalayın — bu pencereyi kapattıktan sonra tekrar göremeyebilirsiniz.</p>
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-2">{t('DomainConnectionPage:copy_now_warning')}</p>
           </div>
         )}
 
         <div className="flex gap-2 justify-end mt-4">
           <button onClick={onKapat} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
-            Kapat
+            {t('common:close')}
           </button>
           <button onClick={olustur} disabled={isleniyor}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded font-medium">
-            {isleniyor ? 'Üretiliyor…' : (yeni ? '↻ Tekrar üret' : '⚡ Yeni parola üret')}
+            {isleniyor ? t('DomainConnectionPage:generating') : (yeni ? t('DomainConnectionPage:regenerate') : t('DomainConnectionPage:generate_new'))}
           </button>
         </div>
       </div>
@@ -295,6 +300,7 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
 }
 
 function KopyaButton({ text, renk }: { text: string; renk: 'amber' | 'emerald' }) {
+  const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const [k, setK] = useState(false)
   const bg: Record<string, string> = {
     amber: 'bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 text-amber-800 dark:text-amber-200',
@@ -303,7 +309,7 @@ function KopyaButton({ text, renk }: { text: string; renk: 'amber' | 'emerald' }
   return (
     <button
       onClick={() => {
-        const ok = panoYaz(text)
+        const ok = panoYaz(text, t('DomainConnectionPage:copy_prompt_fallback'))
         if (ok) {
           setK(true)
           setTimeout(() => setK(false), 1500)
@@ -311,7 +317,7 @@ function KopyaButton({ text, renk }: { text: string; renk: 'amber' | 'emerald' }
       }}
       className={`text-[10px] px-2 py-1 rounded font-medium transition ${bg[renk]} ${k ? 'ring-2 ring-emerald-400' : ''}`}
     >
-      {k ? '✓ Kopyalandı' : 'Kopyala'}
+      {k ? t('DomainConnectionPage:copied') : t('common:copy')}
     </button>
   )
 }

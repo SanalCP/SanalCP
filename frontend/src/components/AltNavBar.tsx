@@ -6,6 +6,7 @@
 // erişilebilir bir yer gerekiyor. Menü sekmesi, çubuğa sığmayan her şey için
 // mevcut çekmeceyi açar — yani hiçbir sayfa erişilemez hâle gelmez.
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 type Sekme = { to: string; etiket: string; ikon: string; end?: boolean }
 
@@ -20,28 +21,29 @@ const IK = {
 }
 
 export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
+  const { t } = useTranslation(['AltNavBar'])
   const navigate = useNavigate()
 
   const isMusteri =
-    typeof window !== 'undefined' && localStorage.getItem('sanalpanel.musteri') === '1'
+    typeof window !== 'undefined' && localStorage.getItem('sanalcp.musteri') === '1'
   const domainID =
     typeof window !== 'undefined'
-      ? localStorage.getItem('sanalpanel.musteri.domain_id') || ''
+      ? localStorage.getItem('sanalcp.musteri.domain_id') || ''
       : ''
 
   // Yönetici: birincil eylem "yeni domain". Müşteri domain oluşturamaz —
   // onun için orta eylem yok, düz 4 sekme + menü.
   const yoneticiSekmeler: Sekme[] = [
-    { to: '/', etiket: 'Anasayfa', ikon: IK.home, end: true },
-    { to: '/domainler', etiket: 'Domainler', ikon: IK.domain },
-    { to: '/izleme', etiket: 'İzleme', ikon: IK.izleme },
+    { to: '/', etiket: t('AltNavBar:tabs.home'), ikon: IK.home, end: true },
+    { to: '/domainler', etiket: t('AltNavBar:tabs.domains'), ikon: IK.domain },
+    { to: '/izleme', etiket: t('AltNavBar:tabs.monitor'), ikon: IK.izleme },
   ]
 
   const musteriSekmeler: Sekme[] = [
-    { to: `/abonelikler/${domainID}`, etiket: 'Genel', ikon: IK.home, end: true },
-    { to: `/abonelikler/${domainID}/dosyalar`, etiket: 'Dosyalar', ikon: IK.dosya },
-    { to: `/abonelikler/${domainID}/veritabanlari`, etiket: 'Veritabanı', ikon: IK.veri },
-    { to: `/abonelikler/${domainID}/yedekler`, etiket: 'Yedekler', ikon: IK.yedek },
+    { to: `/abonelikler/${domainID}`, etiket: t('AltNavBar:tabs.overview'), ikon: IK.home, end: true },
+    { to: `/abonelikler/${domainID}/dosyalar`, etiket: t('AltNavBar:tabs.files'), ikon: IK.dosya },
+    { to: `/abonelikler/${domainID}/veritabanlari`, etiket: t('AltNavBar:tabs.database'), ikon: IK.veri },
+    { to: `/abonelikler/${domainID}/yedekler`, etiket: t('AltNavBar:tabs.backups'), ikon: IK.yedek },
   ]
 
   const sekmeler = isMusteri ? musteriSekmeler : yoneticiSekmeler
@@ -59,7 +61,7 @@ export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
                  border-t border-slate-200 dark:border-slate-800
                  bg-white/95 dark:bg-slate-900/95 backdrop-blur
                  pb-[env(safe-area-inset-bottom)]"
-      aria-label="Alt gezinme"
+      aria-label={t('AltNavBar:nav_aria')}
     >
       {sekmeler.map((s) => (
         <NavLink key={s.to} to={s.to} end={s.end} className={sekmeSinif}>
@@ -88,7 +90,7 @@ export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
           onClick={() => navigate('/domainler?yeni=1')}
           className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 min-w-0
                      text-slate-500 dark:text-slate-400"
-          aria-label="Yeni domain oluştur"
+          aria-label={t('AltNavBar:new_domain_aria')}
         >
           <span className="flex items-center justify-center w-[26px] h-[26px] rounded-lg
                            bg-brand-600 text-white shadow-sm shadow-brand-600/40">
@@ -96,7 +98,7 @@ export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
             </svg>
           </span>
-          <span className="text-[10px] leading-none truncate max-w-full px-0.5">Yeni</span>
+          <span className="text-[10px] leading-none truncate max-w-full px-0.5">{t('AltNavBar:new')}</span>
         </button>
       )}
 
@@ -105,13 +107,13 @@ export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
         onClick={onMenuAc}
         className="flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 min-w-0
                    text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition"
-        aria-label="Menüyü aç"
+        aria-label={t('AltNavBar:open_menu_aria')}
         aria-controls="sp-kenar-cubugu"
       >
         <svg className="w-[22px] h-[22px] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.7}>
           <path strokeLinecap="round" strokeLinejoin="round" d={IK.menu} />
         </svg>
-        <span className="text-[10px] leading-none">Menü</span>
+        <span className="text-[10px] leading-none">{t('AltNavBar:menu')}</span>
       </button>
     </nav>
   )

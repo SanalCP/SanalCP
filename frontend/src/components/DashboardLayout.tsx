@@ -3,6 +3,8 @@
 // sp-mobil-v1
 import { Suspense, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import TopBar from './TopBar'
@@ -14,7 +16,9 @@ const MENU_KAPALI_GRUP_KEY = 'sp-menu-kapali-gruplar'
 type SurumKontrol = { guncelleme_var: boolean; kritik: boolean; duyuru: string; son: string; mevcut?: string; build_tarihi?: string }
 
 type NavItem = { to: string; etiket: string; ikon: string; end?: boolean }
-type NavGroup = { baslik?: string; items: NavItem[] }
+// baslikKey: dil değişse de kararlı kalan iç anahtar (kapalı-grup state'i ve
+// localStorage bunu kullanır); baslik ise ekrana basılan çevrilmiş metin.
+type NavGroup = { baslik?: string; baslikKey?: string; items: NavItem[] }
 
 const ICONS = {
   home:        'M3 12l2-2 7-7 7 7 2 2v8a2 2 0 01-2 2h-3v-7H10v7H7a2 2 0 01-2-2v-8z',
@@ -61,44 +65,46 @@ const ICONS = {
 // Sunucu kipi menüsü. Buradaki her giriş App.tsx'te tanımlı bir rotaya bakar —
 // daha önce yalnız "Araçlar ve Ayarlar" hub sayfasından ulaşılabilen Servisler,
 // PHP, Paket Yöneticisi, Yedekleme ve DNS Şablonu artık doğrudan menüde.
-const NAV: NavGroup[] = [
-  { items: [{ to: '/', etiket: 'Anasayfa', ikon: ICONS.home, end: true }] },
-  { baslik: 'Barındırma', items: [
-    { to: '/domainler',            etiket: 'Domainler',         ikon: ICONS.domain },
-    { to: '/dns',                  etiket: 'DNS Yönetimi',      ikon: ICONS.dns },
-    { to: '/mail',                 etiket: 'E-posta Hesapları', ikon: ICONS.posta },
-    { to: '/veritabanlari',        etiket: 'Veritabanları',     ikon: ICONS.db },
-    { to: '/araclar/dns-sablonu',  etiket: 'DNS Şablonu',       ikon: ICONS.ekdomain },
-    { to: '/hizmet-planlari',      etiket: 'Hizmet Planları',   ikon: ICONS.plan },
+function nav(t: TFunction): NavGroup[] {
+  return [
+  { items: [{ to: '/', etiket: t('DashboardLayout:labels.home'), ikon: ICONS.home, end: true }] },
+  { baslik: t('DashboardLayout:groups.hosting'), baslikKey: 'hosting', items: [
+    { to: '/domainler',            etiket: t('DashboardLayout:items.domains'),       ikon: ICONS.domain },
+    { to: '/dns',                  etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+    { to: '/mail',                 etiket: t('DashboardLayout:items.mail_accounts'), ikon: ICONS.posta },
+    { to: '/veritabanlari',        etiket: t('DashboardLayout:items.databases'),     ikon: ICONS.db },
+    { to: '/araclar/dns-sablonu',  etiket: t('DashboardLayout:items.dns_template'),  ikon: ICONS.ekdomain },
+    { to: '/hizmet-planlari',      etiket: t('DashboardLayout:items.service_plans'), ikon: ICONS.plan },
   ]},
-  { baslik: 'Uygulamalar', items: [
-    { to: '/wordpress',            etiket: 'WordPress',         ikon: ICONS.wp },
-    { to: '/eklentiler',           etiket: 'Eklentiler',        ikon: ICONS.eklenti },
+  { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
+    { to: '/wordpress',            etiket: t('DashboardLayout:items.wordpress'),     ikon: ICONS.wp },
+    { to: '/eklentiler',           etiket: t('DashboardLayout:items.plugins'),       ikon: ICONS.eklenti },
   ]},
-  { baslik: 'Güvenlik', items: [
-    { to: '/ssl',                  etiket: 'SSL Sertifikaları', ikon: ICONS.kilit },
-    { to: '/firewall',             etiket: 'Güvenlik Duvarı',   ikon: ICONS.firewall },
+  { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
+    { to: '/ssl',                  etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
+    { to: '/firewall',             etiket: t('DashboardLayout:items.firewall'),      ikon: ICONS.firewall },
   ]},
-  { baslik: 'Sunucu', items: [
-    { to: '/araclar/servisler',    etiket: 'Servisler',         ikon: ICONS.servis },
-    { to: '/araclar/php-surumler', etiket: 'PHP Sürümleri',     ikon: ICONS.php },
-    { to: '/sistem/php-modulleri', etiket: 'PHP Modülleri',     ikon: ICONS.puzzle },
-    { to: '/araclar/paketler',     etiket: 'Paket Yöneticisi',  ikon: ICONS.paket },
-    { to: '/backup-yonetimi',      etiket: 'Yedekleme',         ikon: ICONS.yedek },
+  { baslik: t('DashboardLayout:groups.server'), baslikKey: 'server', items: [
+    { to: '/araclar/servisler',    etiket: t('DashboardLayout:items.services'),      ikon: ICONS.servis },
+    { to: '/araclar/php-surumler', etiket: t('DashboardLayout:items.php_versions'),  ikon: ICONS.php },
+    { to: '/sistem/php-modulleri', etiket: t('DashboardLayout:items.php_modules'),   ikon: ICONS.puzzle },
+    { to: '/araclar/paketler',     etiket: t('DashboardLayout:items.package_manager'), ikon: ICONS.paket },
+    { to: '/backup-yonetimi',      etiket: t('DashboardLayout:items.backup_management'), ikon: ICONS.yedek },
   ]},
-  { baslik: 'İzleme', items: [
-    { to: '/izleme',               etiket: 'Sunucu İzleme',     ikon: ICONS.izleme },
-    { to: '/istatistikler',        etiket: 'İstatistikler',     ikon: ICONS.istatistik },
+  { baslik: t('DashboardLayout:groups.monitoring'), baslikKey: 'monitoring', items: [
+    { to: '/izleme',               etiket: t('DashboardLayout:items.server_monitoring'), ikon: ICONS.izleme },
+    { to: '/istatistikler',        etiket: t('DashboardLayout:items.statistics'),    ikon: ICONS.istatistik },
   ]},
-  { baslik: 'Yönetim', items: [
-    { to: '/kullanicilar',         etiket: 'Kullanıcılar',      ikon: ICONS.bayi },
-    { to: '/bayi-paketleri',       etiket: 'Bayi Paketleri',    ikon: ICONS.plan },
-    { to: '/musteriler',           etiket: 'Müşteriler',        ikon: ICONS.musteri },
-    { to: '/hesap-aktarimi',       etiket: 'Hesap Aktarımı',    ikon: ICONS.kopya },
-    { to: '/guvenlik-gunlugu',     etiket: 'Güvenlik Günlüğü',  ikon: ICONS.log },
-    { to: '/araclar-ayarlar',      etiket: 'Araçlar ve Ayarlar', ikon: ICONS.araclar },
+  { baslik: t('DashboardLayout:groups.management'), baslikKey: 'management', items: [
+    { to: '/kullanicilar',         etiket: t('DashboardLayout:items.users'),         ikon: ICONS.bayi },
+    { to: '/bayi-paketleri',       etiket: t('DashboardLayout:items.reseller_packages'), ikon: ICONS.plan },
+    { to: '/musteriler',           etiket: t('DashboardLayout:items.customers'),     ikon: ICONS.musteri },
+    { to: '/hesap-aktarimi',       etiket: t('DashboardLayout:items.account_transfer'), ikon: ICONS.kopya },
+    { to: '/guvenlik-gunlugu',     etiket: t('DashboardLayout:items.security_log'),  ikon: ICONS.log },
+    { to: '/araclar-ayarlar',      etiket: t('DashboardLayout:items.tools_settings'), ikon: ICONS.araclar },
   ]},
-]
+  ]
+}
 
 // Bayi menüsü — YALNIZ bayinin gerçekten erişebildiği yerler.
 //
@@ -106,80 +112,83 @@ const NAV: NavGroup[] = [
 // bayiye açıldı: bayi artık kendi müşterilerinin domainlerini, DNS/SSL/e-posta
 // ve veritabanı özetlerini görüyor. Sunucuyu DEĞİŞTİREN uçlar (servis işlem,
 // paket kurulumu, firewall, panel ayarları) hâlâ yalnız admin'de.
-const BAYI_NAV: NavGroup[] = [
-  { items: [{ to: '/', etiket: 'Anasayfa', ikon: ICONS.home, end: true }] },
-  { baslik: 'Barındırma', items: [
-    { to: '/domainler',      etiket: 'Domainler',      ikon: ICONS.domain },
-    { to: '/dns',            etiket: 'DNS Yönetimi',   ikon: ICONS.dns },
-    { to: '/mail',           etiket: 'E-posta',        ikon: ICONS.posta },
-    { to: '/veritabanlari',  etiket: 'Veritabanları',  ikon: ICONS.db },
-    { to: '/ssl',            etiket: 'SSL Sertifikaları', ikon: ICONS.kilit },
+function bayiNav(t: TFunction): NavGroup[] {
+  return [
+  { items: [{ to: '/', etiket: t('DashboardLayout:labels.home'), ikon: ICONS.home, end: true }] },
+  { baslik: t('DashboardLayout:groups.hosting'), baslikKey: 'hosting', items: [
+    { to: '/domainler',      etiket: t('DashboardLayout:items.domains'),   ikon: ICONS.domain },
+    { to: '/dns',            etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+    { to: '/mail',           etiket: t('DashboardLayout:items.mail'),      ikon: ICONS.posta },
+    { to: '/veritabanlari',  etiket: t('DashboardLayout:items.databases'), ikon: ICONS.db },
+    { to: '/ssl',            etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
   ]},
-  { baslik: 'Uygulamalar', items: [
-    { to: '/wordpress',      etiket: 'WordPress',      ikon: ICONS.wp },
+  { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
+    { to: '/wordpress',      etiket: t('DashboardLayout:items.wordpress'), ikon: ICONS.wp },
   ]},
-  { baslik: 'Hesaplarım', items: [
-    { to: '/bayi-ozet',      etiket: 'Kaynak Özetim',     ikon: ICONS.istatistik },
-    { to: '/kullanicilar',   etiket: 'Müşteri Hesapları', ikon: ICONS.bayi },
-    { to: '/musteriler',     etiket: 'Müşteri Kayıtları', ikon: ICONS.musteri },
+  { baslik: t('DashboardLayout:groups.my_accounts'), baslikKey: 'my_accounts', items: [
+    { to: '/bayi-ozet',      etiket: t('DashboardLayout:items.resource_summary'), ikon: ICONS.istatistik },
+    { to: '/kullanicilar',   etiket: t('DashboardLayout:items.customer_accounts'), ikon: ICONS.bayi },
+    { to: '/musteriler',     etiket: t('DashboardLayout:items.customer_records'), ikon: ICONS.musteri },
   ]},
-  { baslik: 'Sunucu', items: [
-    { to: '/sunucu-durumu',   etiket: 'Sunucu Durumu',   ikon: ICONS.izleme },
-    { to: '/hizmet-planlari', etiket: 'Hizmet Planları', ikon: ICONS.plan },
+  { baslik: t('DashboardLayout:groups.server'), baslikKey: 'server', items: [
+    { to: '/sunucu-durumu',   etiket: t('DashboardLayout:items.server_status'),  ikon: ICONS.izleme },
+    { to: '/hizmet-planlari', etiket: t('DashboardLayout:items.service_plans'), ikon: ICONS.plan },
   ]},
-]
+  ]
+}
 
 // Domain kipi menüsü — /abonelikler/:id/* altındayken kenar çubuğunun tamamı
 // buna dönüşür. Karşılığı olan sayfaların hepsi zaten yazılmıştı; tek eksik
 // menüye bağlanmalarıydı (DNS'e ulaşmak üç tık sürüyordu).
-function domainNav(id: string): NavGroup[] {
+function domainNav(id: string, t: TFunction): NavGroup[] {
   const y = (s = '') => `/abonelikler/${id}${s}`
   return [
-    { items: [{ to: y(), etiket: 'Genel Bakış', ikon: ICONS.home, end: true }] },
-    { baslik: 'Web Sitesi', items: [
-      { to: y('/dosyalar'),      etiket: 'Dosyalar',        ikon: ICONS.dosyalar },
-      { to: y('/web-sunucu'),    etiket: 'Apache & nginx',  ikon: ICONS.apache },
-      { to: y('/php'),           etiket: 'PHP Ayarları',    ikon: ICONS.php },
-      { to: y('/composer'),      etiket: 'Composer',        ikon: ICONS.composer },
-      { to: y('/performans'),    etiket: 'Performans',      ikon: ICONS.izleme },
-      { to: y('/redis'),         etiket: 'Redis Cache',     ikon: ICONS.redis },
-      { to: y('/wordpress'),     etiket: 'WordPress',       ikon: ICONS.wp },
+    { items: [{ to: y(), etiket: t('DashboardLayout:labels.overview'), ikon: ICONS.home, end: true }] },
+    { baslik: t('DashboardLayout:groups.website'), baslikKey: 'website', items: [
+      { to: y('/dosyalar'),      etiket: t('DashboardLayout:items.files'),        ikon: ICONS.dosyalar },
+      { to: y('/web-sunucu'),    etiket: t('DashboardLayout:items.apache_nginx'), ikon: ICONS.apache },
+      { to: y('/php'),           etiket: t('DashboardLayout:items.php_settings'), ikon: ICONS.php },
+      { to: y('/composer'),      etiket: t('DashboardLayout:items.composer'),     ikon: ICONS.composer },
+      { to: y('/performans'),    etiket: t('DashboardLayout:items.performance'),  ikon: ICONS.izleme },
+      { to: y('/redis'),         etiket: t('DashboardLayout:items.redis_cache'),  ikon: ICONS.redis },
+      { to: y('/wordpress'),     etiket: t('DashboardLayout:items.wordpress'),    ikon: ICONS.wp },
     ]},
-    { baslik: 'Alan Adı', items: [
-      { to: y('/dns'),           etiket: 'DNS Yönetimi',    ikon: ICONS.dns },
-      { to: y('/subdomainler'),  etiket: 'Subdomainler',    ikon: ICONS.subdomain },
-      { to: y('/ek-alanlar'),    etiket: 'Ek Alan Adları',  ikon: ICONS.ekdomain },
-      { to: y('/ssl'),           etiket: 'SSL/TLS',         ikon: ICONS.kilit },
+    { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
+      { to: y('/dns'),           etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+      { to: y('/subdomainler'),  etiket: t('DashboardLayout:items.subdomains'),   ikon: ICONS.subdomain },
+      { to: y('/ek-alanlar'),    etiket: t('DashboardLayout:items.addon_domains'), ikon: ICONS.ekdomain },
+      { to: y('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
     ]},
-    { baslik: 'Veri', items: [
-      { to: y('/veritabanlari'), etiket: 'Veritabanları',   ikon: ICONS.db },
-      { to: y('/ftp'),           etiket: 'FTP Hesapları',   ikon: ICONS.ftp },
-      { to: y('/mail'),          etiket: 'E-posta',         ikon: ICONS.posta },
-      { to: y('/yedekler'),      etiket: 'Yedekler',        ikon: ICONS.yedek },
-      { to: y('/kopyala'),       etiket: 'Siteyi Kopyala',  ikon: ICONS.kopya },
+    { baslik: t('DashboardLayout:groups.data'), baslikKey: 'data', items: [
+      { to: y('/veritabanlari'), etiket: t('DashboardLayout:items.databases'),    ikon: ICONS.db },
+      { to: y('/ftp'),           etiket: t('DashboardLayout:items.ftp_accounts'), ikon: ICONS.ftp },
+      { to: y('/mail'),          etiket: t('DashboardLayout:items.mail'),         ikon: ICONS.posta },
+      { to: y('/yedekler'),      etiket: t('DashboardLayout:items.backups'),      ikon: ICONS.yedek },
+      { to: y('/kopyala'),       etiket: t('DashboardLayout:items.clone_site'),   ikon: ICONS.kopya },
     ]},
-    { baslik: 'Geliştirici', items: [
-      { to: y('/git'),           etiket: 'Git',             ikon: ICONS.git },
-      { to: y('/cron'),          etiket: 'Zamanlanmış Görevler', ikon: ICONS.cron },
-      { to: y('/ssh-erisim'),    etiket: 'SSH Erişimi',     ikon: ICONS.ssh },
-      { to: y('/gunlukler'),     etiket: 'Günlükler',       ikon: ICONS.log },
+    { baslik: t('DashboardLayout:groups.developer'), baslikKey: 'developer', items: [
+      { to: y('/git'),           etiket: t('DashboardLayout:items.git'),          ikon: ICONS.git },
+      { to: y('/cron'),          etiket: t('DashboardLayout:items.cron_jobs'),    ikon: ICONS.cron },
+      { to: y('/ssh-erisim'),    etiket: t('DashboardLayout:items.ssh_access'),   ikon: ICONS.ssh },
+      { to: y('/gunlukler'),     etiket: t('DashboardLayout:items.logs'),         ikon: ICONS.log },
     ]},
-    { baslik: 'Güvenlik', items: [
-      { to: y('/waf'),           etiket: 'WAF',             ikon: ICONS.waf },
-      { to: y('/erisim-kontrol'), etiket: 'Erişim Kontrolü', ikon: ICONS.erisim },
-      { to: y('/sifre-koruma'),  etiket: 'Şifre Korumalı Dizinler', ikon: ICONS.kilit },
-      { to: y('/imunify'),       etiket: 'Imunify',         ikon: ICONS.imunify },
+    { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
+      { to: y('/waf'),           etiket: t('DashboardLayout:items.waf'),          ikon: ICONS.waf },
+      { to: y('/erisim-kontrol'), etiket: t('DashboardLayout:items.access_control'), ikon: ICONS.erisim },
+      { to: y('/sifre-koruma'),  etiket: t('DashboardLayout:items.password_protected_dirs'), ikon: ICONS.kilit },
+      { to: y('/imunify'),       etiket: t('DashboardLayout:items.imunify'),      ikon: ICONS.imunify },
     ]},
-    { baslik: 'Analiz', items: [
-      { to: y('/istatistik'),    etiket: 'İstatistikler',   ikon: ICONS.istatistik },
-      { to: y('/baglanti'),      etiket: 'Bağlantı Bilgisi', ikon: ICONS.plan },
+    { baslik: t('DashboardLayout:groups.analytics'), baslikKey: 'analytics', items: [
+      { to: y('/istatistik'),    etiket: t('DashboardLayout:items.statistics'),   ikon: ICONS.istatistik },
+      { to: y('/baglanti'),      etiket: t('DashboardLayout:items.connection_info'), ikon: ICONS.plan },
     ]},
   ]
 }
 
 export default function DashboardLayout() {
-  const isMusteri = typeof window !== 'undefined' && localStorage.getItem('sanalpanel.musteri') === '1'
-  const musteriDomainID = typeof window !== 'undefined' ? localStorage.getItem('sanalpanel.musteri.domain_id') || '' : ''
+  const { t } = useTranslation(['DashboardLayout'])
+  const isMusteri = typeof window !== 'undefined' && localStorage.getItem('sanalcp.musteri') === '1'
+  const musteriDomainID = typeof window !== 'undefined' ? localStorage.getItem('sanalcp.musteri.domain_id') || '' : ''
   const rol = useAuth((s) => s.kullanici?.rol)
 
   // Gruplar varsayılan olarak açıktır; yalnız kullanıcının kapattıkları saklanır.
@@ -236,25 +245,25 @@ export default function DashboardLayout() {
   // (yetkisi olmayan araçlar burada yok), yalnız gruplandı.
   const my = (s = '') => `/abonelikler/${musteriDomainID}${s}`
   const MUSTERI_NAV: NavGroup[] = [
-    { items: [{ to: my(), etiket: 'Genel Bakış', ikon: ICONS.home, end: true }] },
-    { baslik: 'Web Sitesi', items: [
-      { to: my('/dosyalar'),      etiket: 'Dosya Yöneticisi', ikon: ICONS.dosyalar },
-      { to: my('/web-sunucu'),    etiket: 'Apache & nginx',   ikon: ICONS.apache },
-      { to: my('/php'),           etiket: 'PHP Ayarları',     ikon: ICONS.php },
+    { items: [{ to: my(), etiket: t('DashboardLayout:labels.overview'), ikon: ICONS.home, end: true }] },
+    { baslik: t('DashboardLayout:groups.website'), baslikKey: 'website', items: [
+      { to: my('/dosyalar'),      etiket: t('DashboardLayout:items.file_manager'), ikon: ICONS.dosyalar },
+      { to: my('/web-sunucu'),    etiket: t('DashboardLayout:items.apache_nginx'), ikon: ICONS.apache },
+      { to: my('/php'),           etiket: t('DashboardLayout:items.php_settings'), ikon: ICONS.php },
     ]},
-    { baslik: 'Alan Adı', items: [
-      { to: my('/dns'),           etiket: 'DNS Ayarları',     ikon: ICONS.dns },
-      { to: my('/ssl'),           etiket: 'SSL/TLS',          ikon: ICONS.kilit },
+    { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
+      { to: my('/dns'),           etiket: t('DashboardLayout:items.dns_settings'), ikon: ICONS.dns },
+      { to: my('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
     ]},
-    { baslik: 'Veri', items: [
-      { to: my('/veritabanlari'), etiket: 'Veritabanları',    ikon: ICONS.db },
-      { to: my('/ftp'),           etiket: 'FTP Hesapları',    ikon: ICONS.ftp },
-      { to: my('/yedekler'),      etiket: 'Yedekler',         ikon: ICONS.yedek },
+    { baslik: t('DashboardLayout:groups.data'), baslikKey: 'data', items: [
+      { to: my('/veritabanlari'), etiket: t('DashboardLayout:items.databases'),    ikon: ICONS.db },
+      { to: my('/ftp'),           etiket: t('DashboardLayout:items.ftp_accounts'), ikon: ICONS.ftp },
+      { to: my('/yedekler'),      etiket: t('DashboardLayout:items.backups'),      ikon: ICONS.yedek },
     ]},
-    { baslik: 'Geliştirici', items: [
-      { to: my('/cron'),          etiket: 'Zamanlanmış Görevler', ikon: ICONS.cron },
-      { to: my('/git'),           etiket: 'Git Deploy',       ikon: ICONS.git },
-      { to: my('/gunlukler'),     etiket: 'Günlükler',        ikon: ICONS.log },
+    { baslik: t('DashboardLayout:groups.developer'), baslikKey: 'developer', items: [
+      { to: my('/cron'),          etiket: t('DashboardLayout:items.cron_jobs'),    ikon: ICONS.cron },
+      { to: my('/git'),           etiket: t('DashboardLayout:items.git_deploy'),   ikon: ICONS.git },
+      { to: my('/gunlukler'),     etiket: t('DashboardLayout:items.logs'),         ikon: ICONS.log },
     ]},
   ]
 
@@ -273,10 +282,10 @@ export default function DashboardLayout() {
   const aktifNav = isMusteri || rol === 'user'
     ? MUSTERI_NAV
     : domainKipi
-    ? domainNav(aktifDomainID)
+    ? domainNav(aktifDomainID, t)
     : rol === 'reseller'
-    ? BAYI_NAV
-    : NAV
+    ? bayiNav(t)
+    : nav(t)
 
   const grupAcik = (b: string) => !kapaliGruplar.includes(b)
 
@@ -315,11 +324,11 @@ export default function DashboardLayout() {
               <path d="M9 10h14v3H9zM9 15h14v3H9zM9 20h9v3H9z" />
             </svg>
           </div>
-          <span className="text-base font-semibold text-slate-900 dark:text-slate-100">SanalPanel</span>
+          <span className="text-base font-semibold text-slate-900 dark:text-slate-100">SanalCP</span>
           <button
             onClick={() => setMobilAcik(false)}
             className="ml-auto -mr-2 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition lg:hidden"
-            aria-label="Menüyü kapat"
+            aria-label={t('DashboardLayout:close_menu_aria')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -337,7 +346,7 @@ export default function DashboardLayout() {
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
-              Sunucu Yönetimi
+              {t('DashboardLayout:server_management_back')}
             </NavLink>
             <DomainSecici aktifID={aktifDomainID} />
           </div>
@@ -348,19 +357,19 @@ export default function DashboardLayout() {
             <div key={gi} className="mb-2">
               {grup.baslik && (
                 <button
-                  onClick={() => toggle(grup.baslik!)}
+                  onClick={() => toggle(grup.baslikKey ?? grup.baslik!)}
                   className="w-full flex items-center justify-between px-3 py-1.5 mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition"
                 >
                   <span>{grup.baslik}</span>
                   <svg
-                    className={`w-3 h-3 transition-transform ${grupAcik(grup.baslik!) ? '' : '-rotate-90'}`}
+                    className={`w-3 h-3 transition-transform ${grupAcik(grup.baslikKey ?? grup.baslik!) ? '' : '-rotate-90'}`}
                     fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
               )}
-              {(!grup.baslik || grupAcik(grup.baslik)) && (
+              {(!grup.baslik || grupAcik(grup.baslikKey ?? grup.baslik)) && (
                 <ul className="space-y-0.5">
                   {grup.items.map((it) => {
                     const ustPath = grup.items.some(
@@ -422,7 +431,7 @@ export default function DashboardLayout() {
                 }`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.7}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={ICONS.profil} />
                 </svg>
-                <span className="truncate">Profil ve Tercihler</span>
+                <span className="truncate">{t('DashboardLayout:profile_prefs')}</span>
               </>
             )}
           </NavLink>
@@ -438,8 +447,8 @@ export default function DashboardLayout() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.363 3.591 2.257 17.657a1.5 1.5 0 0 0 1.302 2.25h16.882a1.5 1.5 0 0 0 1.302-2.25L13.638 3.591a1.5 1.5 0 0 0-2.598 0Z" />
             </svg>
             <span className="min-w-0 flex-1 text-sm">
-              <strong className="font-semibold">Kritik güvenlik duyurusu (v{surum.son}):</strong>{' '}
-              {surum.duyuru || 'Sürüm güncellemesi önerilir.'}
+              <strong className="font-semibold">{t('DashboardLayout:critical_announcement_prefix', { version: surum.son })}</strong>{' '}
+              {surum.duyuru || t('DashboardLayout:version_update_recommended')}
             </span>
             <button
               type="button"
@@ -448,7 +457,7 @@ export default function DashboardLayout() {
                 setDuyuruKapali(true)
               }}
               className="shrink-0 -m-1 rounded-md p-1 hover:bg-red-700"
-              aria-label="Duyuruyu kapat"
+              aria-label={t('DashboardLayout:close_announcement_aria')}
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -461,14 +470,14 @@ export default function DashboardLayout() {
           <div className="flex-1 min-w-0">
             <Suspense fallback={
               <div className="px-6 py-10 text-sm text-slate-400 dark:text-slate-500" role="status">
-                Sayfa yükleniyor…
+                {t('DashboardLayout:page_loading')}
               </div>
             }>
               <Outlet />
             </Suspense>
           </div>
           <footer className="py-4 text-center text-xs text-slate-400 dark:text-slate-600">
-            SanalPanel {surum?.mevcut ? `v${surum.mevcut}` : ''}
+            SanalCP {surum?.mevcut ? `v${surum.mevcut}` : ''}
             {surum?.build_tarihi ? ` · Build: ${surum.build_tarihi}` : ''}
           </footer>
         </main>

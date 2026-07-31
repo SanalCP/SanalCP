@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/store/auth'
 import LoginPage from '@/pages/LoginPage'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -73,6 +74,7 @@ function GuardedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { t } = useTranslation('YakindaPage')
   return (
     <Routes>
       <Route path="/giris" element={<LoginPage />} />
@@ -142,7 +144,7 @@ export default function App() {
 
         <Route path="araclar-ayarlar" element={<AraclarAyarlarPage />} />
         <Route path="istatistikler" element={<IstatistiklerPage />} />
-        <Route path="eklentiler" element={<YakindaPage baslik="Eklentiler" ikon="🧩" aciklama="Panel için 3. parti eklenti yönetimi" ozellikler={["Marketplace gezinme","Tek tıkla kur/kaldır","Sürüm güncelleme","API entegrasyonu","Geliştirici SDK"]} />} />
+        <Route path="eklentiler" element={<YakindaPage baslik={t('YakindaPage:eklentiler.title')} ikon="🧩" aciklama={t('YakindaPage:eklentiler.description')} ozellikler={t('YakindaPage:eklentiler.features', { returnObjects: true }) as string[]} />} />
         <Route path="wordpress" element={<WordPressPage />} />
         <Route path="firewall" element={<FirewallPage />} />
         <Route path="backup-yonetimi" element={<BackupYonetimiPage />} />

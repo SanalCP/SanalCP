@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -12,6 +13,7 @@ type ReadResp = { dosya: string; yol: string; satirlar: string[]; mevcut: boolea
 const MAX_PENCERE = 1000
 
 export default function DomainLogsPage() {
+  const { t } = useTranslation(['DomainLogsPage', 'common'])
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [dosyalar, setDosyalar] = useState<LogDosya[]>([])
@@ -72,7 +74,7 @@ export default function DomainLogsPage() {
           signal: ctrl.signal,
         })
         if (!res.ok || !res.body) {
-          setHata(`stream başlamadı (HTTP ${res.status})`)
+          setHata(t('DomainLogsPage:stream_not_started', { status: res.status }))
           setCanli(false)
           return
         }
@@ -114,13 +116,13 @@ export default function DomainLogsPage() {
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Domainler', href: '/domainler' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('DomainLogsPage:breadcrumb.domains'), href: '/domainler' },
         { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
-        { etiket: 'Günlükler' },
+        { etiket: t('DomainLogsPage:breadcrumb.logs') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Günlükler</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainLogsPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
           <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
@@ -158,16 +160,16 @@ export default function DomainLogsPage() {
             <button
               onClick={() => setGorunum('tablo')}
               className={`px-2.5 py-1.5 font-medium transition ${gorunum === 'tablo' ? 'bg-brand-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-            >Tablo</button>
+            >{t('DomainLogsPage:view.table')}</button>
             <button
               onClick={() => setGorunum('ham')}
               className={`px-2.5 py-1.5 font-medium transition ${gorunum === 'ham' ? 'bg-brand-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-            >Ham</button>
+            >{t('DomainLogsPage:view.raw')}</button>
           </div>
 
           <label className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1.5 select-none cursor-pointer">
             <input type="checkbox" checked={otoScroll} onChange={e => setOtoScroll(e.target.checked)} className="rounded" />
-            Otomatik kaydır
+            {t('DomainLogsPage:auto_scroll')}
           </label>
           <button
             onClick={() => setCanli(c => !c)}
@@ -177,20 +179,20 @@ export default function DomainLogsPage() {
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
             }`}
           >
-            {canli ? '■ Durdur' : '▶ Canlı Takip'}
+            {canli ? t('DomainLogsPage:live_stop') : t('DomainLogsPage:live_start')}
           </button>
           <button
             onClick={ilkYukle}
             disabled={canli}
             className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition disabled:opacity-50"
           >
-            ↻ Son 200
+            {t('DomainLogsPage:refresh_200')}
           </button>
           <button
             onClick={() => setSatirlar([])}
             className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition"
           >
-            Temizle
+            {t('DomainLogsPage:clear')}
           </button>
         </div>
       </div>
@@ -204,20 +206,20 @@ export default function DomainLogsPage() {
           <input
             value={arama}
             onChange={e => setArama(e.target.value)}
-            placeholder="Ara — IP, yol, durum kodu, tarayıcı…"
+            placeholder={t('DomainLogsPage:search_placeholder')}
             className="w-full pl-8 pr-8 py-1.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
           />
           {arama && (
             <button
               onClick={() => setArama('')}
-              aria-label="Aramayı temizle"
+              aria-label={t('DomainLogsPage:clear_search')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
             >×</button>
           )}
         </div>
         {arama && (
           <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-            {gorunen.length} / {satirlar.length} eşleşti
+            {t('DomainLogsPage:matches', { count: gorunen.length, total: satirlar.length })}
           </span>
         )}
       </div>
@@ -228,9 +230,9 @@ export default function DomainLogsPage() {
         className="bg-slate-900 border border-slate-800 rounded-2xl overflow-auto h-[min(60vh,320px)] sm:h-[420px] lg:h-[540px]"
       >
         {satirlar.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500 font-mono">{canli ? 'Bekleniyor… yeni satırlar geldikçe akacak.' : '(log dosyası boş veya henüz oluşmadı)'}</div>
+          <div className="p-6 text-sm text-slate-500 font-mono">{canli ? t('DomainLogsPage:waiting_live') : t('DomainLogsPage:empty_log')}</div>
         ) : gorunen.length === 0 ? (
-          <div className="p-6 text-sm text-slate-500 font-mono">"{arama}" aramasına uygun satır yok.</div>
+          <div className="p-6 text-sm text-slate-500 font-mono">{t('DomainLogsPage:no_match', { q: arama })}</div>
         ) : gorunum === 'ham' ? (
           <div className="p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
             {gorunen.map((s, i) => (
@@ -245,8 +247,8 @@ export default function DomainLogsPage() {
       </div>
 
       <div className="mt-2 text-xs text-slate-500 dark:text-slate-500 flex items-center justify-between">
-        <span>{arama ? `${gorunen.length} / ${satirlar.length} satır (filtreli)` : `${satirlar.length} satır`} · pencere {MAX_PENCERE}</span>
-        {canli && <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>canlı yayın</span>}
+        <span>{arama ? t('DomainLogsPage:footer_lines_filtered', { count: gorunen.length, total: satirlar.length }) : t('DomainLogsPage:footer_lines', { count: satirlar.length })} · {t('DomainLogsPage:window_label', { n: MAX_PENCERE })}</span>
+        {canli && <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>{t('DomainLogsPage:live_badge')}</span>}
       </div>
     </div>
   )
@@ -280,18 +282,19 @@ function parseAccess(line: string): AccessSatir | null {
 }
 
 function AccessTablosu({ satirlar }: { satirlar: string[] }) {
+  const { t } = useTranslation(['DomainLogsPage'])
   const satirNesne = useMemo(() => satirlar.map(parseAccess), [satirlar])
   return (
     <table className="w-full text-xs border-collapse">
       <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
         <tr>
-          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">Zaman</th>
-          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">IP</th>
-          <th className="text-left font-medium px-3 py-2">Method</th>
-          <th className="text-left font-medium px-3 py-2 w-full">Yol</th>
-          <th className="text-left font-medium px-3 py-2">Durum</th>
-          <th className="text-right font-medium px-3 py-2 whitespace-nowrap">Boyut</th>
-          <th className="text-left font-medium px-3 py-2">Tarayıcı</th>
+          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:access_table.time')}</th>
+          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:access_table.ip')}</th>
+          <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:access_table.method')}</th>
+          <th className="text-left font-medium px-3 py-2 w-full">{t('DomainLogsPage:access_table.path')}</th>
+          <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:access_table.status')}</th>
+          <th className="text-right font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:access_table.size')}</th>
+          <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:access_table.browser')}</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-800/70">
@@ -336,14 +339,15 @@ const ERROR_RE = /^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] (.*)$/
 const CLIENT_RE = /client: (\S+?)[,\s]/
 
 function ErrorTablosu({ satirlar }: { satirlar: string[] }) {
+  const { t } = useTranslation(['DomainLogsPage'])
   return (
     <table className="w-full text-xs border-collapse">
       <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
         <tr>
-          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">Zaman</th>
-          <th className="text-left font-medium px-3 py-2">Seviye</th>
-          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">İstemci</th>
-          <th className="text-left font-medium px-3 py-2 w-full">Mesaj</th>
+          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:error_table.time')}</th>
+          <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:error_table.level')}</th>
+          <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:error_table.client')}</th>
+          <th className="text-left font-medium px-3 py-2 w-full">{t('DomainLogsPage:error_table.message')}</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-800/70">

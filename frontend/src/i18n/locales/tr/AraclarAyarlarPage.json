@@ -1,0 +1,62 @@
+{
+  "page_title": "Araçlar ve Ayarlar",
+  "page_subtitle": "Sunucu geneli yönetim — PHP, sistem paketleri, ağ, güvenlik ve bakım.",
+  "breadcrumb_home": "Anasayfa",
+  "breadcrumb_current": "Araçlar ve Ayarlar",
+  "search_placeholder": "Araç ara…",
+  "search_aria": "Araç ara",
+  "section_maintenance": "Sunucu Bakımı",
+  "empty_search_title": "\"{{q}}\" için araç bulunamadı",
+  "empty_search_hint": "Arama terimini değiştirin veya temizleyin.",
+  "footer_total": "{{count}} araç · sunucu geneli",
+  "groups": {
+    "php": "PHP",
+    "system": "Sistem ve Servisler",
+    "network": "Ağ ve DNS",
+    "security": "Güvenlik ve Yedekleme"
+  },
+  "tools": {
+    "php_versions": {
+      "title": "PHP Sürümleri",
+      "badge": "Dinamik",
+      "desc": "7.4 → 8.5 sürümlerini ekleyin / kaldırın. Her domain kendi sürümünü seçer."
+    },
+    "php_modules": {
+      "title": "PHP Modülleri",
+      "desc": "Sunucu genelinde eklenti aç/kapat. PECL paket arama ve derleme."
+    },
+    "packages": {
+      "title": "Paket Yöneticisi",
+      "desc": "DNF paketleri — derleyiciler ve çalışma ortamları. Hazır kurulum grupları."
+    },
+    "services": {
+      "title": "Servisler",
+      "desc": "Nginx / Apache / MariaDB / DNS / PHP-FPM durumu ve yeniden başlatma."
+    },
+    "plans": {
+      "title": "Hizmet Planları",
+      "desc": "Barındırma paketleri; disk, veritabanı ve FTP kotaları."
+    },
+    "dns_template": {
+      "title": "DNS Şablonu",
+      "badge": "Merkezi",
+      "desc": "Yeni domainlere uygulanan merkezi DNS kayıtları (A/MX/SPF/DMARC/DKIM) + SOA."
+    },
+    "domains": {
+      "title": "Domainler",
+      "desc": "Tüm domain listesi, arama ve hızlı erişim."
+    },
+    "firewall": {
+      "title": "Güvenlik Duvarı",
+      "desc": "IP/port yasağı, beyaz liste, port kapatma. Kritik portlar korumalı."
+    },
+    "backup": {
+      "title": "Backup Yöneticisi",
+      "desc": "Tüm domainlerin yedekleri + boyut, tek tıkla yedekle. S3/SFTP hedefler."
+    },
+    "monitor": {
+      "title": "İzleme ve Loglar",
+      "desc": "CPU/RAM/disk grafikleri ve sunucu günlükleri (panel/nginx/SSH…)."
+    }
+  }
+}

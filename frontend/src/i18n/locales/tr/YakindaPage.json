@@ -1,0 +1,10 @@
+{
+  "coming_soon_badge": "Yakında",
+  "roadmap": "Yol Haritası",
+  "planned_features": "Planlanan Özellikler",
+  "eklentiler": {
+    "title": "Eklentiler",
+    "description": "Panel için 3. parti eklenti yönetimi",
+    "features": ["Marketplace gezinme", "Tek tıkla kur/kaldır", "Sürüm güncelleme", "API entegrasyonu", "Geliştirici SDK"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "coming_soon_badge": "Coming Soon",
+  "roadmap": "Roadmap",
+  "planned_features": "Planned Features",
+  "eklentiler": {
+    "title": "Plugins",
+    "description": "3rd-party plugin management for the panel",
+    "features": ["Browse marketplace", "One-click install/remove", "Version updates", "API integration", "Developer SDK"]
+  }
+}

@@ -22,9 +22,9 @@ const KEY_TOKEN = 'sanal.token'
 const KEY_USER  = 'sanal.user'
 const KEY_EXP   = 'sanal.exp'
 
-const KEY_MUSTERI      = 'sanalpanel.musteri'
-const KEY_MUSTERI_DOM  = 'sanalpanel.musteri.domain_id'
-const KEY_MUSTERI_ALAN = 'sanalpanel.musteri.alan_adi'
+const KEY_MUSTERI      = 'sanalcp.musteri'
+const KEY_MUSTERI_DOM  = 'sanalcp.musteri.domain_id'
+const KEY_MUSTERI_ALAN = 'sanalcp.musteri.alan_adi'
 
 function musteriBayrakSil() {
   localStorage.removeItem(KEY_MUSTERI)

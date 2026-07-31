@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -10,24 +11,39 @@ type Servis = {
   durum: string // active | inactive | failed | absent
 }
 
-const DURUM_STIL: Record<string, string> = {
-  active:   'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
-  inactive: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-  failed:   'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
-  absent:   'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+function durumStil(s: string, t: (k: string) => string): string {
+  const map: Record<string, string> = {
+    active:   'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+    inactive: 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
+    failed:   'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
+    absent:   'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+  }
+  return map[s] || map.inactive
 }
-const DURUM_ETIKET: Record<string, string> = {
-  active: '● Çalışıyor', inactive: '○ Durmuş', failed: '✕ Hatalı', absent: '— Kurulu değil',
+
+function durumEtiket(s: string, t: (k: string) => string): string {
+  const map: Record<string, string> = {
+    active: t('ServislerPage:status_active'),
+    inactive: t('ServislerPage:status_inactive'),
+    failed: t('ServislerPage:status_failed'),
+    absent: t('ServislerPage:status_absent'),
+  }
+  return map[s] || s
 }
-const GRUP_IKON: Record<string, string> = {
-  'Web Sunucusu': '🌐',
-  'Veritabanı & Önbellek': '🗄️',
-  'DNS': '📡',
-  'PHP-FPM': '🐘',
-  'Diğer': '⚙️',
+
+function grupIkon(g: string, t: (k: string) => string): string {
+  const map: Record<string, string> = {
+    [t('ServislerPage:group_web')]: '🌐',
+    [t('ServislerPage:group_db_cache')]: '🗄️',
+    [t('ServislerPage:group_dns')]: '📡',
+    [t('ServislerPage:group_php_fpm')]: '🐘',
+    [t('ServislerPage:group_other')]: '⚙️',
+  }
+  return map[g] || '•'
 }
 
 export default function ServislerPage() {
+  const { t } = useTranslation('ServislerPage')
   const [liste, setListe] = useState<Servis[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
   const [islemBirim, setIslemBirim] = useState<string | null>(null)
@@ -39,7 +55,7 @@ export default function ServislerPage() {
       const r = await api.get<Servis[]>('/system/servisler')
       setListe(r.data)
     } catch (e) {
-      setHata(apiHata(e, 'Servisler alınamadı'))
+      setHata(apiHata(e, t('ServislerPage:load_failed')))
     } finally {
       setYukleniyor(false)
     }
@@ -50,10 +66,10 @@ export default function ServislerPage() {
     setIslemBirim(s.birim); setHata(null); setBasari(null)
     try {
       await api.post('/system/servis-islem', { birim: s.birim, aksiyon })
-      setBasari(`${s.etiket} ${aksiyon === 'reload' ? 'yeniden yüklendi' : 'yeniden başlatıldı'}.`)
+      setBasari(aksiyon === 'reload' ? t('ServislerPage:reloaded', { name: s.etiket }) : t('ServislerPage:restarted', { name: s.etiket }))
       await getir()
     } catch (e) {
-      setHata(apiHata(e, `${s.etiket} işlemi başarısız`))
+      setHata(apiHata(e, t('ServislerPage:action_failed', { name: s.etiket })))
     } finally {
       setIslemBirim(null)
     }
@@ -70,13 +86,13 @@ export default function ServislerPage() {
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Araçlar & Ayarlar', href: '/araclar-ayarlar' },
-        { etiket: 'Servisler' },
+        { etiket: t('ServislerPage:breadcrumb_settings'), href: '/araclar-ayarlar' },
+        { etiket: t('ServislerPage:breadcrumb_title') },
       ]} />
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Servis Yönetimi</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('ServislerPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Web, veritabanı, DNS ve PHP servislerini buradan yeniden başlatın. Ayar değişikliği sonrası kullanışlıdır.
+          {t('ServislerPage:subtitle')}
         </p>
       </div>
 
@@ -84,13 +100,13 @@ export default function ServislerPage() {
       {basari && <div className="mb-4 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
 
       {yukleniyor ? (
-        <div className="p-8 text-center text-sm text-slate-400">Yükleniyor…</div>
+        <div className="p-8 text-center text-sm text-slate-400">{t('ServislerPage:loading')}</div>
       ) : (
         <div className="space-y-6">
           {gruplar.map(g => (
             <section key={g.ad}>
               <h2 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-1">
-                <span className="text-sm">{GRUP_IKON[g.ad] || '•'}</span>{g.ad}
+                <span className="text-sm">{grupIkon(g.ad, t)}</span>{g.ad}
               </h2>
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -103,18 +119,17 @@ export default function ServislerPage() {
                           <div className="font-medium text-slate-900 dark:text-slate-100">{s.etiket}</div>
                           <div className="text-xs font-mono text-slate-400 dark:text-slate-500">{s.birim}</div>
                         </div>
-                        <span className={`w-28 text-center text-xs px-2.5 py-1 rounded-full font-medium ${DURUM_STIL[s.durum] || DURUM_STIL.inactive}`}>
-                          {DURUM_ETIKET[s.durum] || s.durum}
+                        <span className={`w-28 text-center text-xs px-2.5 py-1 rounded-full font-medium ${durumStil(s.durum, t)}`}>
+                          {durumEtiket(s.durum, t)}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
-                          {/* Reload slotu her satırda yer kaplar → Restart hizalı kalır */}
                           <button disabled={!s.reload || absent || mesgul} onClick={() => islem(s, 'reload')}
                             className={`w-20 px-3 py-1.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition ${s.reload ? '' : 'invisible'}`}>
-                            Reload
+                            {t("ServislerPage:btn_reload")}
                           </button>
                           <button disabled={absent || mesgul} onClick={() => islem(s, 'restart')}
                             className="w-20 px-3.5 py-1.5 text-sm rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition">
-                            {mesgul ? '…' : 'Restart'}
+                            {mesgul ? '…' : t("ServislerPage:btn_restart")}
                           </button>
                         </div>
                       </li>

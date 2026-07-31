@@ -1,0 +1,14 @@
+{
+  "subtitle": "Hosting Control Panel",
+  "welcome": "Welcome",
+  "continue_prompt": "Sign in to continue.",
+  "username": "Username",
+  "password": "Password",
+  "twofa_code": "Two-factor authentication code",
+  "twofa_hint": "Enter the 6-digit code from your authenticator app.",
+  "login_failed": "Login failed",
+  "signing_in": "Signing in…",
+  "verify_and_login": "Verify and sign in",
+  "login": "Sign in",
+  "footer": "SanalCP · version {{version}}"
+}

@@ -1,0 +1,51 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "title": "Zamanlanmış Görevler"
+  },
+  "title": "Zamanlanmış Görevler",
+  "presets": {
+    "everyMinute": "Her dakika",
+    "everyHour": "Her saat",
+    "dailyAt3": "Her gün gece 03:00",
+    "mondayAt9": "Pazartesi 09:00",
+    "every5Min": "Her 5 dakika",
+    "every15Min": "Her 15 dakika",
+    "firstOfMonth": "Ayın 1'i 00:00"
+  },
+  "addTask": "Görev Ekle",
+  "refresh": "↻ Yenile",
+  "taskCount": "{{count}} görev",
+  "confirmDelete": "\"{{command}}...\" görevi silinsin mi?",
+  "errors": {
+    "deleteFailed": "Silme başarısız",
+    "addFailed": "Ekleme başarısız"
+  },
+  "table": {
+    "command": "Komut / Açıklama",
+    "minute": "Dak",
+    "hour": "Saat",
+    "day": "Gün",
+    "month": "Ay",
+    "week": "Hafta",
+    "action": "İşlem",
+    "delete": "Sil"
+  },
+  "empty": "Henüz görev yok. Yukarıdan ekleyin.",
+  "modal": {
+    "title": "Yeni Zamanlanmış Görev",
+    "presetsLabel": "Hazır Şablonlar",
+    "minute": "Dakika",
+    "hour": "Saat",
+    "day": "Gün",
+    "month": "Ay",
+    "week": "Hafta",
+    "cronHint": "Cron biçimi — * her zaman, */5 her 5'te bir, 0,15,30 liste, 9-17 aralık.",
+    "commandLabel": "Komut",
+    "commandPlaceholder": "/usr/bin/php /home/c_user/public_html/cron.php",
+    "descLabel": "Açıklama (opsiyonel)",
+    "descPlaceholder": "örn. Her gece yedek scripti",
+    "adding": "Ekleniyor…",
+    "add": "Ekle"
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -26,6 +27,7 @@ function n(v: number | undefined | null): number {
 }
 
 export default function IstatistiklerPage() {
+  const { t } = useTranslation(['IstatistiklerPage', 'common'])
   const [u, setU] = useState<Usage | null>(null)
   const [s, setS] = useState<Sayilar | null>(null)
   const [hata, setHata] = useState<string | null>(null)
@@ -51,59 +53,59 @@ export default function IstatistiklerPage() {
   return (
     <div className="px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'İstatistikler' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('IstatistiklerPage:breadcrumb_title') },
       ]} />
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">İstatistikler</h1>
-        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">● Canlı (10sn)</span>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('IstatistiklerPage:title')}</h1>
+        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{t('IstatistiklerPage:live_badge')}</span>
       </div>
-      <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">Sunucu kaynak kullanımı, domain sayıları, sistem özeti.</p>
+      <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">{t('IstatistiklerPage:subtitle')}</p>
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
       {/* Sistem metrik 4 kart */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Metrik baslik="CPU" deger={u ? cpu.toFixed(1) + '%' : '–'}
-          alt={u ? `${cekirdek} çekirdek` : ''} renk="indigo" oran={cpu} />
-        <Metrik baslik="Bellek" deger={u ? bellek.toFixed(1) + '%' : '–'}
+        <Metrik baslik={t('IstatistiklerPage:metrics.cpu')} deger={u ? cpu.toFixed(1) + '%' : '–'}
+          alt={u ? `${cekirdek} ${t('IstatistiklerPage:core_suffix')}` : ''} renk="indigo" oran={cpu} />
+        <Metrik baslik={t('IstatistiklerPage:metrics.memory')} deger={u ? bellek.toFixed(1) + '%' : '–'}
           alt={u ? `${fmt(n(u?.bellek?.kullanilan_kb) * 1024)} / ${fmt(n(u?.bellek?.toplam_kb) * 1024)}` : ''}
           renk="emerald" oran={bellek} />
-        <Metrik baslik="Disk" deger={u ? disk.toFixed(1) + '%' : '–'}
+        <Metrik baslik={t('IstatistiklerPage:metrics.disk')} deger={u ? disk.toFixed(1) + '%' : '–'}
           alt={u ? `${fmt(n(u?.disk?.kullanilan_byte))} / ${fmt(n(u?.disk?.toplam_byte))}` : ''}
           renk="violet" oran={disk} />
-        <Metrik baslik="Yük (1dk)" deger={u ? yuk1.toFixed(2) : '–'}
-          alt={u ? `5dk: ${n(u?.cpu?.yuk_5dk).toFixed(2)} · 15dk: ${n(u?.cpu?.yuk_15dk).toFixed(2)}` : ''}
+        <Metrik baslik={t('IstatistiklerPage:metrics.load')} deger={u ? yuk1.toFixed(2) : '–'}
+          alt={u ? t('IstatistiklerPage:load_detail', { v5: n(u?.cpu?.yuk_5dk).toFixed(2), v15: n(u?.cpu?.yuk_15dk).toFixed(2) }) : ''}
           renk="amber" oran={Math.min(100, (yuk1 / cekirdek) * 100)} />
       </div>
 
       {/* Sistem özeti + sayaçlar */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Sistem</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('IstatistiklerPage:system_card.title')}</h3>
           <div className="space-y-1.5 text-sm">
-            <Satir e="Sunucu adı" d={u?.sistem?.hostname || '–'} />
-            <Satir e="İşletim sistemi" d={u?.sistem?.os_adi || '–'} />
-            <Satir e="Çekirdek (kernel)" d={u?.sistem?.kernel || '–'} />
-            <Satir e="İşlemci" d={u?.sistem?.cpu_modeli ? `${u.sistem.cpu_modeli} · ${cekirdek} çekirdek` : '–'} />
-            <Satir e="Swap" d={u?.swap ? `${n(u.swap.yuzde).toFixed(1)}% · ${fmt(n(u.swap.kullanilan_kb) * 1024)} / ${fmt(n(u.swap.toplam_kb) * 1024)}` : '–'} />
-            <Satir e="Panel sürümü" d={u?.sistem?.panel_surum || '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.hostname')} d={u?.sistem?.hostname || '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.os')} d={u?.sistem?.os_adi || '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.kernel')} d={u?.sistem?.kernel || '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.cpu')} d={u?.sistem?.cpu_modeli ? `${u.sistem.cpu_modeli} · ${cekirdek} ${t('IstatistiklerPage:core_suffix')}` : '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.swap')} d={u?.swap ? `${n(u.swap.yuzde).toFixed(1)}% · ${fmt(n(u.swap.kullanilan_kb) * 1024)} / ${fmt(n(u.swap.toplam_kb) * 1024)}` : '–'} />
+            <Satir e={t('IstatistiklerPage:system_card.panel_version')} d={u?.sistem?.panel_surum || '–'} />
           </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Domainler</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('IstatistiklerPage:domains_card.title')}</h3>
           <div className="space-y-1.5 text-sm">
-            <Satir e="Toplam domain" d={s ? String(s.domain) : '–'} />
-            <Satir e="Aktif domain" d={
+            <Satir e={t('IstatistiklerPage:domains_card.total')} d={s ? String(s.domain) : '–'} />
+            <Satir e={t('IstatistiklerPage:domains_card.active')} d={
               <span className="text-emerald-700 dark:text-emerald-300 font-semibold">{s ? s.domain_aktif : 0}</span>
             } />
-            <Satir e="Pasif domain" d={String(s ? s.domain - s.domain_aktif : 0)} />
+            <Satir e={t('IstatistiklerPage:domains_card.inactive')} d={String(s ? s.domain - s.domain_aktif : 0)} />
           </div>
         </div>
       </div>
 
       <div className="text-xs text-slate-400 dark:text-slate-500 text-center mt-6">
-        Daha detaylı izleme için <a href="/izleme" className="text-brand-600 dark:text-brand-400 hover:underline">İzleme</a> sayfasını ziyaret edin.
+        {t('IstatistiklerPage:footer_prefix')} <a href="/izleme" className="text-brand-600 dark:text-brand-400 hover:underline">{t('IstatistiklerPage:footer_link')}</a> {t('IstatistiklerPage:footer_suffix')}
       </div>
     </div>
   )

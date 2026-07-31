@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 // Panel içi güncelleme kartı.
@@ -10,6 +11,7 @@ type Durum = { arac_var: boolean; calisiyor: boolean; durum: string }
 type LogYanit = { log: string; calisiyor: boolean; durum: string }
 
 export default function PanelGuncelleme() {
+  const { t } = useTranslation(['PanelGuncelleme', 'common'])
   const [durum, setDurum] = useState<Durum | null>(null)
   const [log, setLog] = useState('')
   const [calisiyor, setCalisiyor] = useState(false)
@@ -51,10 +53,10 @@ export default function PanelGuncelleme() {
     setHata(null); setBaslatiliyor(true); setOnay(false)
     try {
       await api.post('/system/guncelleme/baslat')
-      setLog('Güncelleme başlatıldı…\n')
+      setLog(t('PanelGuncelleme:log_started'))
       setCalisiyor(true)
     } catch (e: any) {
-      setHata(e?.response?.data?.hata || e?.message || 'güncelleme başlatılamadı')
+      setHata(e?.response?.data?.hata || e?.message || t('PanelGuncelleme:start_failed'))
     } finally { setBaslatiliyor(false) }
   }
 
@@ -64,12 +66,12 @@ export default function PanelGuncelleme() {
         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0 bg-emerald-100 dark:bg-emerald-900/40">⬆️</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Panel Güncellemesi</span>
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Sunucu</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('PanelGuncelleme:title')}</span>
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">{t('PanelGuncelleme:badge_server')}</span>
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
-            Paneli GitHub'daki son sürüme günceller. Veriler (env, veritabanı, siteler) korunur; yeni sürüm sağlıklı başlamazsa otomatik geri alınır.
-            {durum && !durum.arac_var && ' Güncelleme aracı sunucuda yok — ilk çalıştırmada otomatik indirilecek.'}
+            {t('PanelGuncelleme:desc')}
+            {durum && !durum.arac_var && ` ${t('PanelGuncelleme:desc_tool_missing')}`}
           </div>
 
           {hata && <div className="mt-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs">{hata}</div>}
@@ -77,7 +79,7 @@ export default function PanelGuncelleme() {
           {calisiyor && (
             <div className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
               <span className="w-3 h-3 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-              Güncelleme çalışıyor — panel kısa süre yeniden başlayabilir, sayfayı kapatmayın.
+              {t('PanelGuncelleme:running')}
             </div>
           )}
 
@@ -89,17 +91,17 @@ export default function PanelGuncelleme() {
             {!onay ? (
               <button onClick={() => setOnay(true)} disabled={calisiyor || baslatiliyor}
                 className="text-xs px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed">
-                Güncellemeleri denetle ve kur
+                {t('PanelGuncelleme:check_and_install')}
               </button>
             ) : (
               <>
-                <span className="text-xs text-slate-600 dark:text-slate-300">Panel güncellenecek ve servis yeniden başlayacak. Onaylıyor musunuz?</span>
+                <span className="text-xs text-slate-600 dark:text-slate-300">{t('PanelGuncelleme:confirm_prompt')}</span>
                 <button onClick={baslat} disabled={baslatiliyor}
                   className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition font-medium disabled:opacity-40">
-                  {baslatiliyor ? 'Başlatılıyor…' : 'Evet, güncelle'}
+                  {baslatiliyor ? t('PanelGuncelleme:starting') : t('PanelGuncelleme:confirm_yes')}
                 </button>
                 <button onClick={() => setOnay(false)} className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
-                  Vazgeç
+                  {t('common:giveUp')}
                 </button>
               </>
             )}

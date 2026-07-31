@@ -1,0 +1,72 @@
+{
+  "breadcrumb": {
+    "home": "Anasayfa",
+    "title": "Bayi Paketleri"
+  },
+  "title": "Bayi Paketleri",
+  "subtitle": "Bayilere hızlıca uygulayabileceğiniz hazır limit paketleri. Kullanıcılar sayfasında bir bayinin limitlerini düzenlerken buradan seçim yaparsanız değerler anlık olarak kopyalanır — paketi sonradan değiştirmek zaten atanmış bayileri etkilemez.",
+  "buttons": {
+    "add_package": "Paket Ekle"
+  },
+  "loading": "Yükleniyor…",
+  "empty": {
+    "title": "Henüz bayi paketi yok",
+    "description": "İlk paketinizi tanımlayarak başlayın."
+  },
+  "card": {
+    "default_badge": "Varsayılan",
+    "labels": {
+      "customer": "Müşteri",
+      "domain": "Domain",
+      "disk": "Disk",
+      "traffic": "Trafik"
+    },
+    "oversell_enabled": "Fazla satış açık",
+    "oversell_disabled": "Fazla satış kapalı — taahhüt limiti aşamaz",
+    "used_count": "{{count}} bayi bu paketten dolduruldu",
+    "unused": "Henüz kullanılmadı",
+    "actions": {
+      "edit": "Düzenle",
+      "delete": "Sil"
+    }
+  },
+  "confirm": {
+    "title": "Paketi sil",
+    "message": "\"{{ad}}\" bayi paketi silinsin mi?",
+    "yes": "Evet, sil"
+  },
+  "errors": {
+    "delete_failed": "Silme başarısız",
+    "save_failed": "Kayıt başarısız"
+  },
+  "units": {
+    "unlimited": "sınırsız",
+    "count": "adet",
+    "mb": "MB",
+    "mb_per_month": "MB/ay"
+  },
+  "modal": {
+    "title_new": "Yeni Bayi Paketi",
+    "title_edit": "Paketi Düzenle",
+    "fields": {
+      "package_name": "Paket adı",
+      "description": "Açıklama",
+      "max_customer": "Max müşteri",
+      "max_domain": "Max domain",
+      "disk_mb": "Disk (MB)",
+      "traffic_mb_per_month": "Trafik (MB/ay)",
+      "price_kurus": "Fiyat (kuruş)"
+    },
+    "checkboxes": {
+      "default_promoted": "Bayi Limitleri ekranında varsayılan olarak öne çıkar",
+      "allow_oversell": "Fazla satışa izin ver (kapatılırsa bayi, müşterilerine atadığı disk/trafik taahhüdü toplamında bu paketin limitini aşamaz)"
+    },
+    "info_note": "0 = sınırsız. Fiyat yalnız bilgi amaçlıdır, panelin bir fatura/ödeme akışı yoktur.",
+    "buttons": {
+      "cancel": "İptal",
+      "saving": "Kaydediliyor…",
+      "add": "Ekle",
+      "update": "Güncelle"
+    }
+  }
+}

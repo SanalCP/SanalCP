@@ -1,0 +1,62 @@
+{
+  "page_title": "Tools and Settings",
+  "page_subtitle": "Server-wide administration — PHP, system packages, network, security and maintenance.",
+  "breadcrumb_home": "Home",
+  "breadcrumb_current": "Tools and Settings",
+  "search_placeholder": "Search tools…",
+  "search_aria": "Search tools",
+  "section_maintenance": "Server Maintenance",
+  "empty_search_title": "No tools found for \"{{q}}\"",
+  "empty_search_hint": "Change or clear the search term.",
+  "footer_total": "{{count}} tools · server-wide",
+  "groups": {
+    "php": "PHP",
+    "system": "System and Services",
+    "network": "Network and DNS",
+    "security": "Security and Backup"
+  },
+  "tools": {
+    "php_versions": {
+      "title": "PHP Versions",
+      "badge": "Dynamic",
+      "desc": "Add or remove 7.4 → 8.5 versions. Each domain picks its own version."
+    },
+    "php_modules": {
+      "title": "PHP Modules",
+      "desc": "Enable or disable extensions server-wide. PECL package search and build."
+    },
+    "packages": {
+      "title": "Package Manager",
+      "desc": "DNF packages — compilers and runtimes. Ready-made install groups."
+    },
+    "services": {
+      "title": "Services",
+      "desc": "Nginx / Apache / MariaDB / DNS / PHP-FPM status and restart."
+    },
+    "plans": {
+      "title": "Hosting Plans",
+      "desc": "Hosting packages; disk, database and FTP quotas."
+    },
+    "dns_template": {
+      "title": "DNS Template",
+      "badge": "Centralized",
+      "desc": "Centralized DNS records (A/MX/SPF/DMARC/DKIM) + SOA applied to new domains."
+    },
+    "domains": {
+      "title": "Domains",
+      "desc": "Full domain list, search and quick access."
+    },
+    "firewall": {
+      "title": "Firewall",
+      "desc": "IP/port blocking, whitelist, port closing. Critical ports are protected."
+    },
+    "backup": {
+      "title": "Backup Manager",
+      "desc": "All domain backups + size, one-click backup. S3/SFTP targets."
+    },
+    "monitor": {
+      "title": "Monitoring and Logs",
+      "desc": "CPU/RAM/disk charts and server logs (panel/nginx/SSH…)."
+    }
+  }
+}

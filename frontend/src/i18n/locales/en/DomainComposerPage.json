@@ -1,0 +1,16 @@
+{
+  "breadcrumb_title": "Composer",
+  "title": "PHP Composer",
+  "run_context": "Runs in {{dizin}} as {{kullanici}}.",
+  "not_installed": "Composer is not installed on the server. It needs to be installed by an administrator.",
+  "composer_json_found": "✓ composer.json found",
+  "composer_json_missing": "no composer.json",
+  "package_placeholder": "vendor/package or vendor/package:^1.2",
+  "back_to_subscription": "← Back to subscription",
+  "run_failed": "Could not run",
+  "running": "Running…",
+  "output_no_output": "(no output)",
+  "output_done": "✓ Completed",
+  "output_failed": "✗ Finished with an error",
+  "not_found": "Not found"
+}

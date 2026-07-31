@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
 type Durum = {
@@ -8,6 +9,7 @@ type Durum = {
 }
 
 export default function HostnameAyari() {
+  const { t } = useTranslation(['HostnameAyari'])
   const [durum, setDurum] = useState<Durum | null>(null)
   const [hostname, setHostname] = useState('')
   const [kaydediliyor, setKaydediliyor] = useState(false)
@@ -20,9 +22,9 @@ export default function HostnameAyari() {
       setDurum(data)
       setHostname(data.hostname)
     } catch (e) {
-      setHata(apiHata(e, 'Hostname okunamadı'))
+      setHata(apiHata(e, t('HostnameAyari:load_failed')))
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { void yukle() }, [yukle])
 
@@ -34,9 +36,9 @@ export default function HostnameAyari() {
       const { data } = await api.put<Durum>('/system/hostname', { hostname: hostname.trim() })
       setDurum(data)
       setHostname(data.hostname)
-      setBasari(`Hostname “${data.hostname}” olarak değiştirildi ve kalıcı hale getirildi.`)
+      setBasari(t('HostnameAyari:saved', { hostname: data.hostname }))
     } catch (e) {
-      setHata(apiHata(e, 'Hostname değiştirilemedi'))
+      setHata(apiHata(e, t('HostnameAyari:save_failed')))
     } finally {
       setKaydediliyor(false)
     }
@@ -52,20 +54,19 @@ export default function HostnameAyari() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Sunucu Hostname</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('HostnameAyari:label')}</span>
             {durum && (
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
                 durum.korumali
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                   : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
               }`}>
-                {durum.korumali ? 'Sağlayıcıya karşı korumalı' : 'Koruma bekliyor'}
+                {durum.korumali ? t('HostnameAyari:protected') : t('HostnameAyari:unprotected')}
               </span>
             )}
           </div>
           <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            Sistem hostname’ini kalıcı olarak değiştirir. Cloud-init ve DHCP/NetworkManager’ın VPS sağlayıcısından gelen otomatik adı yeniden yazması engellenir.
-            Tam alan adı kullanmanız önerilir: <code className="text-[11px]">server1.ornek.com</code>
+            {t('HostnameAyari:desc')} <code className="text-[11px]">server1.ornek.com</code>
           </p>
 
           {hata && <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-300">{hata}</div>}
@@ -88,7 +89,7 @@ export default function HostnameAyari() {
               disabled={kaydediliyor || !hostname.trim() || hostname.trim().toLowerCase() === durum?.hostname.toLowerCase()}
               className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {kaydediliyor ? 'Uygulanıyor…' : 'Hostname’i Değiştir'}
+              {kaydediliyor ? t('HostnameAyari:saving') : t('HostnameAyari:submit')}
             </button>
           </div>
         </div>

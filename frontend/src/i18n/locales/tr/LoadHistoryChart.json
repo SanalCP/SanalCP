@@ -1,0 +1,14 @@
+{
+  "range_1h": "1sa",
+  "range_6h": "6sa",
+  "range_24h": "24sa",
+  "range_7d": "7g",
+  "title": "Sistem Yükü Geçmişi",
+  "subtitle": "Load average (1 / 5 / 15 dk)",
+  "cores_suffix": " · {{count}} çekirdek",
+  "min1": "1 dk",
+  "min5": "5 dk",
+  "min15": "15 dk",
+  "cores_label": "{{count}} çekirdek",
+  "no_data": "Henüz veri toplanmadı — örnekler her dakika kaydedilir, birkaç dakika içinde grafik dolar."
+}

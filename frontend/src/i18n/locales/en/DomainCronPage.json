@@ -1,0 +1,51 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "title": "Scheduled Tasks"
+  },
+  "title": "Scheduled Tasks",
+  "presets": {
+    "everyMinute": "Every minute",
+    "everyHour": "Every hour",
+    "dailyAt3": "Every day at 03:00",
+    "mondayAt9": "Monday 09:00",
+    "every5Min": "Every 5 minutes",
+    "every15Min": "Every 15 minutes",
+    "firstOfMonth": "1st of month 00:00"
+  },
+  "addTask": "Add Task",
+  "refresh": "↻ Refresh",
+  "taskCount": "{{count}} task(s)",
+  "confirmDelete": "Delete task \"{{command}}...\"?",
+  "errors": {
+    "deleteFailed": "Delete failed",
+    "addFailed": "Failed to add"
+  },
+  "table": {
+    "command": "Command / Description",
+    "minute": "Min",
+    "hour": "Hour",
+    "day": "Day",
+    "month": "Month",
+    "week": "Week",
+    "action": "Action",
+    "delete": "Delete"
+  },
+  "empty": "No tasks yet. Add one above.",
+  "modal": {
+    "title": "New Scheduled Task",
+    "presetsLabel": "Presets",
+    "minute": "Minute",
+    "hour": "Hour",
+    "day": "Day",
+    "month": "Month",
+    "week": "Week",
+    "cronHint": "Cron format — * always, */5 every 5th, 0,15,30 list, 9-17 range.",
+    "commandLabel": "Command",
+    "commandPlaceholder": "/usr/bin/php /home/c_user/public_html/cron.php",
+    "descLabel": "Description (optional)",
+    "descPlaceholder": "e.g. Nightly backup script",
+    "adding": "Adding…",
+    "add": "Add"
+  }
+}

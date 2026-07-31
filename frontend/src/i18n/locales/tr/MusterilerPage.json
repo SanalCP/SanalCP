@@ -1,0 +1,59 @@
+{
+  "breadcrumb_title": "Müşteriler",
+  "title": "Müşteriler",
+  "subtitle": "Fatura ve iletişim kayıtları. Domainler bu kayıtlara bağlanır — panel giriş hesabı değildir.",
+  "toolbar_new": "Yeni Müşteri",
+  "error": {
+    "load_failed": "Müşteriler alınamadı",
+    "name_email_required": "Ad ve e-posta zorunlu",
+    "save_failed": "Kaydedilemedi",
+    "delete_failed": "Silinemedi"
+  },
+  "success": {
+    "added": "{{name}} eklendi.",
+    "updated": "{{name}} güncellendi.",
+    "deleted": "{{name}} silindi."
+  },
+  "empty": {
+    "title": "Henüz müşteri kaydı yok",
+    "description": "Domainleri bir müşteriye bağlamak için önce müşteri kaydı oluşturun."
+  },
+  "search_empty": "Aramayla eşleşen müşteri yok.",
+  "table": {
+    "name": "Ad",
+    "email": "E-posta",
+    "plan": "Plan",
+    "status": "Durum",
+    "created": "Kayıt"
+  },
+  "status": {
+    "active": "Aktif",
+    "inactive": "Pasif"
+  },
+  "actions": {
+    "edit": "Düzenle",
+    "delete": "Sil"
+  },
+  "modal": {
+    "title_edit": "Müşteriyi Düzenle",
+    "title_new": "Yeni Müşteri"
+  },
+  "fields": {
+    "name": "Ad",
+    "email": "E-posta",
+    "plan": "Plan",
+    "plan_none": "Plansız",
+    "status": "Durum",
+    "notes": "Notlar"
+  },
+  "buttons": {
+    "cancel": "Vazgeç",
+    "saving": "Kaydediliyor…",
+    "save": "Kaydet"
+  },
+  "confirm": {
+    "title": "Müşteriyi sil",
+    "message": "{{name}} kaydı silinecek. Bu müşteriye bağlı domainler silinmez, yalnız bağlantıları kopar.",
+    "yes": "Sil"
+  }
+}

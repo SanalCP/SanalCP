@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 type Nokta = { ts: string; yuk1: number; yuk5: number; yuk15: number; bellek: number }
 type Yanit = { saat: number; cekirdek: number; noktalar: Nokta[] }
 
-const ARALIKLAR = [
-  { et: '1sa', saat: 1 },
-  { et: '6sa', saat: 6 },
-  { et: '24sa', saat: 24 },
-  { et: '7g', saat: 168 },
-]
+function araliklar(t: (k: string) => string) {
+  return [
+    { et: t('LoadHistoryChart:range_1h'), saat: 1 },
+    { et: t('LoadHistoryChart:range_6h'), saat: 6 },
+    { et: t('LoadHistoryChart:range_24h'), saat: 24 },
+    { et: t('LoadHistoryChart:range_7d'), saat: 168 },
+  ]
+}
 
 // SVG düzlemi
 const W = 1000, H = 260, ML = 44, MR = 14, MT = 14, MB = 28
 
 export default function LoadHistoryChart() {
+  const { t } = useTranslation(['LoadHistoryChart'])
+  const ARALIKLAR = araliklar(t)
   const [saat, setSaat] = useState(24)
   const [d, setD] = useState<Yanit | null>(null)
   const [yetkiYok, setYetkiYok] = useState(false)
@@ -64,9 +69,9 @@ export default function LoadHistoryChart() {
     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Sistem Yükü Geçmişi</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('LoadHistoryChart:title')}</h3>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            Load average (1 / 5 / 15 dk){cek ? ` · ${cek} çekirdek` : ''}
+            {t('LoadHistoryChart:subtitle')}{cek ? t('LoadHistoryChart:cores_suffix', { count: cek }) : ''}
           </p>
         </div>
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/50 rounded-lg p-0.5">
@@ -84,16 +89,16 @@ export default function LoadHistoryChart() {
       {/* anlık değerler */}
       {son && (
         <div className="flex flex-wrap gap-4 mb-3 text-xs">
-          <Deger renk="#6366f1" etiket="1 dk" v={son.yuk1} cek={cek} />
-          <Deger renk="#f59e0b" etiket="5 dk" v={son.yuk5} cek={cek} />
-          <Deger renk="#94a3b8" etiket="15 dk" v={son.yuk15} cek={cek} />
+          <Deger renk="#6366f1" etiket={t('LoadHistoryChart:min1')} v={son.yuk1} cek={cek} />
+          <Deger renk="#f59e0b" etiket={t('LoadHistoryChart:min5')} v={son.yuk5} cek={cek} />
+          <Deger renk="#94a3b8" etiket={t('LoadHistoryChart:min15')} v={son.yuk15} cek={cek} />
         </div>
       )}
 
       {pts.length === 0 ? (
         <div className="h-[220px] flex flex-col items-center justify-center text-center text-sm text-slate-400 dark:text-slate-500">
           <div className="text-2xl mb-2">📈</div>
-          Henüz veri toplanmadı — örnekler her dakika kaydedilir, birkaç dakika içinde grafik dolar.
+          {t('LoadHistoryChart:no_data')}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -115,7 +120,7 @@ export default function LoadHistoryChart() {
             {cek > 0 && cek <= yMax && (
               <g>
                 <line x1={ML} y1={yAt(cek)} x2={W - MR} y2={yAt(cek)} stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" opacity="0.6" />
-                <text x={W - MR} y={yAt(cek) - 4} textAnchor="end" fill="#ef4444" fontSize="10" opacity="0.8">{cek} çekirdek</text>
+                <text x={W - MR} y={yAt(cek) - 4} textAnchor="end" fill="#ef4444" fontSize="10" opacity="0.8">{t('LoadHistoryChart:cores_label', { count: cek })}</text>
               </g>
             )}
             {/* X etiketleri */}

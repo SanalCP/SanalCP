@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
@@ -23,7 +24,7 @@ const DILLER: { kod: Dil; ad: string; uzantilar: string[] }[] = [
   { kod: 'md',   ad: 'Markdown',   uzantilar: ['md', 'markdown'] },
   { kod: 'sql',  ad: 'SQL',        uzantilar: ['sql'] },
   { kod: 'xml',  ad: 'XML',        uzantilar: ['xml', 'svg'] },
-  { kod: 'text', ad: 'Düz Metin',  uzantilar: ['txt', 'log', 'ini', 'conf', 'env'] },
+  { kod: 'text', ad: '',           uzantilar: ['txt', 'log', 'ini', 'conf', 'env'] },
 ]
 
 function dilTespit(yol: string): Dil {
@@ -57,6 +58,8 @@ interface Props {
 }
 
 export default function KodEditor({ yol, icerik, onChange, onKaydet, onKapat }: Props) {
+  const { t } = useTranslation(['KodEditor'])
+  const dilAdi = (d: { kod: Dil; ad: string }) => d.kod === 'text' ? t('KodEditor:lang_plain_text') : d.ad
   const [tamEkran, setTamEkran] = useState(false)
   const [dil, setDil] = useState<Dil>(() => dilTespit(yol))
   const [kayitDurum, setKayitDurum] = useState<'temiz' | 'kirli' | 'kaydediliyor' | 'kaydedildi'>('temiz')
@@ -136,9 +139,9 @@ export default function KodEditor({ yol, icerik, onChange, onKaydet, onKapat }: 
             </svg>
             <span className="text-sm font-semibold text-slate-100 truncate">{dosyaAdi}</span>
             <span className="text-xs text-slate-500 dark:text-slate-500 truncate min-w-0 hidden md:inline">— {yol}</span>
-            {kayitDurum === 'kirli' && <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">Değişiklik var</span>}
-            {kayitDurum === 'kaydediliyor' && <span className="text-[10px] uppercase tracking-wider text-sky-400 bg-sky-500/15 px-1.5 py-0.5 rounded">Kaydediliyor…</span>}
-            {kayitDurum === 'kaydedildi' && <span className="text-[10px] uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded">✓ Kaydedildi</span>}
+            {kayitDurum === 'kirli' && <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded">{t('KodEditor:status_dirty')}</span>}
+            {kayitDurum === 'kaydediliyor' && <span className="text-[10px] uppercase tracking-wider text-sky-400 bg-sky-500/15 px-1.5 py-0.5 rounded">{t('KodEditor:status_saving')}</span>}
+            {kayitDurum === 'kaydedildi' && <span className="text-[10px] uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded">{t('KodEditor:status_saved')}</span>}
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -146,14 +149,14 @@ export default function KodEditor({ yol, icerik, onChange, onKaydet, onKapat }: 
               value={dil}
               onChange={e => setDil(e.target.value as Dil)}
               className="text-xs bg-slate-700 text-slate-100 border border-slate-600 rounded px-2 py-1 focus:outline-none focus:border-slate-400"
-              title="Sözdizimi"
+              title={t('KodEditor:syntax_title')}
             >
-              {DILLER.map(d => <option key={d.kod} value={d.kod}>{d.ad}</option>)}
+              {DILLER.map(d => <option key={d.kod} value={d.kod}>{dilAdi(d)}</option>)}
             </select>
             <button
               onClick={() => setTamEkran(!tamEkran)}
               className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded"
-              title={tamEkran ? 'Pencerele' : 'Tam ekran'}
+              title={tamEkran ? t('KodEditor:windowed') : t('KodEditor:fullscreen')}
             >
               {tamEkran ? '⛶' : '⛶'}
             </button>
@@ -161,16 +164,16 @@ export default function KodEditor({ yol, icerik, onChange, onKaydet, onKapat }: 
               onClick={kaydet}
               disabled={kayitDurum === 'kaydediliyor' || kayitDurum === 'temiz'}
               className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:text-slate-500 dark:text-slate-500 text-white rounded font-medium"
-              title="Ctrl+S"
+              title={t('KodEditor:save_shortcut_title')}
             >
-              💾 Kaydet
+              {t('KodEditor:save')}
             </button>
             <button
               onClick={onKapat}
               className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded"
-              title="ESC"
+              title={t('KodEditor:close_shortcut_title')}
             >
-              Kapat
+              {t('KodEditor:close')}
             </button>
           </div>
         </div>

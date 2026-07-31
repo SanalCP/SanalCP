@@ -1,0 +1,139 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "files": "Dosyalar"
+  },
+  "title": "Dosya Yöneticisi",
+  "dragDrop": {
+    "title": "Dosyaları buraya bırak",
+    "target": "Hedef dizin:"
+  },
+  "selection": {
+    "selected": "{{count}} öğe seçili",
+    "rightClickHint": "Sağ tık ile işlemler",
+    "delete": "Sil ({{count}})",
+    "clear": "Seçimi temizle"
+  },
+  "newMenu": {
+    "button": "Yeni",
+    "upload": "📤 Dosya Yükle",
+    "newFolder": "📁 Yeni Klasör",
+    "newFile": "📄 Yeni Dosya"
+  },
+  "toolbar": {
+    "refresh": "Yenile",
+    "resetPerms": "Dosya İzinlerini Sıfırla",
+    "resetPermsTitle": "public_html'i klasör 750 / dosya 644 varsayılanına döndürür",
+    "resetting": "Sıfırlanıyor…",
+    "searchPlaceholder": "🔍 Dosya ara…",
+    "itemCount": "{{count}} öğe",
+    "remaining": "Kalan: {{time}}"
+  },
+  "table": {
+    "name": "Ad",
+    "size": "Boyut",
+    "permissions": "Yetkiler",
+    "owner": "Kullanıcı",
+    "group": "Grup",
+    "modified": "Değişiklik",
+    "loading": "Yükleniyor…",
+    "parentDir": "↑ üst klasör",
+    "empty": "Bu klasör boş",
+    "actions": "İşlemler",
+    "actionsFor": "{{name}} işlemleri"
+  },
+  "sizeModal": {
+    "title": "📏 Boyut Bilgisi",
+    "bytes": "bayt",
+    "ok": "Tamam"
+  },
+  "resetConfirm": {
+    "title": "⚠ Dosya İzinlerini Sıfırla",
+    "body": "public_html altındaki tüm klasör ve dosyaların izinleri varsayılana döndürülecek: klasörler 750, dosyalar 644, sahiplik {{owner}}. Elle özelleştirdiğiniz izinler (ör. bir betiği çalıştırılabilir yaptıysanız) kaybolur.",
+    "confirm": "Evet, Sıfırla"
+  },
+  "resetDone": {
+    "title": "✓ İzinler Sıfırlandı",
+    "body": "public_html altındaki tüm klasör ve dosyalar varsayılana döndürüldü: klasörler 750, dosyalar 644, sahiplik {{owner}}."
+  },
+  "bulkDeleteConfirm": {
+    "title": "⚠ Toplu Silme",
+    "body": "{{count}} öğe geri dönüşsüz silinecek. Klasörler içerdiği dosyalarla birlikte silinir.",
+    "more": "+ {{count}} daha…",
+    "confirm": "Evet, Sil"
+  },
+  "contextMenu": {
+    "open": "Aç",
+    "openInBrowser": "Tarayıcıda Aç",
+    "edit": "Düzenle",
+    "download": "İndir",
+    "extract": "Arşivi Aç",
+    "rename": "Yeniden Adlandır",
+    "permissions": "İzinler",
+    "calcSize": "Boyut Hesapla",
+    "copy": "Kopyala",
+    "move": "Taşı",
+    "addToArchive": "Arşive Ekle",
+    "delete": "Sil"
+  },
+  "renameModal": {
+    "title": "Yeniden Adlandır",
+    "confirm": "Adlandır"
+  },
+  "chmodModal": {
+    "title": "İzinler",
+    "owner": "Sahip",
+    "group": "Grup",
+    "other": "Diğer",
+    "read": "Oku",
+    "write": "Yaz",
+    "execute": "Çalıştır",
+    "octal": "Octal:",
+    "apply": "Uygula"
+  },
+  "copyMoveModal": {
+    "titleCopy": "Kopyala",
+    "titleMove": "Taşı",
+    "more": "+ {{count}} daha…",
+    "targetLabel": "Hedef dizin (home altında)",
+    "targetPlaceholder": "/public_html/yedek",
+    "hintExists": "Hedefin var olması gerekir.",
+    "hintCopy": "Klasörler içerikleriyle kopyalanır.",
+    "hintMove": "Aynı diskte taşıma anlık."
+  },
+  "archiveModal": {
+    "title": "📦 Arşive Ekle ({{count}} öğe)",
+    "filename": "Dosya adı",
+    "format": "Format",
+    "output": "Çıktı:",
+    "submit": "Arşivle"
+  },
+  "newFileModal": {
+    "title": "📄 Yeni Dosya",
+    "filename": "Dosya adı (uzantı dahil)",
+    "hint": "Boş dosya oluşturulur, ardından kod editörü açılır.",
+    "submit": "Oluştur ve Düzenle"
+  },
+  "confirmDelete": "\"{{name}}\" silinsin mi? Bu işlem geri alınamaz.",
+  "newFolderPrompt": "Yeni klasör adı:",
+  "errors": {
+    "deleteFailed": "Silme başarısız",
+    "mkdirFailed": "Klasör oluşturma başarısız",
+    "openFailed": "Açılamadı",
+    "saveFailed": "Kaydedilemedi",
+    "renameFailed": "Yeniden adlandırılamadı",
+    "chmodFailed": "İzin değiştirilemedi",
+    "uploadPartial": "{{ok}}/{{total}} dosya yüklendi, bazıları başarısız oldu.",
+    "deletePartial": "{{ok}}/{{total}} silindi.",
+    "extractFailed": "Açılamadı (zip/tar/rar destek vardır)",
+    "searchFailed": "Arama başarısız",
+    "someErrors": "Bazı hatalar: {{list}}",
+    "copyFailed": "Kopyalama hata",
+    "moveFailed": "Taşıma hata",
+    "archiveFailed": "Arşivleme hata",
+    "createFailed": "Oluşturma hata",
+    "sizeFailed": "Boyut hesabi hata",
+    "downloadFailed": "İndirme başarısız: {{msg}}",
+    "resetPermsFailed": "İzinler sıfırlanamadı"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "not_ready_suffix": "Not Ready",
+  "wip_title": "Under construction",
+  "wip_desc": "This module will go live in the {{faz}} phase. Only the interface skeleton is shown for now."
+}

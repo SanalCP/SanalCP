@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -20,6 +21,7 @@ type GHConn = {
 type GHRepo = { full_name: string; name: string; description?: string; private: boolean; default_branch: string; updated_at: string }
 
 export default function DomainGitPage() {
+  const { t } = useTranslation(['DomainGitPage', 'common'])
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [repo, setRepo] = useState<Repo | null>(null)
@@ -65,15 +67,15 @@ export default function DomainGitPage() {
   useEffect(yukle, [id])
 
   async function ghConnect() {
-    if (!ghToken.trim()) { setHata('GitHub PAT zorunlu'); return }
+    if (!ghToken.trim()) { setHata(t('DomainGitPage:github.token_required')); return }
     setGhYukluyor(true); setHata(null); setBasari(null)
     try {
       const r = await api.post<GHConn>(`/domains/${id}/github/connect`, { token: ghToken.trim() })
       setGhConn(r.data); setGhToken('')
-      setBasari(`GitHub bağlandı: @${r.data.login}`)
+      setBasari(t('DomainGitPage:github.connected', { login: r.data.login }))
       ghLoadRepos()
     } catch (e) {
-      setHata(apiHata(e, 'GitHub bağlantı başarısız'))
+      setHata(apiHata(e, t('DomainGitPage:github.connect_failed')))
     } finally { setGhYukluyor(false) }
   }
 
@@ -82,7 +84,7 @@ export default function DomainGitPage() {
       const r = await api.get<GHRepo[]>(`/domains/${id}/github/repos`)
       setGhRepos(r.data || [])
     } catch (e) {
-      setHata(apiHata(e, 'Repo listesi alınamadı'))
+      setHata(apiHata(e, t('DomainGitPage:github.repos_load_failed')))
     }
   }
 

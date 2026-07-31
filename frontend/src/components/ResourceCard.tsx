@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 type Usage = {
@@ -13,6 +14,7 @@ type Usage = {
 type Saglik = { durum: string; surum: string; zaman: string }
 
 export default function ResourceCard() {
+  const { t } = useTranslation(['ResourceCard'])
   const [u, setU] = useState<Usage | null>(null)
   const [s, setS] = useState<Saglik | null>(null)
 
@@ -37,53 +39,53 @@ export default function ResourceCard() {
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center justify-between">
-          Kaynak Kullanımı
-          {u && <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 uppercase tracking-wider">canlı</span>}
+          {t('ResourceCard:resource_usage')}
+          {u && <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t('ResourceCard:live')}</span>}
         </h3>
 
         {!u ? (
-          <div className="text-sm text-slate-400 dark:text-slate-500 py-6 text-center">Yükleniyor…</div>
+          <div className="text-sm text-slate-400 dark:text-slate-500 py-6 text-center">{t('common:loading')}</div>
         ) : (
           <>
             <Cubuk
-              etiket="CPU"
+              etiket={t('ResourceCard:cpu')}
               yuzde={u.cpu.yuzde}
-              alt={`${u.cpu.cekirdek} çekirdek · yük ${u.cpu.yuk_1dk.toFixed(2)} / ${u.cpu.yuk_5dk.toFixed(2)} / ${u.cpu.yuk_15dk.toFixed(2)}`}
+              alt={t('ResourceCard:cpu_detail', { cores: u.cpu.cekirdek, l1: u.cpu.yuk_1dk.toFixed(2), l5: u.cpu.yuk_5dk.toFixed(2), l15: u.cpu.yuk_15dk.toFixed(2) })}
               renk="brand"
             />
             <Cubuk
-              etiket="Bellek"
+              etiket={t('ResourceCard:memory')}
               yuzde={u.bellek.yuzde}
               alt={`${(u.bellek.kullanilan_kb / 1024).toFixed(0)} MB / ${(u.bellek.toplam_kb / 1024).toFixed(0)} MB`}
               renk="emerald"
             />
             <Cubuk
-              etiket="Disk"
+              etiket={t('ResourceCard:disk')}
               yuzde={u.disk.yuzde}
               alt={`${(u.disk.kullanilan_byte / 1e9).toFixed(1)} GB / ${(u.disk.toplam_byte / 1e9).toFixed(1)} GB`}
               renk="violet"
             />
             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-500 flex justify-between">
-              <span>Çalışma süresi</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">{formatUptime(u.uptime_sn)}</span>
+              <span>{t('ResourceCard:uptime')}</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">{formatUptime(u.uptime_sn, t)}</span>
             </div>
           </>
         )}
       </div>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Sistem Durumu</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('ResourceCard:system_status')}</h3>
         {!s ? (
-          <div className="text-sm text-slate-400 dark:text-slate-500">Bekleniyor…</div>
+          <div className="text-sm text-slate-400 dark:text-slate-500">{t('ResourceCard:waiting')}</div>
         ) : (
           <div className="space-y-2 text-sm">
             <Satir
-              etiket="Backend"
-              deger={s.durum === 'ayakta' ? 'Çalışıyor' : s.durum}
+              etiket={t('ResourceCard:backend')}
+              deger={s.durum === 'ayakta' ? t('ResourceCard:running') : s.durum}
               ok={s.durum === 'ayakta'}
             />
-            <Satir etiket="Sürüm" deger={s.surum} ok />
-            <Satir etiket="Saat" deger={new Date(s.zaman).toLocaleTimeString('tr-TR')} ok />
+            <Satir etiket={t('ResourceCard:version')} deger={s.surum} ok />
+            <Satir etiket={t('ResourceCard:time')} deger={new Date(s.zaman).toLocaleTimeString(t('ResourceCard:locale'))} ok />
           </div>
         )}
       </div>
@@ -124,11 +126,12 @@ function Satir({ etiket, deger, ok }: { etiket: string; deger: string; ok: boole
   )
 }
 
-function formatUptime(sn: number): string {
+function formatUptime(sn: number, t: (k: string) => string): string {
   const gun = Math.floor(sn / 86400)
   const saat = Math.floor((sn % 86400) / 3600)
   const dk = Math.floor((sn % 3600) / 60)
-  if (gun > 0) return `${gun}g ${saat}sa`
-  if (saat > 0) return `${saat}sa ${dk}dk`
-  return `${dk}dk`
+  const g = t('ResourceCard:unit_day'), s = t('ResourceCard:unit_hour'), d = t('ResourceCard:unit_min')
+  if (gun > 0) return `${gun}${g} ${saat}${s}`
+  if (saat > 0) return `${saat}${s} ${dk}${d}`
+  return `${dk}${d}`
 }

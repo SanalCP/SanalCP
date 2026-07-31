@@ -1,0 +1,105 @@
+{
+  "breadcrumb": "Kullanıcılar",
+  "title": "Kullanıcılar",
+  "subtitle_admin": "Panel hesapları: yöneticiler, bayiler ve müşteriler.",
+  "subtitle_reseller": "Açtığınız müşteri hesapları.",
+  "new_account": "Yeni Hesap",
+  "new_customer": "Yeni Müşteri",
+  "error": {
+    "load": "Hesaplar alınamadı",
+    "create": "Hesap oluşturulamadı",
+    "password_reset": "Parola sıfırlanamadı",
+    "limits_load": "Limitler okunamadı",
+    "limits_save": "Limitler kaydedilemedi",
+    "status_change": "Durum değiştirilemedi",
+    "delete": "Silinemedi"
+  },
+  "success": {
+    "created": "{{name}} hesabı oluşturuldu.",
+    "password_updated": "{{name}} parolası güncellendi.",
+    "limits_updated": "{{name}} limitleri güncellendi.",
+    "activated": "{{name}} etkinleştirildi.",
+    "suspended": "{{name}} askıya alındı.",
+    "deleted": "{{name}} silindi."
+  },
+  "empty": {
+    "title_admin": "Henüz başka hesap yok",
+    "title_reseller": "Henüz müşteri hesabınız yok",
+    "desc": "Yeni hesap oluşturarak başlayın.",
+    "no_search_results": "Aramayla eşleşen hesap yok."
+  },
+  "roles": {
+    "admin": "Yönetici",
+    "reseller": "Bayi",
+    "user": "Müşteri"
+  },
+  "table": {
+    "user": "Kullanıcı",
+    "full_name": "Ad Soyad",
+    "role": "Rol",
+    "status": "Durum",
+    "twofa": "2FA",
+    "last_login": "Son Giriş",
+    "system_tag": "(sistem)",
+    "system_account": "sistem hesabı",
+    "active": "Aktif",
+    "suspended": "Askıda",
+    "no_password": "Parola yok",
+    "no_password_title": "Parola atanmamış — bu hesap giriş yapamaz",
+    "twofa_on": "Açık",
+    "twofa_off": "Kapalı",
+    "password_btn": "Parola",
+    "limits_btn": "Limitler",
+    "suspend": "Askıya al",
+    "activate": "Etkinleştir"
+  },
+  "modal_new": {
+    "title_admin": "Yeni Hesap",
+    "title_reseller": "Yeni Müşteri Hesabı",
+    "username": "Kullanıcı adı",
+    "username_placeholder": "ornek_bayi",
+    "username_hint": "3-32 karakter, küçük harfle başlar; harf, rakam, _ ve - içerebilir.",
+    "password": "Parola",
+    "password_hint": "En az 8 karakter. Parola yalnız şimdi görünür — kullanıcıya iletin.",
+    "role": "Rol",
+    "role_hint_reseller": "Bayiler yalnız müşteri hesabı açabilir.",
+    "full_name": "Ad Soyad"
+  },
+  "modal_password": {
+    "title": "Parola Belirle",
+    "desc_suffix": "için yeni parola.",
+    "user_hint": "Bu müşterinin panel hesabı parolası. Müşteri panele yalnızca bu kullanıcı adı ve parolayla girebilir; parola atanmadan giriş yapamaz.",
+    "placeholder": "En az 8 karakter",
+    "submit": "Parolayı Belirle"
+  },
+  "modal_limits": {
+    "title": "Bayi Limitleri",
+    "desc_suffix": "için üst sınırlar.",
+    "zero_unlimited": "0 = sınırsız.",
+    "zero_hint": "İkisi de 0 ise limit kaydı tamamen kaldırılır.",
+    "package": "Bayi paketi",
+    "manual_option": "Elle gir",
+    "package_filled_hint": "Aşağıdaki 4 alan \"{{name}}\" paketinden dolduruldu; değiştirmek için \"Elle gir\"i seçin.",
+    "package_manual_hint": "Bir paket seçmezseniz limitleri elle girersiniz.",
+    "max_customer": "En fazla müşteri",
+    "in_use": "şu an {{n}} kullanılıyor",
+    "below_usage": "— limit mevcut kullanımın altında",
+    "max_domain": "En fazla domain",
+    "disk_quota": "Disk kotası (MB)",
+    "in_use_mb": "şu an {{n}} MB kullanılıyor",
+    "traffic_quota": "Trafik kotası (MB/ay)",
+    "overselling": "Fazla satışa izin ver",
+    "overselling_hint": "Kapatılırsa bayi, müşterilerine atadığı disk/trafik taahhüdü toplamında disk/trafik kotasını aşamaz (WHM'in \"Overselling\" ayarının karşılığı).",
+    "plans_label": "Müşteriye atayabileceği hizmet planları",
+    "plans_empty": "Hizmet planı tanımlı değil.",
+    "plans_hint": "Hiçbiri işaretli değilse kısıt yok — bayi tüm hizmet planlarını kullanabilir.",
+    "no_limit_defined": "Bu bayi için tanımlı limit yok — şu anda sınırsız.",
+    "footer_hint": "Limitin altına düşmek mevcut hesapları silmez ve siteleri kesmez; yalnız yeni müşteri/domain eklemeyi engeller. Disk ve trafik son ölçüme dayanır."
+  },
+  "confirm_delete": {
+    "title": "Hesabı sil",
+    "message": "{{name}} hesabı silinecek.{{extra}}",
+    "message_reseller_extra": " Bu bayinin altındaki hesaplar silinmez, yöneticiye devredilir.",
+    "confirm": "Sil"
+  }
+}

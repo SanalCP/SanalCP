@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
@@ -23,6 +24,7 @@ type GetResp = { plan: Plan; domain_sayisi: number }
 type Surum = { surum: string; aciklama?: string }
 
 export default function PaketDetayPage() {
+  const { t } = useTranslation(['PaketDetayPage', 'common'])
   const { id } = useParams()
   const [plan, setPlan] = useState<Plan | null>(null)
   const [domainSayisi, setDomainSayisi] = useState(0)
@@ -56,11 +58,11 @@ export default function PaketDetayPage() {
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
       await api.put(`/plans/${id}`, plan)
-      setBasari(`"${plan.ad}" kaydedildi. Atanmış domainlere uygulamak için aşağıdan “Yeniden Uygula”.`)
+      setBasari(t('PaketDetayPage:save_success', { name: plan.ad }))
       setTimeout(() => setBasari(null), 6000)
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'Kaydetme başarısız'))
+      setHata(apiHata(e, t('PaketDetayPage:save_failed')))
     } finally {
       setIsleniyor(false)
     }
@@ -71,7 +73,7 @@ export default function PaketDetayPage() {
     setIsleniyor(true)
     try {
       await api.put(`/domains/${domID}/plan`, { plan_id: plan.id })
-      setBasari(`✓ Kaynak limitler ${domainler.find(d => d.id === domID)?.alan_adi} için yeniden uygulandı`)
+      setBasari(t('PaketDetayPage:reapply_success', { domain: domainler.find(d => d.id === domID)?.alan_adi }))
       setTimeout(() => setBasari(null), 4000)
     } catch (e) {
       setHata(apiHata(e))
@@ -83,8 +85,8 @@ export default function PaketDetayPage() {
     setPlan({ ...plan, [k]: v })
   }
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!plan) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Plan bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('PaketDetayPage:loading')}</div>
+  if (!plan) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('PaketDetayPage:not_found')}</div></div>
 
   // Kurulu PHP sürümleri + planın mevcut değeri (kurulu olmasa da görünsün)
   const phpOpts = Array.from(new Set([
@@ -97,9 +99,9 @@ export default function PaketDetayPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Araçlar ve Ayarlar', href: '/araclar-ayarlar' },
-          { etiket: 'Hizmet Planları', href: '/araclar/paketler' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('PaketDetayPage:breadcrumb.tools_settings'), href: '/araclar-ayarlar' },
+          { etiket: t('PaketDetayPage:breadcrumb.service_plans'), href: '/araclar/paketler' },
           { etiket: plan.ad },
         ]} />
 
@@ -108,15 +110,15 @@ export default function PaketDetayPage() {
           <div className="min-w-0">
             <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2 truncate">
               {plan.ad}
-              {plan.varsayilan && <span className="shrink-0 text-[10px] uppercase font-semibold tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded">Varsayılan</span>}
+              {plan.varsayilan && <span className="shrink-0 text-[10px] uppercase font-semibold tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded">{t('PaketDetayPage:default_badge')}</span>}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-              {plan.aciklama || 'Açıklama yok'} · <span className="font-mono">{domainSayisi}</span> domainde kullanılıyor
+              {plan.aciklama || t('PaketDetayPage:no_description')} · <span className="font-mono">{domainSayisi}</span> {t('PaketDetayPage:used_in_domains_inline')}
             </p>
           </div>
           <button onClick={kaydet} disabled={isleniyor}
             className="shrink-0 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-lg shadow-sm">
-            {isleniyor ? 'Kaydediliyor…' : 'Değişiklikleri Kaydet'}
+            {isleniyor ? t('PaketDetayPage:save_button_saving') : t('PaketDetayPage:save_button')}
           </button>
         </div>
 
@@ -124,27 +126,27 @@ export default function PaketDetayPage() {
         {basari && <div className="mb-4 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
 
         {/* Genel */}
-        <Kart baslik="Genel" ikon="⚙️">
+        <Kart baslik={t('PaketDetayPage:general.title')} ikon="⚙️">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Alan etiket="Plan Adı">
+            <Alan etiket={t('PaketDetayPage:general.plan_name')}>
               <input value={plan.ad} onChange={e => P('ad', e.target.value)} className={inp} />
             </Alan>
-            <Alan etiket="Varsayılan Plan">
+            <Alan etiket={t('PaketDetayPage:general.default_plan')}>
               <label className="flex items-center gap-2 h-[38px] px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/60 dark:bg-slate-900/40 cursor-pointer">
                 <input type="checkbox" checked={plan.varsayilan} onChange={e => P('varsayilan', e.target.checked)} className="rounded" />
-                <span className="text-sm text-slate-700 dark:text-slate-300">Yeni domainlere otomatik atansın</span>
+                <span className="text-sm text-slate-700 dark:text-slate-300">{t('PaketDetayPage:general.default_plan_hint')}</span>
               </label>
             </Alan>
-            <Alan etiket="Açıklama" span={2}>
+            <Alan etiket={t('PaketDetayPage:general.description')} span={2}>
               <textarea value={plan.aciklama} onChange={e => P('aciklama', e.target.value)} rows={2} className={inp} />
             </Alan>
           </div>
         </Kart>
 
         {/* Varsayılanlar — yeni domainler bu değerleri miras alır */}
-        <Kart baslik="Varsayılanlar" ikon="🧩" alt="Bu plana bağlı yeni bir domain oluşturulduğunda uygulanacak başlangıç değerleri.">
+        <Kart baslik={t('PaketDetayPage:defaults.title')} ikon="🧩" alt={t('PaketDetayPage:defaults.desc')}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Alan etiket="PHP Sürümü" ipucu="Bu plandaki yeni domainler bu PHP sürümüyle kurulur.">
+            <Alan etiket={t('PaketDetayPage:defaults.php_version')} ipucu={t('PaketDetayPage:defaults.php_version_hint')}>
               <select value={plan.php_surum} onChange={e => P('php_surum', e.target.value)} className={inp}>
                 {phpOpts.map(v => <option key={v} value={v}>PHP {v}</option>)}
               </select>
@@ -153,168 +155,168 @@ export default function PaketDetayPage() {
         </Kart>
 
         {/* Kaynak Limitleri */}
-        <Kart baslik="Kaynak Limitleri" ikon="📊" alt="systemd cgroup + xfs_quota + MariaDB GRANT ile sistem seviyesinde uygulanır. Kaydettikten sonra atanmış domainler için “Yeniden Uygula” tetikleyin.">
+        <Kart baslik={t('PaketDetayPage:resource_limits.title')} ikon="📊" alt={t('PaketDetayPage:resource_limits.desc')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Alan etiket="CPU %" ipucu="100 = 1 çekirdek (systemd CPUQuota)">
+            <Alan etiket={t('PaketDetayPage:resource_limits.cpu')} ipucu={t('PaketDetayPage:resource_limits.cpu_hint')}>
               <input type="number" min={10} max={2000} value={plan.cpu_yuzde} onChange={e => P('cpu_yuzde', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="RAM (MB)" ipucu="Hard MemoryMax; MemoryHigh otomatik %90">
+            <Alan etiket={t('PaketDetayPage:resource_limits.ram')} ipucu={t('PaketDetayPage:resource_limits.ram_hint')}>
               <input type="number" min={64} value={plan.ram_mb} onChange={e => P('ram_mb', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="Max Process" ipucu="systemd TasksMax — PHP-FPM worker dahil">
+            <Alan etiket={t('PaketDetayPage:resource_limits.max_process')} ipucu={t('PaketDetayPage:resource_limits.max_process_hint')}>
               <input type="number" min={5} value={plan.max_process} onChange={e => P('max_process', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="MySQL Bağlantı" ipucu="MAX_USER_CONNECTIONS">
+            <Alan etiket={t('PaketDetayPage:resource_limits.mysql_connections')} ipucu={t('PaketDetayPage:resource_limits.mysql_connections_hint')}>
               <input type="number" min={1} value={plan.mysql_max_baglanti} onChange={e => P('mysql_max_baglanti', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="Disk (MB)" ipucu="0 = sınırsız">
+            <Alan etiket={t('PaketDetayPage:resource_limits.disk')} ipucu={t('PaketDetayPage:resource_limits.disk_hint')}>
               <input type="number" min={0} value={plan.disk_kota_mb} onChange={e => P('disk_kota_mb', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="Trafik (MB/ay)" ipucu="0 = sınırsız">
+            <Alan etiket={t('PaketDetayPage:resource_limits.traffic')} ipucu={t('PaketDetayPage:resource_limits.traffic_hint')}>
               <input type="number" min={0} value={plan.trafik_kota_mb} onChange={e => P('trafik_kota_mb', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="Inode Kotası" ipucu="Toplam dosya + dizin sayısı">
+            <Alan etiket={t('PaketDetayPage:resource_limits.inode_quota')} ipucu={t('PaketDetayPage:resource_limits.inode_quota_hint')}>
               <input type="number" min={1000} value={plan.inode_kota} onChange={e => P('inode_kota', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="I/O Ağırlık" ipucu="systemd IOWeight (1-1000)">
+            <Alan etiket={t('PaketDetayPage:resource_limits.io_weight')} ipucu={t('PaketDetayPage:resource_limits.io_weight_hint')}>
               <input type="number" min={1} max={1000} value={plan.io_agirlik} onChange={e => P('io_agirlik', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="PHP-FPM max_children" ipucu="0 = Otomatik (max(4, RAM/64)). Per-tenant FPM'de RAM tavanıyla tutarlı.">
-              <input type="number" min={0} value={plan.pm_max_children} onChange={e => P('pm_max_children', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = Otomatik" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.pm_max_children')} ipucu={t('PaketDetayPage:resource_limits.pm_max_children_hint')}>
+              <input type="number" min={0} value={plan.pm_max_children} onChange={e => P('pm_max_children', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.pm_max_children_placeholder')} />
             </Alan>
           </div>
-          <div className="mt-4 text-xs font-medium text-slate-500">Disk G/Ç (mutlak throttle — IOWeight'ten farklı; cgroup v2)</div>
+          <div className="mt-4 text-xs font-medium text-slate-500">{t('PaketDetayPage:resource_limits.io_section_label')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-            <Alan etiket="Disk Okuma (MB/s)" ipucu="Mutlak okuma bant genişliği. 0 = sınırsız">
-              <input type="number" min={0} value={plan.io_read_mbps} onChange={e => P('io_read_mbps', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.io_read_mbps')} ipucu={t('PaketDetayPage:resource_limits.io_read_mbps_hint')}>
+              <input type="number" min={0} value={plan.io_read_mbps} onChange={e => P('io_read_mbps', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.io_read_mbps_placeholder')} />
             </Alan>
-            <Alan etiket="Disk Yazma (MB/s)" ipucu="Mutlak yazma bant genişliği. 0 = sınırsız">
-              <input type="number" min={0} value={plan.io_write_mbps} onChange={e => P('io_write_mbps', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.io_write_mbps')} ipucu={t('PaketDetayPage:resource_limits.io_write_mbps_hint')}>
+              <input type="number" min={0} value={plan.io_write_mbps} onChange={e => P('io_write_mbps', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.io_write_mbps_placeholder')} />
             </Alan>
-            <Alan etiket="Okuma IOPS" ipucu="Saniyedeki maksimum okuma işlemi. 0 = sınırsız">
-              <input type="number" min={0} value={plan.io_read_iops} onChange={e => P('io_read_iops', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.io_read_iops')} ipucu={t('PaketDetayPage:resource_limits.io_read_iops_hint')}>
+              <input type="number" min={0} value={plan.io_read_iops} onChange={e => P('io_read_iops', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.io_read_iops_placeholder')} />
             </Alan>
-            <Alan etiket="Yazma IOPS" ipucu="Saniyedeki maksimum yazma işlemi. 0 = sınırsız">
-              <input type="number" min={0} value={plan.io_write_iops} onChange={e => P('io_write_iops', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.io_write_iops')} ipucu={t('PaketDetayPage:resource_limits.io_write_iops_hint')}>
+              <input type="number" min={0} value={plan.io_write_iops} onChange={e => P('io_write_iops', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.io_write_iops_placeholder')} />
             </Alan>
           </div>
-          <div className="mt-4 text-xs font-medium text-slate-500">Veritabanı (MySQL Governor — native MariaDB; Bağlantı limiti yukarıdaki “MySQL Bağlantı”)</div>
+          <div className="mt-4 text-xs font-medium text-slate-500">{t('PaketDetayPage:resource_limits.db_section_label')}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-            <Alan etiket="Maks. Sorgu/Saat" ipucu="MAX_QUERIES_PER_HOUR. 0 = sınırsız">
-              <input type="number" min={0} value={plan.db_max_queries_per_hour} onChange={e => P('db_max_queries_per_hour', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.db_max_queries')} ipucu={t('PaketDetayPage:resource_limits.db_max_queries_hint')}>
+              <input type="number" min={0} value={plan.db_max_queries_per_hour} onChange={e => P('db_max_queries_per_hour', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.db_max_queries_placeholder')} />
             </Alan>
-            <Alan etiket="Maks. Güncelleme/Saat" ipucu="MAX_UPDATES_PER_HOUR. 0 = sınırsız">
-              <input type="number" min={0} value={plan.db_max_updates_per_hour} onChange={e => P('db_max_updates_per_hour', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.db_max_updates')} ipucu={t('PaketDetayPage:resource_limits.db_max_updates_hint')}>
+              <input type="number" min={0} value={plan.db_max_updates_per_hour} onChange={e => P('db_max_updates_per_hour', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.db_max_updates_placeholder')} />
             </Alan>
-            <Alan etiket="Maks. Sorgu Süresi (sn)" ipucu="Bu süreyi aşan sorgu KILL edilir (watchdog). 0 = öldürme yok">
-              <input type="number" min={0} value={plan.db_max_query_seconds} onChange={e => P('db_max_query_seconds', Number(e.target.value) || 0)} className={inpNum} placeholder="0 = sınırsız" />
+            <Alan etiket={t('PaketDetayPage:resource_limits.db_max_query_seconds')} ipucu={t('PaketDetayPage:resource_limits.db_max_query_seconds_hint')}>
+              <input type="number" min={0} value={plan.db_max_query_seconds} onChange={e => P('db_max_query_seconds', Number(e.target.value) || 0)} className={inpNum} placeholder={t('PaketDetayPage:resource_limits.db_max_query_seconds_placeholder')} />
             </Alan>
           </div>
         </Kart>
 
         {/* Sayısal Sınırlar (E-posta kaldırıldı) */}
-        <Kart baslik="Sayısal Sınırlar" ikon="🔢" alt="Bu plana bağlı hesapta oluşturulabilecek nesne sayıları. 0 = sınırsız.">
+        <Kart baslik={t('PaketDetayPage:numeric_limits.title')} ikon="🔢" alt={t('PaketDetayPage:numeric_limits.desc')}>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Alan etiket="Domain">
+            <Alan etiket={t('PaketDetayPage:numeric_limits.domain')}>
               <input type="number" min={0} value={plan.max_domain} onChange={e => P('max_domain', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="Veritabanı">
+            <Alan etiket={t('PaketDetayPage:numeric_limits.database')}>
               <input type="number" min={0} value={plan.max_db} onChange={e => P('max_db', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
-            <Alan etiket="FTP Hesabı">
+            <Alan etiket={t('PaketDetayPage:numeric_limits.ftp')}>
               <input type="number" min={0} value={plan.max_ftp} onChange={e => P('max_ftp', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
           </div>
         </Kart>
 
         {/* Web Sunucusu (nginx) */}
-        <Kart baslik="Web Sunucusu (nginx)" ikon="🛠️" alt="Bu plandaki yeni domainler bu nginx ayarlarıyla kurulur. Ek direktifler kaydederken “nginx -t” ile doğrulanır.">
+        <Kart baslik={t('PaketDetayPage:web_server.title')} ikon="🛠️" alt={t('PaketDetayPage:web_server.desc')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <Alan etiket="FastCGI Cache" ipucu="Dinamik PHP çıktısını nginx tarafında önbelleğe alır (yüksek trafik için)">
+            <Alan etiket={t('PaketDetayPage:web_server.fastcgi_cache')} ipucu={t('PaketDetayPage:web_server.fastcgi_cache_hint')}>
               <label className="flex items-center gap-2 h-[38px] px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/60 dark:bg-slate-900/40 cursor-pointer">
                 <input type="checkbox" checked={plan.fastcgi_cache} onChange={e => P('fastcgi_cache', e.target.checked)} className="rounded" />
-                <span className="text-sm text-slate-700 dark:text-slate-300">Yeni domainlerde açık olsun</span>
+                <span className="text-sm text-slate-700 dark:text-slate-300">{t('PaketDetayPage:web_server.fastcgi_cache_label')}</span>
               </label>
             </Alan>
-            <Alan etiket="Yükleme Boyutu Limiti (MB)" ipucu="nginx client_max_body_size — dosya yükleme üst sınırı">
+            <Alan etiket={t('PaketDetayPage:web_server.upload_size')} ipucu={t('PaketDetayPage:web_server.upload_size_hint')}>
               <input type="number" min={1} max={4096} value={plan.client_max_body_mb} onChange={e => P('client_max_body_mb', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
           </div>
-          <Alan etiket="Ek nginx Direktifleri" ipucu="server{} bloğuna eklenir; kaydederken doğrulanır.">
+          <Alan etiket={t('PaketDetayPage:web_server.extra_directives')} ipucu={t('PaketDetayPage:web_server.extra_directives_hint')}>
             <textarea
               value={plan.nginx_ek_direktifler || ''}
               onChange={e => P('nginx_ek_direktifler', e.target.value)}
               rows={6}
               spellCheck={false}
-              placeholder={'# Örnek:\nadd_header X-Robots-Tag "noindex" always;\nlocation = /saglik { return 200 "ok"; }'}
+              placeholder={t('PaketDetayPage:web_server.extra_directives_placeholder')}
               className={inp + ' font-mono text-xs leading-relaxed'}
             />
           </Alan>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            ⓘ Kaydet'e bastığınızda direktifler geçici bir sunucu bloğunda <code className="font-mono">nginx -t</code> ile test edilir. Geçersizse plan <strong>kaydedilmez</strong> ve nginx'in hata çıktısı yukarıda gösterilir.
+            {t('PaketDetayPage:web_server.extra_directives_note')}
           </p>
         </Kart>
 
         {/* WAF (ModSecurity + OWASP CRS) plan varsayılanı */}
-        <Kart baslik="Güvenlik Duvarı (WAF) Varsayılanı" ikon="🛡️" alt="ModSecurity v3 + OWASP Core Rule Set. Bu plandaki domainler (kendi WAF override'ı yoksa) bu değerleri devralır. Domain düzeyinde ‘Plandan Devral’ seçiliyse buradaki ayar geçerlidir.">
+        <Kart baslik={t('PaketDetayPage:waf.title')} ikon="🛡️" alt={t('PaketDetayPage:waf.desc')}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Alan etiket="WAF Varsayılanı" ipucu="Bu plandaki yeni domainlerde WAF açık mı gelsin (per-domain override edilebilir).">
+            <Alan etiket={t('PaketDetayPage:waf.waf_default')} ipucu={t('PaketDetayPage:waf.waf_default_hint')}>
               <label className="flex items-center gap-2 h-[38px] px-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/60 dark:bg-slate-900/40 cursor-pointer">
                 <input type="checkbox" checked={plan.waf_enabled} onChange={e => P('waf_enabled', e.target.checked)} className="rounded" />
-                <span className="text-sm text-slate-700 dark:text-slate-300">Bu planda açık olsun</span>
+                <span className="text-sm text-slate-700 dark:text-slate-300">{t('PaketDetayPage:waf.waf_default_label')}</span>
               </label>
             </Alan>
-            <Alan etiket="Mod" ipucu="Engelle = kötü istekleri 403’ler (SecRuleEngine On). Denetle = yalnızca audit log’a yazar (DetectionOnly).">
+            <Alan etiket={t('PaketDetayPage:waf.mode')} ipucu={t('PaketDetayPage:waf.mode_hint')}>
               <select value={plan.waf_mode} onChange={e => P('waf_mode', e.target.value)} className={inp} disabled={!plan.waf_enabled}>
-                <option value="on">Engelle (On)</option>
-                <option value="detect">Denetle (yalnızca kaydet)</option>
+                <option value="on">{t('PaketDetayPage:waf.mode_block')}</option>
+                <option value="detect">{t('PaketDetayPage:waf.mode_detect')}</option>
               </select>
             </Alan>
-            <Alan etiket="Paranoya Seviyesi" ipucu="CRS paranoia 1–4. Yüksek = daha sıkı koruma + daha çok yanlış-pozitif.">
+            <Alan etiket={t('PaketDetayPage:waf.paranoia')} ipucu={t('PaketDetayPage:waf.paranoia_hint')}>
               <select value={plan.waf_paranoia} onChange={e => P('waf_paranoia', Number(e.target.value) || 1)} className={inp} disabled={!plan.waf_enabled}>
-                <option value={1}>Seviye 1 (Düşük — önerilen)</option>
-                <option value={2}>Seviye 2 (Orta)</option>
-                <option value={3}>Seviye 3 (Yüksek)</option>
-                <option value={4}>Seviye 4 (Sıkı)</option>
+                <option value={1}>{t('PaketDetayPage:waf.paranoia_level_1')}</option>
+                <option value={2}>{t('PaketDetayPage:waf.paranoia_level_2')}</option>
+                <option value={3}>{t('PaketDetayPage:waf.paranoia_level_3')}</option>
+                <option value={4}>{t('PaketDetayPage:waf.paranoia_level_4')}</option>
               </select>
             </Alan>
           </div>
           <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            ⓘ Değişiklikten sonra bu plana bağlı domainlerin vhost’ları arka planda otomatik yeniden render edilir (nginx -t korumalı, sıfır kesinti). Sunucuda modül kurulu değilse ayar saklanır ve <code className="font-mono">sanalpanel-waf-setup</code> ile etkinleşir.
+            {t('PaketDetayPage:waf.note')}
           </p>
         </Kart>
 
         {/* Atanmış domainler */}
-        <Kart baslik={`Atanmış Domainler (${domainler.length})`} ikon="🌐" alt="Plan güncellendikten sonra “Yeniden Uygula” ile ilgili domain'in cgroup + quota + MySQL limitleri güncellenir.">
+        <Kart baslik={t('PaketDetayPage:assigned_domains.title', { count: domainler.length })} ikon="🌐" alt={t('PaketDetayPage:assigned_domains.desc')}>
           {domainler.length === 0 ? (
-            <div className="text-sm text-slate-400 py-6 text-center">Henüz bu plana atanmış domain yok.</div>
+            <div className="text-sm text-slate-400 py-6 text-center">{t('PaketDetayPage:assigned_domains.empty')}</div>
           ) : (
             <div className="lg:overflow-x-auto">
               <table className={T.tablo}>
                 <thead className={`${T.baslikGrubu} border-b border-slate-200 dark:border-slate-700`}>
                   <tr>
-                    <th className={T.baslik}>Domain</th>
-                    <th className={T.baslik}>Sistem Kullanıcısı</th>
-                    <th className={T.baslik}>Durum</th>
-                    <th className={T.baslik}>Oluşturma</th>
-                    <th className={`${T.baslik} text-right`}>İşlem</th>
+                    <th className={T.baslik}>{t('PaketDetayPage:assigned_domains.col_domain')}</th>
+                    <th className={T.baslik}>{t('PaketDetayPage:assigned_domains.col_system_user')}</th>
+                    <th className={T.baslik}>{t('PaketDetayPage:assigned_domains.col_status')}</th>
+                    <th className={T.baslik}>{t('PaketDetayPage:assigned_domains.col_created')}</th>
+                    <th className={`${T.baslik} text-right`}>{t('PaketDetayPage:assigned_domains.col_action')}</th>
                   </tr>
                 </thead>
                 <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800`}>
                   {domainler.map(d => (
                     <tr key={d.id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/60`}>
                       <td className={T.hucreBaslik}><Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 font-medium">{d.alan_adi}</Link></td>
-                      <td className={T.hucre} data-etiket="Sistem Kullanıcısı"><span className="font-mono text-xs">{d.sistem_kullanici}</span></td>
-                      <td className={T.hucre} data-etiket="Durum">
+                      <td className={T.hucre} data-etiket={t('PaketDetayPage:assigned_domains.col_system_user')}><span className="font-mono text-xs">{d.sistem_kullanici}</span></td>
+                      <td className={T.hucre} data-etiket={t('PaketDetayPage:assigned_domains.col_status')}>
                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-semibold ${
                           d.durum === 'aktif' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
                         }`}>{d.durum}</span>
                       </td>
-                      <td className={T.hucre} data-etiket="Oluşturma"><span className="font-mono text-xs text-slate-500">{d.olusturulma}</span></td>
+                      <td className={T.hucre} data-etiket={t('PaketDetayPage:assigned_domains.col_created')}><span className="font-mono text-xs text-slate-500">{d.olusturulma}</span></td>
                       <td className={T.hucreAksiyon}>
                         <button onClick={() => domainicinYenidenUygula(d.id)} disabled={isleniyor}
                           className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800">
-                          Yeniden Uygula
+                          {t('PaketDetayPage:assigned_domains.reapply')}
                         </button>
                       </td>
                     </tr>

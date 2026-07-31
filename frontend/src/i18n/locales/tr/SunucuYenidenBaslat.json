@@ -1,0 +1,8 @@
+{
+  "start_failed": "başlatılamadı",
+  "rebooting": "Sunucu yeniden başlatılıyor — birkaç dakika içinde erişim geri gelecek.",
+  "confirm": "Emin misiniz?",
+  "starting": "Başlatılıyor…",
+  "yes_reboot": "Evet, yeniden başlat",
+  "reboot_button": "Sunucuyu Yeniden Başlat"
+}

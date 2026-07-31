@@ -1,0 +1,95 @@
+{
+  "title": "Uçtan Uca İzleme",
+  "breadcrumb": "İzleme",
+  "live": "Canlı · {{n}}sn yenile",
+  "tabs": {
+    "server": "Sunucu",
+    "domain": "Domain Bazlı",
+    "logs": "Sunucu Günlükleri"
+  },
+  "server": {
+    "snap": {
+      "cpu": "CPU",
+      "cpu_cores": "{{n}} çekirdek",
+      "mem": "Bellek",
+      "load": "Yük (1dk)",
+      "load_detail": "5dk {{m5}} · 15dk {{m15}}",
+      "disk": "Disk (/)"
+    },
+    "resources_title": "Sistem Kaynakları",
+    "resources_sample": "{{count}}/{{max}} örnek · {{min}}dk",
+    "legend": {
+      "cpu": "CPU",
+      "mem": "Bellek",
+      "swap": "Swap",
+      "load": "Yük (norm)",
+      "rx": "↓ RX (KB/s)",
+      "tx": "↑ TX (KB/s)"
+    },
+    "network_title": "Ağ Trafiği",
+    "network_iface": "Arayüz: {{iface}}",
+    "services_title": "Servisler",
+    "services_active": "{{active}}/{{total}} aktif",
+    "service_active": "Aktif",
+    "service_off": "Kapalı",
+    "processes_title": "En Yoğun İşlemler",
+    "table": {
+      "pid": "PID",
+      "user": "Kullanıcı",
+      "cpu": "CPU%",
+      "mem": "MEM%",
+      "cmd": "Komut"
+    },
+    "chart_collecting": "Veri toplanıyor…"
+  },
+  "domain": {
+    "select_title": "Domain Seçimi",
+    "no_active_domain": "Aktif domain yok",
+    "probing": "Sorgulanıyor…",
+    "probe_btn": "↻ Sağlık Probe",
+    "open_site": "Siteyi aç ↗",
+    "access_log": "Erişim Logu (Access)",
+    "last_lines": "son {{n}} satır",
+    "no_log_yet": "Henüz log yok…",
+    "error_log": "Hata Logu (Error)",
+    "no_error_yet": "Henüz hata kaydı yok",
+    "health": {
+      "reachable": "Erişilebilir",
+      "unreachable": "Erişilemez",
+      "server_label": "Server:"
+    },
+    "ssl": {
+      "no_ssl_title": "⚠ SSL Yok",
+      "no_ssl_desc": "Bu domain HTTPS üzerinden erişilemiyor.",
+      "valid": "🔒 SSL Geçerli",
+      "invalid": "✗ SSL Geçersiz",
+      "days": "gün",
+      "expires": "Bitiş:",
+      "issuer": "Çıkaran:"
+    },
+    "response": {
+      "title": "Yanıt Süresi",
+      "fast": "Hızlı",
+      "acceptable": "Kabul edilebilir",
+      "slow": "Yavaş"
+    }
+  },
+  "logs": {
+    "sources": {
+      "panel": "Panel",
+      "nginx": "nginx",
+      "mariadb": "MariaDB",
+      "named": "DNS (named)",
+      "sshd": "SSH",
+      "cron": "Cron",
+      "sistem": "Tüm Sistem"
+    },
+    "search_placeholder": "Ara…",
+    "last_n": "son {{n}}",
+    "refresh": "↻ Yenile",
+    "not_found": "\"{{q}}\" bulunamadı.",
+    "no_records": "(kayıt yok)",
+    "footer": "{{count}} satır · journald · {{source}}",
+    "footer_filtered": "{{count}} / {{total}} satır · journald · {{source}}"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "breadcrumb_settings": "Araçlar & Ayarlar",
+  "breadcrumb_title": "Servisler",
+  "title": "Servis Yönetimi",
+  "subtitle": "Web, veritabanı, DNS ve PHP servislerini buradan yeniden başlatın. Ayar değişikliği sonrası kullanışlıdır.",
+  "load_failed": "Servisler alınamadı",
+  "loading": "Yükleniyor…",
+  "status_active": "● Çalışıyor",
+  "status_inactive": "○ Durmuş",
+  "status_failed": "✕ Hatalı",
+  "status_absent": "— Kurulu değil",
+  "group_web": "Web Sunucusu",
+  "group_db_cache": "Veritabanı & Önbellek",
+  "group_dns": "DNS",
+  "group_php_fpm": "PHP-FPM",
+  "group_other": "Diğer",
+  "reloaded": "{{name}} yeniden yüklendi.",
+  "restarted": "{{name}} yeniden başlatıldı.",
+  "action_failed": "{{name}} işlemi başarısız",
+  "btn_reload": "Yeniden Yükle",
+  "btn_restart": "Yeniden Başlat"
+}

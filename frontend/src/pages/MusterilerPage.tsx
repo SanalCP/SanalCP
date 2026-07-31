@@ -7,6 +7,7 @@
 // bağlanır; müşteri o hesapla /cp adresinden girer.
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
@@ -29,6 +30,7 @@ type Plan = { id: number; ad: string }
 const BOS: Musteri = { id: 0, ad: '', eposta: '', plan_id: null, durum: 'aktif', notlar: '', olusturma: '' }
 
 export default function MusterilerPage() {
+  const { t } = useTranslation(['MusterilerPage', 'common'])
   const [aramaParam] = useSearchParams()
   const [liste, setListe] = useState<Musteri[]>([])
   const [planlar, setPlanlar] = useState<Plan[]>([])
@@ -50,7 +52,7 @@ export default function MusterilerPage() {
       setListe(Array.isArray(r.data) ? r.data : [])
       setHata(null)
     } catch (e) {
-      setHata(apiHata(e, 'Müşteriler alınamadı'))
+      setHata(apiHata(e, t('MusterilerPage:error.load_failed')))
     } finally {
       setYukleniyor(false)
     }
@@ -74,7 +76,7 @@ export default function MusterilerPage() {
     const ad = duzenlenen.ad.trim()
     const eposta = duzenlenen.eposta.trim()
     if (!ad || !eposta) {
-      setHata('Ad ve e-posta zorunlu')
+      setHata(t('MusterilerPage:error.name_email_required'))
       return
     }
     setKaydediliyor(true)
@@ -89,15 +91,15 @@ export default function MusterilerPage() {
       }
       if (duzenlenen.id === 0) {
         await api.post('/customers', govde)
-        setBasari(`${ad} eklendi.`)
+        setBasari(t('MusterilerPage:success.added', { name: ad }))
       } else {
         await api.put(`/customers/${duzenlenen.id}`, govde)
-        setBasari(`${ad} güncellendi.`)
+        setBasari(t('MusterilerPage:success.updated', { name: ad }))
       }
       setDuzenlenen(null)
       await getir()
     } catch (e) {
-      setHata(apiHata(e, 'Kaydedilemedi'))
+      setHata(apiHata(e, t('MusterilerPage:error.save_failed')))
     } finally {
       setKaydediliyor(false)
     }
@@ -107,11 +109,11 @@ export default function MusterilerPage() {
     if (!silinecek) return
     try {
       await api.delete(`/customers/${silinecek.id}`)
-      setBasari(`${silinecek.ad} silindi.`)
+      setBasari(t('MusterilerPage:success.deleted', { name: silinecek.ad }))
       setSilinecek(null)
       await getir()
     } catch (e) {
-      setHata(apiHata(e, 'Silinemedi'))
+      setHata(apiHata(e, t('MusterilerPage:error.delete_failed')))
       setSilinecek(null)
     }
   }
@@ -121,17 +123,17 @@ export default function MusterilerPage() {
 
   return (
     <div className="w-full px-6 py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Müşteriler' }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('MusterilerPage:breadcrumb_title') }]} />
 
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Müşteriler</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('MusterilerPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Fatura ve iletişim kayıtları. Domainler bu kayıtlara bağlanır — panel giriş hesabı değildir.
+          {t('MusterilerPage:subtitle')}
         </p>
       </div>
 
       <ListToolbar
-        birincil={{ etiket: 'Yeni Müşteri', onClick: () => setDuzenlenen({ ...BOS }) }}
+        birincil={{ etiket: t('MusterilerPage:toolbar_new'), onClick: () => setDuzenlenen({ ...BOS }) }}
         aranan={aranan}
         arananSetter={setAranan}
       />
@@ -144,21 +146,21 @@ export default function MusterilerPage() {
       )}
 
       {yukleniyor ? (
-        <div className="py-16 text-center text-sm text-slate-400">Yükleniyor…</div>
+        <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
       ) : liste.length === 0 ? (
         <EmptyState
-          baslik="Henüz müşteri kaydı yok"
-          aciklama="Domainleri bir müşteriye bağlamak için önce müşteri kaydı oluşturun."
-          buton={{ etiket: 'Yeni Müşteri', onClick: () => setDuzenlenen({ ...BOS }) }}
+          baslik={t('MusterilerPage:empty.title')}
+          aciklama={t('MusterilerPage:empty.description')}
+          buton={{ etiket: t('MusterilerPage:toolbar_new'), onClick: () => setDuzenlenen({ ...BOS }) }}
         />
       ) : suzulmus.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-400">Aramayla eşleşen müşteri yok.</div>
+        <div className="py-12 text-center text-sm text-slate-400">{t('MusterilerPage:search_empty')}</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-slate-900/60">
               <tr>
-                {['Ad', 'E-posta', 'Plan', 'Durum', 'Kayıt', ''].map((b, i) => (
+                {[t('MusterilerPage:table.name'), t('MusterilerPage:table.email'), t('MusterilerPage:table.plan'), t('MusterilerPage:table.status'), t('MusterilerPage:table.created'), ''].map((b, i) => (
                   <th key={i} className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     {b}
                   </th>
@@ -173,16 +175,16 @@ export default function MusterilerPage() {
                   <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{planAdi(m.plan_id)}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {m.durum === 'aktif'
-                      ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">Aktif</span>
-                      : <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Pasif</span>}
+                      ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('MusterilerPage:status.active')}</span>
+                      : <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t('MusterilerPage:status.inactive')}</span>}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap">{m.olusturma}</td>
                   <td className="px-3 py-2.5 text-right whitespace-nowrap">
                     <button onClick={() => setDuzenlenen({ ...m })} className="text-xs text-brand-600 dark:text-brand-400 hover:underline mr-3">
-                      Düzenle
+                      {t('MusterilerPage:actions.edit')}
                     </button>
                     <button onClick={() => setSilinecek(m)} className="text-xs text-red-600 dark:text-red-400 hover:underline">
-                      Sil
+                      {t('MusterilerPage:actions.delete')}
                     </button>
                   </td>
                 </tr>
@@ -194,13 +196,13 @@ export default function MusterilerPage() {
 
       <Modal
         acik={duzenlenen !== null}
-        baslik={duzenlenen?.id ? 'Müşteriyi Düzenle' : 'Yeni Müşteri'}
+        baslik={duzenlenen?.id ? t('MusterilerPage:modal.title_edit') : t('MusterilerPage:modal.title_new')}
         onKapat={() => setDuzenlenen(null)}
       >
         {duzenlenen && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Ad</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.name')}</label>
               <input
                 value={duzenlenen.ad}
                 onChange={(e) => setDuzenlenen({ ...duzenlenen, ad: e.target.value })}
@@ -208,7 +210,7 @@ export default function MusterilerPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">E-posta</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.email')}</label>
               <input
                 type="email"
                 value={duzenlenen.eposta}
@@ -218,30 +220,30 @@ export default function MusterilerPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Plan</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.plan')}</label>
                 <select
                   value={duzenlenen.plan_id ?? ''}
                   onChange={(e) => setDuzenlenen({ ...duzenlenen, plan_id: e.target.value === '' ? null : Number(e.target.value) })}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
-                  <option value="">Plansız</option>
+                  <option value="">{t('MusterilerPage:fields.plan_none')}</option>
                   {planlar.map((p) => <option key={p.id} value={p.id}>{p.ad}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Durum</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.status')}</label>
                 <select
                   value={duzenlenen.durum}
                   onChange={(e) => setDuzenlenen({ ...duzenlenen, durum: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
-                  <option value="aktif">Aktif</option>
-                  <option value="pasif">Pasif</option>
+                  <option value="aktif">{t('MusterilerPage:status.active')}</option>
+                  <option value="pasif">{t('MusterilerPage:status.inactive')}</option>
                 </select>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Notlar</label>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.notes')}</label>
               <input
                 value={duzenlenen.notlar}
                 onChange={(e) => setDuzenlenen({ ...duzenlenen, notlar: e.target.value })}
@@ -253,14 +255,14 @@ export default function MusterilerPage() {
                 onClick={() => setDuzenlenen(null)}
                 className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
-                Vazgeç
+                {t('MusterilerPage:buttons.cancel')}
               </button>
               <button
                 onClick={kaydet}
                 disabled={kaydediliyor}
                 className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition"
               >
-                {kaydediliyor ? 'Kaydediliyor…' : 'Kaydet'}
+                {kaydediliyor ? t('MusterilerPage:buttons.saving') : t('MusterilerPage:buttons.save')}
               </button>
             </div>
           </div>
@@ -269,9 +271,9 @@ export default function MusterilerPage() {
 
       <ConfirmDialog
         acik={silinecek !== null}
-        baslik="Müşteriyi sil"
-        mesaj={`${silinecek?.ad ?? ''} kaydı silinecek. Bu müşteriye bağlı domainler silinmez, yalnız bağlantıları kopar.`}
-        onayMetni="Sil"
+        baslik={t('MusterilerPage:confirm.title')}
+        mesaj={t('MusterilerPage:confirm.message', { name: silinecek?.ad ?? '' })}
+        onayMetni={t('MusterilerPage:confirm.yes')}
         tehlikeli
         onOnay={sil}
         onIptal={() => setSilinecek(null)}

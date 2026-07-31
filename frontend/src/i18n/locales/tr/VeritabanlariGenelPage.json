@@ -1,0 +1,18 @@
+{
+  "title": "Veritabanları",
+  "subtitle": "Sunucudaki tüm MySQL/MariaDB veritabanları ve disk kullanımları.",
+  "empty": "Henüz veritabanı yok",
+  "col_db": "Veritabanı",
+  "col_user": "Kullanıcı",
+  "col_domain": "Alan Adı",
+  "col_server": "Sunucu",
+  "col_size": "Boyut",
+  "col_created": "Oluşturma",
+  "size_kb": "{{n}} KB",
+  "size_mb": "{{n}} MB",
+  "size_gb": "{{n}} GB",
+  "size_empty": "—",
+  "summary_count": "veritabanı",
+  "summary_total_size": "toplam boyut",
+  "summary_unique_users": "farklı kullanıcı"
+}

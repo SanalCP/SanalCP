@@ -1,0 +1,14 @@
+{
+  "range_1h": "1h",
+  "range_6h": "6h",
+  "range_24h": "24h",
+  "range_7d": "7d",
+  "title": "System Load History",
+  "subtitle": "Load average (1 / 5 / 15 min)",
+  "cores_suffix": " · {{count}} cores",
+  "min1": "1 min",
+  "min5": "5 min",
+  "min15": "15 min",
+  "cores_label": "{{count}} cores",
+  "no_data": "No data collected yet — samples are recorded every minute, the chart will fill in within a few minutes."
+}

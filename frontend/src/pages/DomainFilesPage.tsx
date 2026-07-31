@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import DizinAgac from '@/components/DizinAgac'
@@ -42,6 +43,7 @@ type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 const ROOT = '/'
 
 export default function DomainFilesPage() {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [yol, setYol] = useState<string>('/public_html')
@@ -60,7 +62,7 @@ export default function DomainFilesPage() {
   const [aramaQ, setAramaQ] = useState('')
   const [aramaSonuc, setAramaSonuc] = useState<Entry[] | null>(null)
   const [kopyalaModal, setKopyalaModal] = useState<{ tip: 'kopyala' | 'tasi'; yollar: string[] } | null>(null)
-  const [arsivModal, setArsivModal] = useState(false)
+  const [arsivModal, setArsivModal] = useState<string[] | null>(null)
   const [yeniDosyaModal, setYeniDosyaModal] = useState(false)
   const [boyutSonuc, setBoyutSonuc] = useState<{ yol: string; boyut: number } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: Entry } | null>(null)
@@ -107,7 +109,7 @@ export default function DomainFilesPage() {
       tara()
       setIzinSifirlaSonuc(true)
     } catch (e) {
-      setHata(apiHata(e, 'İzinler sıfırlanamadı'))
+      setHata(apiHata(e, t('DomainFilesPage:errors.resetPermsFailed')))
     } finally {
       setIzinSifirlaniyor(false)
     }
@@ -125,18 +127,18 @@ export default function DomainFilesPage() {
   }
 
   async function sil(e: Entry) {
-    if (!confirm(`"${e.adi}" silinsin mi? Bu işlem geri alınamaz.`)) return
+    if (!confirm(t('DomainFilesPage:confirmDelete', { name: e.adi }))) return
     try {
       await api.delete(`/domains/${id}/files`, { params: { yol: e.yol } })
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, 'Silme başarısız'))
+      alert(apiHata(err, t('DomainFilesPage:errors.deleteFailed')))
     }
   }
 
   async function klasorOlustur() {
-    const ad = prompt('Yeni klasör adı:')
+    const ad = prompt(t('DomainFilesPage:newFolderPrompt'))
     if (!ad) return
     const hedef = (yol === '/' ? '' : yol) + '/' + ad
     try {
@@ -144,7 +146,7 @@ export default function DomainFilesPage() {
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, 'Klasör oluşturma başarısız'))
+      alert(apiHata(err, t('DomainFilesPage:errors.mkdirFailed')))
     }
   }
 
@@ -154,7 +156,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get<{yol: string; icerik: string}>(`/domains/${id}/files/oku`, { params: { yol: e.yol } })
       setEditor({ yol: e.yol, icerik: data.icerik })
     } catch (err) {
-      alert(apiHata(err, 'Açılamadı'))
+      alert(apiHata(err, t('DomainFilesPage:errors.openFailed')))
     }
   }
 
@@ -164,7 +166,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/yaz`, { yol: editor.yol, icerik: editor.icerik })
       setEditor(null); tara()
     } catch (err) {
-      alert(apiHata(err, 'Kaydedilemedi'))
+      alert(apiHata(err, t('DomainFilesPage:errors.saveFailed')))
     }
   }
 
@@ -177,7 +179,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/rename`, { eski: e.yol, yeni })
       setRenameFor(null); setAgacYenileme(x => x + 1); tara()
     } catch (err) {
-      alert(apiHata(err, 'Yeniden adlandırılamadı'))
+      alert(apiHata(err, t('DomainFilesPage:errors.renameFailed')))
     }
   }
 
@@ -186,7 +188,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/chmod`, { yol: e.yol, mod })
       setChmodFor(null); tara()
     } catch (err) {
-      alert(apiHata(err, 'İzin değiştirilemedi'))
+      alert(apiHata(err, t('DomainFilesPage:errors.chmodFailed')))
     }
   }
 
@@ -258,7 +260,7 @@ export default function DomainFilesPage() {
     setAgacYenileme(x => x + 1)
     tara()
     if (basarili < files.length) {
-      alert(`${basarili}/${files.length} dosya yüklendi, bazıları başarısız oldu.`)
+      alert(t('DomainFilesPage:errors.uploadPartial', { ok: basarili, total: files.length }))
     }
   }
 
@@ -290,7 +292,7 @@ export default function DomainFilesPage() {
     setSeciliSet(new Set())
     setAgacYenileme(x => x + 1)
     tara()
-    if (basarili < yollar.length) alert(`${basarili}/${yollar.length} silindi.`)
+    if (basarili < yollar.length) alert(t('DomainFilesPage:errors.deletePartial', { ok: basarili, total: yollar.length }))
   }
 
   async function extractEt(e: Entry) {
@@ -300,7 +302,7 @@ export default function DomainFilesPage() {
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, 'Açılamadı (zip/tar/rar destek vardır)'))
+      alert(apiHata(err, t('DomainFilesPage:errors.extractFailed')))
     } finally {
       setExtractAktif(false)
     }
@@ -312,7 +314,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get(`/domains/${id}/files/ara`, { params: { q: aramaQ, yol } })
       setAramaSonuc(data.icerik)
     } catch (err) {
-      alert(apiHata(err, 'Arama başarısız'))
+      alert(apiHata(err, t('DomainFilesPage:errors.searchFailed')))
     }
   }
 
@@ -325,22 +327,22 @@ export default function DomainFilesPage() {
       })
       setKopyalaModal(null); setSeciliSet(new Set())
       setAgacYenileme(x => x + 1); tara()
-      if (data.hatalar?.length) alert('Bazı hatalar: ' + data.hatalar.join('\n'))
+      if (data.hatalar?.length) alert(t('DomainFilesPage:errors.someErrors', { list: data.hatalar.join('\n') }))
     } catch (err) {
-      alert(apiHata(err, kopyalaModal.tip === 'kopyala' ? 'Kopyalama hata' : 'Taşıma hata'))
+      alert(apiHata(err, kopyalaModal.tip === 'kopyala' ? t('DomainFilesPage:errors.copyFailed') : t('DomainFilesPage:errors.moveFailed')))
     }
   }
 
   async function arsivle(ciktiAd: string, format: 'zip' | 'tar.gz') {
-    const yollar = Array.from(seciliSet)
+    const yollar = arsivModal ?? []
     if (yollar.length === 0) return
     const cikti = (yol === '/' ? '' : yol) + '/' + ciktiAd + (format === 'zip' ? '.zip' : '.tar.gz')
     try {
       await api.post(`/domains/${id}/files/archive`, { kaynaklar: yollar, cikti_yol: cikti, format })
-      setArsivModal(false); setSeciliSet(new Set())
+      setArsivModal(null); setSeciliSet(new Set())
       setAgacYenileme(x => x + 1); tara()
     } catch (err) {
-      alert(apiHata(err, 'Arşivleme hata'))
+      alert(apiHata(err, t('DomainFilesPage:errors.archiveFailed')))
     }
   }
 
@@ -353,7 +355,7 @@ export default function DomainFilesPage() {
       const okuResp = await api.get(`/domains/${id}/files/oku`, { params: { yol: hedef } })
       setEditor({ yol: hedef, icerik: okuResp.data.icerik })
     } catch (err) {
-      alert(apiHata(err, 'Oluşturma hata'))
+      alert(apiHata(err, t('DomainFilesPage:errors.createFailed')))
     }
   }
 
@@ -362,7 +364,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get(`/domains/${id}/files/boyut`, { params: { yol: yolu } })
       setBoyutSonuc({ yol: yolu, boyut: data.boyut_b })
     } catch (err) {
-      alert(apiHata(err, 'Boyut hesabi hata'))
+      alert(apiHata(err, t('DomainFilesPage:errors.sizeFailed')))
     }
   }
 
@@ -410,7 +412,7 @@ export default function DomainFilesPage() {
         a.click()
         setTimeout(() => URL.revokeObjectURL(a.href), 1000)
       })
-      .catch(err => alert('İndirme başarısız: ' + err.message))
+      .catch(err => alert(t('DomainFilesPage:errors.downloadFailed', { msg: err.message })))
   }
 
   // ===== Bağlam (sağ-tık) menüsü =====
@@ -451,27 +453,27 @@ export default function DomainFilesPage() {
     const ogeler: CtxOge[] = []
     if (!coklu) {
       if (e.tip === 'klasor') {
-        ogeler.push({ key: 'ac', etiket: 'Aç', ikon: '📂', onTikla: kapatSonra(() => git(e.yol)) })
+        ogeler.push({ key: 'ac', etiket: t('DomainFilesPage:contextMenu.open'), ikon: '📂', onTikla: kapatSonra(() => git(e.yol)) })
       } else {
         if (docrootRel(e.yol) !== null)
-          ogeler.push({ key: 'brw', etiket: 'Tarayıcıda Aç', ikon: '🌐', onTikla: kapatSonra(() => tarayicidaAc(e)) })
-        ogeler.push({ key: 'edit', etiket: 'Düzenle', ikon: '✏️', onTikla: kapatSonra(() => editorAc(e)) })
-        ogeler.push({ key: 'dl', etiket: 'İndir', ikon: '⬇️', onTikla: kapatSonra(() => indir(e)) })
+          ogeler.push({ key: 'brw', etiket: t('DomainFilesPage:contextMenu.openInBrowser'), ikon: '🌐', onTikla: kapatSonra(() => tarayicidaAc(e)) })
+        ogeler.push({ key: 'edit', etiket: t('DomainFilesPage:contextMenu.edit'), ikon: '✏️', onTikla: kapatSonra(() => editorAc(e)) })
+        ogeler.push({ key: 'dl', etiket: t('DomainFilesPage:contextMenu.download'), ikon: '⬇️', onTikla: kapatSonra(() => indir(e)) })
         if (ARSIV_RX.test(e.adi))
-          ogeler.push({ key: 'ext', etiket: 'Arşivi Aç', ikon: '📦', onTikla: kapatSonra(() => extractEt(e)) })
+          ogeler.push({ key: 'ext', etiket: t('DomainFilesPage:contextMenu.extract'), ikon: '📦', onTikla: kapatSonra(() => extractEt(e)) })
       }
-      ogeler.push({ key: 'rn', etiket: 'Yeniden Adlandır', ikon: '🔤', onTikla: kapatSonra(() => setRenameFor(e)) })
-      ogeler.push({ key: 'chmod', etiket: 'İzinler', ikon: '🔒', onTikla: kapatSonra(() => setChmodFor(e)) })
-      ogeler.push({ key: 'boyut', etiket: 'Boyut Hesapla', ikon: '📏', onTikla: kapatSonra(() => boyutHesapla(e.yol)) })
+      ogeler.push({ key: 'rn', etiket: t('DomainFilesPage:contextMenu.rename'), ikon: '🔤', onTikla: kapatSonra(() => setRenameFor(e)) })
+      ogeler.push({ key: 'chmod', etiket: t('DomainFilesPage:contextMenu.permissions'), ikon: '🔒', onTikla: kapatSonra(() => setChmodFor(e)) })
+      ogeler.push({ key: 'boyut', etiket: t('DomainFilesPage:contextMenu.calcSize'), ikon: '📏', onTikla: kapatSonra(() => boyutHesapla(e.yol)) })
       ogeler.push({ ayrac: true, key: 's1' })
     }
     const yollar = coklu ? Array.from(seciliSet) : [e.yol]
     const ek = coklu ? ` (${yollar.length})` : ''
-    ogeler.push({ key: 'copy', etiket: 'Kopyala' + ek, ikon: '📋', onTikla: kapatSonra(() => setKopyalaModal({ tip: 'kopyala', yollar })) })
-    ogeler.push({ key: 'move', etiket: 'Taşı' + ek, ikon: '↔️', onTikla: kapatSonra(() => setKopyalaModal({ tip: 'tasi', yollar })) })
-    ogeler.push({ key: 'arch', etiket: 'Arşive Ekle' + ek, ikon: '🗜️', onTikla: kapatSonra(() => setArsivModal(true)) })
+    ogeler.push({ key: 'copy', etiket: t('DomainFilesPage:contextMenu.copy') + ek, ikon: '📋', onTikla: kapatSonra(() => setKopyalaModal({ tip: 'kopyala', yollar })) })
+    ogeler.push({ key: 'move', etiket: t('DomainFilesPage:contextMenu.move') + ek, ikon: '↔️', onTikla: kapatSonra(() => setKopyalaModal({ tip: 'tasi', yollar })) })
+    ogeler.push({ key: 'arch', etiket: t('DomainFilesPage:contextMenu.addToArchive') + ek, ikon: '🗜️', onTikla: kapatSonra(() => setArsivModal(yollar)) })
     ogeler.push({ ayrac: true, key: 's2' })
-    ogeler.push({ key: 'del', etiket: 'Sil' + ek, ikon: '🗑️', tehlike: true, onTikla: kapatSonra(() => coklu ? setTopluSilOnay(true) : sil(e)) })
+    ogeler.push({ key: 'del', etiket: t('DomainFilesPage:contextMenu.delete') + ek, ikon: '🗑️', tehlike: true, onTikla: kapatSonra(() => coklu ? setTopluSilOnay(true) : sil(e)) })
     return ogeler
   }
 
@@ -480,13 +482,13 @@ export default function DomainFilesPage() {
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Domainler', href: '/domainler' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('DomainFilesPage:breadcrumb.domains'), href: '/domainler' },
         { etiket: domain?.alan_adi || '…', href: `/abonelikler/${id}` },
-        { etiket: 'Dosyalar' },
+        { etiket: t('DomainFilesPage:breadcrumb.files') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Dosya Yöneticisi</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainFilesPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
           <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
@@ -512,17 +514,17 @@ export default function DomainFilesPage() {
             <svg className="w-14 h-14 mx-auto text-brand-600 dark:text-brand-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            <div className="text-lg font-semibold text-brand-700 dark:text-brand-300">Dosyaları buraya bırak</div>
-            <div className="text-sm text-brand-600 dark:text-brand-400/80 mt-1">Hedef dizin: <code className="font-mono bg-white dark:bg-slate-800/60 px-1.5 py-0.5 rounded">{yol}</code></div>
+            <div className="text-lg font-semibold text-brand-700 dark:text-brand-300">{t('DomainFilesPage:dragDrop.title')}</div>
+            <div className="text-sm text-brand-600 dark:text-brand-400/80 mt-1">{t('DomainFilesPage:dragDrop.target')} <code className="font-mono bg-white dark:bg-slate-800/60 px-1.5 py-0.5 rounded">{yol}</code></div>
           </div>
         </div>
       )}
       {seciliSet.size > 0 && (
         <div className="mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-md flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{seciliSet.size} öğe seçili</span>
-          <span className="text-xs text-amber-700/80 dark:text-amber-300/80">Sağ tık ile işlemler</span>
-          <button onClick={() => setTopluSilOnay(true)} className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium">Sil ({seciliSet.size})</button>
-          <button onClick={() => setSeciliSet(new Set())} className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 rounded">Secimi temizle</button>
+          <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{t('DomainFilesPage:selection.selected', { count: seciliSet.size })}</span>
+          <span className="text-xs text-amber-700/80 dark:text-amber-300/80">{t('DomainFilesPage:selection.rightClickHint')}</span>
+          <button onClick={() => setTopluSilOnay(true)} className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium">{t('DomainFilesPage:selection.delete', { count: seciliSet.size })}</button>
+          <button onClick={() => setSeciliSet(new Set())} className="text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:bg-amber-900/30 rounded">{t('DomainFilesPage:selection.clear')}</button>
         </div>
       )}
       {topluYukleme && (
@@ -534,7 +536,7 @@ export default function DomainFilesPage() {
             </svg>
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm">
-                Yükleniyor… <span className="font-mono">{topluYukleme.aktifIndex + 1} / {topluYukleme.toplam}</span>
+                {t('common:loading')} <span className="font-mono">{topluYukleme.aktifIndex + 1} / {topluYukleme.toplam}</span>
               </div>
               <div className="text-xs text-sky-700/90 truncate">{topluYukleme.aktif}</div>
             </div>
@@ -553,7 +555,7 @@ export default function DomainFilesPage() {
           {/* Hiz + ETA */}
           <div className="flex items-center justify-between mt-1 text-[11px] font-mono text-sky-700/80">
             <span>{topluYukleme.hizBps > 0 ? hizBicim(topluYukleme.hizBps) : '—'}</span>
-            <span>{topluYukleme.etaSn > 0 ? `Kalan: ${etaBicim(topluYukleme.etaSn)}` : ''}</span>
+            <span>{topluYukleme.etaSn > 0 ? t('DomainFilesPage:toolbar.remaining', { time: etaBicim(topluYukleme.etaSn) }) : ''}</span>
           </div>
         </div>
       )}
@@ -566,36 +568,36 @@ export default function DomainFilesPage() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            <span>Yeni</span>
+            <span>{t('DomainFilesPage:newMenu.button')}</span>
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
               <path d="M5.516 7.548c.436-.446 1.043-.481 1.576 0L10 10.405l2.908-2.857c.533-.481 1.141-.446 1.576 0 .436.445.408 1.197 0 1.615-.406.418-3.695 3.629-3.695 3.629a1.105 1.105 0 01-1.576 0S5.924 9.581 5.516 9.163c-.409-.418-.436-1.17 0-1.615z" />
             </svg>
           </button>
           {yeniMenuAcik && (
             <div className="absolute right-0 sm:right-auto sm:left-0 max-w-[calc(100vw-2rem)] z-40 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg min-w-[180px] py-1">
-              <button onClick={() => { setYeniMenuAcik(false); fileInputRef.current?.click() }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">📤 Dosya Yükle</button>
-              <button onClick={() => { setYeniMenuAcik(false); klasorOlustur() }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">📁 Yeni Klasör</button>
-              <button onClick={() => { setYeniMenuAcik(false); setYeniDosyaModal(true) }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">📄 Yeni Dosya</button>
+              <button onClick={() => { setYeniMenuAcik(false); fileInputRef.current?.click() }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">{t('DomainFilesPage:newMenu.upload')}</button>
+              <button onClick={() => { setYeniMenuAcik(false); klasorOlustur() }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">{t('DomainFilesPage:newMenu.newFolder')}</button>
+              <button onClick={() => { setYeniMenuAcik(false); setYeniDosyaModal(true) }} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">{t('DomainFilesPage:newMenu.newFile')}</button>
             </div>
           )}
         </div>
 
         {/* Yenile */}
-        <button onClick={() => tara()} title="Yenile"
+        <button onClick={() => tara()} title={t('DomainFilesPage:toolbar.refresh')}
           className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          Yenile
+          {t('DomainFilesPage:toolbar.refresh')}
         </button>
 
         {/* Dosya İzinlerini Sıfırla — CloudPanel'in "clpctl system:permissions:reset" karşılığı */}
-        <button onClick={() => setIzinSifirlaOnay(true)} disabled={izinSifirlaniyor} title="public_html'i klasör 750 / dosya 644 varsayılanına döndürür"
+        <button onClick={() => setIzinSifirlaOnay(true)} disabled={izinSifirlaniyor} title={t('DomainFilesPage:toolbar.resetPermsTitle')}
           className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded disabled:opacity-60">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          {izinSifirlaniyor ? 'Sıfırlanıyor…' : 'Dosya İzinlerini Sıfırla'}
+          {izinSifirlaniyor ? t('DomainFilesPage:toolbar.resetting') : t('DomainFilesPage:toolbar.resetPerms')}
         </button>
 
         <div className="flex-1" />
@@ -607,7 +609,7 @@ export default function DomainFilesPage() {
             value={aramaQ}
             onChange={e => setAramaQ(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && arama()}
-            placeholder="🔍 Dosya ara…"
+            placeholder={t('DomainFilesPage:toolbar.searchPlaceholder')}
             className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm w-full sm:w-56 focus:border-brand-500 outline-none"
           />
           {aramaSonuc && (
@@ -619,7 +621,7 @@ export default function DomainFilesPage() {
         {/* Gizli upload input */}
         <input ref={fileInputRef} type="file" multiple onChange={e => { const list = Array.from(e.target.files || []); if (list.length) dosyalariYukle(list); e.target.value = ""; }} className="hidden" />
 
-        <div className="ml-auto text-sm text-slate-500 dark:text-slate-500">{icerik.length} öğe</div>
+        <div className="ml-auto text-sm text-slate-500 dark:text-slate-500">{t('DomainFilesPage:toolbar.itemCount', { count: icerik.length })}</div>
       </div>
 
       {/* Path breadcrumb */}
@@ -643,19 +645,19 @@ export default function DomainFilesPage() {
           çerçevelerini taşır (iç içe çerçeve olmasın). */}
       <div className="lg:bg-white dark:lg:bg-slate-800 lg:border lg:border-slate-200 dark:lg:border-slate-700 lg:rounded-2xl lg:overflow-hidden">
         {yukleniyor ? (
-          <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+          <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('DomainFilesPage:table.loading')}</div>
         ) : (
           <div className="lg:overflow-x-auto">
             <table className={T.tablo}>
             <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500 border-b border-slate-200 dark:border-slate-700`}>
               <tr>
                 <th className={`${T.baslik} w-10 text-center`}><input type="checkbox" checked={icerik.length > 0 && seciliSet.size === icerik.length} ref={ref => { if (ref) ref.indeterminate = seciliSet.size > 0 && seciliSet.size < icerik.length }} onChange={e => tumunuSec(e.target.checked)} className="cursor-pointer" /></th>
-                <th className={T.baslik}>Ad</th>
-                <th className={T.baslik}>Boyut</th>
-                <th className={T.baslik}>Yetkiler</th>
-                <th className={T.baslik}>Kullanıcı</th>
-                <th className={T.baslik}>Grup</th>
-                <th className={T.baslik}>Değişiklik</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.name')}</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.size')}</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.permissions')}</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.owner')}</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.group')}</th>
+                <th className={T.baslik}>{t('DomainFilesPage:table.modified')}</th>
                 <th className={`${T.baslik} w-10`}></th>
               </tr>
             </thead>
@@ -664,13 +666,13 @@ export default function DomainFilesPage() {
                 <tr className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800 cursor-pointer`} onClick={geri}>
                   {/* Tek hücreli gezinme satırı: colSpan korundu, mobilde tek kart olur. */}
                   <td className={`${T.hucreBaslik} lg:font-normal`} colSpan={8}>
-                    <span className="text-slate-500 dark:text-slate-500">↑ üst klasör</span>
+                    <span className="text-slate-500 dark:text-slate-500">{t('DomainFilesPage:table.parentDir')}</span>
                   </td>
                 </tr>
               )}
               {icerik.length === 0 && !yukleniyor && (
                 <tr className={T.satir}>
-                  <td colSpan={8} className={T.hucreDurum}>Bu klasör boş</td>
+                  <td colSpan={8} className={T.hucreDurum}>{t('DomainFilesPage:table.empty')}</td>
                 </tr>
               )}
               {/* Seçili satır: mobilde halka (ring), masaüstünde zemin rengi. T.satir'ın
@@ -715,27 +717,27 @@ export default function DomainFilesPage() {
                       </button>
                     )}
                   </td>
-                  <td className={T.hucre} data-etiket="Boyut">
+                  <td className={T.hucre} data-etiket={t('DomainFilesPage:table.size')}>
                     <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500">{e.tip === 'klasor' ? '—' : formatBoyut(e.boyut_b)}</span>
                   </td>
-                  <td className={T.hucre} data-etiket="Yetkiler">
+                  <td className={T.hucre} data-etiket={t('DomainFilesPage:table.permissions')}>
                     <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500" title={e.mod}>{e.yetkiler || e.mod}</span>
                   </td>
-                  <td className={T.hucre} data-etiket="Kullanıcı">
+                  <td className={T.hucre} data-etiket={t('DomainFilesPage:table.owner')}>
                     <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500 break-all">{e.sahip || '—'}</span>
                   </td>
-                  <td className={T.hucre} data-etiket="Grup">
+                  <td className={T.hucre} data-etiket={t('DomainFilesPage:table.group')}>
                     <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500 break-all">{e.grup || '—'}</span>
                   </td>
-                  <td className={T.hucre} data-etiket="Değişiklik">
+                  <td className={T.hucre} data-etiket={t('DomainFilesPage:table.modified')}>
                     <span className="text-slate-600 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">{formatTarih(e.degisme)}</span>
                   </td>
                   <td className={`${T.hucreAksiyon} lg:text-right`}>
                     <button
                       onClick={ev => { const r = (ev.currentTarget as HTMLElement).getBoundingClientRect(); ctxAc(r.right, r.bottom, e) }}
                       className="p-1.5 rounded text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100"
-                      title="İşlemler"
-                      aria-label={`${e.adi} işlemleri`}
+                      title={t('DomainFilesPage:table.actions')}
+                      aria-label={t('DomainFilesPage:table.actionsFor', { name: e.adi })}
                     >
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
@@ -775,9 +777,9 @@ export default function DomainFilesPage() {
       )}
       {arsivModal && (
         <ArsivModal
-          adetSayi={seciliSet.size}
+          adetSayi={arsivModal.length}
           onTamam={arsivle}
-          onIptal={() => setArsivModal(false)} />
+          onIptal={() => setArsivModal(null)} />
       )}
       {yeniDosyaModal && (
         <YeniDosyaModal
@@ -787,7 +789,7 @@ export default function DomainFilesPage() {
       {boyutSonuc && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setBoyutSonuc(null)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">📏 Boyut Bilgisi</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('DomainFilesPage:sizeModal.title')}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-3 font-mono">{boyutSonuc.yol}</p>
             <div className="text-2xl font-bold text-brand-700 dark:text-brand-300 mb-2">
               {(() => {
@@ -798,9 +800,9 @@ export default function DomainFilesPage() {
                 return (b/1024/1024/1024).toFixed(2) + ' GB'
               })()}
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">{boyutSonuc.boyut.toLocaleString('tr-TR')} bayt</div>
+            <div className="text-xs text-slate-500 dark:text-slate-500 font-mono">{boyutSonuc.boyut.toLocaleString('tr-TR')} {t('DomainFilesPage:sizeModal.bytes')}</div>
             <div className="mt-4 flex justify-end">
-              <button onClick={() => setBoyutSonuc(null)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">Tamam</button>
+              <button onClick={() => setBoyutSonuc(null)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('DomainFilesPage:sizeModal.ok')}</button>
             </div>
           </div>
         </div>
@@ -808,16 +810,13 @@ export default function DomainFilesPage() {
       {izinSifirlaOnay && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaOnay(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-amber-700 dark:text-amber-300 mb-2">⚠ Dosya İzinlerini Sıfırla</h3>
+            <h3 className="text-base font-semibold text-amber-700 dark:text-amber-300 mb-2">{t('DomainFilesPage:resetConfirm.title')}</h3>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
-              <span className="font-mono">public_html</span> altındaki <strong>tüm</strong> klasör ve dosyaların izinleri
-              varsayılana döndürülecek: klasörler <span className="font-mono">750</span>, dosyalar <span className="font-mono">644</span>,
-              sahiplik <span className="font-mono">{domain?.sistem_kullanici}</span>. Elle özelleştirdiğiniz izinler
-              (ör. bir betiği çalıştırılabilir yaptıysanız) kaybolur.
+              {t('DomainFilesPage:resetConfirm.body', { owner: domain?.sistem_kullanici })}
             </p>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setIzinSifirlaOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
-              <button onClick={izinleriSifirla} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded font-medium">Evet, Sıfırla</button>
+              <button onClick={() => setIzinSifirlaOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
+              <button onClick={izinleriSifirla} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded font-medium">{t('DomainFilesPage:resetConfirm.confirm')}</button>
             </div>
           </div>
         </div>
@@ -825,14 +824,12 @@ export default function DomainFilesPage() {
       {izinSifirlaSonuc && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaSonuc(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-2">✓ İzinler Sıfırlandı</h3>
+            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{t('DomainFilesPage:resetDone.title')}</h3>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
-              <span className="font-mono">public_html</span> altındaki tüm klasör ve dosyalar varsayılana döndürüldü:
-              klasörler <span className="font-mono">750</span>, dosyalar <span className="font-mono">644</span>,
-              sahiplik <span className="font-mono">{domain?.sistem_kullanici}</span>.
+              {t('DomainFilesPage:resetDone.body', { owner: domain?.sistem_kullanici })}
             </p>
             <div className="flex justify-end">
-              <button onClick={() => setIzinSifirlaSonuc(false)} className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded font-medium">Tamam</button>
+              <button onClick={() => setIzinSifirlaSonuc(false)} className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded font-medium">{t('DomainFilesPage:sizeModal.ok')}</button>
             </div>
           </div>
         </div>
@@ -840,17 +837,17 @@ export default function DomainFilesPage() {
       {topluSilOnay && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setTopluSilOnay(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">⚠ Toplu Silme</h3>
+            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">{t('DomainFilesPage:bulkDeleteConfirm.title')}</h3>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
-              <span className="font-semibold">{seciliSet.size}</span> öğe geri dönüşsüz silinecek. Klasörler içerdiği dosyalarla birlikte silinir.
+              {t('DomainFilesPage:bulkDeleteConfirm.body', { count: seciliSet.size })}
             </p>
             <ul className="text-xs font-mono text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded p-2 max-h-40 overflow-auto mb-4">
               {Array.from(seciliSet).slice(0, 8).map(y => <li key={y} className="truncate">{y}</li>)}
-              {seciliSet.size > 8 && <li className="text-slate-400 dark:text-slate-500 italic">+ {seciliSet.size - 8} daha…</li>}
+              {seciliSet.size > 8 && <li className="text-slate-400 dark:text-slate-500 italic">{t('DomainFilesPage:bulkDeleteConfirm.more', { count: seciliSet.size - 8 })}</li>}
             </ul>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setTopluSilOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
-              <button onClick={topluSil} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium">Evet, Sil</button>
+              <button onClick={() => setTopluSilOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
+              <button onClick={topluSil} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium">{t('DomainFilesPage:bulkDeleteConfirm.confirm')}</button>
             </div>
           </div>
         </div>
@@ -961,18 +958,19 @@ function BaglamMenu({ x, y, ogeler, onKapat }: { x: number; y: number; ogeler: C
 }
 
 function RenameModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (yeniAd: string) => void; onIptal: () => void }) {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [ad, setAd] = useState(entry.adi)
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Yeniden Adlandır</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:renameModal.title')}</h3>
         <p className="text-xs text-slate-500 dark:text-slate-500 mb-3"><code className="font-mono">{entry.yol}</code></p>
         <input value={ad} onChange={e => setAd(e.target.value)} autoFocus
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(ad)} disabled={!ad || ad === entry.adi}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">Adlandır</button>
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:renameModal.confirm')}</button>
         </div>
       </div>
     </div>
@@ -980,6 +978,7 @@ function RenameModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (yeni
 }
 
 function ChmodModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (mod: string) => void; onIptal: () => void }) {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [mod, setMod] = useState(entry.mod || '0644')
   // 9-bit checkboxes
   const n = parseInt(mod.replace(/^0/, ''), 8) || 0
@@ -992,20 +991,20 @@ function ChmodModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (mod: 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">İzinler</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:chmodModal.title')}</h3>
         <p className="text-xs text-slate-500 dark:text-slate-500 mb-3"><code className="font-mono">{entry.yol}</code></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 text-center">
-          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">Sahip</div>
-          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">Grup</div>
-          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">Diğer</div>
-          {[0o400, 0o040, 0o004].map((b, i) => <button key={'r'+i} onClick={() => tog(b)} className={cls(bit(b))}>Oku</button>)}
-          {[0o200, 0o020, 0o002].map((b, i) => <button key={'w'+i} onClick={() => tog(b)} className={cls(bit(b))}>Yaz</button>)}
-          {[0o100, 0o010, 0o001].map((b, i) => <button key={'x'+i} onClick={() => tog(b)} className={cls(bit(b))}>Çalıştır</button>)}
+          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">{t('DomainFilesPage:chmodModal.owner')}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">{t('DomainFilesPage:chmodModal.group')}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">{t('DomainFilesPage:chmodModal.other')}</div>
+          {[0o400, 0o040, 0o004].map((b, i) => <button key={'r'+i} onClick={() => tog(b)} className={cls(bit(b))}>{t('DomainFilesPage:chmodModal.read')}</button>)}
+          {[0o200, 0o020, 0o002].map((b, i) => <button key={'w'+i} onClick={() => tog(b)} className={cls(bit(b))}>{t('DomainFilesPage:chmodModal.write')}</button>)}
+          {[0o100, 0o010, 0o001].map((b, i) => <button key={'x'+i} onClick={() => tog(b)} className={cls(bit(b))}>{t('DomainFilesPage:chmodModal.execute')}</button>)}
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-500 mb-3">Octal: <input value={mod} onChange={e => setMod(e.target.value)} className="font-mono ml-1 px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded w-20" /></div>
+        <div className="text-xs text-slate-500 dark:text-slate-500 mb-3">{t('DomainFilesPage:chmodModal.octal')} <input value={mod} onChange={e => setMod(e.target.value)} className="font-mono ml-1 px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded w-20" /></div>
         <div className="flex justify-end gap-2">
-          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
-          <button onClick={() => onTamam(mod)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">Uygula</button>
+          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
+          <button onClick={() => onTamam(mod)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('DomainFilesPage:chmodModal.apply')}</button>
         </div>
       </div>
     </div>
@@ -1032,22 +1031,23 @@ function etaBicim(sn: number): string {
 
 function KopyaTasiModal({ tip, yollar, domainId, onTamam, onIptal }:
   { tip: 'kopyala' | 'tasi'; yollar: string[]; domainId: string | number; onTamam: (hedef: string) => void; onIptal: () => void }) {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [hedef, setHedef] = useState('/public_html')
-  const baslik = tip === 'kopyala' ? 'Kopyala' : 'Taşı'
+  const baslik = tip === 'kopyala' ? t('DomainFilesPage:copyMoveModal.titleCopy') : t('DomainFilesPage:copyMoveModal.titleMove')
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{baslik} ({yollar.length} öğe)</h3>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{baslik} ({t('DomainFilesPage:toolbar.itemCount', { count: yollar.length })})</h3>
         <ul className="text-xs font-mono text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded p-2 max-h-32 overflow-auto mb-4">
           {yollar.slice(0, 5).map(y => <li key={y} className="truncate">{y}</li>)}
-          {yollar.length > 5 && <li className="text-slate-400 dark:text-slate-500 italic">+ {yollar.length - 5} daha…</li>}
+          {yollar.length > 5 && <li className="text-slate-400 dark:text-slate-500 italic">{t('DomainFilesPage:copyMoveModal.more', { count: yollar.length - 5 })}</li>}
         </ul>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Hedef dizin (home altında)</label>
-        <input value={hedef} onChange={e => setHedef(e.target.value)} placeholder="/public_html/yedek"
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:copyMoveModal.targetLabel')}</label>
+        <input value={hedef} onChange={e => setHedef(e.target.value)} placeholder={t('DomainFilesPage:copyMoveModal.targetPlaceholder')}
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Hedefin var olması gerekir. {tip === 'kopyala' ? 'Klasörler içerikleriyle kopyalanır.' : 'Aynı diskte taşıma anlık.'}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('DomainFilesPage:copyMoveModal.hintExists')} {tip === 'kopyala' ? t('DomainFilesPage:copyMoveModal.hintCopy') : t('DomainFilesPage:copyMoveModal.hintMove')}</p>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(hedef)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{baslik}</button>
         </div>
       </div>
@@ -1056,16 +1056,17 @@ function KopyaTasiModal({ tip, yollar, domainId, onTamam, onIptal }:
 }
 
 function ArsivModal({ adetSayi, onTamam, onIptal }: { adetSayi: number; onTamam: (ad: string, format: 'zip' | 'tar.gz') => void; onIptal: () => void }) {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [ad, setAd] = useState('yedek-' + new Date().toISOString().slice(0, 10))
   const [format, setFormat] = useState<'zip' | 'tar.gz'>('zip')
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">📦 Arşive Ekle ({adetSayi} öğe)</h3>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Dosya adı</label>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:archiveModal.title', { count: adetSayi })}</h3>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:archiveModal.filename')}</label>
         <input value={ad} onChange={e => setAd(e.target.value)}
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm mb-3" />
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Format</label>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:archiveModal.format')}</label>
         <div className="flex gap-2">
           <button onClick={() => setFormat('zip')}
             className={`px-3 py-1.5 text-sm rounded border ${format === 'zip' ? 'bg-brand-50 dark:bg-brand-900/20 border-brand-500 text-brand-700 dark:text-brand-300' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
@@ -1076,11 +1077,11 @@ function ArsivModal({ adetSayi, onTamam, onIptal }: { adetSayi: number; onTamam:
             TAR.GZ
           </button>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">Çıktı: <code className="font-mono">{ad}.{format}</code></p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">{t('DomainFilesPage:archiveModal.output')} <code className="font-mono">{ad}.{format}</code></p>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(ad, format)} disabled={!ad}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">Arşivle</button>
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:archiveModal.submit')}</button>
         </div>
       </div>
     </div>
@@ -1088,19 +1089,20 @@ function ArsivModal({ adetSayi, onTamam, onIptal }: { adetSayi: number; onTamam:
 }
 
 function YeniDosyaModal({ onTamam, onIptal }: { onTamam: (ad: string) => void; onIptal: () => void }) {
+  const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [ad, setAd] = useState('yeni-dosya.txt')
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
       <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">📄 Yeni Dosya</h3>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Dosya adı (uzantı dahil)</label>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:newFileModal.title')}</h3>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:newFileModal.filename')}</label>
         <input value={ad} onChange={e => setAd(e.target.value)} autoFocus
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
-        <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">Boş dosya oluşturulur, ardından kod editörü açılır.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">{t('DomainFilesPage:newFileModal.hint')}</p>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+          <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(ad)} disabled={!ad}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">Oluştur ve Düzenle</button>
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:newFileModal.submit')}</button>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@
 // Admin de açabilir (aynı veriyi özet olarak görür); asıl derinlik hâlâ
 // İzleme sayfasındadır.
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -29,9 +30,6 @@ const DURUM_STIL: Record<string, string> = {
   failed: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
   absent: 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
 }
-const DURUM_ETIKET: Record<string, string> = {
-  active: 'Çalışıyor', inactive: 'Durmuş', failed: 'Hatalı', absent: 'Kurulu değil',
-}
 
 function Kart({ baslik, deger, alt }: { baslik: string; deger: string; alt?: string }) {
   return (
@@ -44,6 +42,7 @@ function Kart({ baslik, deger, alt }: { baslik: string; deger: string; alt?: str
 }
 
 export default function SunucuDurumuPage() {
+  const { t } = useTranslation(['SunucuDurumuPage', 'common'])
   const [usage, setUsage] = useState<Usage | null>(null)
   const [servisler, setServisler] = useState<Servis[]>([])
   const [guncelleme, setGuncelleme] = useState<Guncelleme | null>(null)
@@ -57,7 +56,7 @@ export default function SunucuDurumuPage() {
       api.get<Servis[]>('/system/servisler').then((r) => { if (!iptal) setServisler(Array.isArray(r.data) ? r.data : []) }),
       api.get<Guncelleme>('/system/guncelleme').then((r) => { if (!iptal) setGuncelleme(r.data) }).catch(() => {}),
     ])
-      .catch((e) => { if (!iptal) setHata(apiHata(e, 'Sunucu durumu alınamadı')) })
+      .catch((e) => { if (!iptal) setHata(apiHata(e, t('SunucuDurumuPage:load_failed'))) })
       .finally(() => { if (!iptal) setYukleniyor(false) })
     return () => { iptal = true }
   }, [])
@@ -71,35 +70,35 @@ export default function SunucuDurumuPage() {
 
   return (
     <div className="w-full px-4 py-6">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Sunucu Durumu' }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('SunucuDurumuPage:breadcrumb_title') }]} />
 
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Sunucu Durumu</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('SunucuDurumuPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Sunucunun anlık durumu. Bu ekran salt-okunurdur — servis yönetimi yöneticiye aittir.
+          {t('SunucuDurumuPage:subtitle')}
         </p>
       </div>
 
       {hata && <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">{hata}</div>}
 
       {yukleniyor ? (
-        <div className="py-16 text-center text-sm text-slate-400">Yükleniyor…</div>
+        <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <Kart baslik="CPU" deger={usage?.cpu_yuzde != null ? `%${Math.round(usage.cpu_yuzde)}` : '—'}
-                  alt={usage?.yuk?.length ? `yük ${usage.yuk.map((y) => y.toFixed(2)).join(' · ')}` : undefined} />
-            <Kart baslik="Bellek" deger={ramYuzde != null ? `%${ramYuzde}` : '—'}
+            <Kart baslik={t('SunucuDurumuPage:cards.cpu')} deger={usage?.cpu_yuzde != null ? `%${Math.round(usage.cpu_yuzde)}` : '—'}
+                  alt={usage?.yuk?.length ? `${t('SunucuDurumuPage:load_prefix')} ${usage.yuk.map((y) => y.toFixed(2)).join(' · ')}` : undefined} />
+            <Kart baslik={t('SunucuDurumuPage:cards.memory')} deger={ramYuzde != null ? `%${ramYuzde}` : '—'}
                   alt={usage?.ram_toplam_mb ? `${usage.ram_kullanilan_mb ?? 0} / ${usage.ram_toplam_mb} MB` : undefined} />
-            <Kart baslik="Disk" deger={diskYuzde != null ? `%${diskYuzde}` : '—'}
+            <Kart baslik={t('SunucuDurumuPage:cards.disk')} deger={diskYuzde != null ? `%${diskYuzde}` : '—'}
                   alt={usage?.disk_toplam_gb ? `${usage.disk_kullanilan_gb ?? 0} / ${usage.disk_toplam_gb} GB` : undefined} />
-            <Kart baslik="Panel Sürümü" deger={guncelleme?.mevcut ? `v${guncelleme.mevcut}` : '—'}
-                  alt={guncelleme?.guncelleme_var ? `güncelleme var: v${guncelleme.son}` : 'güncel'} />
+            <Kart baslik={t('SunucuDurumuPage:cards.panel_version')} deger={guncelleme?.mevcut ? `v${guncelleme.mevcut}` : '—'}
+                  alt={guncelleme?.guncelleme_var ? t('SunucuDurumuPage:update_available', { version: guncelleme.son }) : t('SunucuDurumuPage:up_to_date')} />
           </div>
 
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Servisler</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">{t('SunucuDurumuPage:services_title')}</h2>
           {servisler.length === 0 ? (
-            <div className="py-8 text-center text-sm text-slate-400">Servis bilgisi yok.</div>
+            <div className="py-8 text-center text-sm text-slate-400">{t('SunucuDurumuPage:no_service_info')}</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {servisler.map((s) => (
@@ -109,7 +108,7 @@ export default function SunucuDurumuPage() {
                     <div className="truncate text-[11px] text-slate-400">{s.grup}</div>
                   </div>
                   <span className={`shrink-0 px-2 py-0.5 rounded text-xs ${DURUM_STIL[s.durum] ?? DURUM_STIL.absent}`}>
-                    {DURUM_ETIKET[s.durum] ?? s.durum}
+                    {t(`SunucuDurumuPage:status.${s.durum}`, { defaultValue: s.durum })}
                   </span>
                 </div>
               ))}

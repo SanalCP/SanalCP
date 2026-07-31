@@ -1,0 +1,21 @@
+{
+  "breadcrumb_home": "Home",
+  "breadcrumb_domains": "Domains",
+  "breadcrumb_ftp": "FTP Account",
+  "title": "FTP Account",
+  "server": "Server",
+  "port": "Port",
+  "port_value": "21 (FTP) / 22 (SFTP)",
+  "username": "Username",
+  "home_dir": "Home directory",
+  "password_reset": "Password Reset",
+  "password_placeholder": "Enter a custom password or leave blank",
+  "set_this_password": "Set This Password",
+  "generate_random": "Generate Random",
+  "new_password_assigned": "✓ New password assigned",
+  "save_hint": "Save this somewhere safe, you won't be able to see it again:",
+  "note_label": "Note:",
+  "note_text_before": "FTP currently uses",
+  "note_text_after": "authentication (local DB). SFTP (port 22) can be used for encryption.",
+  "reset_failed": "Password reset failed"
+}

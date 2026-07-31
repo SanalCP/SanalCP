@@ -1,0 +1,63 @@
+{
+  "breadcrumb": { "home": "Home", "title": "Hosting Plans" },
+  "title": "Hosting Plans",
+  "subtitle": "Define hosting plans (packages) for domains. Each domain is linked to a plan; resources like disk, traffic, PHP version, database and subdomain limits are set per package.",
+  "buttons": { "add_plan": "Add Plan" },
+  "loading": "Loading…",
+  "empty": {
+    "title": "No hosting plans yet",
+    "description": "Get started by defining your first package."
+  },
+  "card": {
+    "default_badge": "Default",
+    "labels": {
+      "disk": "Disk",
+      "traffic": "Traffic",
+      "domain": "Domain",
+      "database": "Database",
+      "ftp": "FTP"
+    },
+    "detail_button": "Details & Resource Limits",
+    "actions": { "delete": "Delete" }
+  },
+  "units": {
+    "unlimited": "unlimited",
+    "mb": "MB",
+    "mb_per_month": "MB/mo",
+    "count": "",
+    "ftp_account": "accounts"
+  },
+  "confirm": {
+    "title": "Delete plan",
+    "message": "Delete plan \"{{ad}}\"?",
+    "yes": "Yes, delete"
+  },
+  "errors": {
+    "delete_failed": "Delete failed",
+    "save_failed": "Save failed"
+  },
+  "modal": {
+    "title_new": "New Plan",
+    "title_edit": "Edit Plan",
+    "fields": {
+      "plan_name": "Plan name",
+      "description": "Description",
+      "disk_mb": "Disk (MB)",
+      "traffic_mb": "Traffic (MB)",
+      "php_version": "PHP Version",
+      "max_domain": "Max domain",
+      "max_db": "Max DB",
+      "max_ftp": "Max FTP"
+    },
+    "checkboxes": {
+      "default_plan": "Default plan for new domains"
+    },
+    "info_note": "0 = unlimited. Disk/traffic are in MB. New domains on this plan are set up with the selected PHP version.",
+    "buttons": {
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "add": "Add",
+      "update": "Update"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "start_failed": "could not start",
+  "rebooting": "Server is rebooting — access will return within a few minutes.",
+  "confirm": "Are you sure?",
+  "starting": "Starting…",
+  "yes_reboot": "Yes, reboot",
+  "reboot_button": "Reboot Server"
+}

@@ -1,0 +1,14 @@
+{
+  "subtitle": "Hosting Kontrol Paneli",
+  "welcome": "Hoş geldiniz",
+  "continue_prompt": "Devam etmek için giriş yapın.",
+  "username": "Kullanıcı adı",
+  "password": "Parola",
+  "twofa_code": "İki adımlı doğrulama kodu",
+  "twofa_hint": "Authenticator uygulamanızdaki 6 haneli kodu girin.",
+  "login_failed": "Giriş başarısız",
+  "signing_in": "Giriş yapılıyor…",
+  "verify_and_login": "Doğrula ve giriş yap",
+  "login": "Giriş yap",
+  "footer": "SanalCP · sürüm {{version}}"
+}

@@ -1,14 +1,17 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { useTranslation } from 'react-i18next'
+
 export default function HenuzHazirDegil({
   baslik, faz, aciklama,
 }: { baslik: string; faz: string; aciklama: string }) {
+  const { t } = useTranslation(['HenuzHazirDegil'])
   return (
     <div className="px-8 py-6">
       <div className="flex items-center mb-1">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{baslik}</h1>
         <span className="ml-3 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded">
-          {faz} · Hazır Değil
+          {faz} · {t('HenuzHazirDegil:not_ready_suffix')}
         </span>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-8">{aciklama}</p>
@@ -19,10 +22,9 @@ export default function HenuzHazirDegil({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">Yapım aşamasında</h3>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('HenuzHazirDegil:wip_title')}</h3>
         <p className="text-sm text-slate-500 dark:text-slate-500 max-w-md mx-auto">
-          Bu modül <span className="font-mono text-brand-700 dark:text-brand-300">{faz}</span> fazında devreye girecek.
-          Şu an sadece arayüz iskeleti görülmektedir.
+          {t('HenuzHazirDegil:wip_desc', { faz })}
         </p>
       </div>
     </div>

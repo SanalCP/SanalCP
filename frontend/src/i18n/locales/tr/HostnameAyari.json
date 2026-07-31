@@ -1,0 +1,11 @@
+{
+  "load_failed": "Hostname okunamadı",
+  "save_failed": "Hostname değiştirilemedi",
+  "saved": "Hostname “{{hostname}}” olarak değiştirildi ve kalıcı hale getirildi.",
+  "label": "Sunucu Hostname",
+  "protected": "Sağlayıcıya karşı korumalı",
+  "unprotected": "Koruma bekliyor",
+  "desc": "Sistem hostname’ini kalıcı olarak değiştirir. Cloud-init ve DHCP/NetworkManager’ın VPS sağlayıcısından gelen otomatik adı yeniden yazması engellenir. Tam alan adı kullanmanız önerilir:",
+  "saving": "Uygulanıyor…",
+  "submit": "Hostname’i Değiştir"
+}

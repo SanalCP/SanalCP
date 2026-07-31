@@ -1,0 +1,52 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "waf": "Web Application Firewall (WAF)"
+  },
+  "title": "Web Application Firewall",
+  "domain_info": "ModSecurity v3 + OWASP Core Rule Set. The nginx vhost is re-rendered on save (zero downtime).",
+  "module_not_installed": {
+    "title": "The ModSecurity module is not installed on the server.",
+    "desc_before": "Settings are saved but the WAF is not applied. It activates automatically once",
+    "desc_after": "is run on the server (existing sites are unaffected)."
+  },
+  "effective_status": {
+    "label": "Effective status:",
+    "active_block": "Active · Block",
+    "active_detect": "Active · Detect",
+    "inactive": "Inactive",
+    "plan_default": "Plan default ({{name}}):",
+    "plan_off": "Off"
+  },
+  "modes": {
+    "title": "WAF Mode",
+    "selected": "● Selected",
+    "devral": { "title": "Inherit from Plan", "desc": "This domain uses the WAF default of its assigned service plan." },
+    "engelle": { "title": "Block", "desc": "Malicious requests (SQLi, XSS, RCE…) are blocked with a 403. SecRuleEngine On." },
+    "denetle": { "title": "Detect", "desc": "Requests aren't blocked; matching rules are only written to the audit log. DetectionOnly — ideal for tuning rules." },
+    "kapali": { "title": "Off", "desc": "WAF is fully disabled for this domain (even if the plan has it on)." }
+  },
+  "paranoia": {
+    "title": "Paranoia Level (CRS)",
+    "desc1": "Higher level = more rules + stronger protection, but a higher chance of false positives.",
+    "desc2_prefix": "Only effective while the WAF is in",
+    "desc2_or": "or",
+    "desc2_suffix": "mode.",
+    "select_inherit": "Inherit from plan",
+    "select_level1": "Level 1 (Low)",
+    "select_level2": "Level 2 (Medium)",
+    "select_level3": "Level 3 (High)",
+    "select_level4": "Level 4 (Strict)",
+    "hint0": "The plan default is used.",
+    "hint1": "Low — basic attack signatures. Almost no false positives. (recommended)",
+    "hint2": "Medium — more rules. Some legitimate requests may be blocked.",
+    "hint3": "High — aggressive. May require tuning (exclusions) per application.",
+    "hint4": "Strict — most aggressive. Only for cases requiring strict auditing."
+  },
+  "apply": "Save and Apply",
+  "applying": "Applying…",
+  "reload": "Reload",
+  "save_failed": "Failed to save",
+  "applied_msg": "✓ WAF applied — {{mode}} mode, paranoia {{level}}",
+  "saved_inactive_msg": "✓ Setting saved — WAF is inactive for this domain"
+}

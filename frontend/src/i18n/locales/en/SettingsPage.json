@@ -1,0 +1,61 @@
+{
+  "title": "Profile & Preferences",
+  "subtitle": "Your account details, password, two-factor authentication and panel preferences.",
+  "account": {
+    "title": "Account Information",
+    "desc": "Edit your full name and email address.",
+    "username": "Username",
+    "role_status": "Role / Status",
+    "full_name": "Full Name",
+    "full_name_placeholder": "Your full name",
+    "email": "Email",
+    "email_placeholder": "you@example.com",
+    "saved": "Information saved.",
+    "save_failed": "Could not save"
+  },
+  "password": {
+    "title": "Password",
+    "desc": "This changes the server's root password (including SSH access).",
+    "current": "Current password",
+    "new": "New password",
+    "new_repeat": "New password (repeat)",
+    "change": "Change Password",
+    "changing": "Changing…",
+    "changed": "Password changed. (Server root password updated.)",
+    "change_failed": "Could not change password",
+    "too_short": "New password must be at least 8 characters.",
+    "mismatch": "New passwords don't match."
+  },
+  "twofa": {
+    "title": "Two-Factor Authentication (2FA)",
+    "desc": "Requires a 6-digit code from an authenticator app in addition to your password at login.",
+    "status": "Status:",
+    "active": "● Active",
+    "off": "○ Off",
+    "enable": "Enable 2FA",
+    "disable": "Disable 2FA",
+    "step1": "1) Add it to your authenticator app (Google Authenticator, Authy, Microsoft Authenticator):",
+    "scan_hint": "Scan with your authenticator app",
+    "manual_hint": "Can't scan? Use this secret key to enter it manually:",
+    "or_link": "or link:",
+    "step2": "2) Enter the 6-digit code from the app:",
+    "verify_enable": "Verify & Enable",
+    "verifying": "Verifying…",
+    "cancel": "Cancel",
+    "disable_prompt": "Enter your authenticator code to disable:",
+    "give_up": "Cancel",
+    "verify_failed": "Could not verify code",
+    "verify_failed_generic": "Could not verify code — enter the 6-digit code from the app",
+    "qr_alt": "2FA QR code"
+  },
+  "prefs": {
+    "title": "Preferences",
+    "desc": "Panel appearance and language preferences.",
+    "theme": "Theme",
+    "theme_system": "System",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "language": "Language",
+    "save": "Save Preferences"
+  }
+}

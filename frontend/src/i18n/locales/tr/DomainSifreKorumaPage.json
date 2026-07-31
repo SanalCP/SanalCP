@@ -1,0 +1,23 @@
+{
+  "breadcrumb_title": "Şifre Korumalı Dizinler",
+  "title": "Şifre Korumalı Dizinler",
+  "subtitle": "Belirli bir dizini HTTP kimlik doğrulaması (.htpasswd) ile koruyun. Ziyaretçiler kullanıcı adı ve parola olmadan erişemez.",
+  "protected": "{{yol}} dizini \"{{kullanici}}\" ile korumaya alındı.",
+  "add_failed": "Eklenemedi",
+  "confirm_remove": "\"{{kullanici}}\" kullanıcısını {{yol}} korumasından kaldır?",
+  "delete_failed": "Silinemedi",
+  "new_protection_title": "Yeni koruma / kullanıcı ekle",
+  "dir_path_label": "Dizin yolu",
+  "dir_path_placeholder": "/gizli",
+  "username_label": "Kullanıcı adı",
+  "username_placeholder": "kullanici",
+  "password_label": "Parola",
+  "dir_help": "Yol / ile başlamalı (örn. /gizli, /admin). Aynı yola birden fazla kullanıcı ekleyebilirsiniz.",
+  "adding": "Ekleniyor…",
+  "add_button": "Koruma Ekle",
+  "existing_protected_title": "Korunan dizinler",
+  "no_protected": "Henüz korumalı dizin yok.",
+  "users_count": "· {{count}} kullanıcı",
+  "remove": "Kaldır",
+  "back_to_subscription": "← Aboneliğe dön"
+}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
@@ -9,6 +10,7 @@ type Tarama = { id: number; durum: string; motor: string; taranan: number; enfek
 type Durum = { clamav: boolean; imza_tarihi: string; kullanici: string; son_tarama: Tarama | null; bulgular: Bulgu[] }
 
 export default function DomainAntivirusPage() {
+  const { t } = useTranslation(['DomainAntivirusPage', 'common'])
   const { id } = useParams()
   const [d, setD] = useState<Durum | null>(null)
   const [yuk, setYuk] = useState(true)
@@ -46,25 +48,25 @@ export default function DomainAntivirusPage() {
     try {
       const { data } = await api.post(`/domains/${id}/antivirus/tara`, {})
       startPoll(data.scan_id)
-    } catch (e) { setHata(apiHata(e, 'Tarama başlatılamadı')); setTarariyor(false) }
+    } catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:scan_start_failed'))); setTarariyor(false) }
   }
 
   async function karantina(b: Bulgu) {
-    if (!confirm(`Dosya karantinaya alınsın mı?\n${b.dosya}\n\n(Dosya ~/.karantina altına taşınır ve erişilemez hâle gelir.)`)) return
+    if (!confirm(t('DomainAntivirusPage:quarantine_confirm', { file: b.dosya }))) return
     setHata(null)
     try { await api.post(`/domains/${id}/antivirus/karantina`, { dosya: b.dosya }); yukle() }
-    catch (e) { setHata(apiHata(e, 'Karantinaya alınamadı')) }
+    catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:quarantine_failed'))) }
   }
 
   async function imzaGuncelle() {
     setImzaYuk(true); setHata(null)
     try { await api.post(`/domains/${id}/antivirus/imza-guncelle`, {}); yukle() }
-    catch (e) { setHata(apiHata(e, 'İmza güncellenemedi')) }
+    catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:signature_update_failed'))) }
     finally { setImzaYuk(false) }
   }
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
+  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainAntivirusPage:not_found')}</div></div>
 
   const aktif = d.bulgular.filter(b => !b.karantina)
 
@@ -72,13 +74,13 @@ export default function DomainAntivirusPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
-          { etiket: 'Antivirüs' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('DomainAntivirusPage:breadcrumb.domains'), href: '/domainler' },
+          { etiket: t('DomainAntivirusPage:breadcrumb.antivirus') },
         ]} />
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Antivirüs — Zararlı Yazılım Taraması</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainAntivirusPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          <span className="font-mono">public_html</span> dizini ClamAV imzaları + yerleşik webshell heuristiği ile taranır.
+          <span className="font-mono">public_html</span> {t('DomainAntivirusPage:desc_suffix')}
         </p>
 
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -89,26 +91,26 @@ export default function DomainAntivirusPage() {
             <div className="text-sm space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${d.clamav ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span className="text-slate-700 dark:text-slate-200">Motor: <span className="font-medium">{d.clamav ? 'ClamAV + Heuristik' : 'Sadece Heuristik'}</span></span>
+                <span className="text-slate-700 dark:text-slate-200">{t('DomainAntivirusPage:engine_label')} <span className="font-medium">{d.clamav ? t('DomainAntivirusPage:engine_clamav') : t('DomainAntivirusPage:engine_heuristic_only')}</span></span>
               </div>
-              {d.clamav && <div className="text-xs text-slate-400 ml-4">İmza veritabanı: {d.imza_tarihi || '—'}</div>}
+              {d.clamav && <div className="text-xs text-slate-400 ml-4">{t('DomainAntivirusPage:signature_db', { date: d.imza_tarihi || '—' })}</div>}
               {d.son_tarama && <div className="text-xs text-slate-400 ml-4">
-                Son tarama: {d.son_tarama.bitis || d.son_tarama.baslangic} · {d.son_tarama.taranan} dosya · {d.son_tarama.enfekte} bulgu
+                {t('DomainAntivirusPage:last_scan', { when: d.son_tarama.bitis || d.son_tarama.baslangic, scanned: d.son_tarama.taranan, found: d.son_tarama.enfekte })}
               </div>}
             </div>
             <div className="flex gap-2">
               {d.clamav && <button onClick={imzaGuncelle} disabled={imzaYuk || tarariyor}
                 className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50">
-                {imzaYuk ? 'Güncelleniyor…' : 'İmzaları Güncelle'}</button>}
+                {imzaYuk ? t('DomainAntivirusPage:updating_signatures') : t('DomainAntivirusPage:update_signatures')}</button>}
               <button onClick={tara} disabled={tarariyor}
                 className="px-4 py-2 text-sm font-medium bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-lg disabled:opacity-50">
-                {tarariyor ? 'Taranıyor…' : 'Şimdi Tara'}</button>
+                {tarariyor ? t('DomainAntivirusPage:scanning') : t('DomainAntivirusPage:scan_now')}</button>
             </div>
           </div>
           {tarariyor && (
             <div className="mt-3 flex items-center gap-2 text-sm text-brand-600 dark:text-brand-400">
               <span className="inline-block w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-              Tarama sürüyor… (büyük sitelerde birkaç dakika sürebilir)
+              {t('DomainAntivirusPage:scan_in_progress')}
             </div>
           )}
         </div>
@@ -116,35 +118,35 @@ export default function DomainAntivirusPage() {
         {/* Bulgular */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
-            Bulgular {d.son_tarama && <span className="text-xs font-normal text-slate-400">— son taramadan</span>}
+            {t('DomainAntivirusPage:findings_title')} {d.son_tarama && <span className="text-xs font-normal text-slate-400">{t('DomainAntivirusPage:findings_last_scan_note')}</span>}
           </h3>
           {!d.son_tarama ? (
-            <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Henüz tarama yapılmadı. “Şimdi Tara” ile başlayın.</div>
+            <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">{t('DomainAntivirusPage:no_scan_yet')}</div>
           ) : aktif.length === 0 && d.bulgular.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-3xl mb-2">✅</div>
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Temiz — zararlı yazılım bulunmadı.</p>
+              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{t('DomainAntivirusPage:clean')}</p>
             </div>
           ) : (
             <div className="lg:overflow-x-auto">
               <table className={T.tablo}>
                 <thead className={T.baslikGrubu}>
                   <tr className="text-left border-b border-slate-100 dark:border-slate-700">
-                    <th className={T.baslik}>Dosya</th><th className={T.baslik}>İmza</th><th className={T.baslik}>Motor</th><th className={T.baslik}>Durum</th><th className={T.baslik}></th>
+                    <th className={T.baslik}>{t('DomainAntivirusPage:table.file')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.signature')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.engine')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.status')}</th><th className={T.baslik}></th>
                   </tr>
                 </thead>
                 <tbody className={T.govde}>
                   {d.bulgular.map((b, i) => (
                     <tr key={i} className={`${T.satir} lg:border-b lg:border-slate-50 dark:lg:border-slate-800`}>
                       <td className={T.hucreBaslik}><span className="font-mono text-xs lg:text-xs text-sm break-all">{b.dosya}</span></td>
-                      <td className={T.hucre} data-etiket="İmza"><span className="text-slate-700 dark:text-slate-200">{b.imza}</span></td>
-                      <td className={T.hucre} data-etiket="Motor"><span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">{b.motor}</span></td>
-                      <td className={T.hucre} data-etiket="Durum">
-                        {b.karantina ? <span className="text-xs text-amber-600 dark:text-amber-400">🔒 Karantinada</span>
-                          : <span className="text-xs text-red-600 dark:text-red-400">⚠ Aktif</span>}
+                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.signature')}><span className="text-slate-700 dark:text-slate-200">{b.imza}</span></td>
+                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.engine')}><span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">{b.motor}</span></td>
+                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.status')}>
+                        {b.karantina ? <span className="text-xs text-amber-600 dark:text-amber-400">🔒 {t('DomainAntivirusPage:quarantined')}</span>
+                          : <span className="text-xs text-red-600 dark:text-red-400">⚠ {t('DomainAntivirusPage:active_finding')}</span>}
                       </td>
                       <td className={T.hucreAksiyon}>
-                        {!b.karantina && <button onClick={() => karantina(b)} className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap">Karantinaya al</button>}
+                        {!b.karantina && <button onClick={() => karantina(b)} className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap">{t('DomainAntivirusPage:quarantine_action')}</button>}
                       </td>
                     </tr>
                   ))}
@@ -154,7 +156,7 @@ export default function DomainAntivirusPage() {
           )}
         </div>
 
-        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link></div>
+        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainAntivirusPage:back_to_subscription')}</Link></div>
       </div>
     </div>
   )

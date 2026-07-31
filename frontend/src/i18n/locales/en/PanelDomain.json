@@ -1,0 +1,20 @@
+{
+  "title": "Panel Domain",
+  "badge_auto_ssl": "Automatic SSL",
+  "desc1": "Access the panel with your own domain instead of a bare IP, without typing a port. The domain's A record must point to this server",
+  "desc2": "— once saved, the panel automatically installs a real Let's Encrypt certificate. The panel always",
+  "desc3": "remains accessible as well (fallback access).",
+  "ip_fallback": "server-ip",
+  "ssl_active": "SSL active",
+  "ssl_valid_until": " — valid until {{date}}",
+  "ssl_active_access": " — you can access it via https://{{domain}} without typing a port",
+  "ssl_cert_failed": "Domain saved but certificate could not be obtained: {{error}}",
+  "placeholder": "panel.example.com",
+  "save_button": "Save and install SSL",
+  "saving": "Saving…",
+  "remove_button": "Remove",
+  "save_success": "✓ Certificate installed — you can access it via https://{{domain}}",
+  "remove_success": "✓ Custom domain removed, panel reverted to server IP + self-signed certificate",
+  "save_failed": "could not be saved",
+  "remove_failed": "could not be removed"
+}

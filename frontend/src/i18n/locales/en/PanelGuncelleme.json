@@ -1,0 +1,13 @@
+{
+  "title": "Panel Update",
+  "badge_server": "Server",
+  "desc": "Updates the panel to the latest version on GitHub. Data (env, database, sites) is preserved; if the new version doesn't start healthy, it's rolled back automatically.",
+  "desc_tool_missing": "Update tool is not on the server — it will be downloaded automatically on first run.",
+  "start_failed": "could not start update",
+  "log_started": "Update started…\n",
+  "running": "Update running — the panel may restart briefly, don't close this page.",
+  "check_and_install": "Check and install updates",
+  "confirm_prompt": "The panel will be updated and the service will restart. Do you confirm?",
+  "starting": "Starting…",
+  "confirm_yes": "Yes, update"
+}

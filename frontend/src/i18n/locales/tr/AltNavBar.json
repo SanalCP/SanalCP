@@ -1,0 +1,16 @@
+{
+  "nav_aria": "Alt gezinme",
+  "tabs": {
+    "home": "Anasayfa",
+    "domains": "Domainler",
+    "monitor": "İzleme",
+    "overview": "Genel",
+    "files": "Dosyalar",
+    "database": "Veritabanı",
+    "backups": "Yedekler"
+  },
+  "new": "Yeni",
+  "new_domain_aria": "Yeni domain oluştur",
+  "menu": "Menü",
+  "open_menu_aria": "Menüyü aç"
+}
