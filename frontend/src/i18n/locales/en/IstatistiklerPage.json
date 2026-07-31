@@ -1,0 +1,32 @@
+{
+  "breadcrumb_title": "Statistics",
+  "title": "Statistics",
+  "live_badge": "● Live (10s)",
+  "subtitle": "Server resource usage, domain counts, system overview.",
+  "metrics": {
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "load": "Load (1min)"
+  },
+  "core_suffix": "cores",
+  "load_detail": "5m: {{v5}} · 15m: {{v15}}",
+  "system_card": {
+    "title": "System",
+    "hostname": "Server name",
+    "os": "Operating system",
+    "kernel": "Kernel",
+    "cpu": "Processor",
+    "swap": "Swap",
+    "panel_version": "Panel version"
+  },
+  "domains_card": {
+    "title": "Domains",
+    "total": "Total domains",
+    "active": "Active domains",
+    "inactive": "Inactive domains"
+  },
+  "footer_prefix": "For more detailed monitoring, visit the",
+  "footer_link": "Monitoring",
+  "footer_suffix": "page."
+}

@@ -1,0 +1,105 @@
+{
+  "breadcrumb": "Users",
+  "title": "Users",
+  "subtitle_admin": "Panel accounts: admins, resellers and customers.",
+  "subtitle_reseller": "Customer accounts you have created.",
+  "new_account": "New Account",
+  "new_customer": "New Customer",
+  "error": {
+    "load": "Failed to load accounts",
+    "create": "Failed to create account",
+    "password_reset": "Failed to reset password",
+    "limits_load": "Failed to read limits",
+    "limits_save": "Failed to save limits",
+    "status_change": "Failed to change status",
+    "delete": "Failed to delete"
+  },
+  "success": {
+    "created": "Account {{name}} created.",
+    "password_updated": "Password for {{name}} updated.",
+    "limits_updated": "Limits for {{name}} updated.",
+    "activated": "{{name}} activated.",
+    "suspended": "{{name}} suspended.",
+    "deleted": "{{name}} deleted."
+  },
+  "empty": {
+    "title_admin": "No other accounts yet",
+    "title_reseller": "You have no customer accounts yet",
+    "desc": "Get started by creating a new account.",
+    "no_search_results": "No accounts match your search."
+  },
+  "roles": {
+    "admin": "Admin",
+    "reseller": "Reseller",
+    "user": "Customer"
+  },
+  "table": {
+    "user": "User",
+    "full_name": "Full Name",
+    "role": "Role",
+    "status": "Status",
+    "twofa": "2FA",
+    "last_login": "Last Login",
+    "system_tag": "(system)",
+    "system_account": "system account",
+    "active": "Active",
+    "suspended": "Suspended",
+    "no_password": "No password",
+    "no_password_title": "No password set — this account cannot log in",
+    "twofa_on": "On",
+    "twofa_off": "Off",
+    "password_btn": "Password",
+    "limits_btn": "Limits",
+    "suspend": "Suspend",
+    "activate": "Activate"
+  },
+  "modal_new": {
+    "title_admin": "New Account",
+    "title_reseller": "New Customer Account",
+    "username": "Username",
+    "username_placeholder": "example_reseller",
+    "username_hint": "3-32 characters, starts with a lowercase letter; may contain letters, digits, _ and -.",
+    "password": "Password",
+    "password_hint": "At least 8 characters. The password is only shown now — pass it on to the user.",
+    "role": "Role",
+    "role_hint_reseller": "Resellers can only create customer accounts.",
+    "full_name": "Full Name"
+  },
+  "modal_password": {
+    "title": "Set Password",
+    "desc_suffix": "new password.",
+    "user_hint": "This is the customer's panel account password. The customer can only log in to the panel with this username and password; they cannot log in without a password set.",
+    "placeholder": "At least 8 characters",
+    "submit": "Set Password"
+  },
+  "modal_limits": {
+    "title": "Reseller Limits",
+    "desc_suffix": "upper limits.",
+    "zero_unlimited": "0 = unlimited.",
+    "zero_hint": "If both are 0, the limit record is removed entirely.",
+    "package": "Reseller package",
+    "manual_option": "Enter manually",
+    "package_filled_hint": "The 4 fields below were filled from the \"{{name}}\" package; select \"Enter manually\" to change them.",
+    "package_manual_hint": "If you don't select a package, you enter the limits manually.",
+    "max_customer": "Max customers",
+    "in_use": "currently using {{n}}",
+    "below_usage": "— limit is below current usage",
+    "max_domain": "Max domains",
+    "disk_quota": "Disk quota (MB)",
+    "in_use_mb": "currently using {{n}} MB",
+    "traffic_quota": "Traffic quota (MB/month)",
+    "overselling": "Allow overselling",
+    "overselling_hint": "If disabled, the reseller cannot exceed their disk/traffic quota in the total disk/traffic they commit to customers (equivalent to WHM's \"Overselling\" setting).",
+    "plans_label": "Service plans that can be assigned to customers",
+    "plans_empty": "No service plans defined.",
+    "plans_hint": "If none are checked there is no restriction — the reseller can use all service plans.",
+    "no_limit_defined": "No limit defined for this reseller — currently unlimited.",
+    "footer_hint": "Going below the limit does not delete existing accounts or take sites down; it only blocks adding new customers/domains. Disk and traffic are based on the last measurement."
+  },
+  "confirm_delete": {
+    "title": "Delete account",
+    "message": "The account {{name}} will be deleted.{{extra}}",
+    "message_reseller_extra": " Accounts under this reseller will not be deleted, they will be transferred to the admin.",
+    "confirm": "Delete"
+  }
+}

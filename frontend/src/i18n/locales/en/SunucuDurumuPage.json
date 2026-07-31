@@ -1,0 +1,24 @@
+{
+  "breadcrumb_title": "Server Status",
+  "title": "Server Status",
+  "subtitle": "Live server status. This screen is read-only — service management belongs to the administrator.",
+  "load_failed": "Could not load server status",
+  "loading": "Loading…",
+  "cards": {
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disk": "Disk",
+    "panel_version": "Panel Version"
+  },
+  "load_prefix": "load",
+  "update_available": "update available: v{{version}}",
+  "up_to_date": "up to date",
+  "services_title": "Services",
+  "no_service_info": "No service information.",
+  "status": {
+    "active": "Running",
+    "inactive": "Stopped",
+    "failed": "Failed",
+    "absent": "Not installed"
+  }
+}

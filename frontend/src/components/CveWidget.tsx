@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
 // Dashboard güvenlik-açığı (CVE) widget'ı.
@@ -32,15 +33,16 @@ const SHIELD = 'M12 3 4.5 6v5.5c0 4.2 3.2 7.1 7.5 8.5 4.3-1.4 7.5-4.3 7.5-8.5V6L
 const CHECK = 'M9 12.5l2 2 4.5-4.5'
 const ALERT = 'M12 9v3.5m0 3h.01'
 
-// Önem etiketine göre renk/metin (semantik — marka turuncusundan ayrı).
-const ONEM: Record<string, { ad: string; nokta: string; metin: string }> = {
-  kritik: { ad: 'Kritik', nokta: 'bg-red-500', metin: 'text-red-600 dark:text-red-400' },
-  onemli: { ad: 'Önemli', nokta: 'bg-amber-500', metin: 'text-amber-600 dark:text-amber-400' },
-  orta: { ad: 'Orta', nokta: 'bg-sky-500', metin: 'text-sky-600 dark:text-sky-400' },
-  dusuk: { ad: 'Düşük', nokta: 'bg-slate-400', metin: 'text-slate-500 dark:text-slate-400' },
+// Önem etiketine göre renk (semantik — marka turuncusundan ayrı). Etiket metni t('CveWidget:severity.<k>') ile çevrilir.
+const ONEM: Record<string, { nokta: string; metin: string }> = {
+  kritik: { nokta: 'bg-red-500', metin: 'text-red-600 dark:text-red-400' },
+  onemli: { nokta: 'bg-amber-500', metin: 'text-amber-600 dark:text-amber-400' },
+  orta: { nokta: 'bg-sky-500', metin: 'text-sky-600 dark:text-sky-400' },
+  dusuk: { nokta: 'bg-slate-400', metin: 'text-slate-500 dark:text-slate-400' },
 }
 
 export default function CveWidget() {
+  const { t } = useTranslation(['CveWidget'])
   const [veri, setVeri] = useState<CveOzet | null>(null)
   const [hata, setHata] = useState('')
   const [taraniyor, setTaraniyor] = useState(false)
@@ -57,7 +59,7 @@ export default function CveWidget() {
       setHata('')
       if (data.guncelleme_calisiyor) baslatPoll()
     } catch (e) {
-      setHata(apiHata(e, 'CVE bilgisi alınamadı'))
+      setHata(apiHata(e, t('CveWidget:fetch_failed')))
     }
   }
 
@@ -79,7 +81,7 @@ export default function CveWidget() {
         if (!data.calisiyor) {
           if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
           setGuncelleniyor(false)
-          setMesaj('Güvenlik güncellemeleri tamamlandı.')
+          setMesaj(t('CveWidget:updates_completed'))
           getir(true)
         }
       } catch { /* geçici — bir sonraki tick tekrar dener */ }
@@ -94,17 +96,14 @@ export default function CveWidget() {
   }
 
   async function guncelle() {
-    if (!window.confirm(
-      'Sunucudaki güvenlik güncellemeleri (dnf --security) kurulacak. ' +
-      'Çekirdek (kernel) güncellemesi varsa etkin olması için yeniden başlatma gerekebilir. Devam edilsin mi?',
-    )) return
+    if (!window.confirm(t('CveWidget:confirm_update'))) return
     setHata('')
     setMesaj('')
     try {
       await api.post('/system/cve/guncelle')
       baslatPoll()
     } catch (e) {
-      setHata(apiHata(e, 'Güncelleme başlatılamadı'))
+      setHata(apiHata(e, t('CveWidget:update_start_failed')))
     }
   }
 
@@ -117,7 +116,7 @@ export default function CveWidget() {
         if (!data.calisiyor) {
           if (kcPollRef.current) { window.clearInterval(kcPollRef.current); kcPollRef.current = null }
           setKcCalisiyor(false)
-          setMesaj('Canlı çekirdek yaması uygulandı.')
+          setMesaj(t('CveWidget:live_patch_applied'))
           getir(true)
         }
       } catch { /* geçici — bir sonraki tick tekrar dener */ }
@@ -131,7 +130,7 @@ export default function CveWidget() {
       await api.post('/system/kernelcare/yamala')
       baslatKcPoll()
     } catch (e) {
-      setHata(apiHata(e, 'Canlı yama başlatılamadı'))
+      setHata(apiHata(e, t('CveWidget:live_patch_start_failed')))
     }
   }
 
@@ -157,9 +156,9 @@ export default function CveWidget() {
             </svg>
           </span>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Güvenlik Açıkları</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('CveWidget:title')}</h3>
             <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
-              {veri ? `${veri.toplam_danisman} güvenlik danışmanı` : 'CVE denetimi (AlmaLinux)'}
+              {veri ? t('CveWidget:subtitle_with_count', { count: veri.toplam_danisman }) : t('CveWidget:subtitle_idle')}
             </p>
           </div>
         </div>
@@ -168,7 +167,7 @@ export default function CveWidget() {
           onClick={yenidenTara}
           disabled={taraniyor || guncelleniyor}
           className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-          {taraniyor ? 'Taranıyor…' : 'Yeniden tara'}
+          {taraniyor ? t('CveWidget:scanning') : t('CveWidget:rescan')}
         </button>
       </div>
 
@@ -176,7 +175,7 @@ export default function CveWidget() {
       {guncelleniyor && (
         <div className="mb-3 flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-[12px] font-medium text-brand-700 dark:border-brand-900/50 dark:bg-brand-900/15 dark:text-brand-300">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" />
-          Güvenlik güncellemeleri kuruluyor… (arka planda sürer)
+          {t('CveWidget:installing_updates')}
         </div>
       )}
 
@@ -184,7 +183,7 @@ export default function CveWidget() {
       {kcCalisiyor && (
         <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[12px] font-medium text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/15 dark:text-emerald-300">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
-          Canlı çekirdek yaması uygulanıyor… (KernelCare — reboot gerekmez)
+          {t('CveWidget:live_patching')}
         </div>
       )}
 
@@ -193,9 +192,9 @@ export default function CveWidget() {
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-900/15 dark:text-emerald-300">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0"><path d={SHIELD} /><path d={CHECK} /></svg>
           <span>
-            <strong>Çekirdek canlı yamalı (KernelCare).</strong> Çekirdek güvenlik açıkları sunucu yeniden başlatılmadan kapatıldı.
-            {veri.kernelcare.efektif_kernel ? <> Efektif çekirdek: <span className="font-mono">{veri.kernelcare.efektif_kernel}</span>.</> : null}
-            {veri.kernelcare.yamali_cve?.length ? <> {veri.kernelcare.yamali_cve.length} CVE canlı yamalı.</> : null}
+            <strong>{t('CveWidget:kernelcare_active_title')}</strong> {t('CveWidget:kernelcare_active_desc')}
+            {veri.kernelcare.efektif_kernel ? <> {t('CveWidget:effective_kernel')} <span className="font-mono">{veri.kernelcare.efektif_kernel}</span>.</> : null}
+            {veri.kernelcare.yamali_cve?.length ? <> {t('CveWidget:cve_live_patched', { count: veri.kernelcare.yamali_cve.length })}</> : null}
           </span>
         </div>
       )}
@@ -204,7 +203,7 @@ export default function CveWidget() {
       {!kcCalisiyor && veri?.kernelcare?.kurulu && !veri.kernelcare.kayitli && (
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/15 dark:text-amber-300">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="mt-0.5 h-3.5 w-3.5 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.36 3.6 2.26 17.66A1.5 1.5 0 0 0 3.56 19.9h16.88a1.5 1.5 0 0 0 1.3-2.25L13.64 3.6a1.5 1.5 0 0 0-2.6 0Z" /></svg>
-          <span><strong>KernelCare kurulu ancak lisans kayıtlı değil.</strong> Rebootsuz çekirdek yaması için TuxCare lisans anahtarıyla kaydedilmeli.</span>
+          <span><strong>{t('CveWidget:kernelcare_unregistered_title')}</strong> {t('CveWidget:kernelcare_unregistered_desc')}</span>
         </div>
       )}
 
@@ -213,9 +212,7 @@ export default function CveWidget() {
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/15 dark:text-amber-300">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="mt-0.5 h-3.5 w-3.5 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.36 3.6 2.26 17.66A1.5 1.5 0 0 0 3.56 19.9h16.88a1.5 1.5 0 0 0 1.3-2.25L13.64 3.6a1.5 1.5 0 0 0-2.6 0Z" /></svg>
           <span>
-            <strong>Yeniden başlatma gerekli.</strong> Güvenlik yamalı yeni çekirdek kurulu ancak sistem hâlâ eski çekirdekle çalışıyor —
-            aşağıdaki açıkların çoğu çekirdek kaynaklı ve <strong>sunucu yeniden başlatılana kadar</strong> açık görünür.
-            Bakım penceresinde reboot önerilir.
+            <strong>{t('CveWidget:reboot_required_title')}</strong> {t('CveWidget:reboot_required_desc')} <strong>{t('CveWidget:reboot_required_bold')}</strong> {t('CveWidget:reboot_required_end')}
           </span>
         </div>
       )}
@@ -247,7 +244,7 @@ export default function CveWidget() {
               <div key={k} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center dark:border-slate-800 dark:bg-slate-950/40">
                 <div className={`text-2xl font-bold tabular-nums ${ONEM[k].metin}`}>{veri[k]}</div>
                 <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-                  <span className={`h-1.5 w-1.5 rounded-full ${ONEM[k].nokta}`} />{ONEM[k].ad}
+                  <span className={`h-1.5 w-1.5 rounded-full ${ONEM[k].nokta}`} />{t(`CveWidget:severity.${k}`)}
                 </div>
               </div>
             ))}

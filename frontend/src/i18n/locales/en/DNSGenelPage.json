@@ -1,0 +1,22 @@
+{
+  "title": "DNS Management",
+  "subtitle": "Summary of all zones on the server. Click a domain to edit its records.",
+  "empty": "No domains with a DNS zone yet",
+  "col_domain": "Domain",
+  "col_records": "Records",
+  "col_a": "A",
+  "col_mx": "MX",
+  "col_txt": "TXT",
+  "col_passive": "Passive",
+  "col_dnssec": "DNSSEC",
+  "col_domain_status": "Domain",
+  "dnssec_on": "On",
+  "dnssec_off": "Off",
+  "domain_active": "Active",
+  "domain_passive": "Passive",
+  "no_records_title": "No records of this type",
+  "summary_zones": "zones",
+  "summary_total_records": "total records",
+  "summary_no_mx": "no MX record",
+  "summary_dnssec_on": "DNSSEC on"
+}

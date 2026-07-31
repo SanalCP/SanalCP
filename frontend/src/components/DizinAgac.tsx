@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 type Entry = { adi: string; yol: string; tip: 'klasor' | 'dosya' | 'sembolik' }
@@ -42,6 +43,7 @@ function TreeNode({
   derinlik: number
   yenileme?: number
 }) {
+  const { t } = useTranslation(['common'])
   const [acik, setAcik] = useState(baslangicAcik)
   const [klasorler, setKlasorler] = useState<Entry[]>([])
   const [yuklendi, setYuklendi] = useState(false)
@@ -131,7 +133,7 @@ function TreeNode({
         <div>
           {yukleniyor && klasorler.length === 0 && (
             <div className="px-3 py-1 text-xs text-slate-400 dark:text-slate-500" style={{ paddingLeft: 24 + derinlik * 14 }}>
-              yükleniyor…
+              {t('common:loading')}
             </div>
           )}
           {klasorler.map(k => (

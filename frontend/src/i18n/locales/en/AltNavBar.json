@@ -1,0 +1,16 @@
+{
+  "nav_aria": "Bottom navigation",
+  "tabs": {
+    "home": "Home",
+    "domains": "Domains",
+    "monitor": "Monitor",
+    "overview": "Overview",
+    "files": "Files",
+    "database": "Database",
+    "backups": "Backups"
+  },
+  "new": "New",
+  "new_domain_aria": "Create new domain",
+  "menu": "Menu",
+  "open_menu_aria": "Open menu"
+}

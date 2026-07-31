@@ -1,0 +1,37 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "antivirus": "Antivirus"
+  },
+  "title": "Antivirus — Malware Scan",
+  "desc_suffix": "directory is scanned with ClamAV signatures + a built-in webshell heuristic.",
+  "not_found": "Not found",
+  "scan_start_failed": "Could not start scan",
+  "quarantine_confirm": "Quarantine this file?\n{{file}}\n\n(The file is moved under ~/.quarantine and becomes inaccessible.)",
+  "quarantine_failed": "Could not quarantine",
+  "signature_update_failed": "Could not update signatures",
+  "engine_label": "Engine:",
+  "engine_clamav": "ClamAV + Heuristic",
+  "engine_heuristic_only": "Heuristic Only",
+  "signature_db": "Signature database: {{date}}",
+  "last_scan": "Last scan: {{when}} · {{scanned}} files · {{found}} findings",
+  "updating_signatures": "Updating…",
+  "update_signatures": "Update Signatures",
+  "scanning": "Scanning…",
+  "scan_now": "Scan Now",
+  "scan_in_progress": "Scan in progress… (can take a few minutes on large sites)",
+  "findings_title": "Findings",
+  "findings_last_scan_note": "— from last scan",
+  "no_scan_yet": "No scan has been run yet. Start with “Scan Now”.",
+  "clean": "Clean — no malware found.",
+  "table": {
+    "file": "File",
+    "signature": "Signature",
+    "engine": "Engine",
+    "status": "Status"
+  },
+  "quarantined": "Quarantined",
+  "active_finding": "Active",
+  "quarantine_action": "Quarantine",
+  "back_to_subscription": "← Back to subscription"
+}

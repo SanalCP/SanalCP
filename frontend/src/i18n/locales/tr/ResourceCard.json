@@ -1,0 +1,19 @@
+{
+  "resource_usage": "Kaynak Kullanımı",
+  "live": "canlı",
+  "cpu": "CPU",
+  "cpu_detail": "{{cores}} çekirdek · yük {{l1}} / {{l5}} / {{l15}}",
+  "memory": "Bellek",
+  "disk": "Disk",
+  "uptime": "Çalışma süresi",
+  "system_status": "Sistem Durumu",
+  "waiting": "Bekleniyor…",
+  "backend": "Backend",
+  "running": "Çalışıyor",
+  "version": "Sürüm",
+  "time": "Saat",
+  "unit_day": "g",
+  "unit_hour": "sa",
+  "unit_min": "dk",
+  "locale": "tr-TR"
+}

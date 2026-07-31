@@ -1,6 +1,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 type DomainOzet = { id: number; alan_adi: string }
@@ -13,6 +14,7 @@ type DomainOzet = { id: number; alan_adi: string }
  * açar. Birden çok domainin aynı ekranını karşılaştırmak bu sayede tek tık.
  */
 export default function DomainSecici({ aktifID }: { aktifID: string }) {
+  const { t } = useTranslation(['DomainSecici', 'common'])
   const [domainler, setDomainler] = useState<DomainOzet[]>([])
   const [acik, setAcik] = useState(false)
   const [arama, setArama] = useState('')
@@ -72,7 +74,7 @@ export default function DomainSecici({ aktifID }: { aktifID: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-          {aktif?.alan_adi || 'Alan adı seç'}
+          {aktif?.alan_adi || t('DomainSecici:choose_domain')}
         </span>
         <svg className={`w-3.5 h-3.5 flex-shrink-0 text-slate-400 transition-transform ${acik ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -87,14 +89,14 @@ export default function DomainSecici({ aktifID }: { aktifID: string }) {
                 ref={aramaRef}
                 value={arama}
                 onChange={(e) => setArama(e.target.value)}
-                placeholder="Ara…"
+                placeholder={t('common:search_placeholder')}
                 className="w-full px-2 py-1.5 text-sm rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
           )}
           <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
             {suzulmus.length === 0 && (
-              <li className="px-3 py-2 text-sm text-slate-400">Sonuç yok</li>
+              <li className="px-3 py-2 text-sm text-slate-400">{t('DomainSecici:no_results')}</li>
             )}
             {suzulmus.map((d) => {
               const secili = String(d.id) === aktifID

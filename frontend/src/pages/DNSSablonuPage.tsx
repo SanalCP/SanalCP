@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
@@ -26,6 +27,7 @@ type Meta = {
 const TIPLER = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA', 'PTR']
 
 export default function DNSSablonuPage() {
+  const { t } = useTranslation(['DNSSablonuPage', 'common'])
   const [rows, setRows] = useState<Row[]>([])
   const [meta, setMeta] = useState<Meta | null>(null)
   const [yuk, setYuk] = useState(true)
@@ -57,10 +59,10 @@ export default function DNSSablonuPage() {
     setHata(null); setBasari(null); setKaydediyor(true)
     try {
       await api.put('/dns-template', { kayitlar: rows, meta })
-      setBasari('Şablon kaydedildi. Yeni domainler ve "Varsayılan Şablonu Uygula" bu şablonu kullanır.')
+      setBasari(t('DNSSablonuPage:saved'))
       setTimeout(() => setBasari(null), 5000)
       yukle()
-    } catch (e) { setHata(apiHata(e, 'Şablon kaydedilemedi')) }
+    } catch (e) { setHata(apiHata(e, t('DNSSablonuPage:save_failed'))) }
     finally { setKaydediyor(false) }
   }
 
@@ -69,26 +71,25 @@ export default function DNSSablonuPage() {
 
   return (
     <div className="px-6 md:px-8 py-6">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Araçlar ve Ayarlar', href: '/araclar-ayarlar' }, { etiket: 'DNS Şablonu' }]} />
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Merkezi DNS Şablonu</h1>
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('DashboardLayout:items.tools_settings'), href: '/araclar-ayarlar' }, { etiket: t('DNSSablonuPage:breadcrumb_title') }]} />
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DNSSablonuPage:title')}</h1>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        Yeni bir domain eklendiğinde ve <span className="font-medium">"Varsayılan Şablonu Uygula"</span> butonuna basıldığında bu şablon uygulanır.
-        Değişiklikleriniz anında geçerli olur.
+        {t('DNSSablonuPage:subtitle')}
       </p>
 
       {hata && <div className="mb-4 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-4 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
 
       <div className="mb-4 px-3.5 py-2.5 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-lg text-xs text-brand-800 dark:text-brand-200">
-        <strong>Yer tutucular:</strong>{' '}
-        <code className="font-mono">{'{DOMAIN}'}</code> alan adı ·{' '}
-        <code className="font-mono">{'{IP}'}</code> sunucu IP ·{' '}
-        <code className="font-mono">{'{SELECTOR}'}</code> DKIM seçici ·{' '}
-        <code className="font-mono">{'{DKIM}'}</code> otomatik üretilen DKIM public key (TXT)
+        <strong>{t('DNSSablonuPage:placeholders_title')}</strong>{' '}
+        <code className="font-mono">{'{DOMAIN}'}</code> {t('DNSSablonuPage:ph_domain')} ·{' '}
+        <code className="font-mono">{'{IP}'}</code> {t('DNSSablonuPage:ph_ip')} ·{' '}
+        <code className="font-mono">{'{SELECTOR}'}</code> {t('DNSSablonuPage:ph_selector')} ·{' '}
+        <code className="font-mono">{'{DKIM}'}</code> {t('DNSSablonuPage:ph_dkim')}
       </div>
 
       {yuk ? (
-        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('DNSSablonuPage:loading')}</div>
       ) : (
         <>
           {/* Kayıt satırları */}
@@ -97,12 +98,12 @@ export default function DNSSablonuPage() {
               <table className={T.tablo}>
                 <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700`}>
                   <tr>
-                    <th className={`${T.baslik} w-40`}>Ad (alt-ad)</th>
-                    <th className={`${T.baslik} w-28`}>Tip</th>
-                    <th className={T.baslik}>Değer</th>
-                    <th className={`${T.baslik} w-24`}>TTL</th>
-                    <th className={`${T.baslik} w-24`}>Öncelik</th>
-                    <th className={`${T.baslik} text-center w-20`}>Aktif</th>
+                    <th className={`${T.baslik} w-40`}>{t('DNSSablonuPage:col_name')}</th>
+                    <th className={`${T.baslik} w-28`}>{t('DNSSablonuPage:col_type')}</th>
+                    <th className={T.baslik}>{t('DNSSablonuPage:col_value')}</th>
+                    <th className={`${T.baslik} w-24`}>{t('DNSSablonuPage:col_ttl')}</th>
+                    <th className={`${T.baslik} w-24`}>{t('DNSSablonuPage:col_priority')}</th>
+                    <th className={`${T.baslik} text-center w-20`}>{t('DNSSablonuPage:col_active')}</th>
                     <th className={`${T.baslik} w-12`}></th>
                   </tr>
                 </thead>
@@ -110,31 +111,31 @@ export default function DNSSablonuPage() {
                   {rows.map((r, i) => (
                     <tr key={i} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/60`}>
                       <td className={T.hucreBaslik}><input value={r.ad} onChange={e => setRow(i, { ad: e.target.value })} className={inp + ' font-mono w-full'} /></td>
-                      <td className={T.hucre} data-etiket="Tip">
+                      <td className={T.hucre} data-etiket={t('DNSSablonuPage:col_type')}>
                         <select value={r.tip} onChange={e => setRow(i, { tip: e.target.value })} className={inp + ' font-mono w-full'}>
-                          {TIPLER.map(t => <option key={t} value={t}>{t}</option>)}
+                          {TIPLER.map(tip => <option key={tip} value={tip}>{tip}</option>)}
                         </select>
                       </td>
-                      <td className={T.hucre} data-etiket="Değer"><input value={r.deger} onChange={e => setRow(i, { deger: e.target.value })} className={inp + ' font-mono w-full'} /></td>
-                      <td className={T.hucre} data-etiket="TTL"><input type="number" min={60} value={r.ttl} onChange={e => setRow(i, { ttl: parseInt(e.target.value) || 3600 })} className={inp + ' font-mono w-full'} /></td>
-                      <td className={T.hucre} data-etiket="Öncelik">
+                      <td className={T.hucre} data-etiket={t('DNSSablonuPage:col_value')}><input value={r.deger} onChange={e => setRow(i, { deger: e.target.value })} className={inp + ' font-mono w-full'} /></td>
+                      <td className={T.hucre} data-etiket={t('DNSSablonuPage:col_ttl')}><input type="number" min={60} value={r.ttl} onChange={e => setRow(i, { ttl: parseInt(e.target.value) || 3600 })} className={inp + ' font-mono w-full'} /></td>
+                      <td className={T.hucre} data-etiket={t('DNSSablonuPage:col_priority')}>
                         {(r.tip === 'MX' || r.tip === 'SRV')
                           ? <input type="number" min={0} value={r.oncelik} onChange={e => setRow(i, { oncelik: parseInt(e.target.value) || 0 })} className={inp + ' font-mono w-full'} />
                           : <span className="text-slate-300 dark:text-slate-600 text-sm pl-2">—</span>}
                       </td>
-                      <td className={T.hucre} data-etiket="Aktif">
+                      <td className={T.hucre} data-etiket={t('DNSSablonuPage:col_active')}>
                         <input type="checkbox" checked={r.aktif} onChange={e => setRow(i, { aktif: e.target.checked })} className="cursor-pointer w-4 h-4 accent-brand-600" />
                       </td>
                       <td className={T.hucreAksiyon}>
-                        <button onClick={() => satirSil(i)} title="Satırı sil" className="text-red-500 hover:text-red-700 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <button onClick={() => satirSil(i)} title={t('DNSSablonuPage:delete_row')} className="text-red-500 hover:text-red-700 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                          <span className="lg:hidden ml-1.5 text-xs">Satırı sil</span>
+                          <span className="lg:hidden ml-1.5 text-xs">{t('DNSSablonuPage:delete_row')}</span>
                         </button>
                       </td>
                     </tr>
                   ))}
                   {rows.length === 0 && (
-                    <tr><td colSpan={7} className={T.hucreDurum}>Şablonda kayıt yok — "Kayıt Ekle" ile başlayın.</td></tr>
+                    <tr><td colSpan={7} className={T.hucreDurum}>{t('DNSSablonuPage:empty_rows')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -142,7 +143,7 @@ export default function DNSSablonuPage() {
             <div className="px-3 py-2.5 border-t border-slate-100 dark:border-slate-800">
               <button onClick={satirEkle} className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-300">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                Kayıt Ekle
+                {t('DNSSablonuPage:add_row')}
               </button>
             </div>
           </div>
@@ -150,37 +151,36 @@ export default function DNSSablonuPage() {
           {/* Meta: SOA + DKIM */}
           {meta && (
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4">SOA & DKIM Parametreleri</h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4">{t('DNSSablonuPage:soa_dkim_title')}</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                 {(['soa_refresh', 'soa_retry', 'soa_expire', 'soa_minimum', 'soa_ttl'] as const).map(f => (
                   <label key={f} className="block">
-                    <span className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">{f.replace('soa_', '')} (sn)</span>
+                    <span className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">{f.replace('soa_', '')} {t('DNSSablonuPage:soa_unit')}</span>
                     <input type="number" min={0} value={meta[f]} onChange={e => setMeta({ ...meta, [f]: parseInt(e.target.value) || 0 })} className={inp + ' font-mono'} />
                   </label>
                 ))}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                 <label className="block">
-                  <span className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">DKIM Seçici</span>
-                  <input value={meta.dkim_selector} onChange={e => setMeta({ ...meta, dkim_selector: e.target.value })} className={inp + ' font-mono'} placeholder="default" />
+                  <span className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">{t('DNSSablonuPage:dkim_selector_label')}</span>
+                  <input value={meta.dkim_selector} onChange={e => setMeta({ ...meta, dkim_selector: e.target.value })} className={inp + ' font-mono'} placeholder={t('DNSSablonuPage:dkim_placeholder')} />
                 </label>
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer pb-2">
                   <input type="checkbox" checked={meta.dkim_aktif} onChange={e => setMeta({ ...meta, dkim_aktif: e.target.checked })} className="w-4 h-4 accent-brand-600" />
-                  DKIM anahtar üretimini etkinleştir
+                  {t('DNSSablonuPage:dkim_enable_label')}
                 </label>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-3">
-                DKIM açıkken şablonda <code className="font-mono">{'{DKIM}'}</code> içeren bir TXT kaydı olmalıdır (ör. ad: <code className="font-mono">{'{SELECTOR}._domainkey'}</code>).
-                Her domain için 2048-bit RSA anahtar çifti otomatik üretilir; public key DNS'e yazılır, private key OpenDKIM kuruluysa mail sunucusuyla eşlenir.
+                {t('DNSSablonuPage:dkim_help')}
               </p>
             </div>
           )}
 
           <div className="flex items-center gap-3">
             <button onClick={kaydet} disabled={kaydediyor} className={btnDark}>
-              {kaydediyor ? 'Kaydediliyor…' : 'Şablonu Kaydet'}
+              {kaydediyor ? t('DNSSablonuPage:saving_button') : t('DNSSablonuPage:save_button')}
             </button>
-            <button onClick={yukle} className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">Geri Al</button>
+            <button onClick={yukle} className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">{t('DNSSablonuPage:revert')}</button>
           </div>
         </>
       )}

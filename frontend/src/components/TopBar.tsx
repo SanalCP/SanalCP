@@ -3,9 +3,11 @@
 // sp-mobil-v1
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/store/auth'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import { api } from '@/lib/api'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 type AramaKaydi = {
   tur: 'sayfa' | 'domain' | 'musteri' | 'kullanici'
@@ -19,62 +21,68 @@ type Domain = { id: number; alan_adi: string; sistem_kullanici?: string; durum?:
 type Musteri = { id: number; ad: string; eposta?: string; durum?: string }
 type Kullanici = { id: number; kullanici_adi: string; ad_soyad?: string; eposta?: string; rol?: string }
 
-const SAYFALAR: Array<AramaKaydi & { roller?: string[] }> = [
-  { tur: 'sayfa', baslik: 'Anasayfa', aciklama: 'Panel özeti', yol: '/', anahtarlar: 'dashboard genel bakış' },
-  { tur: 'sayfa', baslik: 'Domainler', aciklama: 'Alan adları ve abonelikler', yol: '/domainler', anahtarlar: 'site hosting abonelik', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'DNS Yönetimi', aciklama: 'Genel DNS kayıtları', yol: '/dns', anahtarlar: 'zone nameserver ns', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'E-posta Hesapları', aciklama: 'Posta kutuları ve mail', yol: '/mail', anahtarlar: 'email mailbox', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'Veritabanları', aciklama: 'MySQL veritabanları', yol: '/veritabanlari', anahtarlar: 'database mysql db', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'SSL Sertifikaları', aciklama: 'TLS ve sertifika yönetimi', yol: '/ssl', anahtarlar: 'https lets encrypt', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'WordPress', aciklama: 'WordPress siteleri', yol: '/wordpress', anahtarlar: 'wp uygulama', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'Hizmet Planları', aciklama: 'Paket ve kota planları', yol: '/hizmet-planlari', anahtarlar: 'paket kota', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'Kullanıcılar', aciklama: 'Panel hesapları', yol: '/kullanicilar', anahtarlar: 'hesap bayi admin müşteri', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'Müşteriler', aciklama: 'Müşteri ve iletişim kayıtları', yol: '/musteriler', anahtarlar: 'customer fatura', roller: ['admin', 'reseller'] },
-  { tur: 'sayfa', baslik: 'Sunucu Durumu', aciklama: 'Kaynak ve servis özeti', yol: '/sunucu-durumu', anahtarlar: 'cpu ram disk', roller: ['reseller'] },
-  { tur: 'sayfa', baslik: 'Sunucu İzleme', aciklama: 'Canlı sunucu metrikleri ve günlükler', yol: '/izleme', anahtarlar: 'monitor log cpu ram', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'İstatistikler', aciklama: 'Kullanım istatistikleri', yol: '/istatistikler', anahtarlar: 'grafik trafik', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Servisler', aciklama: 'Sistem servisleri', yol: '/araclar/servisler', anahtarlar: 'systemd nginx mysql php', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'PHP Sürümleri', aciklama: 'PHP sürüm yönetimi', yol: '/araclar/php-surumler', anahtarlar: 'fpm', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'PHP Modülleri', aciklama: 'PHP eklenti yönetimi', yol: '/sistem/php-modulleri', anahtarlar: 'extension pecl', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Paket Yöneticisi', aciklama: 'Sistem paketleri', yol: '/araclar/paketler', anahtarlar: 'dnf rpm', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'DNS Şablonu', aciklama: 'Varsayılan DNS kayıtları', yol: '/araclar/dns-sablonu', anahtarlar: 'template zone', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Güvenlik Duvarı', aciklama: 'Firewall kuralları', yol: '/firewall', anahtarlar: 'port ip engelle', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Güvenlik Günlüğü', aciklama: 'Güvenlik olayları', yol: '/guvenlik-gunlugu', anahtarlar: 'audit log olay', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Yedekleme', aciklama: 'Sunucu yedek yönetimi', yol: '/backup-yonetimi', anahtarlar: 'backup geri yükle', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Hesap Aktarımı', aciklama: 'Hesap ve site taşıma', yol: '/hesap-aktarimi', anahtarlar: 'migration transfer cpanel', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Araçlar ve Ayarlar', aciklama: 'Panel araçları', yol: '/araclar-ayarlar', anahtarlar: 'settings tools', roller: ['admin'] },
-  { tur: 'sayfa', baslik: 'Profil ve Tercihler', aciklama: 'Hesap ve güvenlik ayarları', yol: '/profil', anahtarlar: 'parola şifre 2fa tema' },
-]
+type TFunc = (key: string) => string
 
-const DOMAIN_SAYFALARI = [
-  ['', 'Genel Bakış', 'Domain özeti'],
-  ['/dosyalar', 'Dosya Yöneticisi', 'Dosyalar ve dizinler'],
-  ['/web-sunucu', 'Apache & nginx', 'Web sunucusu ayarları'],
-  ['/php', 'PHP Ayarları', 'PHP ve FPM yapılandırması'],
-  ['/composer', 'Composer', 'PHP paket yönetimi'],
-  ['/performans', 'Performans', 'Site performans ayarları'],
-  ['/redis', 'Redis Cache', 'Önbellek yönetimi'],
-  ['/wordpress', 'WordPress', 'WordPress araçları'],
-  ['/dns', 'DNS Yönetimi', 'Domain DNS kayıtları'],
-  ['/subdomainler', 'Subdomainler', 'Alt alan adları'],
-  ['/ek-alanlar', 'Ek Alan Adları', 'Alias domainler'],
-  ['/ssl', 'SSL/TLS', 'HTTPS sertifikası'],
-  ['/veritabanlari', 'Veritabanları', 'MySQL veritabanları'],
-  ['/ftp', 'FTP Hesapları', 'FTP erişimi'],
-  ['/mail', 'E-posta', 'Posta kutuları'],
-  ['/yedekler', 'Yedekler', 'Domain yedekleri'],
-  ['/kopyala', 'Siteyi Kopyala', 'Site klonlama'],
-  ['/git', 'Git', 'Git deploy'],
-  ['/cron', 'Zamanlanmış Görevler', 'Cron işleri'],
-  ['/ssh-erisim', 'SSH Erişimi', 'Terminal erişimi'],
-  ['/gunlukler', 'Günlükler', 'Erişim ve hata logları'],
-  ['/waf', 'WAF', 'Web uygulama güvenlik duvarı'],
-  ['/erisim-kontrol', 'Erişim Kontrolü', 'IP erişim kuralları'],
-  ['/sifre-koruma', 'Şifre Korumalı Dizinler', 'Dizin parolası'],
-  ['/imunify', 'Imunify', 'Zararlı yazılım taraması'],
-  ['/istatistik', 'İstatistikler', 'Domain kullanım verileri'],
-  ['/baglanti', 'Bağlantı Bilgisi', 'FTP ve veritabanı bilgileri'],
-] as const
+function sayfalar(t: TFunc): Array<AramaKaydi & { roller?: string[] }> {
+  return [
+    { tur: 'sayfa', baslik: t('TopBar:pages.home.baslik'), aciklama: t('TopBar:pages.home.aciklama'), yol: '/', anahtarlar: 'dashboard genel bakış' },
+    { tur: 'sayfa', baslik: t('TopBar:pages.domains.baslik'), aciklama: t('TopBar:pages.domains.aciklama'), yol: '/domainler', anahtarlar: 'site hosting abonelik', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.dns.baslik'), aciklama: t('TopBar:pages.dns.aciklama'), yol: '/dns', anahtarlar: 'zone nameserver ns', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.mail.baslik'), aciklama: t('TopBar:pages.mail.aciklama'), yol: '/mail', anahtarlar: 'email mailbox', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.databases.baslik'), aciklama: t('TopBar:pages.databases.aciklama'), yol: '/veritabanlari', anahtarlar: 'database mysql db', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.ssl.baslik'), aciklama: t('TopBar:pages.ssl.aciklama'), yol: '/ssl', anahtarlar: 'https lets encrypt', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.wordpress.baslik'), aciklama: t('TopBar:pages.wordpress.aciklama'), yol: '/wordpress', anahtarlar: 'wp uygulama', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.plans.baslik'), aciklama: t('TopBar:pages.plans.aciklama'), yol: '/hizmet-planlari', anahtarlar: 'paket kota', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.users.baslik'), aciklama: t('TopBar:pages.users.aciklama'), yol: '/kullanicilar', anahtarlar: 'hesap bayi admin müşteri', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.customers.baslik'), aciklama: t('TopBar:pages.customers.aciklama'), yol: '/musteriler', anahtarlar: 'customer fatura', roller: ['admin', 'reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.server_status.baslik'), aciklama: t('TopBar:pages.server_status.aciklama'), yol: '/sunucu-durumu', anahtarlar: 'cpu ram disk', roller: ['reseller'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.monitor.baslik'), aciklama: t('TopBar:pages.monitor.aciklama'), yol: '/izleme', anahtarlar: 'monitor log cpu ram', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.stats.baslik'), aciklama: t('TopBar:pages.stats.aciklama'), yol: '/istatistikler', anahtarlar: 'grafik trafik', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.services.baslik'), aciklama: t('TopBar:pages.services.aciklama'), yol: '/araclar/servisler', anahtarlar: 'systemd nginx mysql php', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.php_versions.baslik'), aciklama: t('TopBar:pages.php_versions.aciklama'), yol: '/araclar/php-surumler', anahtarlar: 'fpm', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.php_modules.baslik'), aciklama: t('TopBar:pages.php_modules.aciklama'), yol: '/sistem/php-modulleri', anahtarlar: 'extension pecl', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.packages.baslik'), aciklama: t('TopBar:pages.packages.aciklama'), yol: '/araclar/paketler', anahtarlar: 'dnf rpm', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.dns_template.baslik'), aciklama: t('TopBar:pages.dns_template.aciklama'), yol: '/araclar/dns-sablonu', anahtarlar: 'template zone', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.firewall.baslik'), aciklama: t('TopBar:pages.firewall.aciklama'), yol: '/firewall', anahtarlar: 'port ip engelle', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.security_log.baslik'), aciklama: t('TopBar:pages.security_log.aciklama'), yol: '/guvenlik-gunlugu', anahtarlar: 'audit log olay', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.backup.baslik'), aciklama: t('TopBar:pages.backup.aciklama'), yol: '/backup-yonetimi', anahtarlar: 'backup geri yükle', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.transfer.baslik'), aciklama: t('TopBar:pages.transfer.aciklama'), yol: '/hesap-aktarimi', anahtarlar: 'migration transfer cpanel', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.tools_settings.baslik'), aciklama: t('TopBar:pages.tools_settings.aciklama'), yol: '/araclar-ayarlar', anahtarlar: 'settings tools', roller: ['admin'] },
+    { tur: 'sayfa', baslik: t('TopBar:pages.profile.baslik'), aciklama: t('TopBar:pages.profile.aciklama'), yol: '/profil', anahtarlar: 'parola şifre 2fa tema' },
+  ]
+}
+
+function domainSayfalari(t: TFunc): readonly [string, string, string][] {
+  return [
+    ['', t('TopBar:domain_pages.overview.baslik'), t('TopBar:domain_pages.overview.aciklama')],
+    ['/dosyalar', t('TopBar:domain_pages.files.baslik'), t('TopBar:domain_pages.files.aciklama')],
+    ['/web-sunucu', t('TopBar:domain_pages.webserver.baslik'), t('TopBar:domain_pages.webserver.aciklama')],
+    ['/php', t('TopBar:domain_pages.php.baslik'), t('TopBar:domain_pages.php.aciklama')],
+    ['/composer', t('TopBar:domain_pages.composer.baslik'), t('TopBar:domain_pages.composer.aciklama')],
+    ['/performans', t('TopBar:domain_pages.performance.baslik'), t('TopBar:domain_pages.performance.aciklama')],
+    ['/redis', t('TopBar:domain_pages.redis.baslik'), t('TopBar:domain_pages.redis.aciklama')],
+    ['/wordpress', t('TopBar:domain_pages.wordpress.baslik'), t('TopBar:domain_pages.wordpress.aciklama')],
+    ['/dns', t('TopBar:domain_pages.dns.baslik'), t('TopBar:domain_pages.dns.aciklama')],
+    ['/subdomainler', t('TopBar:domain_pages.subdomains.baslik'), t('TopBar:domain_pages.subdomains.aciklama')],
+    ['/ek-alanlar', t('TopBar:domain_pages.addon_domains.baslik'), t('TopBar:domain_pages.addon_domains.aciklama')],
+    ['/ssl', t('TopBar:domain_pages.ssl.baslik'), t('TopBar:domain_pages.ssl.aciklama')],
+    ['/veritabanlari', t('TopBar:domain_pages.databases.baslik'), t('TopBar:domain_pages.databases.aciklama')],
+    ['/ftp', t('TopBar:domain_pages.ftp.baslik'), t('TopBar:domain_pages.ftp.aciklama')],
+    ['/mail', t('TopBar:domain_pages.mail.baslik'), t('TopBar:domain_pages.mail.aciklama')],
+    ['/yedekler', t('TopBar:domain_pages.backups.baslik'), t('TopBar:domain_pages.backups.aciklama')],
+    ['/kopyala', t('TopBar:domain_pages.clone.baslik'), t('TopBar:domain_pages.clone.aciklama')],
+    ['/git', t('TopBar:domain_pages.git.baslik'), t('TopBar:domain_pages.git.aciklama')],
+    ['/cron', t('TopBar:domain_pages.cron.baslik'), t('TopBar:domain_pages.cron.aciklama')],
+    ['/ssh-erisim', t('TopBar:domain_pages.ssh.baslik'), t('TopBar:domain_pages.ssh.aciklama')],
+    ['/gunlukler', t('TopBar:domain_pages.logs.baslik'), t('TopBar:domain_pages.logs.aciklama')],
+    ['/waf', t('TopBar:domain_pages.waf.baslik'), t('TopBar:domain_pages.waf.aciklama')],
+    ['/erisim-kontrol', t('TopBar:domain_pages.access_control.baslik'), t('TopBar:domain_pages.access_control.aciklama')],
+    ['/sifre-koruma', t('TopBar:domain_pages.password_protect.baslik'), t('TopBar:domain_pages.password_protect.aciklama')],
+    ['/imunify', t('TopBar:domain_pages.imunify.baslik'), t('TopBar:domain_pages.imunify.aciklama')],
+    ['/istatistik', t('TopBar:domain_pages.stats.baslik'), t('TopBar:domain_pages.stats.aciklama')],
+    ['/baglanti', t('TopBar:domain_pages.connection_info.baslik'), t('TopBar:domain_pages.connection_info.aciklama')],
+  ]
+}
 
 function normalize(s: string) {
   return s.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -103,6 +111,7 @@ function panoYaz(text: string): boolean {
 }
 
 export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; menuAcik?: boolean }) {
+  const { t } = useTranslation(['TopBar', 'common'])
   const kullanici = useAuth((s) => s.kullanici)
   const cikis = useAuth((s) => s.cikis)
   const navigate = useNavigate()
@@ -123,15 +132,18 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
   const rol = kullanici?.rol || 'user'
   const domainID = location.pathname.match(/^\/abonelikler\/(\d+)/)?.[1]
 
+  const SAYFALAR = useMemo(() => sayfalar(t), [t])
+  const DOMAIN_SAYFALARI = useMemo(() => domainSayfalari(t), [t])
+
   const sonuclar = useMemo(() => {
     const q = normalize(arama.trim())
     if (!q) return []
-    const sayfalar = SAYFALAR.filter(s => !s.roller || s.roller.includes(rol))
-    const domainSayfalari: AramaKaydi[] = domainID ? DOMAIN_SAYFALARI.map(([ek, baslik, aciklama]) => ({
-      tur: 'sayfa', baslik, aciklama: `${aciklama} · açık domain`, yol: `/abonelikler/${domainID}${ek}`,
+    const sayfalarFiltrelenmis = SAYFALAR.filter(s => !s.roller || s.roller.includes(rol))
+    const domainSayfalariEslesen: AramaKaydi[] = domainID ? DOMAIN_SAYFALARI.map(([ek, baslik, aciklama]) => ({
+      tur: 'sayfa', baslik, aciklama: `${aciklama}${t('TopBar:domain_pages.open_domain_suffix')}`, yol: `/abonelikler/${domainID}${ek}`,
       anahtarlar: 'domain site abonelik',
     })) : []
-    return [...sayfalar, ...domainSayfalari, ...kayitlar]
+    return [...sayfalarFiltrelenmis, ...domainSayfalariEslesen, ...kayitlar]
       .map((s) => {
         const metin = normalize(`${s.baslik} ${s.aciklama} ${s.anahtarlar || ''}`)
         const puan = normalize(s.baslik).startsWith(q) ? 0 : metin.includes(q) ? 1 : 2
@@ -141,7 +153,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
       .sort((a, b) => a.puan - b.puan || a.s.baslik.localeCompare(b.s.baslik, 'tr'))
       .slice(0, 12)
       .map(x => x.s)
-  }, [arama, domainID, kayitlar, rol])
+  }, [arama, domainID, kayitlar, rol, SAYFALAR, DOMAIN_SAYFALARI, t])
 
   async function aramaVerileriniYukle() {
     if (kayitlarYuklendi || aramaYukleniyor) return
@@ -149,19 +161,19 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
     const istekler: Promise<AramaKaydi[]>[] = [
       api.get<Domain[]>('/domains').then(r => (Array.isArray(r.data) ? r.data : []).map(d => ({
         tur: 'domain' as const, baslik: d.alan_adi,
-        aciklama: `Domain${d.sistem_kullanici ? ` · ${d.sistem_kullanici}` : ''}${d.durum ? ` · ${d.durum}` : ''}`,
+        aciklama: `${t('TopBar:types.domain')}${d.sistem_kullanici ? ` · ${d.sistem_kullanici}` : ''}${d.durum ? ` · ${d.durum}` : ''}`,
         yol: `/abonelikler/${d.id}`, anahtarlar: `site hosting ${d.sistem_kullanici || ''}`,
       }))).catch(() => []),
     ]
     if (rol === 'admin' || rol === 'reseller') {
       istekler.push(
         api.get<Musteri[]>('/customers').then(r => (Array.isArray(r.data) ? r.data : []).map(m => ({
-          tur: 'musteri' as const, baslik: m.ad, aciklama: `Müşteri${m.eposta ? ` · ${m.eposta}` : ''}`,
+          tur: 'musteri' as const, baslik: m.ad, aciklama: `${t('TopBar:types.musteri')}${m.eposta ? ` · ${m.eposta}` : ''}`,
           yol: `/musteriler?arama=${encodeURIComponent(m.eposta || m.ad)}`, anahtarlar: m.eposta,
         }))).catch(() => []),
         api.get<Kullanici[]>('/users').then(r => (Array.isArray(r.data) ? r.data : []).map(u => ({
           tur: 'kullanici' as const, baslik: u.ad_soyad || u.kullanici_adi,
-          aciklama: `Kullanıcı · ${u.kullanici_adi}${u.eposta ? ` · ${u.eposta}` : ''}`,
+          aciklama: `${t('TopBar:types.kullanici')} · ${u.kullanici_adi}${u.eposta ? ` · ${u.eposta}` : ''}`,
           yol: `/kullanicilar?arama=${encodeURIComponent(u.kullanici_adi)}`,
           anahtarlar: `${u.eposta || ''} ${u.rol || ''}`,
         }))).catch(() => []),
@@ -241,7 +253,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
       <button
         onClick={onMenuAc}
         className="lg:hidden -ml-1 p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition flex-shrink-0"
-        aria-label="Menüyü aç"
+        aria-label={t('TopBar:menu_open')}
         aria-expanded={!!menuAcik}
         aria-controls="sp-kenar-cubugu"
       >
@@ -269,13 +281,13 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
               if (e.key === 'ArrowUp') { e.preventDefault(); setSeciliSonuc(i => Math.max(i - 1, 0)) }
               if (e.key === 'Enter' && sonuclar[seciliSonuc]) { e.preventDefault(); sonucaGit(sonuclar[seciliSonuc]) }
             }}
-            placeholder="Her şeyi ara..."
-            aria-label="Panelde ara"
+            placeholder={t('TopBar:search_placeholder')}
+            aria-label={t('TopBar:search_aria')}
             aria-expanded={aramaAcik && !!arama.trim()}
             aria-controls="global-arama-sonuclari"
             className="w-full pl-9 pr-16 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:bg-white dark:focus:bg-slate-800 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 outline-none transition"
           />
-          <span className="hidden sm:block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 pointer-events-none">Ctrl K</span>
+          <span className="hidden sm:block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 pointer-events-none">{t('TopBar:search_shortcut')}</span>
           {aramaAcik && arama.trim() && (
             <div id="global-arama-sonuclari" role="listbox" className="absolute top-full left-0 right-0 mt-2 max-h-[min(70vh,32rem)] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-50 p-1.5">
               {sonuclar.map((s, i) => (
@@ -298,12 +310,12 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
                     <span className="block text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{s.baslik}</span>
                     <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{s.aciklama}</span>
                   </span>
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">{s.tur}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">{t(`TopBar:types.${s.tur}`)}</span>
                 </button>
               ))}
-              {aramaYukleniyor && <div className="px-3 py-3 text-sm text-slate-500">Kayıtlar yükleniyor…</div>}
+              {aramaYukleniyor && <div className="px-3 py-3 text-sm text-slate-500">{t('TopBar:loading_records')}</div>}
               {!aramaYukleniyor && sonuclar.length === 0 && (
-                <div className="px-3 py-6 text-center text-sm text-slate-500">“{arama}” için sonuç bulunamadı.</div>
+                <div className="px-3 py-6 text-center text-sm text-slate-500">{t('TopBar:no_results', { query: arama })}</div>
               )}
             </div>
           )}
@@ -314,19 +326,20 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
         {sunucuIp && (
           <button
             onClick={ipKopyala}
-            title="Tıkla → kopyala"
+            title={t('TopBar:ip_copy_title')}
             className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-mono text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition"
           >
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
             </svg>
             {ipKopyalandi ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium">✓ Kopyalandı</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium">{t('TopBar:ip_copied')}</span>
             ) : (
               <span>{sunucuIp}</span>
             )}
           </button>
         )}
+        <LanguageSwitcher />
         <button onClick={temaDegistir}
           className="p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition"
           title={`Tema: ${tema} — tıkla değiştir`}>

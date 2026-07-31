@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -15,6 +16,7 @@ type Durum = {
 }
 
 export default function DomainSSHPage() {
+  const { t } = useTranslation(['DomainSSHPage', 'common'])
   const { id } = useParams()
   const [d, setD] = useState<Durum | null>(null)
   const [yuk, setYuk] = useState(true)
@@ -37,11 +39,11 @@ export default function DomainSSHPage() {
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
       await api.put(`/domains/${id}/ssh`, { aktif })
-      setBasari(aktif ? 'SSH erişimi açıldı.' : 'SSH erişimi kapatıldı.')
+      setBasari(aktif ? t('DomainSSHPage:enabled_msg') : t('DomainSSHPage:disabled_msg'))
       setTimeout(() => setBasari(null), 4000)
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'İşlem başarısız'))
+      setHata(apiHata(e, t('DomainSSHPage:action_failed')))
     } finally { setIsleniyor(false) }
   }
 
@@ -49,17 +51,17 @@ export default function DomainSSHPage() {
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
       const { data } = await api.put(`/domains/${id}/ssh/anahtar`, { anahtar })
-      setBasari(data.anahtar_var ? '✓ SSH anahtarı kaydedildi.' : '✓ SSH anahtarları temizlendi.')
+      setBasari(data.anahtar_var ? t('DomainSSHPage:key_saved') : t('DomainSSHPage:keys_cleared'))
       setTimeout(() => setBasari(null), 4000)
       setAnahtar('')
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'Anahtar kaydedilemedi'))
+      setHata(apiHata(e, t('DomainSSHPage:key_save_failed')))
     } finally { setIsleniyor(false) }
   }
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
+  if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainSSHPage:not_found')}</div></div>
 
   const sshKomut = `ssh ${d.kullanici}@${d.ssh_host} -p ${d.ssh_port}`
 
@@ -67,24 +69,24 @@ export default function DomainSSHPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
+          { etiket: t('DomainSSHPage:breadcrumb_home'), href: '/' },
+          { etiket: t('DomainSSHPage:breadcrumb_domains'), href: '/domainler' },
           { etiket: d.alan_adi, href: `/abonelikler/${id}` },
-          { etiket: 'SSH Erişimi' },
+          { etiket: t('DomainSSHPage:breadcrumb_ssh') },
         ]} />
 
         <div className="flex items-start justify-between gap-4 mb-1">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">SSH Erişimi</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('DomainSSHPage:title')}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              <span className="font-mono">{d.alan_adi}</span> hesabı için kabuk (shell) erişimi.
+              <span className="font-mono">{d.alan_adi}</span> {t('DomainSSHPage:subtitle')}
             </p>
           </div>
           <span className={`shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
             d.aktif ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'
           }`}>
             <span className={`w-2 h-2 rounded-full ${d.aktif ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-            {d.aktif ? 'SSH AÇIK' : 'SSH KAPALI'}
+            {d.aktif ? t('DomainSSHPage:ssh_on') : t('DomainSSHPage:ssh_off')}
           </span>
         </div>
 
@@ -95,72 +97,71 @@ export default function DomainSSHPage() {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Kabuk Erişimi</h3>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainSSHPage:shell_access')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Açık: <code className="font-mono">/bin/bash</code> · Kapalı: <code className="font-mono">/usr/sbin/nologin</code>.
-                Mevcut: <code className="font-mono">{d.shell || '—'}</code>
+                {t('DomainSSHPage:shell_open_label')} <code className="font-mono">/bin/bash</code> {t('DomainSSHPage:shell_closed_label')} <code className="font-mono">/usr/sbin/nologin</code>{t('DomainSSHPage:shell_current_label')} <code className="font-mono">{d.shell || '—'}</code>
               </p>
             </div>
             {d.aktif ? (
               <button onClick={() => toggle(false)} disabled={isleniyor || d.is_demo}
                 className="shrink-0 px-4 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 text-sm font-medium rounded-lg">
-                SSH'i Kapat
+                {t('DomainSSHPage:close_ssh')}
               </button>
             ) : (
               <button onClick={() => toggle(true)} disabled={isleniyor || d.is_demo}
                 className="shrink-0 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-lg">
-                SSH'i Aç
+                {t('DomainSSHPage:open_ssh')}
               </button>
             )}
           </div>
-          {d.is_demo && <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">Demo domainde SSH değiştirilemez.</p>}
+          {d.is_demo && <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">{t('DomainSSHPage:demo_notice')}</p>}
         </div>
 
         {/* Bağlantı bilgisi */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Bağlantı Bilgisi</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainSSHPage:connection_info')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <Bilgi etiket="Kullanıcı" deger={d.kullanici} />
-            <Bilgi etiket="Sunucu" deger={d.ssh_host} />
-            <Bilgi etiket="Port" deger={String(d.ssh_port)} />
+            <Bilgi etiket={t('DomainSSHPage:user')} deger={d.kullanici} />
+            <Bilgi etiket={t('DomainSSHPage:server')} deger={d.ssh_host} />
+            <Bilgi etiket={t('DomainSSHPage:port')} deger={String(d.ssh_port)} />
           </div>
           <div className="mt-3">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Bağlantı komutu</label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainSSHPage:connection_command')}</label>
             <div className="mt-1 flex items-center gap-2">
               <code className="flex-1 px-3 py-2 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto">{sshKomut}</code>
-              <button onClick={() => navigator.clipboard?.writeText(sshKomut)} className="shrink-0 text-xs px-2.5 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">Kopyala</button>
+              <button onClick={() => navigator.clipboard?.writeText(sshKomut)} className="shrink-0 text-xs px-2.5 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">{t('common:copy')}</button>
             </div>
           </div>
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">🔑 Parola: <strong>FTP hesabınızla aynı</strong> — SSH açıkken otomatik eşitlenir. Alternatif olarak aşağıya SSH genel anahtarı ekleyebilirsiniz.</p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t('DomainSSHPage:password_hint')} <strong>{t('DomainSSHPage:password_hint_bold')}</strong> {t('DomainSSHPage:password_hint_rest')}</p>
         </div>
 
         {/* SSH Public Key */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">SSH Genel Anahtarı (authorized_keys)</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainSSHPage:public_key_title')}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Parola yerine anahtarla giriş için genel anahtarınızı ekleyin. {d.anahtar_var
-              ? <span className="text-emerald-600 dark:text-emerald-400">Şu an bir anahtar tanımlı.</span>
-              : <span className="text-slate-500">Henüz anahtar tanımlı değil.</span>}
+            {t('DomainSSHPage:public_key_desc')} {d.anahtar_var
+              ? <span className="text-emerald-600 dark:text-emerald-400">{t('DomainSSHPage:key_defined')}</span>
+              : <span className="text-slate-500">{t('DomainSSHPage:key_not_defined')}</span>}
           </p>
           <textarea
             value={anahtar}
             onChange={e => setAnahtar(e.target.value)}
             rows={4}
             spellCheck={false}
-            placeholder="ssh-ed25519 AAAA... kullanici@makine"
+            placeholder={t('DomainSSHPage:key_placeholder')}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-xs font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
           />
           <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-slate-400">Boş bırakıp kaydederseniz tüm anahtarlar silinir.</p>
+            <p className="text-xs text-slate-400">{t('DomainSSHPage:key_clear_hint')}</p>
             <button onClick={anahtarKaydet} disabled={isleniyor || d.is_demo}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-lg">
-              Anahtarı Kaydet
+              {t('DomainSSHPage:save_key')}
             </button>
           </div>
         </div>
 
         <div className="mt-4">
-          <Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link>
+          <Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainSSHPage:back_to_subscription')}</Link>
         </div>
       </div>
     </div>

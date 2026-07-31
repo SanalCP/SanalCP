@@ -1,0 +1,22 @@
+{
+  "title": "SSL Sertifikaları",
+  "subtitle": "Tüm alan adlarının sertifika durumu ve bitiş tarihleri. En yakın bitiş en üstte.",
+  "empty": "Henüz alan adı yok",
+  "col_domain": "Alan Adı",
+  "col_ssl": "SSL",
+  "col_expires": "Bitiş",
+  "col_remaining": "Kalan",
+  "col_domain_status": "Domain",
+  "ssl_active": "Aktif",
+  "ssl_none": "Yok",
+  "domain_active": "Aktif",
+  "domain_passive": "Pasif",
+  "days_remaining": "{{n}} gün",
+  "days_ago_expired": "{{n}} gün önce doldu",
+  "manage_link": "Yönet",
+  "install_link": "Kur",
+  "summary_active": "sertifika aktif",
+  "summary_expired": "süresi dolmuş",
+  "summary_expiring_soon": "30 günden az",
+  "summary_no_ssl": "SSL yok"
+}

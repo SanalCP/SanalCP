@@ -2,6 +2,7 @@
 // kutu ve yönlendirme var. Kutu eklemek/silmek domain sayfasında.
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import GenelListe, { type Kolon } from '@/components/GenelListe'
 import { api, apiHata } from '@/lib/api'
 
@@ -20,59 +21,66 @@ type QueueMessage = {
   sender: string; recipients: QueueRecipient[]
 }
 
-const kolonlar: Kolon<Satir>[] = [
-  {
-    baslik: 'Alan Adı',
-    dar: true,
-    hucre: (s) => (
-      <Link to={`/abonelikler/${s.domain_id}/mail`} className="font-medium text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 transition">
-        {s.alan_adi}
-      </Link>
-    ),
-  },
-  {
-    baslik: 'Posta',
-    dar: true,
-    hucre: (s) => {
-      if (!s.mail_aktif) return <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">Kapalı</span>
-      if (s.mail_durum === 'suspended') return <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Askıda</span>
-      return <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">Açık</span>
-    },
-  },
-  {
-    baslik: 'Kutu',
-    dar: true,
-    hucre: (s) => (s.kutu_sayisi === 0
-      ? <span className="text-slate-400">—</span>
-      : <span>{s.kutu_sayisi}</span>),
-  },
-  {
-    baslik: 'Yönlendirme',
-    dar: true,
-    hucre: (s) => (s.alias_sayisi === 0
-      ? <span className="text-slate-400">—</span>
-      : <span>{s.alias_sayisi}</span>),
-  },
-  {
-    baslik: 'Askıda Kutu',
-    dar: true,
-    hucre: (s) => (s.pasif_kutu > 0
-      ? <span className="text-amber-600 dark:text-amber-400">{s.pasif_kutu}</span>
-      : <span className="text-slate-400">—</span>),
-  },
-  {
-    baslik: '',
-    dar: true,
-    sinif: 'text-right',
-    hucre: (s) => (
-      <Link to={`/abonelikler/${s.domain_id}/mail`} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">
-        {s.mail_aktif ? 'Yönet' : 'Etkinleştir'}
-      </Link>
-    ),
-  },
-]
+function formatBoyut(b: number, t: (k: string, opts?: Record<string, unknown>) => string): string {
+  if (b < 1024) return t('MailGenelPage:size_b', { n: b })
+  if (b < 1024 * 1024) return t('MailGenelPage:size_kb', { n: (b / 1024).toFixed(1) })
+  return t('MailGenelPage:size_mb', { n: (b / 1024 / 1024).toFixed(1) })
+}
 
 export default function MailGenelPage() {
+  const { t } = useTranslation(['MailGenelPage', 'common'])
+  const kolonlar: Kolon<Satir>[] = [
+    {
+      baslik: t('MailGenelPage:col_domain'),
+      dar: true,
+      hucre: (s) => (
+        <Link to={`/abonelikler/${s.domain_id}/mail`} className="font-medium text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 transition">
+          {s.alan_adi}
+        </Link>
+      ),
+    },
+    {
+      baslik: t('MailGenelPage:col_mail'),
+      dar: true,
+      hucre: (s) => {
+        if (!s.mail_aktif) return <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t('MailGenelPage:mail_off')}</span>
+        if (s.mail_durum === 'suspended') return <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{t('MailGenelPage:mail_suspended')}</span>
+        return <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('MailGenelPage:mail_active')}</span>
+      },
+    },
+    {
+      baslik: t('MailGenelPage:col_mailbox'),
+      dar: true,
+      hucre: (s) => (s.kutu_sayisi === 0
+        ? <span className="text-slate-400">—</span>
+        : <span>{s.kutu_sayisi}</span>),
+    },
+    {
+      baslik: t('MailGenelPage:col_alias'),
+      dar: true,
+      hucre: (s) => (s.alias_sayisi === 0
+        ? <span className="text-slate-400">—</span>
+        : <span>{s.alias_sayisi}</span>),
+    },
+    {
+      baslik: t('MailGenelPage:col_suspended'),
+      dar: true,
+      hucre: (s) => (s.pasif_kutu > 0
+        ? <span className="text-amber-600 dark:text-amber-400">{s.pasif_kutu}</span>
+        : <span className="text-slate-400">—</span>),
+    },
+    {
+      baslik: '',
+      dar: true,
+      sinif: 'text-right',
+      hucre: (s) => (
+        <Link to={`/abonelikler/${s.domain_id}/mail`} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">
+          {s.mail_aktif ? t('MailGenelPage:manage_link') : t('MailGenelPage:enable_link')}
+        </Link>
+      ),
+    },
+  ]
+
   const [queue, setQueue] = useState<QueueMessage[]>([])
   const [queueHata, setQueueHata] = useState<string | null>(null)
   const [queueYuk, setQueueYuk] = useState(true)
@@ -82,41 +90,43 @@ export default function MailGenelPage() {
     setQueueYuk(true); setQueueHata(null)
     api.get<{ messages: QueueMessage[] }>('/admin/mail/queue')
       .then(r => setQueue(r.data.messages || []))
-      .catch(e => setQueueHata(apiHata(e, 'Posta kuyruğu okunamadı')))
+      .catch(e => setQueueHata(apiHata(e, t('MailGenelPage:queue_failed'))))
       .finally(() => setQueueYuk(false))
   }
   useEffect(queueYukle, [])
 
   async function queueAction(action: 'flush'|'delete'|'hold'|'release'|'requeue', queue_id = '') {
-    if (action === 'delete' && !confirm(`${queue_id} kuyruk iletisi kalıcı olarak silinsin mi?`)) return
+    if (action === 'delete' && !confirm(t('MailGenelPage:confirm_delete_queue', { id: queue_id }))) return
     setQueueIslem(action + queue_id); setQueueHata(null)
     try {
       await api.post('/admin/mail/queue', { action, queue_id })
       queueYukle()
     } catch (e) {
-      setQueueHata(apiHata(e, 'Kuyruk işlemi başarısız'))
+      setQueueHata(apiHata(e, t('MailGenelPage:queue_action_failed')))
     } finally {
       setQueueIslem('')
     }
   }
 
+  const locale = t('MailGenelPage:datetime_locale')
+
   return (
     <>
       <GenelListe<Satir>
-        baslik="E-posta Hesapları"
-        aciklama="Sunucudaki tüm posta kutuları ve yönlendirmeler. Kutu eklemek için alan adına tıklayın."
+        baslik={t('MailGenelPage:title')}
+        aciklama={t('MailGenelPage:subtitle')}
         uc="/genel/mail"
         kolonlar={kolonlar}
         araAlan={(s) => s.alan_adi}
         satirAnahtar={(s) => s.domain_id}
-        bosMesaj="Henüz alan adı yok"
+        bosMesaj={t('MailGenelPage:empty')}
         ozet={(l) => {
-          const askida = l.reduce((t, s) => t + s.pasif_kutu, 0)
+          const askida = l.reduce((tt, s) => tt + s.pasif_kutu, 0)
           return [
-            { etiket: 'posta açık domain', deger: l.filter((s) => s.mail_aktif).length },
-            { etiket: 'toplam kutu', deger: l.reduce((t, s) => t + s.kutu_sayisi, 0) },
-            { etiket: 'yönlendirme', deger: l.reduce((t, s) => t + s.alias_sayisi, 0) },
-            ...(askida > 0 ? [{ etiket: 'askıda kutu', deger: askida, vurgu: 'uyari' as const }] : []),
+            { etiket: t('MailGenelPage:summary_active_domains'), deger: l.filter((s) => s.mail_aktif).length },
+            { etiket: t('MailGenelPage:summary_total_mailboxes'), deger: l.reduce((tt, s) => tt + s.kutu_sayisi, 0) },
+            { etiket: t('MailGenelPage:summary_aliases'), deger: l.reduce((tt, s) => tt + s.alias_sayisi, 0) },
+            ...(askida > 0 ? [{ etiket: t('MailGenelPage:summary_suspended_mailboxes'), deger: askida, vurgu: 'uyari' as const }] : []),
           ]
         }}
       />
@@ -124,42 +134,42 @@ export default function MailGenelPage() {
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
           <div className="p-5 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Postfix Mail Kuyruğu</h2>
-              <p className="text-xs text-slate-500 mt-1">Teslim bekleyen, ertelenen veya yönetici tarafından bekletilen iletiler.</p>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('MailGenelPage:queue_title')}</h2>
+              <p className="text-xs text-slate-500 mt-1">{t('MailGenelPage:queue_subtitle')}</p>
             </div>
             <div className="flex gap-2">
               <button onClick={queueYukle} disabled={queueYuk}
-                className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded">↻ Yenile</button>
+                className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded">{t('MailGenelPage:refresh')}</button>
               <button onClick={() => queueAction('flush')} disabled={!!queueIslem}
                 className="px-3 py-1.5 text-xs bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded disabled:opacity-50">
-                Kuyruğu yeniden dene
+                {t('MailGenelPage:queue_retry')}
               </button>
             </div>
           </div>
           {queueHata && <div className="m-4 p-3 text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-300 rounded">{queueHata}</div>}
-          {queueYuk ? <div className="p-8 text-center text-sm text-slate-400">Kuyruk okunuyor…</div> :
-           queue.length === 0 ? <div className="p-8 text-center text-sm text-emerald-600 dark:text-emerald-400">✓ Mail kuyruğu boş</div> :
+          {queueYuk ? <div className="p-8 text-center text-sm text-slate-400">{t('MailGenelPage:queue_loading')}</div> :
+           queue.length === 0 ? <div className="p-8 text-center text-sm text-emerald-600 dark:text-emerald-400">{t('MailGenelPage:queue_empty')}</div> :
            <div className="overflow-x-auto">
              <table className="w-full text-sm">
                <thead className="bg-slate-50 dark:bg-slate-900 text-xs text-slate-500">
-                 <tr><th className="text-left p-3">Kuyruk ID</th><th className="text-left p-3">Gönderen → Alıcı</th><th className="text-left p-3">Boyut / Zaman</th><th className="text-right p-3">İşlemler</th></tr>
+                 <tr><th className="text-left p-3">{t('MailGenelPage:col_queue_id')}</th><th className="text-left p-3">{t('MailGenelPage:col_sender_recipients')}</th><th className="text-left p-3">{t('MailGenelPage:col_size_time')}</th><th className="text-right p-3">{t('MailGenelPage:col_actions')}</th></tr>
                </thead>
                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                  {queue.map(m => <tr key={m.queue_id}>
                    <td className="p-3 font-mono">{m.queue_id}<div className="text-[10px] text-slate-400">{m.queue_name}</div></td>
                    <td className="p-3">
-                     <div className="font-mono text-xs">{m.sender || '<>'}</div>
+                     <div className="font-mono text-xs">{m.sender || t('MailGenelPage:no_recipient')}</div>
                      <div className="font-mono text-xs text-slate-500">→ {m.recipients.map(r => r.address).join(', ')}</div>
                      {m.recipients.find(r => r.delay_reason)?.delay_reason &&
                        <div className="mt-1 text-[10px] text-amber-600 max-w-xl">{m.recipients.find(r => r.delay_reason)?.delay_reason}</div>}
                    </td>
-                   <td className="p-3 text-xs text-slate-500">{formatBoyut(m.message_size)}<div>{new Date(m.arrival_time * 1000).toLocaleString('tr-TR')}</div></td>
+                   <td className="p-3 text-xs text-slate-500">{formatBoyut(m.message_size, t)}<div>{new Date(m.arrival_time * 1000).toLocaleString(locale)}</div></td>
                    <td className="p-3 text-right whitespace-nowrap">
                      {m.queue_name === 'hold' ?
-                       <button onClick={() => queueAction('release', m.queue_id)} className="text-xs text-emerald-600 px-2">Serbest bırak</button> :
-                       <button onClick={() => queueAction('hold', m.queue_id)} className="text-xs text-amber-600 px-2">Beklet</button>}
-                     <button onClick={() => queueAction('requeue', m.queue_id)} className="text-xs text-brand-600 px-2">Yeniden sırala</button>
-                     <button onClick={() => queueAction('delete', m.queue_id)} className="text-xs text-red-600 px-2">Sil</button>
+                       <button onClick={() => queueAction('release', m.queue_id)} className="text-xs text-emerald-600 px-2">{t('MailGenelPage:release')}</button> :
+                       <button onClick={() => queueAction('hold', m.queue_id)} className="text-xs text-amber-600 px-2">{t('MailGenelPage:hold')}</button>}
+                     <button onClick={() => queueAction('requeue', m.queue_id)} className="text-xs text-brand-600 px-2">{t('MailGenelPage:requeue')}</button>
+                     <button onClick={() => queueAction('delete', m.queue_id)} className="text-xs text-red-600 px-2">{t('MailGenelPage:delete')}</button>
                    </td>
                  </tr>)}
                </tbody>
@@ -169,10 +179,4 @@ export default function MailGenelPage() {
       </div>
     </>
   )
-}
-
-function formatBoyut(b: number) {
-  if (b < 1024) return `${b} B`
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
-  return `${(b / 1024 / 1024).toFixed(1)} MB`
 }

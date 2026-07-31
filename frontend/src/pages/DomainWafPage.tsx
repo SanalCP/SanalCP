@@ -2,6 +2,8 @@
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -17,26 +19,31 @@ type Yanit = {
   modul_yuklu: boolean
 }
 
-const MODLAR: { key: Mod; ad: string; ikon: string; aciklama: string; renk: string }[] = [
-  { key: 'devral', ad: 'Plandan Devral', ikon: '↩︎',
-    aciklama: 'Bu domain, bağlı olduğu hizmet planının WAF varsayılanını kullanır.', renk: 'slate' },
-  { key: 'engelle', ad: 'Engelle', ikon: '🛡️',
-    aciklama: 'Kötü amaçlı istekler (SQLi, XSS, RCE…) 403 ile bloklanır. SecRuleEngine On.', renk: 'emerald' },
-  { key: 'denetle', ad: 'Denetle', ikon: '👁️',
-    aciklama: 'İstekler bloklanmaz; yalnızca eşleşen kurallar audit log’a yazılır. DetectionOnly — kural ayarlamak için ideal.', renk: 'indigo' },
-  { key: 'kapali', ad: 'Kapalı', ikon: '⛔',
-    aciklama: 'WAF bu domain için tamamen devre dışı (plan açık olsa bile).', renk: 'rose' },
-]
+function modlar(t: TFunction): { key: Mod; ad: string; ikon: string; aciklama: string; renk: string }[] {
+  return [
+    { key: 'devral', ad: t('DomainWafPage:modes.devral.title'), ikon: '↩︎',
+      aciklama: t('DomainWafPage:modes.devral.desc'), renk: 'slate' },
+    { key: 'engelle', ad: t('DomainWafPage:modes.engelle.title'), ikon: '🛡️',
+      aciklama: t('DomainWafPage:modes.engelle.desc'), renk: 'emerald' },
+    { key: 'denetle', ad: t('DomainWafPage:modes.denetle.title'), ikon: '👁️',
+      aciklama: t('DomainWafPage:modes.denetle.desc'), renk: 'indigo' },
+    { key: 'kapali', ad: t('DomainWafPage:modes.kapali.title'), ikon: '⛔',
+      aciklama: t('DomainWafPage:modes.kapali.desc'), renk: 'rose' },
+  ]
+}
 
-const PARANOYA_ACIKLAMA: Record<number, string> = {
-  0: 'Plan varsayılanı kullanılır.',
-  1: 'Düşük — temel saldırı imzaları. Neredeyse hiç yanlış-pozitif. (önerilen)',
-  2: 'Orta — daha fazla kural. Bazı meşru istekler engellenebilir.',
-  3: 'Yüksek — agresif. Uygulamaya göre ayarlama (exclusion) gerekebilir.',
-  4: 'Sıkı — en agresif. Yalnızca sıkı denetim gereken durumlar için.',
+function paranoyaAciklama(t: TFunction): Record<number, string> {
+  return {
+    0: t('DomainWafPage:paranoia.hint0'),
+    1: t('DomainWafPage:paranoia.hint1'),
+    2: t('DomainWafPage:paranoia.hint2'),
+    3: t('DomainWafPage:paranoia.hint3'),
+    4: t('DomainWafPage:paranoia.hint4'),
+  }
 }
 
 export default function DomainWafPage() {
+  const { t } = useTranslation(['DomainWafPage', 'common'])
   const { id } = useParams()
   const [y, setY] = useState<Yanit | null>(null)
   const [ayar, setAyar] = useState<Ayar | null>(null)
@@ -62,11 +69,11 @@ export default function DomainWafPage() {
       const r = await api.put<{ efektif: Efektif; modul_yuklu: boolean }>(`/domains/${id}/waf`, { ayar })
       const ef = r.data.efektif
       setBasari(ef.aktif
-        ? `✓ WAF uygulandı — ${ef.engine === 'On' ? 'Engelleme' : 'Denetleme'} modu, paranoya ${ef.paranoya}`
-        : '✓ Ayar kaydedildi — WAF bu domain için pasif')
+        ? t('DomainWafPage:applied_msg', { mode: ef.engine === 'On' ? t('DomainWafPage:modes.engelle.title') : t('DomainWafPage:modes.denetle.title'), level: ef.paranoya })
+        : t('DomainWafPage:saved_inactive_msg'))
       yukle()
     } catch (e) {
-      setHata(apiHata(e, 'Kaydetme başarısız'))
+      setHata(apiHata(e, t('DomainWafPage:save_failed')))
     } finally {
       setIsleniyor(false)
     }
@@ -75,15 +82,15 @@ export default function DomainWafPage() {
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' },
+        { etiket: t('common:home'), href: '/' }, { etiket: t('DomainWafPage:breadcrumb.domains'), href: '/domainler' },
         { etiket: y?.alan_adi || '...', href: `/abonelikler/${id}` },
-        { etiket: 'Web Uygulama Güvenlik Duvarı (WAF)' },
+        { etiket: t('DomainWafPage:breadcrumb.waf') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Web Uygulama Güvenlik Duvarı</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainWafPage:title')}</h1>
       {y && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
         <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 font-medium">{y.alan_adi}</Link>
-        {' · '}ModSecurity v3 + OWASP Core Rule Set. Kaydedince nginx vhost yeniden render edilir (sıfır kesinti).
+        {' · '}{t('DomainWafPage:domain_info')}
       </p>}
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{hata}</div>}
@@ -91,41 +98,42 @@ export default function DomainWafPage() {
 
       {y && !y.modul_yuklu && (
         <div className="mb-5 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-200">
-          <strong>ModSecurity modülü sunucuda kurulu değil.</strong> Ayarlar kaydedilir ancak WAF uygulanmaz.
-          Sunucuda <code className="font-mono">sanalpanel-waf-setup</code> çalıştırıldığında otomatik etkinleşir (mevcut siteler etkilenmez).
+          <strong>{t('DomainWafPage:module_not_installed.title')}</strong>{' '}
+          {t('DomainWafPage:module_not_installed.desc', { cmd: 'sanalcp-waf-setup' }).replace('sanalcp-waf-setup', '')}
+          <code className="font-mono">sanalcp-waf-setup</code>
         </div>
       )}
 
       {yuk || !ayar || !y ? (
-        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div>
       ) : (
         <>
           {/* Efektif durum + plan bilgisi */}
           <div className="mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Etkin Durum:</span>
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainWafPage:effective_status.label')}</span>
               {y.efektif.aktif ? (
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                   y.efektif.engine === 'On'
                     ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                     : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
                 }`}>
-                  ● {y.efektif.engine === 'On' ? 'Aktif · Engelleme' : 'Aktif · Denetleme'} · Paranoya {y.efektif.paranoya}
+                  ● {y.efektif.engine === 'On' ? t('DomainWafPage:effective_status.active_block') : t('DomainWafPage:effective_status.active_detect')} · Paranoya {y.efektif.paranoya}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">○ Pasif</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">○ {t('DomainWafPage:effective_status.inactive')}</span>
               )}
               <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto">
-                Plan varsayılanı ({y.plan.ad || '—'}):{' '}
-                {y.plan.aktif ? `${y.plan.mod === 'denetle' ? 'Denetle' : 'Engelle'} · PL${y.plan.paranoya}` : 'Kapalı'}
+                {t('DomainWafPage:effective_status.plan_default', { name: y.plan.ad || '—' })}{' '}
+                {y.plan.aktif ? `${y.plan.mod === 'denetle' ? t('DomainWafPage:modes.denetle.title') : t('DomainWafPage:modes.engelle.title')} · PL${y.plan.paranoya}` : t('DomainWafPage:effective_status.plan_off')}
               </span>
             </div>
           </div>
 
           {/* Mod seçici */}
-          <Kart baslik="WAF Modu">
+          <Kart baslik={t('DomainWafPage:modes.title')}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {MODLAR.map(m => {
+              {modlar(t).map(m => {
                 const aktif = ayar.mod === m.key
                 const renk: Record<string, string> = {
                   slate:   aktif ? 'border-slate-500 bg-slate-100 dark:bg-slate-700/40 ring-2 ring-slate-400/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-400',
@@ -165,7 +173,7 @@ export default function DomainWafPage() {
                 <option value={3}>Seviye 3 (Yüksek)</option>
                 <option value={4}>Seviye 4 (Sıkı)</option>
               </select>
-              <span className="text-xs text-slate-500 dark:text-slate-400">{PARANOYA_ACIKLAMA[ayar.paranoya]}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{paranoyaAciklama(t)[ayar.paranoya]}</span>
             </div>
           </Kart>
 

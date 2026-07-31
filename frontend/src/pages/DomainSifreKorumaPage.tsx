@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
 type Kayit = { id: number; yol: string; kullanici: string; created_at: string }
 
 export default function DomainSifreKorumaPage() {
+  const { t } = useTranslation(['DomainSifreKorumaPage', 'common'])
   const { id } = useParams()
   const [liste, setListe] = useState<Kayit[]>([])
   const [yuk, setYuk] = useState(true)
@@ -29,21 +31,21 @@ export default function DomainSifreKorumaPage() {
     setHata(null); setOk(null); setKaydediyor(true)
     try {
       await api.post(`/domains/${id}/koruma`, { yol, kullanici, parola })
-      setOk(`${yol} dizini "${kullanici}" ile korumaya alındı.`)
+      setOk(t('DomainSifreKorumaPage:protected', { yol, kullanici }))
       setParola('')
       yukle()
     } catch (err) {
-      setHata(apiHata(err, 'Eklenemedi'))
+      setHata(apiHata(err, t('DomainSifreKorumaPage:add_failed')))
     } finally { setKaydediyor(false) }
   }
 
   async function sil(k: Kayit) {
-    if (!confirm(`"${k.kullanici}" kullanıcısını ${k.yol} korumasından kaldır?`)) return
+    if (!confirm(t('DomainSifreKorumaPage:confirm_remove', { kullanici: k.kullanici, yol: k.yol }))) return
     setHata(null); setOk(null)
     try {
       await api.delete(`/domains/${id}/koruma/${k.id}`)
       yukle()
-    } catch (err) { setHata(apiHata(err, 'Silinemedi')) }
+    } catch (err) { setHata(apiHata(err, t('DomainSifreKorumaPage:delete_failed'))) }
   }
 
   // yol -> o yola ait kullanıcılar
@@ -53,13 +55,13 @@ export default function DomainSifreKorumaPage() {
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
-          { etiket: 'Şifre Korumalı Dizinler' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('common:domain'), href: '/domainler' },
+          { etiket: t('DomainSifreKorumaPage:breadcrumb_title') },
         ]} />
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Şifre Korumalı Dizinler</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainSifreKorumaPage:title')}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          Belirli bir dizini HTTP kimlik doğrulaması (<span className="font-mono">.htpasswd</span>) ile koruyun. Ziyaretçiler kullanıcı adı ve parola olmadan erişemez.
+          {t('DomainSifreKorumaPage:subtitle')}
         </p>
 
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -67,39 +69,39 @@ export default function DomainSifreKorumaPage() {
 
         {/* Ekleme formu */}
         <form onSubmit={ekle} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Yeni koruma / kullanıcı ekle</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainSifreKorumaPage:new_protection_title')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="block">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Dizin yolu</span>
-              <input value={yol} onChange={e => setYol(e.target.value)} required placeholder="/gizli"
+              <span className="text-xs text-slate-500 dark:text-slate-400">{t('DomainSifreKorumaPage:dir_path_label')}</span>
+              <input value={yol} onChange={e => setYol(e.target.value)} required placeholder={t('DomainSifreKorumaPage:dir_path_placeholder')}
                 className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Kullanıcı adı</span>
-              <input value={kullanici} onChange={e => setKullanici(e.target.value)} required placeholder="kullanici"
+              <span className="text-xs text-slate-500 dark:text-slate-400">{t('DomainSifreKorumaPage:username_label')}</span>
+              <input value={kullanici} onChange={e => setKullanici(e.target.value)} required placeholder={t('DomainSifreKorumaPage:username_placeholder')}
                 className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-500 dark:text-slate-400">Parola</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{t('DomainSifreKorumaPage:password_label')}</span>
               <input value={parola} onChange={e => setParola(e.target.value)} required type="password" placeholder="••••••••"
                 className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
             </label>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Yol <span className="font-mono">/</span> ile başlamalı (örn. <span className="font-mono">/gizli</span>, <span className="font-mono">/admin</span>). Aynı yola birden fazla kullanıcı ekleyebilirsiniz.</p>
+          <p className="text-[11px] text-slate-400 mt-2">{t('DomainSifreKorumaPage:dir_help')}</p>
           <button disabled={kaydediyor} className="mt-3 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
-            {kaydediyor ? 'Ekleniyor…' : 'Koruma Ekle'}
+            {kaydediyor ? t('DomainSifreKorumaPage:adding') : t('DomainSifreKorumaPage:add_button')}
           </button>
         </form>
 
         {/* Mevcut korumalar */}
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Korunan dizinler</h3>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainSifreKorumaPage:existing_protected_title')}</h3>
           {yuk ? (
-            <div className="text-sm text-slate-400">Yükleniyor…</div>
+            <div className="text-sm text-slate-400">{t('common:loading')}</div>
           ) : liste.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-3xl mb-2">🔒</div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Henüz korumalı dizin yok.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t('DomainSifreKorumaPage:no_protected')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -108,13 +110,13 @@ export default function DomainSifreKorumaPage() {
                   <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-900/40">
                     <span className="text-sm">🔒</span>
                     <span className="font-mono text-sm text-slate-700 dark:text-slate-200">{g}</span>
-                    <span className="text-xs text-slate-400">· {ks.length} kullanıcı</span>
+                    <span className="text-xs text-slate-400">{t('DomainSifreKorumaPage:users_count', { count: ks.length })}</span>
                   </div>
                   <ul className="divide-y divide-slate-50 dark:divide-slate-700/50">
                     {ks.map(k => (
                       <li key={k.id} className="flex items-center justify-between px-3 py-2">
                         <span className="text-sm text-slate-600 dark:text-slate-300">{k.kullanici}</span>
-                        <button onClick={() => sil(k)} className="text-xs text-red-600 dark:text-red-400 hover:underline">Kaldır</button>
+                        <button onClick={() => sil(k)} className="text-xs text-red-600 dark:text-red-400 hover:underline">{t('DomainSifreKorumaPage:remove')}</button>
                       </li>
                     ))}
                   </ul>
@@ -124,7 +126,7 @@ export default function DomainSifreKorumaPage() {
           )}
         </div>
 
-        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link></div>
+        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainSifreKorumaPage:back_to_subscription')}</Link></div>
       </div>
     </div>
   )

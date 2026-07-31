@@ -1,0 +1,15 @@
+{
+  "title": "Clone Site",
+  "desc": "Creates a timestamped snapshot of your site's files under ~/kopyalar/ — a safe restore point before making changes.",
+  "created": "Copy created: {{ad}} ({{mb}} MB)",
+  "create_failed": "Could not create copy",
+  "confirm_delete": "Delete this copy?\n{{ad}} ({{mb}} MB)",
+  "delete_failed": "Could not delete",
+  "info_box": "ℹ️ This tool only copies files (the database is not included). For a full backup, use the Backup & Restore tool.",
+  "create_new_desc": "Create a new copy from the public_html contents.",
+  "creating": "Copying…",
+  "create_button": "Create Copy",
+  "existing_copies": "Existing copies",
+  "no_copies": "No copies yet.",
+  "back_to_subscription": "← Back to subscription"
+}

@@ -1,0 +1,32 @@
+{
+  "breadcrumb_title": "İstatistikler",
+  "title": "İstatistikler",
+  "live_badge": "● Canlı (10sn)",
+  "subtitle": "Sunucu kaynak kullanımı, domain sayıları, sistem özeti.",
+  "metrics": {
+    "cpu": "CPU",
+    "memory": "Bellek",
+    "disk": "Disk",
+    "load": "Yük (1dk)"
+  },
+  "core_suffix": "çekirdek",
+  "load_detail": "5dk: {{v5}} · 15dk: {{v15}}",
+  "system_card": {
+    "title": "Sistem",
+    "hostname": "Sunucu adı",
+    "os": "İşletim sistemi",
+    "kernel": "Çekirdek (kernel)",
+    "cpu": "İşlemci",
+    "swap": "Swap",
+    "panel_version": "Panel sürümü"
+  },
+  "domains_card": {
+    "title": "Domainler",
+    "total": "Toplam domain",
+    "active": "Aktif domain",
+    "inactive": "Pasif domain"
+  },
+  "footer_prefix": "Daha detaylı izleme için",
+  "footer_link": "İzleme",
+  "footer_suffix": "sayfasını ziyaret edin."
+}

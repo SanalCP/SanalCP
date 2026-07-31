@@ -1,0 +1,20 @@
+{
+  "title": "Panel Alan Adı",
+  "badge_auto_ssl": "Otomatik SSL",
+  "desc1": "Panele çıplak IP yerine kendi alan adınızla, port yazmadan girin. Domainin A kaydı bu sunucuyu",
+  "desc2": "göstermelidir — kaydedince panel otomatik olarak gerçek bir Let's Encrypt sertifikası kurar. Panel her zaman",
+  "desc3": "üzerinden de erişilebilir kalır (yedek erişim).",
+  "ip_fallback": "sunucu-ip",
+  "ssl_active": "SSL aktif",
+  "ssl_valid_until": " — {{date}} tarihine kadar geçerli",
+  "ssl_active_access": " — https://{{domain}} üzerinden port yazmadan erişebilirsiniz",
+  "ssl_cert_failed": "Domain kaydedildi ama sertifika alınamadı: {{error}}",
+  "placeholder": "panel.ornekalan.com",
+  "save_button": "Kaydet ve SSL kur",
+  "saving": "Kaydediliyor…",
+  "remove_button": "Kaldır",
+  "save_success": "✓ Sertifika kuruldu — https://{{domain}} üzerinden erişebilirsiniz",
+  "remove_success": "✓ Özel domain kaldırıldı, panel sunucu IP + self-signed sertifikaya döndü",
+  "save_failed": "kaydedilemedi",
+  "remove_failed": "kaldırılamadı"
+}

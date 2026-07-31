@@ -1,0 +1,120 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "dns_settings": "DNS Ayarları"
+  },
+  "title": "DNS Ayarları",
+  "ip_label": "IP:",
+  "info": {
+    "label": "Bilgi:",
+    "text1": "Bu sunucu ",
+    "authoritative_dns": "authoritative DNS",
+    "text2": "'tir (BIND) — kayıtlar kaydedildiği anda yayınlanır. Domainin çalışması için alan adı operatöründe NS kayıtlarını bu sunucunun ",
+    "your_domain": "alaniniz",
+    "after": " adreslerine yönlendirin."
+  },
+  "soa": {
+    "toggle_label": "⚙️ SOA Ayarları",
+    "toggle_hint": "(başlangıç yetki kaydı — refresh/retry/expire/NS)",
+    "hide": "▲ gizle",
+    "edit": "▼ düzenle",
+    "primary_ns": "Birincil NS",
+    "hostmaster": "Hostmaster (e-posta)",
+    "seconds_suffix": "(sn)",
+    "save": "SOA Kaydet"
+  },
+  "dnssec": {
+    "status_signed": "imzalı",
+    "status_signing": "imzalanıyor…",
+    "status_off": "kapalı",
+    "desc": "Zone imzalama (BIND inline-signing). Açtıktan sonra oluşan DS kaydını alan adı operatörünüze girin.",
+    "refresh_status": "↻ Durum",
+    "close": "Kapat",
+    "enable": "Etkinleştir",
+    "enabling": "Etkinleştiriliyor…",
+    "ds_title": "DS Kaydı — registrar'a girin",
+    "ds_copy_hint": "Bu DS kaydını alan adınızın operatöründe (registrar) DNSSEC/DS alanına girin. Yayılması TTL süresi kadar sürebilir.",
+    "ds_pending": "İmzalama sürüyor; DS kaydı henüz hazır değil. Birkaç saniye sonra \"↻ Durum\"a basın.",
+    "enabled_msg": "DNSSEC etkinleştirildi. Aşağıdaki DS kaydını alan adı operatörünüze (registrar) girin.",
+    "disabled_msg": "DNSSEC kapatıldı.",
+    "update_failed": "DNSSEC güncellenemedi"
+  },
+  "actions": {
+    "add_record": "Kayıt Ekle",
+    "apply_template": "📋 Varsayılan Şablonu Uygula",
+    "apply_template_tooltip": "A/MX/TXT/NS varsayılan kayıtlarını ekler (idempotent)",
+    "refresh": "↻ Yenile",
+    "record_count": "{{count}} kayıt"
+  },
+  "selection": {
+    "selected_count": "{{count}} kayıt seçildi",
+    "make_active": "Aktif Yap",
+    "make_inactive": "Pasif Yap",
+    "delete_selected": "Seçilenleri Sil ({{count}})",
+    "clear_selection": "Seçimi Temizle"
+  },
+  "table": {
+    "select_all": "Tümünü seç",
+    "select_row": "{{ad}} {{tip}} seç",
+    "name": "Ad",
+    "type": "Tip",
+    "value": "Değer",
+    "ttl": "TTL",
+    "priority": "Öncelik",
+    "empty": "Henüz DNS kaydı yok."
+  },
+  "modal": {
+    "new_title": "Yeni DNS Kaydı",
+    "edit_title": "DNS Kaydını Düzenle",
+    "name_label": "Ad (alt-ad)",
+    "name_hint": "\"@\" = ana domain, \"www\", \"mail\" vs.",
+    "type_label": "Tip",
+    "value_label": "Değer",
+    "ttl_label": "TTL (sn)",
+    "priority_label": "Öncelik",
+    "active_label": "Aktif",
+    "update": "Güncelle"
+  },
+  "value_hints": {
+    "A": "IPv4 adresi — ör. 203.0.113.10",
+    "AAAA": "IPv6 adresi — ör. 2a01:4f8:1c1c::1",
+    "CNAME": "Hedef alan adı — ör. hedef.example.com",
+    "MX": "Mail sunucusu — ör. mail.example.com (öncelik ayrı alanda)",
+    "TXT": "Serbest metin — ör. v=spf1 mx ~all",
+    "NS": "Ad sunucusu — ör. ns1.example.com",
+    "SRV": "ağırlık port hedef — ör. 5 5060 sip.example.com (öncelik ayrı alanda)",
+    "CAA": "flags tag \"değer\" — ör. 0 issue \"letsencrypt.org\"",
+    "PTR": "Hedef alan adı — ör. host.example.com",
+    "DS": "keytag alg digest-tip digest — ör. 12345 13 2 49FD46E6C4B45C55D4AC…",
+    "TLSA": "kullanım seçici eşleşme veri — ör. 3 1 1 0B9FA5A59EED715C26C1020C…",
+    "SSHFP": "algoritma tip parmak-izi — ör. 4 2 123456789ABCDEF…",
+    "NAPTR": "order pref \"flags\" \"servis\" \"regexp\" replacement"
+  },
+  "confirm": {
+    "delete_title": "DNS kaydını sil",
+    "delete_msg": "\"{{ad}} {{tip}} {{deger}}\" silinsin mi?",
+    "delete_confirm": "Evet, sil",
+    "bulk_delete_title": "Seçili DNS kayıtlarını sil",
+    "bulk_delete_msg": "{{count}} DNS kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam edilsin mi?",
+    "bulk_delete_confirm": "Evet, {{count}} kaydı sil",
+    "dnssec_disable_title": "DNSSEC'i kapat",
+    "dnssec_disable_msg": "ÖNEMLİ: DNSSEC'i kapatmadan ÖNCE alan adı operatörünüzden (registrar) DS kaydını SİLİN ve TTL süresi kadar bekleyin. Aksi halde alan adınız çözümlenemez hale gelir (SERVFAIL). DS kaydını sildiyseniz devam edin.",
+    "dnssec_disable_confirm": "DS'i sildim, kapat"
+  },
+  "errors": {
+    "bulk_delete_failed": "Toplu silme başarısız",
+    "bulk_update_failed": "Toplu güncelleme başarısız",
+    "soa_save_failed": "SOA kaydedilemedi",
+    "template_apply_failed": "Şablon uygulanamadı",
+    "delete_failed": "Silme başarısız",
+    "record_save_failed": "Kayıt başarısız"
+  },
+  "success": {
+    "bulk_deleted": "{{count}} kayıt silindi",
+    "bulk_updated": "{{count}} kayıt {{durum}} yapıldı",
+    "soa_saved": "SOA ayarları kaydedildi ve zone yeniden yazıldı.",
+    "template_applied": "{{count}} varsayılan kayıt eklendi"
+  },
+  "status_active": "aktif",
+  "status_inactive": "pasif"
+}

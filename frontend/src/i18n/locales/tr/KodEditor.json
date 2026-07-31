@@ -1,0 +1,17 @@
+{
+  "lang_plain_text": "Düz Metin",
+  "status_dirty": "Değişiklik var",
+  "status_saving": "Kaydediliyor…",
+  "status_saved": "✓ Kaydedildi",
+  "syntax_title": "Sözdizimi",
+  "windowed": "Pencerele",
+  "fullscreen": "Tam ekran",
+  "save": "💾 Kaydet",
+  "save_shortcut_title": "Ctrl+S",
+  "close": "Kapat",
+  "close_shortcut_title": "ESC",
+  "cursor_position": "Satır {{line}}, Kolon {{col}}",
+  "line_count": "{{count}} satır",
+  "byte_count": "{{count}} bayt",
+  "footer_hint": "Ctrl+S: kaydet · Esc: kapat"
+}

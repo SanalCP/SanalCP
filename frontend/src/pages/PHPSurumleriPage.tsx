@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -12,6 +13,7 @@ type Surum = {
 }
 
 export default function PHPSurumleriPage() {
+  const { t } = useTranslation(['PHPSurumleriPage', 'common'])
   const [surumler, setSurumler] = useState<Surum[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -30,34 +32,34 @@ export default function PHPSurumleriPage() {
   useEffect(yukle, [])
 
   async function kur(s: Surum) {
-    if (!confirm(`PHP ${s.surum} (${s.kaynak}) için 14 paket kurulacak (fpm + cli + mysqlnd + 12 ekstension). Devam?`)) return
+    if (!confirm(t('PHPSurumleriPage:install_confirm', { version: s.surum, source: s.kaynak }))) return
     const key = s.surum + ':' + s.kaynak
     setIsleniyor(key); setHata(null); setBasari(null)
     try {
       const r = await api.post('/php-surumler/kur', { surum: s.surum, kaynak: s.kaynak })
-      setBasari(`✓ PHP ${s.surum} kuruldu`)
-      setOutput({ baslik: `PHP ${s.surum} kurulum`, output: r.data.output || '' })
+      setBasari(t('PHPSurumleriPage:install_done', { version: s.surum }))
+      setOutput({ baslik: t('PHPSurumleriPage:install_title', { version: s.surum }), output: r.data.output || '' })
       setTimeout(() => setBasari(null), 4000)
       yukle()
-    } catch (e) { setHata(apiHata(e, 'Kurulum başarısız')) }
+    } catch (e) { setHata(apiHata(e, t('PHPSurumleriPage:install_failed'))) }
     finally { setIsleniyor(null) }
   }
 
   async function kaldir(s: Surum) {
     if (s.kaynak === 'appstream') {
-      alert('AppStream PHP sistem default\'u, kaldırılamaz')
+      alert(t('PHPSurumleriPage:appstream_remove_blocked'))
       return
     }
-    if (!confirm(`PHP ${s.surum} (Remi) ve TÜM ekstension'ları KALDIRILACAK.\nBu sürümü kullanan domain varsa işlem reddedilir. Devam?`)) return
+    if (!confirm(t('PHPSurumleriPage:remove_confirm', { version: s.surum }))) return
     const key = s.surum + ':' + s.kaynak
     setIsleniyor(key); setHata(null); setBasari(null)
     try {
       const r = await api.post('/php-surumler/kaldir', { surum: s.surum, kaynak: s.kaynak })
-      setBasari(`✓ PHP ${s.surum} kaldırıldı`)
-      setOutput({ baslik: `PHP ${s.surum} kaldırma`, output: r.data.output || '' })
+      setBasari(t('PHPSurumleriPage:remove_done', { version: s.surum }))
+      setOutput({ baslik: t('PHPSurumleriPage:remove_title', { version: s.surum }), output: r.data.output || '' })
       setTimeout(() => setBasari(null), 4000)
       yukle()
-    } catch (e) { setHata(apiHata(e, 'Kaldırma başarısız')) }
+    } catch (e) { setHata(apiHata(e, t('PHPSurumleriPage:remove_failed'))) }
     finally { setIsleniyor(null) }
   }
 
@@ -71,15 +73,14 @@ export default function PHPSurumleriPage() {
   return (
     <div className="px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Araçlar ve Ayarlar' },
-        { etiket: 'PHP Sürümleri' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('PHPSurumleriPage:breadcrumb.tools_settings') },
+        { etiket: t('PHPSurumleriPage:breadcrumb.php_versions') },
       ]} />
 
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">PHP Sürümleri</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('PHPSurumleriPage:title')}</h1>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        Sunucuya istediğiniz PHP sürümünü ekleyin veya kaldırın. Her sürüm bağımsız PHP-FPM havuzunda çalışır; domain bazında seçilebilir.
-        Kurulum 14 paket içerir (fpm, cli, mysqlnd, mbstring, bcmath, intl, gd, soap, opcache, pdo, xml, zip, pgsql, ldap).
+        {t('PHPSurumleriPage:desc')}
       </p>
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{hata}</div>}
@@ -87,16 +88,16 @@ export default function PHPSurumleriPage() {
 
       {/* Filtre */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500 mr-2">Filtre:</span>
+        <span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500 mr-2">{t('PHPSurumleriPage:filter_label')}</span>
         {(['tumu', 'yuklu', 'yuklenebilir'] as const).map(f => (
           <button key={f} onClick={() => setFiltre(f)}
             className={`px-3 py-1 text-sm rounded ${filtre === f ? 'bg-brand-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
-            {f === 'tumu' ? 'Tümü' : f === 'yuklu' ? `Yüklü (${yukluSayi})` : `Yüklenebilir (${surumler.length - yukluSayi})`}
+            {f === 'tumu' ? t('PHPSurumleriPage:filter_all') : f === 'yuklu' ? t('PHPSurumleriPage:filter_installed', { count: yukluSayi }) : t('PHPSurumleriPage:filter_installable', { count: surumler.length - yukluSayi })}
           </button>
         ))}
       </div>
 
-      {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div> : (
+      {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtreli.map(s => {
             const key = s.surum + ':' + s.kaynak
@@ -113,8 +114,8 @@ export default function PHPSurumleriPage() {
                           ? 'bg-sky-100 text-sky-700'
                           : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
                       }`}>{s.kaynak}</span>
-                      {s.yuklu && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">YÜKLÜ</span>}
-                      {parseInt(s.surum) < 8 && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">EOL</span>}
+                      {s.yuklu && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{t('PHPSurumleriPage:installed_badge')}</span>}
+                      {parseInt(s.surum) < 8 && <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{t('PHPSurumleriPage:eol_badge')}</span>}
                     </div>
                   </div>
                 </div>
@@ -123,27 +124,27 @@ export default function PHPSurumleriPage() {
 
                 {s.yuklu && (
                   <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 space-y-0.5 mb-3 font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2">
-                    {s.gercek_surum && <div>Sürüm: <span className="text-slate-900 dark:text-slate-100">{s.gercek_surum}</span></div>}
-                    {s.modul_sayi !== undefined && <div>Modül: <span className="text-slate-900 dark:text-slate-100">{s.modul_sayi}</span></div>}
-                    {s.service && <div className="truncate">Servis: <span className="text-slate-700 dark:text-slate-300">{s.service}</span></div>}
+                    {s.gercek_surum && <div>{t('PHPSurumleriPage:version_label')} <span className="text-slate-900 dark:text-slate-100">{s.gercek_surum}</span></div>}
+                    {s.modul_sayi !== undefined && <div>{t('PHPSurumleriPage:module_label')} <span className="text-slate-900 dark:text-slate-100">{s.modul_sayi}</span></div>}
+                    {s.service && <div className="truncate">{t('PHPSurumleriPage:service_label')} <span className="text-slate-700 dark:text-slate-300">{s.service}</span></div>}
                   </div>
                 )}
 
                 {s.yuklu ? (
                   s.kaynak === 'appstream' ? (
                     <button disabled className="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-sm rounded cursor-not-allowed">
-                      Sabit (sistem default)
+                      {t('PHPSurumleriPage:fixed_default')}
                     </button>
                   ) : (
                     <button onClick={() => kaldir(s)} disabled={meşgul}
                       className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white text-sm rounded">
-                      {meşgul ? 'Kaldırılıyor…' : '🗑 Kaldır'}
+                      {meşgul ? t('PHPSurumleriPage:removing') : t('PHPSurumleriPage:remove')}
                     </button>
                   )
                 ) : (
                   <button onClick={() => kur(s)} disabled={meşgul}
                     className="w-full px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded">
-                    {meşgul ? '⏳ Kuruluyor…' : '⬇ Kur'}
+                    {meşgul ? t('PHPSurumleriPage:installing') : t('PHPSurumleriPage:install')}
                   </button>
                 )}
               </div>
@@ -162,7 +163,7 @@ export default function PHPSurumleriPage() {
             <pre className="flex-1 overflow-auto p-3 bg-slate-900 text-slate-100 text-xs font-mono whitespace-pre-wrap">{output.output}</pre>
             <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 text-right">
               <button onClick={() => setOutput(null)}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">Kapat</button>
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('common:close')}</button>
             </div>
           </div>
         </div>

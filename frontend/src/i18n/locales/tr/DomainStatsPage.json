@@ -1,0 +1,22 @@
+{
+  "breadcrumb_title": "İstatistikler",
+  "title": "Trafik İstatistikleri",
+  "subtitle": "nginx erişim günlüğü analizi.",
+  "refresh": "↻ Yenile",
+  "not_found": "Bulunamadı",
+  "no_data": "Henüz erişim günlüğü verisi yok. Site trafik almaya başladığında burada görünür.",
+  "kpi_total_requests": "Toplam İstek",
+  "kpi_bandwidth": "Bant Kullanımı",
+  "kpi_unique_ip": "Tekil IP",
+  "kpi_bot_ratio": "Bot Oranı",
+  "status_distribution": "HTTP Durum Dağılımı",
+  "daily_requests": "Günlük İstek (son 7 gün)",
+  "top_paths": "En Çok İstenen Yollar",
+  "top_ips": "En Aktif IP'ler",
+  "recent_requests": "Son İstekler",
+  "no_rows": "Veri yok.",
+  "request_unit": "istek",
+  "request_title": "{{count}} istek",
+  "back_to_subscription": "← Aboneliğe dön",
+  "locale": "tr-TR"
+}

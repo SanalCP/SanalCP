@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
 import DomainList, { type Domain } from '@/components/DomainList'
@@ -9,6 +10,7 @@ import ResourceCard from '@/components/ResourceCard'
 import { useAuth } from '@/store/auth'
 
 export default function DashboardPage() {
+  const { t } = useTranslation(['DashboardPage', 'common'])
   const kullanici = useAuth((s) => s.kullanici)
   const [params, setParams] = useSearchParams()
   const [domainler, setDomainler] = useState<Domain[]>([])
@@ -40,14 +42,14 @@ export default function DashboardPage() {
     <div className="w-full px-6 py-5">
       <div className="mb-5 flex items-baseline justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Pano</h1>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('DashboardPage:title')}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
-            Hoş geldiniz, <span className="text-slate-700 dark:text-slate-300 font-medium">{kullanici?.ad_soyad || kullanici?.adi}</span>
+            {t('DashboardPage:welcome')} <span className="text-slate-700 dark:text-slate-300 font-medium">{kullanici?.ad_soyad || kullanici?.adi}</span>
           </p>
         </div>
         {secili && (
           <div className="text-right text-xs text-slate-500 dark:text-slate-500">
-            <span className="block">Seçili domain</span>
+            <span className="block">{t('DashboardPage:selected_domain')}</span>
             <span className="text-brand-700 dark:text-brand-300 font-mono font-semibold text-sm">{secili.alan_adi}</span>
           </div>
         )}
@@ -69,7 +71,7 @@ export default function DashboardPage() {
             <DomainPano domain={secili} />
           ) : (
             <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-12 text-center text-slate-500 dark:text-slate-500">
-              {yukleniyor ? 'Yükleniyor…' : 'Henüz domain yok. Sol panelden ekleyin.'}
+              {yukleniyor ? t('common:loading') : t('DashboardPage:empty')}
             </div>
           )}
         </section>

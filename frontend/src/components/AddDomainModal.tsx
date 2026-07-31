@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Modal from './Modal'
 
@@ -16,6 +17,7 @@ export default function AddDomainModal({
   onKapat: () => void
   onEklendi: () => void
 }) {
+  const { t } = useTranslation(['AddDomainModal', 'common'])
   const [alanAdi, setAlanAdi] = useState('')
   const [phpSurum, setPhpSurum] = useState('8.3')
   const [planId, setPlanId] = useState<number | ''>('')
@@ -68,7 +70,7 @@ export default function AddDomainModal({
       }
       if (planId !== '') govde.plan_id = planId
       const { data } = await api.post('/domains', govde)
-      setBasari(`${data.alan_adi} başarıyla oluşturuldu (sistem kullanıcısı: ${data.sistem_kullanici})`)
+      setBasari(t('AddDomainModal:created_success', { alan_adi: data.alan_adi, sistem_kullanici: data.sistem_kullanici }))
       setTimeout(() => {
         setAlanAdi('')
         setBasari(null)
@@ -76,46 +78,46 @@ export default function AddDomainModal({
         onKapat()
       }, 1500)
     } catch (e) {
-      setHata(apiHata(e, 'Domain eklenemedi'))
+      setHata(apiHata(e, t('AddDomainModal:create_failed')))
     } finally {
       setYukleniyor(false)
     }
   }
 
   return (
-    <Modal acik={acik} baslik="Yeni Domain Ekle" onKapat={onKapat} genislik="md">
+    <Modal acik={acik} baslik={t('AddDomainModal:title')} onKapat={onKapat} genislik="md">
       <form onSubmit={gonder} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Alan Adı</label>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:domain_label')}</label>
           <input
             type="text"
             value={alanAdi}
             onChange={(e) => setAlanAdi(e.target.value)}
-            placeholder="example.com"
+            placeholder={t('AddDomainModal:domain_placeholder')}
             autoFocus
             required
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition text-sm"
           />
-          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Örnek: <code className="font-mono">site.com</code>, <code className="font-mono">musteri-1.org</code></p>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('AddDomainModal:domain_hint')} <code className="font-mono">site.com</code>, <code className="font-mono">musteri-1.org</code></p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Plan (Paket)</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:plan_label')}</label>
             <select
               value={planId}
               onChange={(e) => planDegis(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition text-sm bg-white dark:bg-slate-800"
             >
-              <option value="">Plan seçilmedi</option>
+              <option value="">{t('AddDomainModal:plan_none')}</option>
               {planlar.map(p => (
-                <option key={p.id} value={p.id}>{p.ad}{p.varsayilan ? ' (varsayılan)' : ''}</option>
+                <option key={p.id} value={p.id}>{p.ad}{p.varsayilan ? t('AddDomainModal:plan_default_suffix') : ''}</option>
               ))}
             </select>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Kaynak limitleri ve varsayılan PHP bu plandan gelir.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('AddDomainModal:plan_hint')}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">PHP Sürümü</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:php_label')}</label>
             <select
               value={phpSurum}
               onChange={(e) => setPhpSurum(e.target.value)}
@@ -124,13 +126,13 @@ export default function AddDomainModal({
               {phpOpts.map(v => <option key={v} value={v}>PHP {v}</option>)}
             </select>
             <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
-              {phpPlandan ? <span className="text-brand-600 dark:text-brand-400">✓ Plandan geldi ({seciliPlan?.ad})</span> : 'Plandan bağımsız değiştirebilirsiniz.'}
+              {phpPlandan ? <span className="text-brand-600 dark:text-brand-400">{t('AddDomainModal:php_from_plan', { ad: seciliPlan?.ad })}</span> : t('AddDomainModal:php_independent')}
             </p>
           </div>
         </div>
 
         <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 rounded-md p-3 text-xs text-sky-800">
-          <strong>Otomatik yapılacaklar:</strong> Linux kullanıcı (<code className="font-mono">c_&lt;slug&gt;</code>) + ev dizini (<code className="font-mono">/home/c_&lt;slug&gt;/public_html</code>) + nginx vhost + hoşgeldin sayfası
+          <strong>{t('AddDomainModal:auto_box_title')}</strong> {t('AddDomainModal:auto_box_user')} (<code className="font-mono">c_&lt;slug&gt;</code>) {t('AddDomainModal:auto_box_middle')} (<code className="font-mono">/home/c_&lt;slug&gt;/public_html</code>) {t('AddDomainModal:auto_box_end')}
         </div>
 
         {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -143,14 +145,14 @@ export default function AddDomainModal({
             disabled={yukleniyor}
             className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded-md text-sm transition"
           >
-            İptal
+            {t('common:cancel')}
           </button>
           <button
             type="submit"
             disabled={yukleniyor || !alanAdi.trim()}
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 rounded-md text-sm font-medium transition"
           >
-            {yukleniyor ? 'Sağlanıyor…' : 'Domain Ekle'}
+            {yukleniyor ? t('AddDomainModal:provisioning') : t('AddDomainModal:add_domain')}
           </button>
         </div>
       </form>

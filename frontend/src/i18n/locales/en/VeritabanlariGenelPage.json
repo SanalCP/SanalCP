@@ -1,0 +1,18 @@
+{
+  "title": "Databases",
+  "subtitle": "All MySQL/MariaDB databases on the server and their disk usage.",
+  "empty": "No databases yet",
+  "col_db": "Database",
+  "col_user": "User",
+  "col_domain": "Domain",
+  "col_server": "Server",
+  "col_size": "Size",
+  "col_created": "Created",
+  "size_kb": "{{n}} KB",
+  "size_mb": "{{n}} MB",
+  "size_gb": "{{n}} GB",
+  "size_empty": "—",
+  "summary_count": "databases",
+  "summary_total_size": "total size",
+  "summary_unique_users": "unique users"
+}

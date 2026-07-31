@@ -1,0 +1,67 @@
+{
+  "title": "Hesap İçe Aktarma",
+  "subtitle": "cPanel tam hesap yedeğini güvenli biçimde analiz edin. Arşiv bu aşamada açılmaz veya sunucuya kalıcı olarak kaydedilmez.",
+  "breadcrumb": {
+    "admin": "Yönetim",
+    "current": "Hesap Aktarımı"
+  },
+  "error": {
+    "analyze_failed": "Arşiv analiz edilemedi",
+    "import_failed": "Hesap içe aktarılamadı"
+  },
+  "upload": {
+    "file_label": "cPanel full backup (.tar.gz / .tgz)",
+    "uploading": "Yükleniyor %{{progress}}",
+    "analyze_button": "Arşivi Analiz Et"
+  },
+  "kpi": {
+    "primary_domain": "Ana Domain",
+    "undetermined": "Belirlenemedi",
+    "web_files": "Web Dosyası",
+    "databases": "Veritabanı",
+    "mail_data": "E-posta Verisi",
+    "none": "Yok",
+    "files_suffix": "dosya"
+  },
+  "detail": {
+    "title": "Hesap bilgisi",
+    "source_panel": "Kaynak panel",
+    "source_panel_value": "cPanel",
+    "user": "Kullanıcı",
+    "archive_root": "Arşiv kökü",
+    "total_entries": "Toplam üye",
+    "expanded_size": "Açılmış boyut",
+    "cron_jobs": "Cron görevleri",
+    "ssl_files": "SSL dosyaları",
+    "mailboxes": "Posta kutuları",
+    "aliases": "Yönlendirmeler"
+  },
+  "lists": {
+    "databases": "Veritabanları",
+    "dns_zones": "DNS zoneları",
+    "cron_jobs": "Cron görevleri",
+    "empty": "Bulunamadı"
+  },
+  "info_note": "Analiz tamamlandı. İçe aktarma yeni bir domain oluşturur; hata halinde oluşturulan hesap otomatik geri alınır.",
+  "target_section": {
+    "title": "Hedef ve plan",
+    "target_customer": "Hedef müşteri",
+    "select_customer": "Müşteri seçin",
+    "service_plan": "Hizmet planı",
+    "default_plan": "Varsayılan plan",
+    "primary_domain": "Ana domain",
+    "php_version": "PHP sürümü",
+    "import_button": "Hesabı İçe Aktar",
+    "importing": "İçe aktarılıyor… %{{progress}}"
+  },
+  "result": {
+    "success_title": "İçe aktarma tamamlandı",
+    "summary": "{{domain}} · {{files}} web dosyası · {{databases}} veritabanı",
+    "cron_imported": "{{count}} cron görevi aktarıldı.",
+    "ssl_imported": "SSL sertifikası aktarıldı · son geçerlilik {{expires}}",
+    "mailbox_passwords_title": "Yeni posta kutusu parolaları — şimdi kaydedin",
+    "aliases_imported": "{{count}} yönlendirme aktarıldı.",
+    "skipped_prefix": "⚠ ",
+    "manage_domain": "Domaini yönet →"
+  }
+}

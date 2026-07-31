@@ -1,0 +1,21 @@
+{
+  "breadcrumb_home": "Anasayfa",
+  "breadcrumb_domains": "Domainler",
+  "breadcrumb_ftp": "FTP Hesabı",
+  "title": "FTP Hesabı",
+  "server": "Sunucu",
+  "port": "Port",
+  "port_value": "21 (FTP) / 22 (SFTP)",
+  "username": "Kullanıcı adı",
+  "home_dir": "Ev dizini",
+  "password_reset": "Parola Sıfırlama",
+  "password_placeholder": "Özel parola girin veya boş bırakın",
+  "set_this_password": "Bu Parolayı Ayarla",
+  "generate_random": "Rastgele Üret",
+  "new_password_assigned": "✓ Yeni parola atandı",
+  "save_hint": "Bunu güvenli bir yere kaydedin, sonra göremezsiniz:",
+  "note_label": "Not:",
+  "note_text_before": "FTP şu anda",
+  "note_text_after": "doğrulama kullanıyor (DB local). Şifrelemek için SFTP (port 22) kullanılabilir.",
+  "reset_failed": "Parola sıfırlama başarısız"
+}

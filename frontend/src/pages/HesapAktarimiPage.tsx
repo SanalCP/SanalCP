@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AxiosProgressEvent } from 'axios'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -37,6 +38,7 @@ type ImportResult = {
 }
 
 export default function HesapAktarimiPage() {
+  const { t } = useTranslation(['HesapAktarimiPage', 'common'])
   const [dosya, setDosya] = useState<File | null>(null)
   const [envanter, setEnvanter] = useState<Inventory | null>(null)
   const [hata, setHata] = useState<string | null>(null)
@@ -76,7 +78,7 @@ export default function HesapAktarimiPage() {
       setEnvanter(r.data)
       setDomain(r.data.primary_domain || '')
     } catch (e) {
-      setHata(apiHata(e, 'Arşiv analiz edilemedi'))
+      setHata(apiHata(e, t('HesapAktarimiPage:error.analyze_failed')))
     } finally {
       setYukleniyor(false)
     }
@@ -100,7 +102,7 @@ export default function HesapAktarimiPage() {
       })
       setSonuc(r.data)
     } catch (e) {
-      setHata(apiHata(e, 'Hesap içe aktarılamadı'))
+      setHata(apiHata(e, t('HesapAktarimiPage:error.import_failed')))
     } finally {
       setAktariliyor(false)
     }
@@ -109,16 +111,16 @@ export default function HesapAktarimiPage() {
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Yönetim' },
-        { etiket: 'Hesap Aktarımı' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('HesapAktarimiPage:breadcrumb.admin') },
+        { etiket: t('HesapAktarimiPage:breadcrumb.current') },
       ]} />
       <div className="flex items-center gap-3 mb-1">
         <span className="text-2xl">🚚</span>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Hesap İçe Aktarma</h1>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t('HesapAktarimiPage:title')}</h1>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
-        cPanel tam hesap yedeğini güvenli biçimde analiz edin. Arşiv bu aşamada açılmaz veya sunucuya kalıcı olarak kaydedilmez.
+        {t('HesapAktarimiPage:subtitle')}
       </p>
 
       {hata && <div className="mb-4 px-4 py-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -126,14 +128,14 @@ export default function HesapAktarimiPage() {
       <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-5 mb-5">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           <label className="flex-1">
-            <span className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">cPanel full backup (.tar.gz / .tgz)</span>
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">{t('HesapAktarimiPage:upload.file_label')}</span>
             <input type="file" accept=".tar.gz,.tgz,application/gzip"
               onChange={e => { setDosya(e.target.files?.[0] || null); setEnvanter(null) }}
               className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 dark:file:bg-brand-950/40 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-brand-700 dark:file:text-brand-300 hover:file:bg-brand-100" />
           </label>
           <button onClick={analizEt} disabled={!dosya || yukleniyor}
             className="px-5 py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">
-            {yukleniyor ? `Yükleniyor %${ilerleme}` : 'Arşivi Analiz Et'}
+            {yukleniyor ? t('HesapAktarimiPage:upload.uploading', { progress: ilerleme }) : t('HesapAktarimiPage:upload.analyze_button')}
           </button>
         </div>
         {dosya && <div className="mt-3 text-xs text-slate-400">{dosya.name} · {fmtByte(dosya.size)}</div>}
@@ -143,10 +145,10 @@ export default function HesapAktarimiPage() {
       {envanter && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <Kpi etiket="Ana Domain" deger={envanter.primary_domain || 'Belirlenemedi'} />
-            <Kpi etiket="Web Dosyası" deger={envanter.web_files.toLocaleString('tr-TR')} alt={fmtByte(envanter.web_bytes)} />
-            <Kpi etiket="Veritabanı" deger={String(envanter.databases.length)} />
-            <Kpi etiket="E-posta Verisi" deger={envanter.mail_files ? `${envanter.mail_files.toLocaleString('tr-TR')} dosya` : 'Yok'} />
+            <Kpi etiket={t('HesapAktarimiPage:kpi.primary_domain')} deger={envanter.primary_domain || t('HesapAktarimiPage:kpi.undetermined')} />
+            <Kpi etiket={t('HesapAktarimiPage:kpi.web_files')} deger={envanter.web_files.toLocaleString('tr-TR')} alt={fmtByte(envanter.web_bytes)} />
+            <Kpi etiket={t('HesapAktarimiPage:kpi.databases')} deger={String(envanter.databases.length)} />
+            <Kpi etiket={t('HesapAktarimiPage:kpi.mail_data')} deger={envanter.mail_files ? `${envanter.mail_files.toLocaleString('tr-TR')} ${t('HesapAktarimiPage:kpi.files_suffix')}` : t('HesapAktarimiPage:kpi.none')} />
           </div>
 
           {envanter.warnings.length > 0 && (
@@ -156,47 +158,47 @@ export default function HesapAktarimiPage() {
           )}
 
           <div className="grid lg:grid-cols-2 gap-4">
-            <Detail title="Hesap bilgisi" rows={[
-              ['Kaynak panel', 'cPanel'],
-              ['Kullanıcı', envanter.username || '—'],
-              ['Arşiv kökü', envanter.archive_root || '—'],
-              ['Toplam üye', envanter.entry_count.toLocaleString('tr-TR')],
-              ['Açılmış boyut', fmtByte(envanter.expanded_bytes)],
-              ['Cron görevleri', String(envanter.cron_jobs.length)],
-              ['SSL dosyaları', String(envanter.ssl_certs)],
-              ['Posta kutuları', String(envanter.mailboxes.length)],
-              ['Yönlendirmeler', String(envanter.alias_count)],
+            <Detail title={t('HesapAktarimiPage:detail.title')} rows={[
+              [t('HesapAktarimiPage:detail.source_panel'), t('HesapAktarimiPage:detail.source_panel_value')],
+              [t('HesapAktarimiPage:detail.user'), envanter.username || '—'],
+              [t('HesapAktarimiPage:detail.archive_root'), envanter.archive_root || '—'],
+              [t('HesapAktarimiPage:detail.total_entries'), envanter.entry_count.toLocaleString('tr-TR')],
+              [t('HesapAktarimiPage:detail.expanded_size'), fmtByte(envanter.expanded_bytes)],
+              [t('HesapAktarimiPage:detail.cron_jobs'), String(envanter.cron_jobs.length)],
+              [t('HesapAktarimiPage:detail.ssl_files'), String(envanter.ssl_certs)],
+              [t('HesapAktarimiPage:detail.mailboxes'), String(envanter.mailboxes.length)],
+              [t('HesapAktarimiPage:detail.aliases'), String(envanter.alias_count)],
             ]} />
             <div className="space-y-4">
-              <List title="Veritabanları" values={envanter.databases} />
-              <List title="DNS zoneları" values={envanter.dns_zones} />
-              <List title="Cron görevleri" values={envanter.cron_jobs.map(c => `${c.minute} ${c.hour} ${c.day} ${c.month} ${c.weekday}  ${c.command}`)} />
+              <List title={t('HesapAktarimiPage:lists.databases')} values={envanter.databases} emptyLabel={t('HesapAktarimiPage:lists.empty')} />
+              <List title={t('HesapAktarimiPage:lists.dns_zones')} values={envanter.dns_zones} emptyLabel={t('HesapAktarimiPage:lists.empty')} />
+              <List title={t('HesapAktarimiPage:lists.cron_jobs')} values={envanter.cron_jobs.map(c => `${c.minute} ${c.hour} ${c.day} ${c.month} ${c.weekday}  ${c.command}`)} emptyLabel={t('HesapAktarimiPage:lists.empty')} />
             </div>
           </div>
 
           <div className="mt-5 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/20 px-4 py-3 text-sm text-sky-800 dark:text-sky-300">
-            Analiz tamamlandı. İçe aktarma yeni bir domain oluşturur; hata halinde oluşturulan hesap otomatik geri alınır.
+            {t('HesapAktarimiPage:info_note')}
           </div>
 
           <div className="mt-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-5">
-            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-4">Hedef ve plan</h2>
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-4">{t('HesapAktarimiPage:target_section.title')}</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              <Field label="Hedef müşteri">
+              <Field label={t('HesapAktarimiPage:target_section.target_customer')}>
                 <select value={customerID} onChange={e => setCustomerID(e.target.value)} className={inputClass}>
-                  <option value="">Müşteri seçin</option>
+                  <option value="">{t('HesapAktarimiPage:target_section.select_customer')}</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.ad} — {c.eposta}</option>)}
                 </select>
               </Field>
-              <Field label="Hizmet planı">
+              <Field label={t('HesapAktarimiPage:target_section.service_plan')}>
                 <select value={planID} onChange={e => setPlanID(e.target.value)} className={inputClass}>
-                  <option value="">Varsayılan plan</option>
+                  <option value="">{t('HesapAktarimiPage:target_section.default_plan')}</option>
                   {plans.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
                 </select>
               </Field>
-              <Field label="Ana domain">
+              <Field label={t('HesapAktarimiPage:target_section.primary_domain')}>
                 <input value={domain} onChange={e => setDomain(e.target.value.toLowerCase())} className={inputClass} />
               </Field>
-              <Field label="PHP sürümü">
+              <Field label={t('HesapAktarimiPage:target_section.php_version')}>
                 <select value={phpVersion} onChange={e => setPHPVersion(e.target.value)} className={inputClass}>
                   {['7.4', '8.2', '8.3', '8.4', '8.5'].map(v => <option key={v}>{v}</option>)}
                 </select>
@@ -205,23 +207,23 @@ export default function HesapAktarimiPage() {
             <button onClick={iceAktar}
               disabled={aktariliyor || !customerID || !domain}
               className="mt-5 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50">
-              {aktariliyor ? `İçe aktarılıyor… %${ilerleme}` : 'Hesabı İçe Aktar'}
+              {aktariliyor ? t('HesapAktarimiPage:target_section.importing', { progress: ilerleme }) : t('HesapAktarimiPage:target_section.import_button')}
             </button>
           </div>
 
           {sonuc && <div className="mt-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/20 p-5">
-            <h2 className="font-semibold text-emerald-800 dark:text-emerald-200">İçe aktarma tamamlandı</h2>
-            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{sonuc.domain} · {sonuc.web_files} web dosyası · {sonuc.databases.length} veritabanı</p>
-            <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{sonuc.cron_jobs} cron görevi aktarıldı.</p>
-            {sonuc.ssl_imported && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">SSL sertifikası aktarıldı · son geçerlilik {sonuc.ssl_expires}</p>}
+            <h2 className="font-semibold text-emerald-800 dark:text-emerald-200">{t('HesapAktarimiPage:result.success_title')}</h2>
+            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{t('HesapAktarimiPage:result.summary', { domain: sonuc.domain, files: sonuc.web_files, databases: sonuc.databases.length })}</p>
+            <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{t('HesapAktarimiPage:result.cron_imported', { count: sonuc.cron_jobs })}</p>
+            {sonuc.ssl_imported && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{t('HesapAktarimiPage:result.ssl_imported', { expires: sonuc.ssl_expires })}</p>}
             {sonuc.databases.map(d => <p key={d.target} className="mt-1 text-xs font-mono text-emerald-700 dark:text-emerald-300">{d.source} → {d.target}</p>)}
             {sonuc.mailboxes.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-white/60 dark:bg-slate-900/40 p-3">
-              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">Yeni posta kutusu parolaları — şimdi kaydedin</p>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">{t('HesapAktarimiPage:result.mailbox_passwords_title')}</p>
               {sonuc.mailboxes.map(m => <p key={m.email} className="text-xs font-mono text-amber-800 dark:text-amber-200">{m.email}: {m.password}</p>)}
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{sonuc.aliases} yönlendirme aktarıldı.</p>
+              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('HesapAktarimiPage:result.aliases_imported', { count: sonuc.aliases })}</p>
             </div>}
-            {sonuc.skipped?.map(s => <p key={s} className="mt-1 text-xs text-amber-700 dark:text-amber-300">⚠ {s}</p>)}
-            <Link to={`/abonelikler/${sonuc.domain_id}`} className="inline-block mt-3 text-sm font-medium text-brand-700 dark:text-brand-300">Domaini yönet →</Link>
+            {sonuc.skipped?.map(s => <p key={s} className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('HesapAktarimiPage:result.skipped_prefix')}{s}</p>)}
+            <Link to={`/abonelikler/${sonuc.domain_id}`} className="inline-block mt-3 text-sm font-medium text-brand-700 dark:text-brand-300">{t('HesapAktarimiPage:result.manage_domain')}</Link>
           </div>}
         </>
       )}
@@ -251,10 +253,10 @@ function Detail({ title, rows }: { title: string; rows: string[][] }) {
   </div>
 }
 
-function List({ title, values }: { title: string; values: string[] }) {
+function List({ title, values, emptyLabel }: { title: string; values: string[]; emptyLabel: string }) {
   return <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-4">
     <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">{title} <span className="text-slate-400">({values.length})</span></h2>
-    {values.length ? <div className="flex flex-wrap gap-1.5">{values.map(v => <span key={v} className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200">{v}</span>)}</div> : <p className="text-xs text-slate-400">Bulunamadı</p>}
+    {values.length ? <div className="flex flex-wrap gap-1.5">{values.map(v => <span key={v} className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200">{v}</span>)}</div> : <p className="text-xs text-slate-400">{emptyLabel}</p>}
   </div>
 }
 

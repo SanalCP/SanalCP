@@ -1,0 +1,11 @@
+{
+  "load_failed": "Could not read hostname",
+  "save_failed": "Could not change hostname",
+  "saved": "Hostname changed to “{{hostname}}” and made persistent.",
+  "label": "Server Hostname",
+  "protected": "Protected against provider",
+  "unprotected": "Protection pending",
+  "desc": "Permanently changes the system hostname. Prevents cloud-init and DHCP/NetworkManager from overwriting it with the automatic name from your VPS provider. Using a fully qualified domain name is recommended:",
+  "saving": "Applying…",
+  "submit": "Change Hostname"
+}

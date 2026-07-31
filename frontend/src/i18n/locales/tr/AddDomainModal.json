@@ -1,0 +1,21 @@
+{
+  "title": "Yeni Domain Ekle",
+  "domain_label": "Alan Adı",
+  "domain_placeholder": "example.com",
+  "domain_hint": "Örnek:",
+  "plan_label": "Plan (Paket)",
+  "plan_none": "Plan seçilmedi",
+  "plan_default_suffix": " (varsayılan)",
+  "plan_hint": "Kaynak limitleri ve varsayılan PHP bu plandan gelir.",
+  "php_label": "PHP Sürümü",
+  "php_from_plan": "✓ Plandan geldi ({{ad}})",
+  "php_independent": "Plandan bağımsız değiştirebilirsiniz.",
+  "auto_box_title": "Otomatik yapılacaklar:",
+  "auto_box_user": "Linux kullanıcı",
+  "auto_box_middle": "+ ev dizini",
+  "auto_box_end": "+ nginx vhost + hoşgeldin sayfası",
+  "created_success": "{{alan_adi}} başarıyla oluşturuldu (sistem kullanıcısı: {{sistem_kullanici}})",
+  "create_failed": "Domain eklenemedi",
+  "provisioning": "Sağlanıyor…",
+  "add_domain": "Domain Ekle"
+}

@@ -1,0 +1,37 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "antivirus": "Antivirüs"
+  },
+  "title": "Antivirüs — Zararlı Yazılım Taraması",
+  "desc_suffix": "dizini ClamAV imzaları + yerleşik webshell heuristiği ile taranır.",
+  "not_found": "Bulunamadı",
+  "scan_start_failed": "Tarama başlatılamadı",
+  "quarantine_confirm": "Dosya karantinaya alınsın mı?\n{{file}}\n\n(Dosya ~/.karantina altına taşınır ve erişilemez hâle gelir.)",
+  "quarantine_failed": "Karantinaya alınamadı",
+  "signature_update_failed": "İmza güncellenemedi",
+  "engine_label": "Motor:",
+  "engine_clamav": "ClamAV + Heuristik",
+  "engine_heuristic_only": "Sadece Heuristik",
+  "signature_db": "İmza veritabanı: {{date}}",
+  "last_scan": "Son tarama: {{when}} · {{scanned}} dosya · {{found}} bulgu",
+  "updating_signatures": "Güncelleniyor…",
+  "update_signatures": "İmzaları Güncelle",
+  "scanning": "Taranıyor…",
+  "scan_now": "Şimdi Tara",
+  "scan_in_progress": "Tarama sürüyor… (büyük sitelerde birkaç dakika sürebilir)",
+  "findings_title": "Bulgular",
+  "findings_last_scan_note": "— son taramadan",
+  "no_scan_yet": "Henüz tarama yapılmadı. “Şimdi Tara” ile başlayın.",
+  "clean": "Temiz — zararlı yazılım bulunmadı.",
+  "table": {
+    "file": "Dosya",
+    "signature": "İmza",
+    "engine": "Motor",
+    "status": "Durum"
+  },
+  "quarantined": "Karantinada",
+  "active_finding": "Aktif",
+  "quarantine_action": "Karantinaya al",
+  "back_to_subscription": "← Aboneliğe dön"
+}

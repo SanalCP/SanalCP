@@ -1,0 +1,72 @@
+{
+  "breadcrumb": {
+    "home": "Home",
+    "title": "Reseller Packages"
+  },
+  "title": "Reseller Packages",
+  "subtitle": "Pre-defined limit packages you can quickly apply to resellers. When editing a reseller's limits on the Users page, selecting a package from here will copy the values instantly — changing the package later does not affect resellers that have already been assigned.",
+  "buttons": {
+    "add_package": "Add Package"
+  },
+  "loading": "Loading…",
+  "empty": {
+    "title": "No reseller packages yet",
+    "description": "Get started by defining your first package."
+  },
+  "card": {
+    "default_badge": "Default",
+    "labels": {
+      "customer": "Customer",
+      "domain": "Domain",
+      "disk": "Disk",
+      "traffic": "Traffic"
+    },
+    "oversell_enabled": "Overselling enabled",
+    "oversell_disabled": "Overselling disabled — cannot exceed committed limit",
+    "used_count": "{{count}} resellers filled this package",
+    "unused": "Not used yet",
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    }
+  },
+  "confirm": {
+    "title": "Delete package",
+    "message": "Delete reseller package \"{{ad}}\"?",
+    "yes": "Yes, delete"
+  },
+  "errors": {
+    "delete_failed": "Delete failed",
+    "save_failed": "Save failed"
+  },
+  "units": {
+    "unlimited": "unlimited",
+    "count": "items",
+    "mb": "MB",
+    "mb_per_month": "MB/month"
+  },
+  "modal": {
+    "title_new": "New Reseller Package",
+    "title_edit": "Edit Package",
+    "fields": {
+      "package_name": "Package name",
+      "description": "Description",
+      "max_customer": "Max customers",
+      "max_domain": "Max domains",
+      "disk_mb": "Disk (MB)",
+      "traffic_mb_per_month": "Traffic (MB/month)",
+      "price_kurus": "Price (kuruş)"
+    },
+    "checkboxes": {
+      "default_promoted": "Highlight as default on the Reseller Limits screen",
+      "allow_oversell": "Allow overselling (if disabled, the reseller cannot exceed this package's limit in the total disk/traffic commitment assigned to their customers)"
+    },
+    "info_note": "0 = unlimited. Price is for information only; the panel has no billing/payment flow.",
+    "buttons": {
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "add": "Add",
+      "update": "Update"
+    }
+  }
+}

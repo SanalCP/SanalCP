@@ -1,0 +1,12 @@
+{
+  "title": "Optimize Server",
+  "badge": "Maintenance",
+  "desc": "Updates system packages (dnf -y update) and re-tunes MariaDB / nginx / PHP settings based on server resources. Runs in the background — can take a while and may briefly affect services.",
+  "started_failed": "could not start optimization",
+  "started_log": "Optimization started…\n",
+  "running": "Optimization running — the package update can take a while, you can close this page (it continues in the background).",
+  "start_button": "Update packages and optimize",
+  "confirm_text": "System packages will be updated and services re-tuned. Do you confirm?",
+  "starting": "Starting…",
+  "yes_start": "Yes, start"
+}

@@ -1,0 +1,52 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "waf": "Web Uygulama Güvenlik Duvarı (WAF)"
+  },
+  "title": "Web Uygulama Güvenlik Duvarı",
+  "domain_info": "ModSecurity v3 + OWASP Core Rule Set. Kaydedince nginx vhost yeniden render edilir (sıfır kesinti).",
+  "module_not_installed": {
+    "title": "ModSecurity modülü sunucuda kurulu değil.",
+    "desc_before": "Ayarlar kaydedilir ancak WAF uygulanmaz. Sunucuda",
+    "desc_after": "çalıştırıldığında otomatik etkinleşir (mevcut siteler etkilenmez)."
+  },
+  "effective_status": {
+    "label": "Etkin Durum:",
+    "active_block": "Aktif · Engelleme",
+    "active_detect": "Aktif · Denetleme",
+    "inactive": "Pasif",
+    "plan_default": "Plan varsayılanı ({{name}}):",
+    "plan_off": "Kapalı"
+  },
+  "modes": {
+    "title": "WAF Modu",
+    "selected": "● Seçili",
+    "devral": { "title": "Plandan Devral", "desc": "Bu domain, bağlı olduğu hizmet planının WAF varsayılanını kullanır." },
+    "engelle": { "title": "Engelle", "desc": "Kötü amaçlı istekler (SQLi, XSS, RCE…) 403 ile bloklanır. SecRuleEngine On." },
+    "denetle": { "title": "Denetle", "desc": "İstekler bloklanmaz; yalnızca eşleşen kurallar audit log’a yazılır. DetectionOnly — kural ayarlamak için ideal." },
+    "kapali": { "title": "Kapalı", "desc": "WAF bu domain için tamamen devre dışı (plan açık olsa bile)." }
+  },
+  "paranoia": {
+    "title": "Paranoya Seviyesi (CRS)",
+    "desc1": "Daha yüksek seviye = daha çok kural + daha güçlü koruma, ancak yanlış-pozitif olasılığı artar.",
+    "desc2_prefix": "Yalnızca WAF",
+    "desc2_or": "veya",
+    "desc2_suffix": "modundayken etkilidir.",
+    "select_inherit": "Plandan devral",
+    "select_level1": "Seviye 1 (Düşük)",
+    "select_level2": "Seviye 2 (Orta)",
+    "select_level3": "Seviye 3 (Yüksek)",
+    "select_level4": "Seviye 4 (Sıkı)",
+    "hint0": "Plan varsayılanı kullanılır.",
+    "hint1": "Düşük — temel saldırı imzaları. Neredeyse hiç yanlış-pozitif. (önerilen)",
+    "hint2": "Orta — daha fazla kural. Bazı meşru istekler engellenebilir.",
+    "hint3": "Yüksek — agresif. Uygulamaya göre ayarlama (exclusion) gerekebilir.",
+    "hint4": "Sıkı — en agresif. Yalnızca sıkı denetim gereken durumlar için."
+  },
+  "apply": "Kaydet ve Uygula",
+  "applying": "Uygulanıyor…",
+  "reload": "Yeniden Yükle",
+  "save_failed": "Kaydetme başarısız",
+  "applied_msg": "✓ WAF uygulandı — {{mode}} modu, paranoya {{level}}",
+  "saved_inactive_msg": "✓ Ayar kaydedildi — WAF bu domain için pasif"
+}

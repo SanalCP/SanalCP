@@ -1,0 +1,31 @@
+{
+  "breadcrumb": {
+    "tools_settings": "Araçlar ve Ayarlar",
+    "php_versions": "PHP Sürümleri"
+  },
+  "title": "PHP Sürümleri",
+  "desc": "Sunucuya istediğiniz PHP sürümünü ekleyin veya kaldırın. Her sürüm bağımsız PHP-FPM havuzunda çalışır; domain bazında seçilebilir. Kurulum 14 paket içerir (fpm, cli, mysqlnd, mbstring, bcmath, intl, gd, soap, opcache, pdo, xml, zip, pgsql, ldap).",
+  "install_confirm": "PHP {{version}} ({{source}}) için 14 paket kurulacak (fpm + cli + mysqlnd + 12 ekstension). Devam?",
+  "install_done": "✓ PHP {{version}} kuruldu",
+  "install_title": "PHP {{version}} kurulum",
+  "install_failed": "Kurulum başarısız",
+  "appstream_remove_blocked": "AppStream PHP sistem default'u, kaldırılamaz",
+  "remove_confirm": "PHP {{version}} (Remi) ve TÜM ekstension'ları KALDIRILACAK.\nBu sürümü kullanan domain varsa işlem reddedilir. Devam?",
+  "remove_done": "✓ PHP {{version}} kaldırıldı",
+  "remove_title": "PHP {{version}} kaldırma",
+  "remove_failed": "Kaldırma başarısız",
+  "filter_label": "Filtre:",
+  "filter_all": "Tümü",
+  "filter_installed": "Yüklü ({{count}})",
+  "filter_installable": "Yüklenebilir ({{count}})",
+  "installed_badge": "YÜKLÜ",
+  "eol_badge": "EOL",
+  "version_label": "Sürüm:",
+  "module_label": "Modül:",
+  "service_label": "Servis:",
+  "fixed_default": "Sabit (sistem default)",
+  "removing": "Kaldırılıyor…",
+  "remove": "🗑 Kaldır",
+  "installing": "⏳ Kuruluyor…",
+  "install": "⬇ Kur"
+}

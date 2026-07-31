@@ -1,0 +1,62 @@
+{
+  "breadcrumb": {
+    "tools_settings": "Araçlar ve Ayarlar",
+    "package_manager": "Paket Yöneticisi"
+  },
+  "title": "Paket Yöneticisi · Derleyiciler",
+  "subtitle_prefix": "DNF üzerinden sunucu paketleri. Kritik paketler (kernel, bash, openssh, nginx, mariadb…)",
+  "subtitle_strong": "korunmaktadır",
+  "groups_card": {
+    "title": "📦 Hızlı Kurulum Grupları",
+    "hint": "Bir gruba tıkla, içindeki paketleri tek tek aç/kapat."
+  },
+  "groups": {
+    "dev_tools": { "name": "🛠️ Geliştirme Araçları", "desc": "gcc, make, autoconf, automake, libtool, kernel-devel" },
+    "python": { "name": "🐍 Python", "desc": "Python 3 + pip + venv + devel headers" },
+    "nodejs": { "name": "⚛️ Node.js + npm", "desc": "Node.js LTS + npm" },
+    "go": { "name": "🟦 Go", "desc": "Golang derleyici" },
+    "java": { "name": "☕ Java", "desc": "OpenJDK 21 LTS + Maven" },
+    "rust": { "name": "🦀 Rust", "desc": "Rust + cargo" },
+    "container": { "name": "📦 Container/VM", "desc": "Docker uyumlu — podman + buildah + skopeo" },
+    "system_tools": { "name": "🔧 Sistem araçları", "desc": "CLI üretkenlik araçları" },
+    "image_processing": { "name": "🖼️ Resim işleme", "desc": "ImageMagick + WebP + optimizasyon" },
+    "db_clients": { "name": "🗄️ DB istemcileri", "desc": "PostgreSQL + Redis CLI" },
+    "security": { "name": "🔐 Güvenlik", "desc": "GnuPG, OpenSSL, fail2ban" }
+  },
+  "installed_count": "{{count}} / {{total}} kurulu",
+  "installed_badge": "KURULU",
+  "protected_badge": "KORUMALI",
+  "processing": "İşleniyor…",
+  "confirm": {
+    "remove_package": "\"{{package}}\" paketi KALDIRILACAK. Devam?",
+    "install_package": "\"{{package}}\" paketi sunucuya kurulacak. Devam?",
+    "install_generic": "Paket \"{{package}}\" sunucu genelinde kurulacak. Devam?",
+    "remove_generic": "Paket \"{{package}}\" KALDIRILACAK. Devam?"
+  },
+  "toggle_success_installed": "✓ {{package}} kuruldu",
+  "toggle_success_removed": "✓ {{package}} kaldırıldı",
+  "install_failed": "Kurulum başarısız",
+  "remove_failed": "Kaldırma başarısız",
+  "output_modal": {
+    "remove_title": "Kaldırma çıktısı: {{package}}",
+    "install_title": "Kurulum çıktısı: {{package}}",
+    "close": "Kapat"
+  },
+  "search": {
+    "tab_repo": "🔍 Repolarda Ara",
+    "tab_installed": "📦 Kurulu Paketler",
+    "placeholder_repo": "örn: mongodb, redis, nodejs, gcc, htop",
+    "placeholder_installed": "kurulu paket adı veya açıklama",
+    "searching": "Aranıyor…",
+    "search_btn": "Ara",
+    "no_results": "Sonuç yok.",
+    "result_count": "{{count}} sonuç",
+    "failed": "Arama başarısız"
+  },
+  "action": {
+    "installing": "Kuruluyor…",
+    "removing": "Kaldırılıyor…",
+    "install": "Kur",
+    "remove": "Kaldır"
+  }
+}

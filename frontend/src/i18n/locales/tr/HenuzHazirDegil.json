@@ -1,0 +1,5 @@
+{
+  "not_ready_suffix": "Hazır Değil",
+  "wip_title": "Yapım aşamasında",
+  "wip_desc": "Bu modül {{faz}} fazında devreye girecek. Şu an sadece arayüz iskeleti görülmektedir."
+}

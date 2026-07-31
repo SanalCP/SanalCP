@@ -1,0 +1,19 @@
+{
+  "resource_usage": "Resource Usage",
+  "live": "live",
+  "cpu": "CPU",
+  "cpu_detail": "{{cores}} cores · load {{l1}} / {{l5}} / {{l15}}",
+  "memory": "Memory",
+  "disk": "Disk",
+  "uptime": "Uptime",
+  "system_status": "System Status",
+  "waiting": "Waiting…",
+  "backend": "Backend",
+  "running": "Running",
+  "version": "Version",
+  "time": "Time",
+  "unit_day": "d",
+  "unit_hour": "h",
+  "unit_min": "m",
+  "locale": "en-US"
+}

@@ -1,0 +1,139 @@
+{
+  "breadcrumb": {
+    "domains": "Domains",
+    "files": "Files"
+  },
+  "title": "File Manager",
+  "dragDrop": {
+    "title": "Drop files here",
+    "target": "Target directory:"
+  },
+  "selection": {
+    "selected": "{{count}} item(s) selected",
+    "rightClickHint": "Right-click for actions",
+    "delete": "Delete ({{count}})",
+    "clear": "Clear selection"
+  },
+  "newMenu": {
+    "button": "New",
+    "upload": "📤 Upload File",
+    "newFolder": "📁 New Folder",
+    "newFile": "📄 New File"
+  },
+  "toolbar": {
+    "refresh": "Refresh",
+    "resetPerms": "Reset File Permissions",
+    "resetPermsTitle": "Restores public_html to default: 750 for folders, 644 for files",
+    "resetting": "Resetting…",
+    "searchPlaceholder": "🔍 Search files…",
+    "itemCount": "{{count}} item(s)",
+    "remaining": "Remaining: {{time}}"
+  },
+  "table": {
+    "name": "Name",
+    "size": "Size",
+    "permissions": "Permissions",
+    "owner": "Owner",
+    "group": "Group",
+    "modified": "Modified",
+    "loading": "Loading…",
+    "parentDir": "↑ parent directory",
+    "empty": "This folder is empty",
+    "actions": "Actions",
+    "actionsFor": "{{name}} actions"
+  },
+  "sizeModal": {
+    "title": "📏 Size Info",
+    "bytes": "bytes",
+    "ok": "OK"
+  },
+  "resetConfirm": {
+    "title": "⚠ Reset File Permissions",
+    "body": "All folder and file permissions under public_html will be restored to defaults: folders 750, files 644, ownership {{owner}}. Any permissions you customized manually (e.g. making a script executable) will be lost.",
+    "confirm": "Yes, Reset"
+  },
+  "resetDone": {
+    "title": "✓ Permissions Reset",
+    "body": "All folders and files under public_html have been restored to defaults: folders 750, files 644, ownership {{owner}}."
+  },
+  "bulkDeleteConfirm": {
+    "title": "⚠ Bulk Delete",
+    "body": "{{count}} item(s) will be permanently deleted. Folders are deleted along with their contents.",
+    "more": "+ {{count}} more…",
+    "confirm": "Yes, Delete"
+  },
+  "contextMenu": {
+    "open": "Open",
+    "openInBrowser": "Open in Browser",
+    "edit": "Edit",
+    "download": "Download",
+    "extract": "Extract Archive",
+    "rename": "Rename",
+    "permissions": "Permissions",
+    "calcSize": "Calculate Size",
+    "copy": "Copy",
+    "move": "Move",
+    "addToArchive": "Add to Archive",
+    "delete": "Delete"
+  },
+  "renameModal": {
+    "title": "Rename",
+    "confirm": "Rename"
+  },
+  "chmodModal": {
+    "title": "Permissions",
+    "owner": "Owner",
+    "group": "Group",
+    "other": "Other",
+    "read": "Read",
+    "write": "Write",
+    "execute": "Execute",
+    "octal": "Octal:",
+    "apply": "Apply"
+  },
+  "copyMoveModal": {
+    "titleCopy": "Copy",
+    "titleMove": "Move",
+    "more": "+ {{count}} more…",
+    "targetLabel": "Target directory (under home)",
+    "targetPlaceholder": "/public_html/backup",
+    "hintExists": "The target must already exist.",
+    "hintCopy": "Folders are copied with their contents.",
+    "hintMove": "Moving on the same disk is instant."
+  },
+  "archiveModal": {
+    "title": "📦 Add to Archive ({{count}} item(s))",
+    "filename": "File name",
+    "format": "Format",
+    "output": "Output:",
+    "submit": "Archive"
+  },
+  "newFileModal": {
+    "title": "📄 New File",
+    "filename": "File name (with extension)",
+    "hint": "An empty file is created, then the code editor opens.",
+    "submit": "Create & Edit"
+  },
+  "confirmDelete": "Delete \"{{name}}\"? This action cannot be undone.",
+  "newFolderPrompt": "New folder name:",
+  "errors": {
+    "deleteFailed": "Delete failed",
+    "mkdirFailed": "Failed to create folder",
+    "openFailed": "Could not open",
+    "saveFailed": "Could not save",
+    "renameFailed": "Could not rename",
+    "chmodFailed": "Could not change permissions",
+    "uploadPartial": "{{ok}}/{{total}} files uploaded, some failed.",
+    "deletePartial": "{{ok}}/{{total}} deleted.",
+    "extractFailed": "Could not open (zip/tar/rar supported)",
+    "searchFailed": "Search failed",
+    "someErrors": "Some errors: {{list}}",
+    "copyFailed": "Copy failed",
+    "moveFailed": "Move failed",
+    "archiveFailed": "Archiving failed",
+    "createFailed": "Creation failed",
+    "sizeFailed": "Failed to calculate size",
+    "downloadFailed": "Download failed: {{msg}}",
+    "resetPermsFailed": "Could not reset permissions"
+  }
+}

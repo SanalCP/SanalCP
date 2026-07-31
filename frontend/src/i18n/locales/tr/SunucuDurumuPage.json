@@ -1,0 +1,24 @@
+{
+  "breadcrumb_title": "Sunucu Durumu",
+  "title": "Sunucu Durumu",
+  "subtitle": "Sunucunun anlık durumu. Bu ekran salt-okunurdur — servis yönetimi yöneticiye aittir.",
+  "load_failed": "Sunucu durumu alınamadı",
+  "loading": "Yükleniyor…",
+  "cards": {
+    "cpu": "CPU",
+    "memory": "Bellek",
+    "disk": "Disk",
+    "panel_version": "Panel Sürümü"
+  },
+  "load_prefix": "yük",
+  "update_available": "güncelleme var: v{{version}}",
+  "up_to_date": "güncel",
+  "services_title": "Servisler",
+  "no_service_info": "Servis bilgisi yok.",
+  "status": {
+    "active": "Çalışıyor",
+    "inactive": "Durmuş",
+    "failed": "Hatalı",
+    "absent": "Kurulu değil"
+  }
+}

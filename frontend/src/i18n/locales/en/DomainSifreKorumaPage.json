@@ -1,0 +1,23 @@
+{
+  "breadcrumb_title": "Password-Protected Directories",
+  "title": "Password-Protected Directories",
+  "subtitle": "Protect a specific directory with HTTP basic authentication (.htpasswd). Visitors cannot access it without a username and password.",
+  "protected": "Directory {{yol}} is now protected with \"{{kullanici}}\".",
+  "add_failed": "Could not add",
+  "confirm_remove": "Remove user \"{{kullanici}}\" from {{yol}} protection?",
+  "delete_failed": "Could not delete",
+  "new_protection_title": "Add new protection / user",
+  "dir_path_label": "Directory path",
+  "dir_path_placeholder": "/secret",
+  "username_label": "Username",
+  "username_placeholder": "user",
+  "password_label": "Password",
+  "dir_help": "Path must start with / (e.g. /secret, /admin). You can add multiple users to the same path.",
+  "adding": "Adding…",
+  "add_button": "Add Protection",
+  "existing_protected_title": "Protected directories",
+  "no_protected": "No protected directories yet.",
+  "users_count": "· {{count}} users",
+  "remove": "Remove",
+  "back_to_subscription": "← Back to subscription"
+}

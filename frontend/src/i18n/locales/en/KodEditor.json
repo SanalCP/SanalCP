@@ -1,0 +1,17 @@
+{
+  "lang_plain_text": "Plain Text",
+  "status_dirty": "Unsaved changes",
+  "status_saving": "Saving…",
+  "status_saved": "✓ Saved",
+  "syntax_title": "Syntax",
+  "windowed": "Windowed",
+  "fullscreen": "Fullscreen",
+  "save": "💾 Save",
+  "save_shortcut_title": "Ctrl+S",
+  "close": "Close",
+  "close_shortcut_title": "ESC",
+  "cursor_position": "Line {{line}}, Column {{col}}",
+  "line_count": "{{count}} lines",
+  "byte_count": "{{count}} bytes",
+  "footer_hint": "Ctrl+S: save · Esc: close"
+}

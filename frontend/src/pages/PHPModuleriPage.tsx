@@ -2,6 +2,7 @@
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -14,6 +15,7 @@ const ZORUNLU = new Set([
 ])
 
 export default function PHPModuleriPage() {
+  const { t } = useTranslation(['PHPModuleriPage', 'common'])
   const [surumler, setSurumler] = useState<Surum[]>([])
   const [aktifSurum, setAktifSurum] = useState('8.3')
   const [exts, setExts] = useState<Ext[]>([])
@@ -37,7 +39,7 @@ export default function PHPModuleriPage() {
 
   async function toggle(e: Ext) {
     if (ZORUNLU.has(e.adi.toLowerCase())) {
-      alert('Bu modül PHP\'nin temel parçasıdır, kapatılamaz.')
+      alert(t('PHPModuleriPage:core_module_alert'))
       return
     }
     const yeniAktif = !e.aktif
@@ -47,56 +49,61 @@ export default function PHPModuleriPage() {
         ini_dosya: e.ini_dosya,
         aktif: yeniAktif,
       })
-      setBasari(`✓ ${e.adi} ${yeniAktif ? 'aktif edildi' : 'devre dışı'} · PHP-FPM yeniden başlatıldı`)
+      setBasari(t('PHPModuleriPage:toggle_success', {
+        name: e.adi,
+        state: t(yeniAktif ? 'PHPModuleriPage:toggle_state_enabled' : 'PHPModuleriPage:toggle_state_disabled'),
+      }))
       setTimeout(() => setBasari(null), 3000)
       yukle()
     } catch (err) {
-      setHata(apiHata(err, 'Toggle başarısız'))
+      setHata(apiHata(err, t('PHPModuleriPage:toggle_failed')))
     }
   }
 
   async function ioncubeKur() {
-    if (!confirm(`IonCube Loader PHP ${aktifSurum} için kurulacak.\n\nioncube.com'dan tar.gz indirilir → .so kopyalanır → zend_extension olarak yüklenir.\nDevam?`)) return
+    if (!confirm(t('PHPModuleriPage:ioncube_install_confirm', { version: aktifSurum }))) return
     setYuk(true); setHata(null)
     try {
       const r = await api.post('/php-extensions/ioncube-kur', { surum: aktifSurum })
       const d = r.data
-      setBasari(`✓ IonCube kuruldu — ${d.yuklendi ? 'LOADED' : 'ini yazıldı ancak runtime\'da görünmedi'}`)
+      setBasari(t('PHPModuleriPage:ioncube_install_success', {
+        state: t(d.yuklendi ? 'PHPModuleriPage:ioncube_install_success_loaded' : 'PHPModuleriPage:ioncube_install_success_written'),
+      }))
       setTimeout(() => setBasari(null), 5000)
       yukle()
     } catch (err) {
-      setHata(apiHata(err, 'IonCube kurulum başarısız'))
+      setHata(apiHata(err, t('PHPModuleriPage:ioncube_install_failed')))
       setYuk(false)
     }
   }
 
   async function ioncubeKaldir() {
-    if (!confirm(`IonCube Loader PHP ${aktifSurum}'ten kaldırılacak. Devam?`)) return
+    if (!confirm(t('PHPModuleriPage:ioncube_remove_confirm', { version: aktifSurum }))) return
     setYuk(true); setHata(null)
     try {
       await api.post('/php-extensions/ioncube-kaldir', { surum: aktifSurum })
-      setBasari('✓ IonCube kaldırıldı')
+      setBasari(t('PHPModuleriPage:ioncube_remove_success'))
       setTimeout(() => setBasari(null), 3000)
       yukle()
     } catch (err) {
-      setHata(apiHata(err, 'IonCube kaldırma başarısız'))
+      setHata(apiHata(err, t('PHPModuleriPage:ioncube_remove_failed')))
       setYuk(false)
     }
   }
 
   async function peclKur(paket: string) {
     if (!paket.match(/^[a-zA-Z0-9_-]+$/)) {
-      alert('Geçersiz paket adı'); return
+      alert(t('PHPModuleriPage:pecl_invalid_name_alert')); return
     }
-    if (!confirm(`PECL paketi "${paket}" PHP ${aktifSurum} için derlenip kurulacak. Devam?`)) return
+    if (!confirm(t('PHPModuleriPage:pecl_install_confirm', { package: paket, version: aktifSurum }))) return
     setPeclModal(false); setYuk(true)
     try {
       const r = await api.post('/php-extensions/pecl-install', { surum: aktifSurum, paket })
-      setBasari(`✓ ${paket} kuruldu`)
+      setBasari(t('PHPModuleriPage:pecl_install_success', { package: paket }))
       console.log('PECL install output:', r.data.output)
       yukle()
     } catch (err) {
-      setHata(apiHata(err, 'PECL kurulum başarısız'))
+      setHata(apiHata(err, t('PHPModuleriPage:pecl_install_failed')))
       setYuk(false)
     }
   }
@@ -108,29 +115,29 @@ export default function PHPModuleriPage() {
   return (
     <div className="px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
-        { etiket: 'Sistem Yönetimi' },
-        { etiket: 'PHP Modülleri' },
+        { etiket: t('common:home'), href: '/' },
+        { etiket: t('PHPModuleriPage:breadcrumb.system_management') },
+        { etiket: t('PHPModuleriPage:breadcrumb.php_modules') },
       ]} />
 
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">PHP Modülleri</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('PHPModuleriPage:title')}</h1>
         <div className="flex gap-2">
           <button onClick={() => {
               const ioncubeKurlu = exts.some(e => e.adi.toLowerCase().includes('ioncube'))
               if (ioncubeKurlu) ioncubeKaldir(); else ioncubeKur()
             }}
             className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-md">
-            {exts.some(e => e.adi.toLowerCase().includes('ioncube')) ? '⊗ IonCube Kaldır' : '🔐 IonCube Yükle'}
+            {exts.some(e => e.adi.toLowerCase().includes('ioncube')) ? t('PHPModuleriPage:ioncube_remove_btn') : t('PHPModuleriPage:ioncube_install_btn')}
           </button>
           <button onClick={() => setPeclModal(true)}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded-md">
-            📦 PECL'den Kur
+            {t('PHPModuleriPage:pecl_install_btn')}
           </button>
         </div>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        Sunucu genelinde PHP eklenti yönetimi. Toggle ile aç/kapat, FPM otomatik yeniden başlatılır. <strong>Sunucu bazında</strong> — tüm domain'leri etkiler.
+        {t('PHPModuleriPage:desc_prefix')} <strong>{t('PHPModuleriPage:desc_strong')}</strong> {t('PHPModuleriPage:desc_suffix')}
       </p>
 
       {/* Sürüm sekmesi */}
@@ -142,7 +149,7 @@ export default function PHPModuleriPage() {
                 ? 'border-brand-500 text-brand-700 dark:text-brand-300'
                 : 'border-transparent text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300'
             }`}>
-            PHP {s.surum}
+            {t('PHPModuleriPage:version_tab', { version: s.surum })}
           </button>
         ))}
       </div>
@@ -151,18 +158,18 @@ export default function PHPModuleriPage() {
       <div className="flex items-center justify-between mb-4 gap-3">
         <div className="flex items-center gap-3 text-sm">
           <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium text-xs">
-            {aktifSayi} aktif
+            {t('PHPModuleriPage:active_count', { count: aktifSayi })}
           </span>
           <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500 font-medium text-xs">
-            {pasifSayi} pasif
+            {t('PHPModuleriPage:passive_count', { count: pasifSayi })}
           </span>
-          <span className="text-slate-400 dark:text-slate-500 text-xs">Toplam {exts.length}</span>
+          <span className="text-slate-400 dark:text-slate-500 text-xs">{t('PHPModuleriPage:total_count', { count: exts.length })}</span>
         </div>
         <input
           type="text"
           value={filtre}
           onChange={e => setFiltre(e.target.value)}
-          placeholder="🔍 Modül ara..."
+          placeholder={t('PHPModuleriPage:search_placeholder')}
           className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm w-64 focus:border-brand-500 outline-none"
         />
       </div>
@@ -170,7 +177,7 @@ export default function PHPModuleriPage() {
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
 
-      {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div> : (
+      {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
           {filtreli.map(e => {
             const zorunlu = ZORUNLU.has(e.adi.toLowerCase())
@@ -183,7 +190,7 @@ export default function PHPModuleriPage() {
                 }`}>
                 <div className="min-w-0 flex-1">
                   <div className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{e.adi}</div>
-                  {zorunlu && <div className="text-[10px] text-slate-500 dark:text-slate-500">temel modül</div>}
+                  {zorunlu && <div className="text-[10px] text-slate-500 dark:text-slate-500">{t('PHPModuleriPage:core_module_label')}</div>}
                 </div>
                 <button
                   onClick={() => toggle(e)}
@@ -191,7 +198,7 @@ export default function PHPModuleriPage() {
                   className={`flex-shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition ${
                     e.aktif ? 'bg-emerald-500' : 'bg-slate-300'
                   } ${zorunlu ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  title={zorunlu ? 'Temel modül, kapatılamaz' : (e.aktif ? 'Devre dışı bırak' : 'Aktif et')}
+                  title={zorunlu ? t('PHPModuleriPage:core_module_title') : (e.aktif ? t('PHPModuleriPage:disable_tooltip') : t('PHPModuleriPage:enable_tooltip'))}
                 >
                   <span className={`inline-block h-3 w-3 transform rounded-full bg-white dark:bg-slate-800 shadow transition ${e.aktif ? 'translate-x-5' : 'translate-x-1'}`} />
                 </button>
@@ -204,12 +211,12 @@ export default function PHPModuleriPage() {
       {peclModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPeclModal(false)}>
           <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">PECL'den Modül Kur</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">PECL deposundan modül indirir ve derler. Örn: <code className="font-mono">mongodb, swoole, geoip, oauth, yaml, msgpack</code></p>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('PHPModuleriPage:pecl_modal_title')}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">{t('PHPModuleriPage:pecl_modal_desc_prefix')} <code className="font-mono">mongodb, swoole, geoip, oauth, yaml, msgpack</code></p>
             <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2 mb-3">
-              ⚠ PHP {aktifSurum} için derleme yapılır. Hedef: <code className="font-mono">/etc/php.d/</code> ya da Remi dizinine
+              {t('PHPModuleriPage:pecl_modal_warn_prefix', { version: aktifSurum })} <code className="font-mono">/etc/php.d/</code> {t('PHPModuleriPage:pecl_modal_warn_suffix')}
             </p>
-            <input id="peclPaketAdi" type="text" autoFocus placeholder="örn: mongodb"
+            <input id="peclPaketAdi" type="text" autoFocus placeholder={t('PHPModuleriPage:pecl_modal_input_placeholder')}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm mb-3"
               onKeyDown={e => {
                 if (e.key === 'Enter') {
@@ -219,11 +226,11 @@ export default function PHPModuleriPage() {
               }} />
             <div className="flex justify-end gap-2">
               <button onClick={() => setPeclModal(false)}
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">İptal</button>
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
               <button onClick={() => {
                 const v = (document.getElementById('peclPaketAdi') as HTMLInputElement)?.value?.trim()
                 if (v) peclKur(v)
-              }} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">Kur</button>
+              }} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('PHPModuleriPage:pecl_modal_install_btn')}</button>
             </div>
           </div>
         </div>

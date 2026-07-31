@@ -1,0 +1,59 @@
+{
+  "breadcrumb_title": "Customers",
+  "title": "Customers",
+  "subtitle": "Billing and contact records. Domains link to these — this is not a panel login account.",
+  "toolbar_new": "New Customer",
+  "error": {
+    "load_failed": "Could not load customers",
+    "name_email_required": "Name and email are required",
+    "save_failed": "Could not save",
+    "delete_failed": "Could not delete"
+  },
+  "success": {
+    "added": "{{name}} added.",
+    "updated": "{{name}} updated.",
+    "deleted": "{{name}} deleted."
+  },
+  "empty": {
+    "title": "No customer records yet",
+    "description": "Create a customer record first to link domains to a customer."
+  },
+  "search_empty": "No customers match your search.",
+  "table": {
+    "name": "Name",
+    "email": "Email",
+    "plan": "Plan",
+    "status": "Status",
+    "created": "Created"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "modal": {
+    "title_edit": "Edit Customer",
+    "title_new": "New Customer"
+  },
+  "fields": {
+    "name": "Name",
+    "email": "Email",
+    "plan": "Plan",
+    "plan_none": "No plan",
+    "status": "Status",
+    "notes": "Notes"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save"
+  },
+  "confirm": {
+    "title": "Delete customer",
+    "message": "{{name}} will be deleted. Domains linked to this customer are not deleted, only unlinked.",
+    "yes": "Delete"
+  }
+}

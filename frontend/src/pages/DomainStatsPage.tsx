@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
@@ -13,6 +14,7 @@ type Ozet = {
 }
 
 export default function DomainStatsPage() {
+  const { t } = useTranslation(['DomainStatsPage', 'common'])
   const { id } = useParams()
   const [o, setO] = useState<Ozet | null>(null)
   const [yuk, setYuk] = useState(true)
@@ -28,46 +30,47 @@ export default function DomainStatsPage() {
   }
   useEffect(yukle, [id])
 
-  if (yuk) return <div className="px-6 py-5 text-slate-400">Yükleniyor…</div>
-  if (!o) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || 'Bulunamadı'}</div></div>
+  if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
+  if (!o) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainStatsPage:not_found')}</div></div>
 
   const maxGun = Math.max(1, ...o.gunluk.map(g => g.istek))
   const durumBar: Record<string, string> = { '2xx': 'bg-emerald-500', '3xx': 'bg-sky-500', '4xx': 'bg-amber-500', '5xx': 'bg-rose-500' }
+  const locale = t('DomainStatsPage:locale')
 
   return (
     <div className="px-6 py-5">
       <div>
         <Breadcrumb items={[
-          { etiket: 'Anasayfa', href: '/' },
-          { etiket: 'Domainler', href: '/domainler' },
+          { etiket: t('common:home'), href: '/' },
+          { etiket: t('common:domain'), href: '/domainler' },
           { etiket: o.alan_adi, href: `/abonelikler/${id}` },
-          { etiket: 'İstatistikler' },
+          { etiket: t('DomainStatsPage:breadcrumb_title') },
         ]} />
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Trafik İstatistikleri</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1"><span className="font-mono">{o.alan_adi}</span> — nginx erişim günlüğü analizi.</p>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('DomainStatsPage:title')}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1"><span className="font-mono">{o.alan_adi}</span> — {t('DomainStatsPage:subtitle')}</p>
           </div>
-          <button onClick={yukle} className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">↻ Yenile</button>
+          <button onClick={yukle} className="text-sm px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">{t('DomainStatsPage:refresh')}</button>
         </div>
 
         {!o.log_var || o.toplam_istek === 0 ? (
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-10 text-center text-sm text-slate-400">
-            Henüz erişim günlüğü verisi yok. Site trafik almaya başladığında burada görünür.
+            {t('DomainStatsPage:no_data')}
           </div>
         ) : (
           <>
             {/* KPI kartları */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <KPI etiket="Toplam İstek" deger={o.toplam_istek.toLocaleString('tr-TR')} renk="indigo" />
-              <KPI etiket="Bant Kullanımı" deger={`${o.toplam_bant_mb.toFixed(1)} MB`} renk="sky" />
-              <KPI etiket="Tekil IP" deger={o.tekil_ip.toLocaleString('tr-TR')} renk="emerald" />
-              <KPI etiket="Bot Oranı" deger={`%${o.bot_orani}`} renk={o.bot_orani >= 50 ? 'rose' : 'violet'} />
+              <KPI etiket={t('DomainStatsPage:kpi_total_requests')} deger={o.toplam_istek.toLocaleString(locale)} renk="indigo" />
+              <KPI etiket={t('DomainStatsPage:kpi_bandwidth')} deger={`${o.toplam_bant_mb.toFixed(1)} MB`} renk="sky" />
+              <KPI etiket={t('DomainStatsPage:kpi_unique_ip')} deger={o.tekil_ip.toLocaleString(locale)} renk="emerald" />
+              <KPI etiket={t('DomainStatsPage:kpi_bot_ratio')} deger={`%${o.bot_orani}`} renk={o.bot_orani >= 50 ? 'rose' : 'violet'} />
             </div>
 
             {/* Durum dağılımı */}
-            <Kart baslik="HTTP Durum Dağılımı">
+            <Kart baslik={t('DomainStatsPage:status_distribution')}>
               <div className="space-y-2">
                 {(['2xx', '3xx', '4xx', '5xx'] as const).map(g => {
                   const v = o.durum_grup[g] || 0
@@ -78,7 +81,7 @@ export default function DomainStatsPage() {
                       <div className="flex-1 h-3 rounded-full bg-slate-100 dark:bg-slate-700/50 overflow-hidden">
                         <div className={`h-full rounded-full ${durumBar[g]}`} style={{ width: Math.max(oran, v > 0 ? 2 : 0) + '%' }} />
                       </div>
-                      <span className="w-24 text-right text-xs font-mono text-slate-600 dark:text-slate-300">{v.toLocaleString('tr-TR')} <span className="text-slate-400">%{oran}</span></span>
+                      <span className="w-24 text-right text-xs font-mono text-slate-600 dark:text-slate-300">{v.toLocaleString(locale)} <span className="text-slate-400">%{oran}</span></span>
                     </div>
                   )
                 })}
@@ -87,12 +90,12 @@ export default function DomainStatsPage() {
 
             {/* Günlük istek (7 gün) */}
             {o.gunluk.length > 0 && (
-              <Kart baslik="Günlük İstek (son 7 gün)">
+              <Kart baslik={t('DomainStatsPage:daily_requests')}>
                 <div className="flex items-end gap-2 h-32">
                   {o.gunluk.map(g => (
                     <div key={g.tarih} className="flex-1 flex flex-col items-center gap-1">
                       <div className="w-full flex items-end justify-center" style={{ height: '100px' }}>
-                        <div className="w-full max-w-[36px] rounded-t bg-gradient-to-t from-brand-600 to-brand-400" style={{ height: Math.max(4, g.istek / maxGun * 100) + '%' }} title={`${g.istek} istek`} />
+                        <div className="w-full max-w-[36px] rounded-t bg-gradient-to-t from-brand-600 to-brand-400" style={{ height: Math.max(4, g.istek / maxGun * 100) + '%' }} title={t('DomainStatsPage:request_title', { count: g.istek })} />
                       </div>
                       <span className="text-[10px] text-slate-400 font-mono">{g.tarih.split('/')[0]}</span>
                       <span className="text-[10px] text-slate-600 dark:text-slate-300 font-mono">{g.istek}</span>
@@ -103,15 +106,15 @@ export default function DomainStatsPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Kart baslik="En Çok İstenen Yollar">
-                <Tablo rows={o.top_yollar} birim="istek" mono />
+              <Kart baslik={t('DomainStatsPage:top_paths')}>
+                <Tablo rows={o.top_yollar} birim={t('DomainStatsPage:request_unit')} mono locale={locale} />
               </Kart>
-              <Kart baslik="En Aktif IP'ler">
-                <Tablo rows={o.top_ip} birim="istek" mono />
+              <Kart baslik={t('DomainStatsPage:top_ips')}>
+                <Tablo rows={o.top_ip} birim={t('DomainStatsPage:request_unit')} mono locale={locale} />
               </Kart>
             </div>
 
-            <Kart baslik="Son İstekler">
+            <Kart baslik={t('DomainStatsPage:recent_requests')}>
               <div className="font-mono text-xs space-y-1 max-h-64 overflow-y-auto">
                 {o.son_istekler.map((s, i) => {
                   const kod = s.slice(0, 3)
@@ -123,7 +126,7 @@ export default function DomainStatsPage() {
           </>
         )}
 
-        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">← Aboneliğe dön</Link></div>
+        <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainStatsPage:back_to_subscription')}</Link></div>
       </div>
     </div>
   )
@@ -146,7 +149,7 @@ function Kart({ baslik, children }: { baslik: string; children: React.ReactNode 
     </div>
   )
 }
-function Tablo({ rows, birim, mono }: { rows: KV[]; birim: string; mono?: boolean }) {
+function Tablo({ rows, birim, mono, locale }: { rows: KV[]; birim: string; mono?: boolean; locale: string }) {
   const max = Math.max(1, ...rows.map(r => r.sayi))
   if (!rows.length) return <div className="text-sm text-slate-400 py-3">Veri yok.</div>
   return (
@@ -155,7 +158,7 @@ function Tablo({ rows, birim, mono }: { rows: KV[]; birim: string; mono?: boolea
         <div key={i} className="relative flex items-center justify-between text-xs py-1 px-2 rounded overflow-hidden">
           <div className="absolute inset-0 bg-brand-500/10 dark:bg-brand-500/15" style={{ width: (r.sayi / max * 100) + '%' }} />
           <span className={`relative truncate ${mono ? 'font-mono' : ''} text-slate-700 dark:text-slate-200`} title={r.ad}>{r.ad}</span>
-          <span className="relative shrink-0 ml-2 font-mono text-slate-500 dark:text-slate-400">{r.sayi.toLocaleString('tr-TR')} {birim}</span>
+          <span className="relative shrink-0 ml-2 font-mono text-slate-500 dark:text-slate-400">{r.sayi.toLocaleString(locale)} {birim}</span>
         </div>
       ))}
     </div>

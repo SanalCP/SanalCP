@@ -1,0 +1,16 @@
+{
+  "breadcrumb_title": "Composer",
+  "title": "PHP Composer",
+  "run_context": "{{dizin}} dizininde {{kullanici}} olarak çalışır.",
+  "not_installed": "Composer sunucuda kurulu değil. Yönetici tarafından kurulması gerekiyor.",
+  "composer_json_found": "✓ composer.json bulundu",
+  "composer_json_missing": "composer.json yok",
+  "package_placeholder": "vendor/paket veya vendor/paket:^1.2",
+  "back_to_subscription": "← Aboneliğe dön",
+  "run_failed": "Çalıştırılamadı",
+  "running": "Çalışıyor…",
+  "output_no_output": "(çıktı yok)",
+  "output_done": "✓ Tamamlandı",
+  "output_failed": "✗ Hata ile bitti",
+  "not_found": "Bulunamadı"
+}

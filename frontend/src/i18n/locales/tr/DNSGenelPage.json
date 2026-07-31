@@ -1,0 +1,22 @@
+{
+  "title": "DNS Yönetimi",
+  "subtitle": "Sunucudaki tüm zone'ların özeti. Kayıtları düzenlemek için alan adına tıklayın.",
+  "empty": "Henüz DNS zone'u olan alan adı yok",
+  "col_domain": "Alan Adı",
+  "col_records": "Kayıt",
+  "col_a": "A",
+  "col_mx": "MX",
+  "col_txt": "TXT",
+  "col_passive": "Pasif",
+  "col_dnssec": "DNSSEC",
+  "col_domain_status": "Domain",
+  "dnssec_on": "Açık",
+  "dnssec_off": "Kapalı",
+  "domain_active": "Aktif",
+  "domain_passive": "Pasif",
+  "no_records_title": "Bu tipte kayıt yok",
+  "summary_zones": "zone",
+  "summary_total_records": "toplam kayıt",
+  "summary_no_mx": "MX kaydı yok",
+  "summary_dnssec_on": "DNSSEC açık"
+}

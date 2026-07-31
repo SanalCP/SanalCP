@@ -1,0 +1,7 @@
+{
+  "title": "Domainler",
+  "add_domain": "+ Domain Ekle",
+  "add_domain_hint": "F2'de aktif olacak",
+  "empty": "Henüz domain yok",
+  "no_ssl": "SSL yok"
+}

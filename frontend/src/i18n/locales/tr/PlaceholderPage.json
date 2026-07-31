@@ -1,0 +1,7 @@
+{
+  "phase_badge": "{{phase}} · Hazır Değil",
+  "wip_title": "Yapım aşamasında",
+  "wip_prefix": "Bu modül",
+  "wip_suffix": "devreye girecek.",
+  "wip_next_phases": "sonraki fazlarda"
+}

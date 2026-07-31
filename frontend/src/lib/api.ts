@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import { useAuth } from '@/store/auth'
+import i18n from '@/i18n'
 
 const baseURL = (import.meta.env.VITE_API_BASE as string) || '/api/v1'
 
@@ -28,7 +29,7 @@ api.interceptors.response.use(
   },
 )
 
-export function apiHata(err: unknown, varsayilan = 'Beklenmeyen bir hata oluştu'): string {
+export function apiHata(err: unknown, varsayilan = i18n.t('common:error_generic')): string {
   const e = err as AxiosError<{ hata?: string }>
   if (e?.response?.data?.hata) return e.response.data.hata
   if (e?.message) return e.message

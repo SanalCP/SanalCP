@@ -1,0 +1,63 @@
+{
+  "breadcrumb": { "home": "Anasayfa", "title": "Hizmet Planları" },
+  "title": "Hizmet Planları",
+  "subtitle": "Domainler için hizmet planları (paketler) tanımlayın. Her domain bir plana bağlanır; disk, trafik, PHP sürümü, veritabanı ve alt domain limiti gibi kaynaklar paket başına ayarlanır.",
+  "buttons": { "add_plan": "Plan Ekle" },
+  "loading": "Yükleniyor…",
+  "empty": {
+    "title": "Henüz hizmet planı yok",
+    "description": "İlk paketinizi tanımlayarak başlayın."
+  },
+  "card": {
+    "default_badge": "Varsayılan",
+    "labels": {
+      "disk": "Disk",
+      "traffic": "Trafik",
+      "domain": "Domain",
+      "database": "Veritabanı",
+      "ftp": "FTP"
+    },
+    "detail_button": "Detay & Kaynak Limitleri",
+    "actions": { "delete": "Sil" }
+  },
+  "units": {
+    "unlimited": "sınırsız",
+    "mb": "MB",
+    "mb_per_month": "MB/ay",
+    "count": "adet",
+    "ftp_account": "hesap"
+  },
+  "confirm": {
+    "title": "Planı sil",
+    "message": "\"{{ad}}\" planı silinsin mi?",
+    "yes": "Evet, sil"
+  },
+  "errors": {
+    "delete_failed": "Silme başarısız",
+    "save_failed": "Kayıt başarısız"
+  },
+  "modal": {
+    "title_new": "Yeni Plan",
+    "title_edit": "Planı Düzenle",
+    "fields": {
+      "plan_name": "Plan adı",
+      "description": "Açıklama",
+      "disk_mb": "Disk (MB)",
+      "traffic_mb": "Trafik (MB)",
+      "php_version": "PHP Sürümü",
+      "max_domain": "Max domain",
+      "max_db": "Max DB",
+      "max_ftp": "Max FTP"
+    },
+    "checkboxes": {
+      "default_plan": "Yeni domainlerde varsayılan plan"
+    },
+    "info_note": "0 = sınırsız. Disk/trafik MB cinsindendir. Bu plandaki yeni domainler seçili PHP sürümüyle kurulur.",
+    "buttons": {
+      "cancel": "İptal",
+      "saving": "Kaydediliyor…",
+      "add": "Ekle",
+      "update": "Güncelle"
+    }
+  }
+}

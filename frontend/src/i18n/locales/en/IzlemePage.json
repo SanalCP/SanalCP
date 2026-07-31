@@ -1,0 +1,95 @@
+{
+  "title": "End-to-End Monitoring",
+  "breadcrumb": "Monitoring",
+  "live": "Live · refresh every {{n}}s",
+  "tabs": {
+    "server": "Server",
+    "domain": "Per Domain",
+    "logs": "Server Logs"
+  },
+  "server": {
+    "snap": {
+      "cpu": "CPU",
+      "cpu_cores": "{{n}} cores",
+      "mem": "Memory",
+      "load": "Load (1m)",
+      "load_detail": "5m {{m5}} · 15m {{m15}}",
+      "disk": "Disk (/)"
+    },
+    "resources_title": "System Resources",
+    "resources_sample": "{{count}}/{{max}} samples · {{min}}min",
+    "legend": {
+      "cpu": "CPU",
+      "mem": "Memory",
+      "swap": "Swap",
+      "load": "Load (norm.)",
+      "rx": "↓ RX (KB/s)",
+      "tx": "↑ TX (KB/s)"
+    },
+    "network_title": "Network Traffic",
+    "network_iface": "Interface: {{iface}}",
+    "services_title": "Services",
+    "services_active": "{{active}}/{{total}} active",
+    "service_active": "Active",
+    "service_off": "Off",
+    "processes_title": "Top Processes",
+    "table": {
+      "pid": "PID",
+      "user": "User",
+      "cpu": "CPU%",
+      "mem": "MEM%",
+      "cmd": "Command"
+    },
+    "chart_collecting": "Collecting data…"
+  },
+  "domain": {
+    "select_title": "Select Domain",
+    "no_active_domain": "No active domain",
+    "probing": "Probing…",
+    "probe_btn": "↻ Health Probe",
+    "open_site": "Open site ↗",
+    "access_log": "Access Log",
+    "last_lines": "last {{n}} lines",
+    "no_log_yet": "No logs yet…",
+    "error_log": "Error Log",
+    "no_error_yet": "No errors recorded yet",
+    "health": {
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "server_label": "Server:"
+    },
+    "ssl": {
+      "no_ssl_title": "⚠ No SSL",
+      "no_ssl_desc": "This domain is not reachable over HTTPS.",
+      "valid": "🔒 SSL Valid",
+      "invalid": "✗ SSL Invalid",
+      "days": "days",
+      "expires": "Expires:",
+      "issuer": "Issuer:"
+    },
+    "response": {
+      "title": "Response Time",
+      "fast": "Fast",
+      "acceptable": "Acceptable",
+      "slow": "Slow"
+    }
+  },
+  "logs": {
+    "sources": {
+      "panel": "Panel",
+      "nginx": "nginx",
+      "mariadb": "MariaDB",
+      "named": "DNS (named)",
+      "sshd": "SSH",
+      "cron": "Cron",
+      "sistem": "Whole System"
+    },
+    "search_placeholder": "Search…",
+    "last_n": "last {{n}}",
+    "refresh": "↻ Refresh",
+    "not_found": "\"{{q}}\" not found.",
+    "no_records": "(no records)",
+    "footer": "{{count}} lines · journald · {{source}}",
+    "footer_filtered": "{{count}} / {{total}} lines · journald · {{source}}"
+  }
+}

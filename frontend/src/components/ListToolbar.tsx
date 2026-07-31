@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type ToolbarButton = { etiket: string; onClick?: () => void; disabled?: boolean; ipucu?: string }
 
@@ -12,6 +13,7 @@ export default function ListToolbar({
   arananSetter?: (s: string) => void
   aranan?: string
 }) {
+  const { t } = useTranslation(['common'])
   return (
     <div className="flex items-center gap-2 mb-4 flex-wrap">
       {birincil && (
@@ -47,7 +49,7 @@ export default function ListToolbar({
             type="text"
             value={aranan || ''}
             onChange={(e) => arananSetter(e.target.value)}
-            placeholder="Ara..."
+            placeholder={t('common:search_placeholder')}
             className="pl-8 pr-3 py-1.5 text-sm w-56 border border-slate-200 dark:border-slate-700 rounded-full focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 outline-none transition"
           />
         </div>

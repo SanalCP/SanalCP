@@ -1,0 +1,32 @@
+{
+  "breadcrumb_title": "My Resource Summary",
+  "title": "My Resource Summary",
+  "subtitle": "Your reseller account's limits, actual usage, and the total quotas (commitment) you've allocated to your customers.",
+  "usage_card_title": "Resource Usage",
+  "bars": {
+    "disk": "Disk",
+    "traffic": "Traffic (monthly)",
+    "customer": "Customers",
+    "domain": "Domains"
+  },
+  "units": {
+    "mb": "MB",
+    "count": ""
+  },
+  "oversell_off_note": "Oversell disabled: the total disk/traffic quotas (commitment) you assign to customers cannot exceed the limit.",
+  "status_card_title": "Status",
+  "status": {
+    "suspended_accounts": "Suspended accounts",
+    "allowed_plans": "Available hosting plans",
+    "allowed_plans_restricted": "{{count}} plans (restricted)",
+    "allowed_plans_all": "All",
+    "oversell": "Oversell",
+    "oversell_on": "Enabled",
+    "oversell_off": "Disabled"
+  },
+  "bar": {
+    "usage_label": "used",
+    "commitment_label": "committed",
+    "commitment_limit_title": "Commitment limit"
+  }
+}

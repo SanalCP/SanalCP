@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 type Limit = { kullanim: number; limit: number }
@@ -14,6 +15,7 @@ export type Ozet = {
 }
 
 export default function DomainKaynakKart({ domainId }: { domainId: number | string }) {
+  const { t } = useTranslation(['DomainKaynakKart', 'common'])
   const [ozet, setOzet] = useState<Ozet | null>(null)
   const [yuk, setYuk] = useState(true)
 
@@ -45,8 +47,8 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
       {/* Plan + Özet */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Paket ve Kaynaklar</h3>
-          <button onClick={yukle} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" title="Yenile">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainKaynakKart:plan_resources')}</h3>
+          <button onClick={yukle} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" title={t('common:refresh')}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -54,37 +56,37 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
         </div>
 
         <div className="mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-0.5">Hizmet Planı</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-0.5">{t('DomainKaynakKart:service_plan')}</div>
           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{ozet.plan_adi}</div>
         </div>
 
-        <Bar etiket="Disk" k={ozet.disk_mb.kullanim} l={ozet.disk_mb.limit} birim="MB" renk="indigo" />
-        <Bar etiket="Trafik (aylık)" k={ozet.trafik_mb.kullanim} l={ozet.trafik_mb.limit} birim="MB" renk="sky" />
-        <Bar etiket="Veritabanı" k={ozet.db_sayisi.kullanim} l={ozet.db_sayisi.limit} birim="DB" renk="emerald" />
-        <Bar etiket="FTP Hesabı" k={ozet.ftp_sayisi.kullanim} l={ozet.ftp_sayisi.limit} birim="hesap" renk="amber" />
-        <Bar etiket="E-posta Kutusu" k={ozet.eposta_sayi.kullanim} l={ozet.eposta_sayi.limit} birim="kutu" renk="rose" />
-        <Bar etiket="Subdomain" k={ozet.domain_sayi.kullanim} l={ozet.domain_sayi.limit} birim="domain" renk="violet" />
+        <Bar etiket={t('DomainKaynakKart:disk')} k={ozet.disk_mb.kullanim} l={ozet.disk_mb.limit} birim="MB" renk="indigo" />
+        <Bar etiket={t('DomainKaynakKart:traffic_monthly')} k={ozet.trafik_mb.kullanim} l={ozet.trafik_mb.limit} birim="MB" renk="sky" />
+        <Bar etiket={t('DomainKaynakKart:database')} k={ozet.db_sayisi.kullanim} l={ozet.db_sayisi.limit} birim="DB" renk="emerald" />
+        <Bar etiket={t('DomainKaynakKart:ftp_account')} k={ozet.ftp_sayisi.kullanim} l={ozet.ftp_sayisi.limit} birim={t('DomainKaynakKart:unit_account')} renk="amber" />
+        <Bar etiket={t('DomainKaynakKart:mail_box')} k={ozet.eposta_sayi.kullanim} l={ozet.eposta_sayi.limit} birim={t('DomainKaynakKart:unit_box')} renk="rose" />
+        <Bar etiket={t('DomainKaynakKart:subdomain')} k={ozet.domain_sayi.kullanim} l={ozet.domain_sayi.limit} birim={t('DomainKaynakKart:unit_domain')} renk="violet" />
       </div>
 
       {/* Yapılandırma Özeti */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Yapılandırma</h3>
-        <Sat e="IP Adresi" d={ozet.ipv4 || '—'} mono />
-        <Sat e="Sistem Kullanıcısı" d={ozet.sk} mono />
-        <Sat e="PHP Sürümü"
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainKaynakKart:configuration')}</h3>
+        <Sat e={t('DomainKaynakKart:ip_address')} d={ozet.ipv4 || '—'} mono />
+        <Sat e={t('DomainKaynakKart:system_user')} d={ozet.sk} mono />
+        <Sat e={t('DomainKaynakKart:php_version')}
           d={<span><span className="font-mono font-medium text-slate-800 dark:text-slate-200">PHP {ozet.php_surum}</span></span>}
         />
-        <Sat e="SSL/TLS"
+        <Sat e={t('DomainKaynakKart:ssl_tls')}
           d={
             ozet.ssl_aktif
               ? <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-700 dark:text-emerald-300 text-xs font-medium">Aktif</span>
+                  <span className="text-emerald-700 dark:text-emerald-300 text-xs font-medium">{t('DomainKaynakKart:active')}</span>
                   {ozet.ssl_bitis && <span className="text-slate-400 dark:text-slate-500 text-[10px]">→ {ozet.ssl_bitis}</span>}
                 </span>
               : <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                  <span className="text-slate-500 dark:text-slate-500 text-xs">Yok</span>
+                  <span className="text-slate-500 dark:text-slate-500 text-xs">{t('DomainKaynakKart:none')}</span>
                 </span>
           }
         />
@@ -92,12 +94,12 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
 
       {/* İlave Sayaclar */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Sayaçlar</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainKaynakKart:counters')}</h3>
         <div className="grid grid-cols-2 gap-y-2 gap-x-3">
-          <Mini etiket="DNS kayıt" deger={ozet.dns_kayit} />
-          <Mini etiket="Cron işi" deger={ozet.cron_is} />
-          <Mini etiket="Yedek" deger={ozet.yedek_sayisi} />
-          <Mini etiket="Yedek boyutu" deger={`${ozet.yedek_mb} MB`} />
+          <Mini etiket={t('DomainKaynakKart:dns_records')} deger={ozet.dns_kayit} />
+          <Mini etiket={t('DomainKaynakKart:cron_jobs')} deger={ozet.cron_is} />
+          <Mini etiket={t('DomainKaynakKart:backup')} deger={ozet.yedek_sayisi} />
+          <Mini etiket={t('DomainKaynakKart:backup_size')} deger={`${ozet.yedek_mb} MB`} />
         </div>
       </div>
     </div>

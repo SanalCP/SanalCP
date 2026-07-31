@@ -5,6 +5,8 @@
 // GÖRÜNTÜ olarak kopyalanır (bkz. internal/users LimitKaydet). Paketi sonradan
 // değiştirmek zaten atanmış bayileri etkilemez.
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ListToolbar from '@/components/ListToolbar'
@@ -28,6 +30,8 @@ type Paket = {
 }
 
 export default function BayiPaketleriPage() {
+  const { t } = useTranslation(['BayiPaketleriPage', 'common'])
+  const locale = i18n.language === 'en' ? 'en-US' : 'tr-TR'
   const [items, setItems] = useState<Paket[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -49,34 +53,32 @@ export default function BayiPaketleriPage() {
       await api.delete(`/bayi-paketleri/${silinecek.id}`)
       setSilinecek(null); yukle()
     } catch (e) {
-      alert(apiHata(e, 'Silme başarısız'))
+      alert(apiHata(e, t('BayiPaketleriPage:errors.delete_failed')))
     }
   }
 
   return (
     <div className="px-6 py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Bayi Paketleri' }]} />
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">Bayi Paketleri</h1>
+      <Breadcrumb items={[{ etiket: t('BayiPaketleriPage:breadcrumb.home'), href: '/' }, { etiket: t('BayiPaketleriPage:breadcrumb.title') }]} />
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('BayiPaketleriPage:title')}</h1>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">
-        Bayilere hızlıca uygulayabileceğiniz hazır limit paketleri. Kullanıcılar sayfasında bir
-        bayinin limitlerini düzenlerken buradan seçim yaparsanız değerler anlık olarak kopyalanır —
-        paketi sonradan değiştirmek zaten atanmış bayileri etkilemez.
+        {t('BayiPaketleriPage:subtitle')}
       </p>
 
       <ListToolbar
-        birincil={{ etiket: 'Paket Ekle', onClick: () => setModal({} as Paket) }}
+        birincil={{ etiket: t('BayiPaketleriPage:buttons.add_package'), onClick: () => setModal({} as Paket) }}
         butonlar={[]}
       />
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
       {yuk ? (
-        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">Yükleniyor…</div>
+        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('BayiPaketleriPage:loading')}</div>
       ) : items.length === 0 ? (
         <EmptyState
-          baslik="Henüz bayi paketi yok"
-          aciklama="İlk paketinizi tanımlayarak başlayın."
-          buton={{ etiket: 'Paket Ekle', onClick: () => setModal({} as Paket) }}
+          baslik={t('BayiPaketleriPage:empty.title')}
+          aciklama={t('BayiPaketleriPage:empty.description')}
+          buton={{ etiket: t('BayiPaketleriPage:buttons.add_package'), onClick: () => setModal({} as Paket) }}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -86,32 +88,32 @@ export default function BayiPaketleriPage() {
                 <div className="min-w-0">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     {p.ad}
-                    {p.varsayilan && <span className="text-[10px] uppercase tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded font-semibold">Varsayılan</span>}
+                    {p.varsayilan && <span className="text-[10px] uppercase tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-1.5 py-0.5 rounded font-semibold">{t('BayiPaketleriPage:card.default_badge')}</span>}
                   </h3>
                   {p.aciklama && <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">{p.aciklama}</p>}
                 </div>
-                {p.fiyat_kurus > 0 && <span className="shrink-0 text-[11px] font-mono font-semibold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{fmtFiyat(p.fiyat_kurus)}</span>}
+                {p.fiyat_kurus > 0 && <span className="shrink-0 text-[11px] font-mono font-semibold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{fmtFiyat(p.fiyat_kurus, locale)}</span>}
               </div>
 
               <dl className="grid grid-cols-2 gap-y-1.5 text-sm mt-4">
-                <Sat e="Müşteri" d={fmt(p.max_customer, 'adet')} />
-                <Sat e="Domain" d={fmt(p.max_domain, 'adet')} />
-                <Sat e="Disk" d={fmt(p.disk_kota_mb, 'MB')} />
-                <Sat e="Trafik" d={fmt(p.trafik_kota_mb, 'MB/ay')} />
+                <Sat e={t('BayiPaketleriPage:card.labels.customer')} d={fmt(p.max_customer, 'count', locale, t)} />
+                <Sat e={t('BayiPaketleriPage:card.labels.domain')} d={fmt(p.max_domain, 'count', locale, t)} />
+                <Sat e={t('BayiPaketleriPage:card.labels.disk')} d={fmt(p.disk_kota_mb, 'mb', locale, t)} />
+                <Sat e={t('BayiPaketleriPage:card.labels.traffic')} d={fmt(p.trafik_kota_mb, 'mb_per_month', locale, t)} />
               </dl>
 
               <p className="mt-3 text-[11px] text-slate-400">
-                {p.fazla_satis ? 'Fazla satış açık' : 'Fazla satış kapalı — taahhüt limiti aşamaz'}
+                {p.fazla_satis ? t('BayiPaketleriPage:card.oversell_enabled') : t('BayiPaketleriPage:card.oversell_disabled')}
               </p>
               <p className="text-[11px] text-slate-400">
-                {p.bayi_sayisi > 0 ? `${p.bayi_sayisi} bayi bu paketten dolduruldu` : 'Henüz kullanılmadı'}
+                {p.bayi_sayisi > 0 ? t('BayiPaketleriPage:card.used_count', { count: p.bayi_sayisi }) : t('BayiPaketleriPage:card.unused')}
               </p>
 
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setModal(p)} className="flex-1 text-center text-sm px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md">
-                  Düzenle
+                  {t('BayiPaketleriPage:card.actions.edit')}
                 </button>
-                <button onClick={() => setSilinecek(p)} className="text-sm px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 rounded-md">Sil</button>
+                <button onClick={() => setSilinecek(p)} className="text-sm px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 rounded-md">{t('BayiPaketleriPage:card.actions.delete')}</button>
               </div>
             </div>
           ))}
@@ -128,10 +130,10 @@ export default function BayiPaketleriPage() {
 
       <ConfirmDialog
         acik={!!silinecek}
-        baslik="Paketi sil"
-        mesaj={`"${silinecek?.ad}" bayi paketi silinsin mi?`}
+        baslik={t('BayiPaketleriPage:confirm.title')}
+        mesaj={t('BayiPaketleriPage:confirm.message', { ad: silinecek?.ad || '' })}
         tehlikeli
-        onayMetni="Evet, sil"
+        onayMetni={t('BayiPaketleriPage:confirm.yes')}
         onOnay={sil}
         onIptal={() => setSilinecek(null)}
       />
@@ -148,17 +150,23 @@ function Sat({ e, d }: { e: string; d: string }) {
   )
 }
 
-function fmt(n: number, birim: string) {
-  if (n <= 0) return 'sınırsız'
-  if (birim.startsWith('MB') && n >= 1024) return `${(n / 1024).toFixed(1)} G${birim.slice(2)}`
-  return `${n.toLocaleString('tr-TR')} ${birim}`
+type UnitKey = 'count' | 'mb' | 'mb_per_month'
+
+function fmt(n: number, birim: UnitKey, locale: string, t: (key: string) => string) {
+  if (n <= 0) return t('BayiPaketleriPage:units.unlimited')
+  if ((birim === 'mb' || birim === 'mb_per_month') && n >= 1024) {
+    const perMonth = birim === 'mb_per_month' ? '/' + t('BayiPaketleriPage:units.mb_per_month').split('/')[1] : ''
+    return `${(n / 1024).toFixed(1)} GB${perMonth}`
+  }
+  return `${n.toLocaleString(locale)} ${t(`BayiPaketleriPage:units.${birim}`)}`
 }
 
-function fmtFiyat(kurus: number) {
-  return (kurus / 100).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })
+function fmtFiyat(kurus: number, locale: string) {
+  return (kurus / 100).toLocaleString(locale, { style: 'currency', currency: 'TRY' })
 }
 
 function PaketModal({ paket, onKapat, onKayit }: { paket: Paket; onKapat: () => void; onKayit: () => void }) {
+  const { t } = useTranslation(['BayiPaketleriPage', 'common'])
   const yeni = !paket.id
   const [form, setForm] = useState<Paket>({
     id: paket.id || 0,
@@ -185,43 +193,43 @@ function PaketModal({ paket, onKapat, onKayit }: { paket: Paket; onKapat: () => 
       else await api.put(`/bayi-paketleri/${form.id}`, form)
       onKayit()
     } catch (e) {
-      setHata(apiHata(e, 'Kayıt başarısız'))
+      setHata(apiHata(e, t('BayiPaketleriPage:errors.save_failed')))
     } finally {
       setIsleniyor(false)
     }
   }
 
   return (
-    <Modal acik={true} baslik={yeni ? 'Yeni Bayi Paketi' : 'Paketi Düzenle'} onKapat={onKapat} genislik="lg">
+    <Modal acik={true} baslik={yeni ? t('BayiPaketleriPage:modal.title_new') : t('BayiPaketleriPage:modal.title_edit')} onKapat={onKapat} genislik="lg">
       <form onSubmit={gonder} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <Alan etiket="Paket adı" value={form.ad} setVal={v => setForm({ ...form, ad: v })} required />
-          <Alan etiket="Açıklama" value={form.aciklama} setVal={v => setForm({ ...form, aciklama: v })} />
+          <Alan etiket={t('BayiPaketleriPage:modal.fields.package_name')} value={form.ad} setVal={v => setForm({ ...form, ad: v })} required />
+          <Alan etiket={t('BayiPaketleriPage:modal.fields.description')} value={form.aciklama} setVal={v => setForm({ ...form, aciklama: v })} />
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Sayi etiket="Max müşteri" value={form.max_customer} setVal={v => setForm({ ...form, max_customer: v })} />
-          <Sayi etiket="Max domain" value={form.max_domain} setVal={v => setForm({ ...form, max_domain: v })} />
-          <Sayi etiket="Disk (MB)" value={form.disk_kota_mb} setVal={v => setForm({ ...form, disk_kota_mb: v })} />
-          <Sayi etiket="Trafik (MB/ay)" value={form.trafik_kota_mb} setVal={v => setForm({ ...form, trafik_kota_mb: v })} />
-          <Sayi etiket="Fiyat (kuruş)" value={form.fiyat_kurus} setVal={v => setForm({ ...form, fiyat_kurus: v })} />
+          <Sayi etiket={t('BayiPaketleriPage:modal.fields.max_customer')} value={form.max_customer} setVal={v => setForm({ ...form, max_customer: v })} />
+          <Sayi etiket={t('BayiPaketleriPage:modal.fields.max_domain')} value={form.max_domain} setVal={v => setForm({ ...form, max_domain: v })} />
+          <Sayi etiket={t('BayiPaketleriPage:modal.fields.disk_mb')} value={form.disk_kota_mb} setVal={v => setForm({ ...form, disk_kota_mb: v })} />
+          <Sayi etiket={t('BayiPaketleriPage:modal.fields.traffic_mb_per_month')} value={form.trafik_kota_mb} setVal={v => setForm({ ...form, trafik_kota_mb: v })} />
+          <Sayi etiket={t('BayiPaketleriPage:modal.fields.price_kurus')} value={form.fiyat_kurus} setVal={v => setForm({ ...form, fiyat_kurus: v })} />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="checkbox" checked={form.varsayilan} onChange={e => setForm({ ...form, varsayilan: e.target.checked })} className="rounded" />
-          Bayi Limitleri ekranında varsayılan olarak öne çıkar
+          {t('BayiPaketleriPage:modal.checkboxes.default_promoted')}
         </label>
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="checkbox" checked={form.fazla_satis} onChange={e => setForm({ ...form, fazla_satis: e.target.checked })} className="rounded" />
-          Fazla satışa izin ver (kapatılırsa bayi, müşterilerine atadığı disk/trafik taahhüdü toplamında bu paketin limitini aşamaz)
+          {t('BayiPaketleriPage:modal.checkboxes.allow_oversell')}
         </label>
         <p className="text-xs text-slate-500 dark:text-slate-500">
-          0 = sınırsız. Fiyat yalnız bilgi amaçlıdır, panelin bir fatura/ödeme akışı yoktur.
+          {t('BayiPaketleriPage:modal.info_note')}
         </p>
 
         {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onKapat} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm">İptal</button>
-          <button type="submit" disabled={isleniyor || !form.ad.trim()} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded-md">{isleniyor ? 'Kaydediliyor…' : (yeni ? 'Ekle' : 'Güncelle')}</button>
+          <button type="button" onClick={onKapat} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{t('BayiPaketleriPage:modal.buttons.cancel')}</button>
+          <button type="submit" disabled={isleniyor || !form.ad.trim()} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded-md">{isleniyor ? t('BayiPaketleriPage:modal.buttons.saving') : (yeni ? t('BayiPaketleriPage:modal.buttons.add') : t('BayiPaketleriPage:modal.buttons.update'))}</button>
         </div>
       </form>
     </Modal>

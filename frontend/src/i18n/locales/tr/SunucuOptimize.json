@@ -1,0 +1,12 @@
+{
+  "title": "Sunucuyu Optimize Et",
+  "badge": "Bakım",
+  "desc": "Sistem paketlerini günceller (dnf -y update) ve MariaDB / nginx / PHP ayarlarını sunucu kaynağına göre yeniden ayarlar. İş arka planda çalışır — uzun sürebilir ve servisleri kısa süre etkileyebilir.",
+  "started_failed": "optimizasyon başlatılamadı",
+  "started_log": "Optimizasyon başlatıldı…\n",
+  "running": "Optimizasyon çalışıyor — paket güncellemesi uzun sürebilir, sayfayı kapatabilirsiniz (arka planda devam eder).",
+  "start_button": "Paketleri güncelle ve optimize et",
+  "confirm_text": "Sistem paketleri güncellenecek ve servisler yeniden ayarlanacak. Onaylıyor musunuz?",
+  "starting": "Başlatılıyor…",
+  "yes_start": "Evet, başlat"
+}

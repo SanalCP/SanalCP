@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
 // Panel için özel alan adı + otomatik Let's Encrypt — CloudPanel'deki gibi paneli
@@ -15,6 +16,7 @@ type Durum = {
 }
 
 export default function PanelDomain() {
+  const { t } = useTranslation(['PanelDomain'])
   const [durum, setDurum] = useState<Durum | null>(null)
   const [domain, setDomain] = useState('')
   const [kaydediliyor, setKaydediliyor] = useState(false)
@@ -37,10 +39,10 @@ export default function PanelDomain() {
     try {
       const r = await api.post('/system/panel-domain', { domain: domain.trim() })
       if (r.data.uyari) setUyari(r.data.uyari)
-      else setBasari(`✓ Sertifika kuruldu — https://${domain.trim()} üzerinden erişebilirsiniz`)
+      else setBasari(t('PanelDomain:save_success', { domain: domain.trim() }))
       yukle()
     } catch (e: any) {
-      setHata(e?.response?.data?.hata || e?.message || 'kaydedilemedi')
+      setHata(e?.response?.data?.hata || e?.message || t('PanelDomain:save_failed'))
     } finally { setKaydediliyor(false) }
   }
 
@@ -49,10 +51,10 @@ export default function PanelDomain() {
     try {
       await api.delete('/system/panel-domain')
       setDomain('')
-      setBasari('✓ Özel domain kaldırıldı, panel sunucu IP + self-signed sertifikaya döndü')
+      setBasari(t('PanelDomain:remove_success'))
       yukle()
     } catch (e: any) {
-      setHata(e?.response?.data?.hata || e?.message || 'kaldırılamadı')
+      setHata(e?.response?.data?.hata || e?.message || t('PanelDomain:remove_failed'))
     } finally { setKaydediliyor(false) }
   }
 
@@ -62,25 +64,24 @@ export default function PanelDomain() {
         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0 bg-violet-100 dark:bg-violet-900/40">🔗</div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Panel Alan Adı</span>
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">Otomatik SSL</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('PanelDomain:title')}</span>
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">{t('PanelDomain:badge_auto_ssl')}</span>
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">
-            Panele çıplak IP yerine kendi alan adınızla, port yazmadan girin. Domainin A kaydı bu sunucuyu
-            {durum?.sunucu_ip ? <> (<code className="text-[11px]">{durum.sunucu_ip}</code>)</> : null} göstermelidir — kaydedince
-            panel otomatik olarak gerçek bir Let's Encrypt sertifikası kurar. Panel her zaman
-            <code className="text-[11px]"> https://{durum?.sunucu_ip || 'sunucu-ip'}:8443</code> üzerinden de erişilebilir kalır (yedek erişim).
+            {t('PanelDomain:desc1')}
+            {durum?.sunucu_ip ? <> (<code className="text-[11px]">{durum.sunucu_ip}</code>)</> : null} {t('PanelDomain:desc2')}
+            <code className="text-[11px]"> https://{durum?.sunucu_ip || t('PanelDomain:ip_fallback')}:8443</code> {t('PanelDomain:desc3')}
           </div>
 
           {durum?.ssl_durum === 'aktif' && (
             <div className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              SSL aktif{durum.ssl_bitis ? ` — ${durum.ssl_bitis} tarihine kadar geçerli` : ''} — https://{durum.ozel_domain} üzerinden port yazmadan erişebilirsiniz
+              {t('PanelDomain:ssl_active')}{durum.ssl_bitis ? t('PanelDomain:ssl_valid_until', { date: durum.ssl_bitis }) : ''}{t('PanelDomain:ssl_active_access', { domain: durum.ozel_domain })}
             </div>
           )}
           {durum?.ssl_durum === 'basarisiz' && durum.ssl_hata && (
             <div className="mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs">
-              Domain kaydedildi ama sertifika alınamadı: {durum.ssl_hata}
+              {t('PanelDomain:ssl_cert_failed', { error: durum.ssl_hata })}
             </div>
           )}
           {hata && <div className="mt-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs">{hata}</div>}
@@ -92,19 +93,19 @@ export default function PanelDomain() {
               type="text"
               value={domain}
               onChange={e => setDomain(e.target.value)}
-              placeholder="panel.ornekalan.com"
+              placeholder={t('PanelDomain:placeholder')}
               autoComplete="off"
               spellCheck={false}
               className="flex-1 max-w-xs px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
             <button onClick={kaydet} disabled={kaydediliyor || !domain.trim()}
               className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed">
-              {kaydediliyor ? 'Kaydediliyor…' : 'Kaydet ve SSL kur'}
+              {kaydediliyor ? t('PanelDomain:saving') : t('PanelDomain:save_button')}
             </button>
             {durum?.ozel_domain && (
               <button onClick={kaldir} disabled={kaydediliyor}
                 className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-40">
-                Kaldır
+                {t('PanelDomain:remove_button')}
               </button>
             )}
           </div>

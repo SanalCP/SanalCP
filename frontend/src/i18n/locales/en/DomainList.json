@@ -1,0 +1,7 @@
+{
+  "title": "Domains",
+  "add_domain": "+ Add Domain",
+  "add_domain_hint": "Will be active in F2",
+  "empty": "No domains yet",
+  "no_ssl": "No SSL"
+}

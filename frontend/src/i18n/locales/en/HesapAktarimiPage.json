@@ -1,0 +1,67 @@
+{
+  "title": "Account Import",
+  "subtitle": "Safely analyze a full cPanel account backup. The archive is not extracted or permanently stored on the server at this stage.",
+  "breadcrumb": {
+    "admin": "Administration",
+    "current": "Account Transfer"
+  },
+  "error": {
+    "analyze_failed": "Could not analyze archive",
+    "import_failed": "Could not import account"
+  },
+  "upload": {
+    "file_label": "cPanel full backup (.tar.gz / .tgz)",
+    "uploading": "Uploading {{progress}}%",
+    "analyze_button": "Analyze Archive"
+  },
+  "kpi": {
+    "primary_domain": "Primary Domain",
+    "undetermined": "Could not be determined",
+    "web_files": "Web Files",
+    "databases": "Databases",
+    "mail_data": "Mail Data",
+    "none": "None",
+    "files_suffix": "files"
+  },
+  "detail": {
+    "title": "Account information",
+    "source_panel": "Source panel",
+    "source_panel_value": "cPanel",
+    "user": "User",
+    "archive_root": "Archive root",
+    "total_entries": "Total entries",
+    "expanded_size": "Expanded size",
+    "cron_jobs": "Cron jobs",
+    "ssl_files": "SSL files",
+    "mailboxes": "Mailboxes",
+    "aliases": "Aliases"
+  },
+  "lists": {
+    "databases": "Databases",
+    "dns_zones": "DNS zones",
+    "cron_jobs": "Cron jobs",
+    "empty": "Not found"
+  },
+  "info_note": "Analysis complete. Importing will create a new domain; if an error occurs, the created account will be rolled back automatically.",
+  "target_section": {
+    "title": "Target and plan",
+    "target_customer": "Target customer",
+    "select_customer": "Select customer",
+    "service_plan": "Service plan",
+    "default_plan": "Default plan",
+    "primary_domain": "Primary domain",
+    "php_version": "PHP version",
+    "import_button": "Import Account",
+    "importing": "Importing… {{progress}}%"
+  },
+  "result": {
+    "success_title": "Import completed",
+    "summary": "{{domain}} · {{files}} web files · {{databases}} databases",
+    "cron_imported": "{{count}} cron jobs imported.",
+    "ssl_imported": "SSL certificate imported · expires on {{expires}}",
+    "mailbox_passwords_title": "New mailbox passwords — save them now",
+    "aliases_imported": "{{count}} aliases imported.",
+    "skipped_prefix": "⚠ ",
+    "manage_domain": "Manage domain →"
+  }
+}

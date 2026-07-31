@@ -2,6 +2,8 @@
 // sanal-dark-swept-v2
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import Breadcrumb from '@/components/Breadcrumb'
 import PanelGuncelleme from '@/components/PanelGuncelleme'
 import SunucuOptimize from '@/components/SunucuOptimize'
@@ -43,62 +45,64 @@ const I = {
   chevron:   'M9 5l7 7-7 7',
 }
 
-const GRUPLAR: Grup[] = [
-  {
-    ad: 'PHP',
-    ikon: I.chip,
-    araclar: [
-      { baslik: 'PHP Sürümleri', href: '/araclar/php-surumler', ikon: I.chip, rozet: 'Dinamik',
-        anahtar: 'remi fpm versiyon 7.4 8.0 8.1 8.2 8.3 8.4 8.5',
-        aciklama: '7.4 → 8.5 sürümlerini ekleyin / kaldırın. Her domain kendi sürümünü seçer.' },
-      { baslik: 'PHP Modülleri', href: '/sistem/php-modulleri', ikon: I.puzzle,
-        anahtar: 'extension pecl derleme',
-        aciklama: 'Sunucu genelinde eklenti aç/kapat. PECL paket arama ve derleme.' },
-    ],
-  },
-  {
-    ad: 'Sistem ve Servisler',
-    ikon: I.server,
-    araclar: [
-      { baslik: 'Paket Yöneticisi', href: '/araclar/paketler', ikon: I.cube,
-        anahtar: 'dnf gcc python node go podman derleyici',
-        aciklama: 'DNF paketleri — derleyiciler ve çalışma ortamları. Hazır kurulum grupları.' },
-      { baslik: 'Servisler', href: '/araclar/servisler', ikon: I.refresh,
-        anahtar: 'nginx apache mariadb dns php-fpm restart',
-        aciklama: 'Nginx / Apache / MariaDB / DNS / PHP-FPM durumu ve yeniden başlatma.' },
-      { baslik: 'Hizmet Planları', href: '/hizmet-planlari', ikon: I.clipboard,
-        anahtar: 'paket kota disk ftp veritabani',
-        aciklama: 'Barındırma paketleri; disk, veritabanı ve FTP kotaları.' },
-    ],
-  },
-  {
-    ad: 'Ağ ve DNS',
-    ikon: I.globe,
-    araclar: [
-      { baslik: 'DNS Şablonu', href: '/araclar/dns-sablonu', ikon: I.globe, rozet: 'Merkezi',
-        anahtar: 'a mx spf dmarc dkim soa kayit',
-        aciklama: 'Yeni domainlere uygulanan merkezi DNS kayıtları (A/MX/SPF/DMARC/DKIM) + SOA.' },
-      { baslik: 'Domainler', href: '/domainler', ikon: I.link,
-        anahtar: 'site abonelik liste',
-        aciklama: 'Tüm domain listesi, arama ve hızlı erişim.' },
-    ],
-  },
-  {
-    ad: 'Güvenlik ve Yedekleme',
-    ikon: I.shield,
-    araclar: [
-      { baslik: 'Güvenlik Duvarı', href: '/firewall', ikon: I.shield,
-        anahtar: 'nftables ip port yasak beyaz liste',
-        aciklama: 'IP/port yasağı, beyaz liste, port kapatma. Kritik portlar korumalı.' },
-      { baslik: 'Backup Yöneticisi', href: '/backup-yonetimi', ikon: I.server,
-        anahtar: 'yedek s3 sftp boyut',
-        aciklama: 'Tüm domainlerin yedekleri + boyut, tek tıkla yedekle. S3/SFTP hedefler.' },
-      { baslik: 'İzleme ve Loglar', href: '/izleme', ikon: I.chart,
-        anahtar: 'cpu ram disk grafik journald gunluk log',
-        aciklama: 'CPU/RAM/disk grafikleri ve sunucu günlükleri (panel/nginx/SSH…).' },
-    ],
-  },
-]
+function getGruplar(t: TFunction): Grup[] {
+  return [
+    {
+      ad: t('AraclarAyarlarPage:groups.php'),
+      ikon: I.chip,
+      araclar: [
+        { baslik: t('AraclarAyarlarPage:tools.php_versions.title'), href: '/araclar/php-surumler', ikon: I.chip, rozet: t('AraclarAyarlarPage:tools.php_versions.badge'),
+          anahtar: 'remi fpm versiyon 7.4 8.0 8.1 8.2 8.3 8.4 8.5',
+          aciklama: t('AraclarAyarlarPage:tools.php_versions.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.php_modules.title'), href: '/sistem/php-modulleri', ikon: I.puzzle,
+          anahtar: 'extension pecl derleme',
+          aciklama: t('AraclarAyarlarPage:tools.php_modules.desc') },
+      ],
+    },
+    {
+      ad: t('AraclarAyarlarPage:groups.system'),
+      ikon: I.server,
+      araclar: [
+        { baslik: t('AraclarAyarlarPage:tools.packages.title'), href: '/araclar/paketler', ikon: I.cube,
+          anahtar: 'dnf gcc python node go podman derleyici',
+          aciklama: t('AraclarAyarlarPage:tools.packages.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.services.title'), href: '/araclar/servisler', ikon: I.refresh,
+          anahtar: 'nginx apache mariadb dns php-fpm restart',
+          aciklama: t('AraclarAyarlarPage:tools.services.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.plans.title'), href: '/hizmet-planlari', ikon: I.clipboard,
+          anahtar: 'paket kota disk ftp veritabani',
+          aciklama: t('AraclarAyarlarPage:tools.plans.desc') },
+      ],
+    },
+    {
+      ad: t('AraclarAyarlarPage:groups.network'),
+      ikon: I.globe,
+      araclar: [
+        { baslik: t('AraclarAyarlarPage:tools.dns_template.title'), href: '/araclar/dns-sablonu', ikon: I.globe, rozet: t('AraclarAyarlarPage:tools.dns_template.badge'),
+          anahtar: 'a mx spf dmarc dkim soa kayit',
+          aciklama: t('AraclarAyarlarPage:tools.dns_template.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.domains.title'), href: '/domainler', ikon: I.link,
+          anahtar: 'site abonelik liste',
+          aciklama: t('AraclarAyarlarPage:tools.domains.desc') },
+      ],
+    },
+    {
+      ad: t('AraclarAyarlarPage:groups.security'),
+      ikon: I.shield,
+      araclar: [
+        { baslik: t('AraclarAyarlarPage:tools.firewall.title'), href: '/firewall', ikon: I.shield,
+          anahtar: 'nftables ip port yasak beyaz liste',
+          aciklama: t('AraclarAyarlarPage:tools.firewall.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.backup.title'), href: '/backup-yonetimi', ikon: I.server,
+          anahtar: 'yedek s3 sftp boyut',
+          aciklama: t('AraclarAyarlarPage:tools.backup.desc') },
+        { baslik: t('AraclarAyarlarPage:tools.monitor.title'), href: '/izleme', ikon: I.chart,
+          anahtar: 'cpu ram disk grafik journald gunluk log',
+          aciklama: t('AraclarAyarlarPage:tools.monitor.desc') },
+      ],
+    },
+  ]
+}
 
 function Ikon({ d, className = '' }: { d: string; className?: string }) {
   return (
@@ -148,32 +152,35 @@ function AracKart({ a }: { a: Arac }) {
 }
 
 export default function AraclarAyarlarPage() {
+  const { t } = useTranslation('AraclarAyarlarPage')
   const [q, setQ] = useState('')
 
+  const GRUPLAR = useMemo(() => getGruplar(t), [t])
+
   const gruplar = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    if (!t) return GRUPLAR
+    const s = q.trim().toLowerCase()
+    if (!s) return GRUPLAR
     return GRUPLAR
       .map(g => ({
         ...g,
         araclar: g.araclar.filter(a =>
-          (a.baslik + ' ' + a.aciklama + ' ' + (a.anahtar ?? '') + ' ' + g.ad).toLowerCase().includes(t)),
+          (a.baslik + ' ' + a.aciklama + ' ' + (a.anahtar ?? '') + ' ' + g.ad).toLowerCase().includes(s)),
       }))
       .filter(g => g.araclar.length > 0)
-  }, [q])
+  }, [GRUPLAR, q])
 
   const toplam = GRUPLAR.reduce((n, g) => n + g.araclar.length, 0)
 
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
-      <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Araçlar ve Ayarlar' }]} />
+      <Breadcrumb items={[{ etiket: t('AraclarAyarlarPage:breadcrumb_home'), href: '/' }, { etiket: t('AraclarAyarlarPage:breadcrumb_current') }]} />
 
       {/* Başlık + arama */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Araçlar ve Ayarlar</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t('AraclarAyarlarPage:page_title')}</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Sunucu geneli yönetim — PHP, sistem paketleri, ağ, güvenlik ve bakım.
+            {t('AraclarAyarlarPage:page_subtitle')}
           </p>
         </div>
         <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
@@ -185,8 +192,8 @@ export default function AraclarAyarlarPage() {
               type="search"
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Araç ara…"
-              aria-label="Araç ara"
+              placeholder={t('AraclarAyarlarPage:search_placeholder')}
+              aria-label={t('AraclarAyarlarPage:search_aria')}
               className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900
                          placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30
                          dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100"
@@ -200,7 +207,7 @@ export default function AraclarAyarlarPage() {
         <div className="mb-3 flex items-center gap-2">
           <Ikon d={I.wrench} className="h-4 w-4 text-slate-400" />
           <h2 id="bakim-baslik" className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Sunucu Bakımı
+            {t('AraclarAyarlarPage:section_maintenance')}
           </h2>
         </div>
         <div className="space-y-3">
@@ -215,8 +222,8 @@ export default function AraclarAyarlarPage() {
       {gruplar.length === 0 ? (
         <div role="status" className="rounded-2xl border border-dashed border-slate-200 py-14 text-center dark:border-slate-800">
           <Ikon d={I.tune} className="mx-auto h-9 w-9 text-slate-300 dark:text-slate-600" />
-          <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">"{q}" için araç bulunamadı</p>
-          <p className="mt-1 text-xs text-slate-500">Arama terimini değiştirin veya temizleyin.</p>
+          <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">{t('AraclarAyarlarPage:empty_search_title', { q })}</p>
+          <p className="mt-1 text-xs text-slate-500">{t('AraclarAyarlarPage:empty_search_hint')}</p>
         </div>
       ) : (
         gruplar.map(g => (
@@ -237,7 +244,7 @@ export default function AraclarAyarlarPage() {
       )}
 
       {!q && (
-        <p className="pt-2 text-xs text-slate-400 dark:text-slate-600">{toplam} araç · sunucu geneli</p>
+        <p className="pt-2 text-xs text-slate-400 dark:text-slate-600">{t('AraclarAyarlarPage:footer_total', { count: toplam })}</p>
       )}
     </div>
   )

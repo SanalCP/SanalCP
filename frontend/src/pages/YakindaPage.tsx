@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { useTranslation } from 'react-i18next'
 import Breadcrumb from '@/components/Breadcrumb'
 
 interface Props {
@@ -10,10 +11,11 @@ interface Props {
 }
 
 export default function YakindaPage({ baslik, aciklama, ikon, ozellikler }: Props) {
+  const { t } = useTranslation(['YakindaPage', 'common'])
   return (
     <div className="px-6 py-5">
       <Breadcrumb items={[
-        { etiket: 'Anasayfa', href: '/' },
+        { etiket: t('common:home'), href: '/' },
         { etiket: baslik },
       ]} />
 
@@ -27,10 +29,10 @@ export default function YakindaPage({ baslik, aciklama, ikon, ozellikler }: Prop
 
       <div className="bg-gradient-to-br from-brand-50/40 to-indigo-50/40 border-2 border-dashed border-brand-200 dark:border-brand-800 rounded-2xl p-8 mt-6">
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-[10px] uppercase tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-2 py-0.5 rounded font-bold">Yakında</span>
-          <span className="text-xs text-slate-500 dark:text-slate-500">Yol Haritası</span>
+          <span className="text-[10px] uppercase tracking-wider bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 px-2 py-0.5 rounded font-bold">{t('YakindaPage:coming_soon_badge')}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-500">{t('YakindaPage:roadmap')}</span>
         </div>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4">Planlanan Özellikler</h3>
+        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-4">{t('YakindaPage:planned_features')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {ozellikler.map(o => (
             <div key={o} className="flex items-start gap-2 px-3 py-2 bg-white dark:bg-slate-800/80 rounded border border-slate-100 dark:border-slate-800">

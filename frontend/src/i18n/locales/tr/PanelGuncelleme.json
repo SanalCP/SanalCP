@@ -1,0 +1,13 @@
+{
+  "title": "Panel Güncellemesi",
+  "badge_server": "Sunucu",
+  "desc": "Paneli GitHub'daki son sürüme günceller. Veriler (env, veritabanı, siteler) korunur; yeni sürüm sağlıklı başlamazsa otomatik geri alınır.",
+  "desc_tool_missing": "Güncelleme aracı sunucuda yok — ilk çalıştırmada otomatik indirilecek.",
+  "start_failed": "güncelleme başlatılamadı",
+  "log_started": "Güncelleme başlatıldı…\n",
+  "running": "Güncelleme çalışıyor — panel kısa süre yeniden başlayabilir, sayfayı kapatmayın.",
+  "check_and_install": "Güncellemeleri denetle ve kur",
+  "confirm_prompt": "Panel güncellenecek ve servis yeniden başlayacak. Onaylıyor musunuz?",
+  "starting": "Başlatılıyor…",
+  "confirm_yes": "Evet, güncelle"
+}

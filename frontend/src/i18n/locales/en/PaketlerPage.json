@@ -1,0 +1,62 @@
+{
+  "breadcrumb": {
+    "tools_settings": "Tools and Settings",
+    "package_manager": "Package Manager"
+  },
+  "title": "Package Manager · Compilers",
+  "subtitle_prefix": "Server packages via DNF. Critical packages (kernel, bash, openssh, nginx, mariadb…) are",
+  "subtitle_strong": "protected",
+  "groups_card": {
+    "title": "📦 Quick Install Groups",
+    "hint": "Click a group to toggle its packages individually."
+  },
+  "groups": {
+    "dev_tools": { "name": "🛠️ Development Tools", "desc": "gcc, make, autoconf, automake, libtool, kernel-devel" },
+    "python": { "name": "🐍 Python", "desc": "Python 3 + pip + venv + devel headers" },
+    "nodejs": { "name": "⚛️ Node.js + npm", "desc": "Node.js LTS + npm" },
+    "go": { "name": "🟦 Go", "desc": "Go compiler" },
+    "java": { "name": "☕ Java", "desc": "OpenJDK 21 LTS + Maven" },
+    "rust": { "name": "🦀 Rust", "desc": "Rust + cargo" },
+    "container": { "name": "📦 Container/VM", "desc": "Docker-compatible — podman + buildah + skopeo" },
+    "system_tools": { "name": "🔧 System tools", "desc": "CLI productivity tools" },
+    "image_processing": { "name": "🖼️ Image processing", "desc": "ImageMagick + WebP + optimization" },
+    "db_clients": { "name": "🗄️ DB clients", "desc": "PostgreSQL + Redis CLI" },
+    "security": { "name": "🔐 Security", "desc": "GnuPG, OpenSSL, fail2ban" }
+  },
+  "installed_count": "{{count}} / {{total}} installed",
+  "installed_badge": "INSTALLED",
+  "protected_badge": "PROTECTED",
+  "processing": "Processing…",
+  "confirm": {
+    "remove_package": "\"{{package}}\" will be REMOVED. Continue?",
+    "install_package": "\"{{package}}\" will be installed on the server. Continue?",
+    "install_generic": "Package \"{{package}}\" will be installed server-wide. Continue?",
+    "remove_generic": "Package \"{{package}}\" will be REMOVED. Continue?"
+  },
+  "toggle_success_installed": "✓ {{package}} installed",
+  "toggle_success_removed": "✓ {{package}} removed",
+  "install_failed": "Installation failed",
+  "remove_failed": "Removal failed",
+  "output_modal": {
+    "remove_title": "Removal output: {{package}}",
+    "install_title": "Installation output: {{package}}",
+    "close": "Close"
+  },
+  "search": {
+    "tab_repo": "🔍 Search Repositories",
+    "tab_installed": "📦 Installed Packages",
+    "placeholder_repo": "e.g.: mongodb, redis, nodejs, gcc, htop",
+    "placeholder_installed": "installed package name or description",
+    "searching": "Searching…",
+    "search_btn": "Search",
+    "no_results": "No results.",
+    "result_count": "{{count}} results",
+    "failed": "Search failed"
+  },
+  "action": {
+    "installing": "Installing…",
+    "removing": "Removing…",
+    "install": "Install",
+    "remove": "Remove"
+  }
+}

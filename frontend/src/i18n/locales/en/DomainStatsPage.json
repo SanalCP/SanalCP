@@ -1,0 +1,22 @@
+{
+  "breadcrumb_title": "Statistics",
+  "title": "Traffic Statistics",
+  "subtitle": "nginx access log analysis.",
+  "refresh": "↻ Refresh",
+  "not_found": "Not found",
+  "no_data": "No access log data yet. Once the site starts receiving traffic, it will appear here.",
+  "kpi_total_requests": "Total Requests",
+  "kpi_bandwidth": "Bandwidth",
+  "kpi_unique_ip": "Unique IPs",
+  "kpi_bot_ratio": "Bot Ratio",
+  "status_distribution": "HTTP Status Distribution",
+  "daily_requests": "Daily Requests (last 7 days)",
+  "top_paths": "Top Requested Paths",
+  "top_ips": "Top Active IPs",
+  "recent_requests": "Recent Requests",
+  "no_rows": "No data.",
+  "request_unit": "requests",
+  "request_title": "{{count}} requests",
+  "back_to_subscription": "← Back to subscription",
+  "locale": "en-US"
+}

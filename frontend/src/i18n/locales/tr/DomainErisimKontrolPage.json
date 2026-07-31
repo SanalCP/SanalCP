@@ -1,0 +1,41 @@
+{
+  "breadcrumb": {
+    "domains": "Domainler",
+    "access_control": "Erişim Kontrolü"
+  },
+  "title": "Erişim Kontrolü",
+  "subtitle": "Hotlink koruması ve IP bazlı izin/engel listesi.",
+  "back_to_subscription": "← Aboneliğe dön",
+  "hotlink": {
+    "title": "Hotlink Koruması",
+    "active": "aktif",
+    "inactive": "kapalı",
+    "desc": "Resimleriniz (jpg, png, gif, webp, svg…) başka sitelerden doğrudan bağlantıyla (hotlink) gösterilemez; yalnızca kendi domaininizden ve aşağıda izin verdiğiniz adreslerden gelen istekler resimlere erişebilir.",
+    "allowed_label": "İzinli ekstra domainler (virgülle ayrık, opsiyonel)",
+    "allowed_placeholder": "cdn.baskadomain.com, *.ortak.com",
+    "saving": "Kaydediliyor…",
+    "disable": "Kapat",
+    "enable": "Etkinleştir",
+    "update_list": "İzinli Listeyi Güncelle",
+    "enabled_msg": "Hotlink koruması etkinleştirildi.",
+    "disabled_msg": "Hotlink koruması kapatıldı.",
+    "save_failed": "Kaydedilemedi"
+  },
+  "ip": {
+    "title": "IP İzin/Engel Listesi",
+    "desc": "Bu domaine erişimi belirli IP adreslerine kısıtlayın ya da kötü niyetli IP'leri engelleyin.",
+    "mode_off": "Kapalı",
+    "mode_block": "Listedekileri Engelle",
+    "mode_allow": "Yalnızca Listedekilere İzin Ver",
+    "mode_updated": "Mod güncellendi.",
+    "cidr_label": "IP veya CIDR",
+    "cidr_placeholder": "1.2.3.4 veya 1.2.3.0/24",
+    "add": "Ekle",
+    "add_failed": "Eklenemedi",
+    "delete": "Sil",
+    "delete_failed": "Silinemedi",
+    "empty_allow": "Henüz kural yok — liste boşken mod devre dışı sayılır (site kilitlenmez).",
+    "empty_block": "Henüz engellenen IP yok.",
+    "save_failed": "Kaydedilemedi"
+  }
+}

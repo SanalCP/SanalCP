@@ -1,0 +1,7 @@
+{
+  "phase_badge": "{{phase}} · Not Ready",
+  "wip_title": "Under construction",
+  "wip_prefix": "This module will roll out in",
+  "wip_suffix": ".",
+  "wip_next_phases": "in a future phase"
+}

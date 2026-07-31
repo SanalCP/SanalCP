@@ -1,0 +1,32 @@
+{
+  "breadcrumb_title": "Kaynak Özetim",
+  "title": "Kaynak Özetim",
+  "subtitle": "Bayi hesabınızın limitleri, gerçek kullanımı ve müşterilerinize dağıttığınız kotaların toplamı (taahhüt).",
+  "usage_card_title": "Kaynak Kullanımı",
+  "bars": {
+    "disk": "Disk",
+    "traffic": "Trafik (aylık)",
+    "customer": "Müşteri",
+    "domain": "Domain"
+  },
+  "units": {
+    "mb": "MB",
+    "count": "adet"
+  },
+  "oversell_off_note": "Fazla satış kapalı: müşterilerinize atadığınız disk/trafik kotalarının toplamı (taahhüt) limitin üstüne çıkamaz.",
+  "status_card_title": "Durum",
+  "status": {
+    "suspended_accounts": "Askıdaki hesap",
+    "allowed_plans": "Kullanabileceği hizmet planı",
+    "allowed_plans_restricted": "{{count}} plan (kısıtlı)",
+    "allowed_plans_all": "Tümü",
+    "oversell": "Fazla satış",
+    "oversell_on": "Açık",
+    "oversell_off": "Kapalı"
+  },
+  "bar": {
+    "usage_label": "kullanım",
+    "commitment_label": "taahhüt",
+    "commitment_limit_title": "Taahhüt sınırı"
+  }
+}
