@@ -104,7 +104,22 @@ func KernelcareDurumHandler(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, kernelcareDurum())
 }
 
-const kcWrapperIcerik = `#!/usr/bin/env bash
+func kcWrapperIcerik(dil string) string {
+	if dil == "en" {
+		return `#!/usr/bin/env bash
+set -uo pipefail
+echo "════════ KernelCare live kernel patching — $(date "+%Y-%m-%d %H:%M:%S") ════════"
+echo
+if command -v kcarectl >/dev/null 2>&1; then
+  kcarectl --update
+else
+  echo "  (kcarectl not found — KernelCare is not installed)"
+fi
+echo
+echo "════════ ✓ Live patching complete ════════"
+`
+	}
+	return `#!/usr/bin/env bash
 set -uo pipefail
 echo "════════ KernelCare canlı çekirdek yaması — $(date "+%Y-%m-%d %H:%M:%S") ════════"
 echo
@@ -116,10 +131,11 @@ fi
 echo
 echo "════════ ✓ Canlı yama tamamlandı ════════"
 `
+}
 
-func kcWrapperYaz() error {
+func kcWrapperYaz(dil string) error {
 	tmp := kcWrapper + ".tmp"
-	if err := os.WriteFile(tmp, []byte(kcWrapperIcerik), 0o700); err != nil {
+	if err := os.WriteFile(tmp, []byte(kcWrapperIcerik(dil)), 0o700); err != nil {
 		return err
 	}
 	return os.Rename(tmp, kcWrapper)
@@ -129,21 +145,23 @@ func kcWrapperYaz() error {
 // (systemd-run, sekme/panel kapansa da sürer).
 func KernelcareYamala(w http.ResponseWriter, r *http.Request) {
 	if !kernelcareKurulu() {
-		httpx.WriteError(w, http.StatusBadRequest, "KernelCare kurulu değil")
+		httpx.WriteError(w, http.StatusBadRequest, t("KernelCare kurulu değil", "KernelCare is not installed"))
 		return
 	}
 	if kernelcareCalisiyor() {
-		httpx.WriteError(w, http.StatusConflict, "canlı yama zaten çalışıyor")
+		httpx.WriteError(w, http.StatusConflict, t("canlı yama zaten çalışıyor", "live patching already running"))
 		return
 	}
 	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
-	if err := kcWrapperYaz(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
+	if err := kcWrapperYaz(panelDili()); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, t("hazırlanamadı: ", "could not prepare: ")+err.Error())
 		return
 	}
-	bas := fmt.Sprintf("=== KernelCare canlı yama başlatıldı: %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+	bas := fmt.Sprintf("%s\n", t(
+		fmt.Sprintf("=== KernelCare canlı yama başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("=== KernelCare live patch started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
 	if err := os.WriteFile(kcLogYol, []byte(bas), 0o640); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "log açılamadı: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
 		return
 	}
 	cmd := exec.Command("systemd-run",
@@ -154,7 +172,7 @@ func KernelcareYamala(w http.ResponseWriter, r *http.Request) {
 		"-p", "StandardError=append:"+kcLogYol,
 		kcWrapper)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"baslatildi": true})

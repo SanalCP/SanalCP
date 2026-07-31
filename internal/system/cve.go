@@ -200,7 +200,24 @@ func CveDurum(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, ozet)
 }
 
-const cveWrapperIcerik = `#!/usr/bin/env bash
+func cveWrapperIcerik(dil string) string {
+	if dil == "en" {
+		return `#!/usr/bin/env bash
+set -uo pipefail
+echo "════════ Security updates — $(date "+%Y-%m-%d %H:%M:%S") ════════"
+echo
+if command -v dnf >/dev/null 2>&1; then
+  dnf -y --refresh update --security
+elif command -v yum >/dev/null 2>&1; then
+  yum -y update --security
+else
+  echo "  (dnf/yum not found — update skipped)"
+fi
+echo
+echo "════════ ✓ Security updates complete ════════"
+`
+	}
+	return `#!/usr/bin/env bash
 set -uo pipefail
 echo "════════ Güvenlik güncellemeleri — $(date "+%Y-%m-%d %H:%M:%S") ════════"
 echo
@@ -214,10 +231,11 @@ fi
 echo
 echo "════════ ✓ Güvenlik güncellemeleri tamamlandı ════════"
 `
+}
 
-func cveWrapperYaz() error {
+func cveWrapperYaz(dil string) error {
 	tmp := cveWrapper + ".tmp"
-	if err := os.WriteFile(tmp, []byte(cveWrapperIcerik), 0o700); err != nil {
+	if err := os.WriteFile(tmp, []byte(cveWrapperIcerik(dil)), 0o700); err != nil {
 		return err
 	}
 	return os.Rename(tmp, cveWrapper)
@@ -226,25 +244,27 @@ func cveWrapperYaz() error {
 // CveGuncelle — POST /system/cve/guncelle : güvenlik güncellemelerini arka planda kur.
 func CveGuncelle(w http.ResponseWriter, r *http.Request) {
 	if cveGuncellemeCalisiyor() {
-		httpx.WriteError(w, http.StatusConflict, "güvenlik güncellemesi zaten çalışıyor")
+		httpx.WriteError(w, http.StatusConflict, t("güvenlik güncellemesi zaten çalışıyor", "security update already running"))
 		return
 	}
 	if c, _ := optimizeCalisiyor(); c {
-		httpx.WriteError(w, http.StatusConflict, "optimizasyon sürüyor — bitince tekrar deneyin")
+		httpx.WriteError(w, http.StatusConflict, t("optimizasyon sürüyor — bitince tekrar deneyin", "optimization is in progress — try again once it's done"))
 		return
 	}
 	if c, _ := guncelleCalisiyor(); c {
-		httpx.WriteError(w, http.StatusConflict, "panel güncellemesi sürüyor — bitince tekrar deneyin")
+		httpx.WriteError(w, http.StatusConflict, t("panel güncellemesi sürüyor — bitince tekrar deneyin", "a panel update is in progress — try again once it's done"))
 		return
 	}
 	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
-	if err := cveWrapperYaz(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
+	if err := cveWrapperYaz(panelDili()); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, t("hazırlanamadı: ", "could not prepare: ")+err.Error())
 		return
 	}
-	bas := fmt.Sprintf("=== Güvenlik güncellemesi başlatıldı: %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+	bas := fmt.Sprintf("%s\n", t(
+		fmt.Sprintf("=== Güvenlik güncellemesi başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("=== Security update started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
 	if err := os.WriteFile(cveLogYol, []byte(bas), 0o640); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "log açılamadı: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
 		return
 	}
 	cmd := exec.Command("systemd-run",
@@ -255,7 +275,7 @@ func CveGuncelle(w http.ResponseWriter, r *http.Request) {
 		"-p", "StandardError=append:"+cveLogYol,
 		cveWrapper)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
 		return
 	}
 	// cache'i sıfırla — güncelleme sonrası tarama tazelensin.
