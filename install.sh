@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# SanalPanel — tek satır kurulum (bootstrap)
-#   curl -fsSL https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/install.sh | bash
+# SanalCP — tek satır kurulum (bootstrap)
+#   curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
 #
 # Bu bootstrap deponun tamamını (installer + prebuilt binary + config'ler) indirir
-# ve sanalpanel-install.sh'yi çalıştırır.
+# ve sanalcp-install.sh'yi çalıştırır.
 set -euo pipefail
 
-REPO="sanalpanel/sanalpanel"
+REPO="sanalcp/sanalcp"
 BRANCH="main"
 
 c_b="\033[1;34m"; c_g="\033[32m"; c_r="\033[31m"; c_0="\033[0m"
@@ -16,7 +16,7 @@ c_b="\033[1;34m"; c_g="\033[32m"; c_r="\033[31m"; c_0="\033[0m"
 command -v curl >/dev/null 2>&1 || { echo -e "${c_r}✗ curl gerekli${c_0}"; exit 1; }
 command -v tar  >/dev/null 2>&1 || { echo -e "${c_r}✗ tar gerekli${c_0}"; exit 1; }
 
-echo -e "${c_b}══ SanalPanel indiriliyor (github.com/$REPO) ══${c_0}"
+echo -e "${c_b}══ SanalCP indiriliyor (github.com/$REPO) ══${c_0}"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 if ! curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar xz -C "$TMP"; then
@@ -25,7 +25,7 @@ fi
 SRC=$(find "$TMP" -maxdepth 1 -type d -name "*-$BRANCH" | head -1)
 [ -z "$SRC" ] && SRC=$(find "$TMP" -maxdepth 1 -mindepth 1 -type d | head -1)
 cd "$SRC" || { echo -e "${c_r}✗ paket açılamadı${c_0}"; exit 1; }
-chmod +x sanalpanel-install.sh assets/sanalpanel-server assets/sanalpanel-seed-admin assets/ops/* 2>/dev/null || true
+chmod +x sanalcp-install.sh assets/sanalcp-server assets/sanalcp-seed-admin assets/ops/* 2>/dev/null || true
 
 echo -e "${c_g}✓ indirildi — kurulum başlıyor${c_0}\n"
-exec bash sanalpanel-install.sh "$@"
+exec bash sanalcp-install.sh "$@"

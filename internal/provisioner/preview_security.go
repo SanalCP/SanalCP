@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// panelFrameAncestors tenant sitelerinin yalnız kendi origin'i ve SanalPanel
+// panelFrameAncestors tenant sitelerinin yalnız kendi origin'i ve SanalCP
 // tarafından iframe içinde gösterilebilmesini sağlayan CSP kaynak listesidir.
 // X-Frame-Options farklı bir origin'e güvenli izin veremediği için kullanılmaz.
 func panelFrameAncestors() string {

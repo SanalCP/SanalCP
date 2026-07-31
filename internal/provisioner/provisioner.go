@@ -50,7 +50,7 @@ func Init(d *sql.DB) {
 	HealHomePerms()             // Batch3: mevcut tenant ev dizinlerine izolasyon izinleri (retroaktif)
 	ensureFPMSELinuxFcontext()  // Batch5A: /run/php-fpm-<sk>/ için SELinux fcontext (taze Enforcing kurulumda ilk domain 500 vermesin)
 	ensureHTTPDHomeBooleans()   // Batch5A: httpd_enable_homedirs + httpd_read_user_content (yoksa home'dan site 404)
-	HealSSLCertPathsOnStartup() // Batch5A: home'daki SSL cert'lerini /etc/pki/sanalpanel'e taşı (Enforcing'de nginx okuyabilsin)
+	HealSSLCertPathsOnStartup() // Batch5A: home'daki SSL cert'lerini /etc/pki/sanalcp'e taşı (Enforcing'de nginx okuyabilsin)
 	HealSSLVhost443OnStartup()  // SSL teardown fix: 443 bloğu düşmüş / cert'i silinmiş SSL domain'leri onar (LE>self-signed), 443 daima dinlesin
 	EnsureTenantFPMOnStartup()  // Batch5A: kurulu per-tenant FPM servislerini (Seçenek A) ayakta tut
 	HealWAFOnStartup()          // WAF: ModSecurity modul durumu + WAF-etkin domain'lerin per-domain modsec conf'unu tazele (modul yoksa graceful)
@@ -72,7 +72,7 @@ const cacheZoneName = "sanalcache"
 const cacheZoneDir = "/var/cache/nginx/sanalcache"
 
 // cacheZoneBody: sanalcache.conf içeriği (idempotent — sabit yol + sabit içerik).
-const cacheZoneBody = `# SanalPanel tarafından otomatik yönetilir — ELLE DÜZENLEMEYİN.
+const cacheZoneBody = `# SanalCP tarafından otomatik yönetilir — ELLE DÜZENLEMEYİN.
 # vhost'lar "fastcgi_cache sanalcache" kullanır; zone tanımı burada garanti edilir.
 # Her vhost render'ında ve panel açılışında yeniden yazılır (idempotent).
 fastcgi_cache_path ` + cacheZoneDir + ` levels=1:2 keys_zone=` + cacheZoneName + `:100m max_size=1g inactive=60m use_temp_path=off;
@@ -343,7 +343,7 @@ server {
 
 {{if .EkDirektifler}}    # ---- Ek direktifler (kullanıcı) ----
     {{.EkDirektifler}}
-{{end}}    # SanalPanel managed (SSL: {{.SSLKaynak}}) — {{.AlanAdi}}
+{{end}}    # SanalCP managed (SSL: {{.SSLKaynak}}) — {{.AlanAdi}}
 }
 {{- else -}}
 server {
@@ -426,7 +426,7 @@ server {
 
 {{if .EkDirektifler}}    # ---- Ek direktifler (kullanıcı) ----
     {{.EkDirektifler}}
-{{end}}    # SanalPanel managed — {{.AlanAdi}} (HTTP only, PHP {{.PHPSurum}})
+{{end}}    # SanalCP managed — {{.AlanAdi}} (HTTP only, PHP {{.PHPSurum}})
 }
 {{- end -}}
 `))
@@ -480,7 +480,7 @@ func buildSecurityHeaders(o VhostOpts) string {
 
 // suspendedVhostTmpl — "Hesabı Askıya Al" için: acme-challenge hariç TÜM istekler 503.
 // SSL sertifikası varsa 443'te de servis edilir (böylece askıdayken bile cert yenilenebilir).
-var suspendedVhostTmpl = template.Must(template.New("s").Parse(`# {{.AlanAdi}} — SanalPanel tarafından ASKIYA ALINDI
+var suspendedVhostTmpl = template.Must(template.New("s").Parse(`# {{.AlanAdi}} — SanalCP tarafından ASKIYA ALINDI
 server {
     listen 80;
     listen [::]:80;
@@ -535,7 +535,7 @@ server {
 // redirectVhostTmpl: domain_redirects'te tüm-domain yönlendirme tanımlıysa (ve Askida/
 // vhost_ozel devrede değilse) render edilir. HTTP her zaman hedefe yönlendirir; SSL
 // varsa 443 de aynı şekilde (sertifika zaten kurulu, browser hata vermeden yönlendirir).
-var redirectVhostTmpl = template.Must(template.New("r").Parse(`# {{.AlanAdi}} — SanalPanel yönlendirmesi: {{.RedirectHedef}}
+var redirectVhostTmpl = template.Must(template.New("r").Parse(`# {{.AlanAdi}} — SanalCP yönlendirmesi: {{.RedirectHedef}}
 server {
     listen 80;
     listen [::]:80;
@@ -964,7 +964,7 @@ func Deprovision(alanAdi, sk string) error {
 	}
 	// Per-tenant FPM (Seçenek A) izlerini kaldır (servis + unit + config + run dizini + .bak).
 	TeardownTenantFPM(sk)
-	// Sistem SSL cert dizinini temizle (/etc/pki/sanalpanel/<domain>) — userdel home'u siler
+	// Sistem SSL cert dizinini temizle (/etc/pki/sanalcp/<domain>) — userdel home'u siler
 	// ama cert artık sistemde; orphan kalmasın.
 	if alanAdi != "" && ValidateDomain(alanAdi) == nil {
 		_ = os.RemoveAll(certSystemDir(alanAdi))
@@ -984,7 +984,7 @@ func Deprovision(alanAdi, sk string) error {
 	// userdel -r AlmaLinux'ta tenant crontab'ını her zaman kaldırmıyor. Aktarım
 	// rollback'i ve normal domain silme sonrasında görevlerin yetim çalışmasını önle.
 	_ = os.Remove(filepath.Join("/var/spool/cron", sk))
-	_ = os.Remove(filepath.Join("/var/lib/sanalpanel/cron-suspended", sk))
+	_ = os.Remove(filepath.Join("/var/lib/sanalcp/cron-suspended", sk))
 	if userExists(sk) {
 		_, _ = exec.Command("userdel", "-r", sk).CombinedOutput()
 	}
@@ -1024,7 +1024,7 @@ func SetPHPVersion(alanAdi, sk, yeniSurum, certPath, keyPath, sslKaynak, backend
 
 // certSystemBaseDir: SSL cert/key'lerin yazıldığı SİSTEM kökü (SELinux cert_t; nginx
 // httpd_t okur). Home (user_home_t) DEĞİL.
-const certSystemBaseDir = "/etc/pki/sanalpanel"
+const certSystemBaseDir = "/etc/pki/sanalcp"
 
 // certSystemDir: bir domain'in SSL cert/key sistem dizini. 🔴 Home'a değil buraya yazarız:
 // Enforcing'de nginx(httpd_t) home'daki cert'i (user_home_t) okuyamaz → "cannot load
@@ -1093,7 +1093,7 @@ func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath
 	// düzeltip self-signed'dan LE'ye yükseltmek istediğinde) sessizce no-op olur ve
 	// var olan self-signed cert'i "letsencrypt" etiketiyle yeniden dağıtarak başarı
 	// izlenimi verir (gerçek CA'dan hiç cert alınmaz). Bu, canlıda tam olarak
-	// gözlemlenen hataydı: sanalpanel.tr'de "tip":"letsencrypt" isteği ok:true
+	// gözlemlenen hataydı: sanalcp.tr'de "tip":"letsencrypt" isteği ok:true
 	// dönüyordu ama sertifika dosyası hiç değişmiyordu.
 	if src, srcKey, gercek := enIyiCertBul(alanAdi, 30); src != "" && gercek {
 		if cp, kp, e := certiPkiyeKur(alanAdi, src, srcKey); e == nil {
@@ -1182,7 +1182,7 @@ func copyFile(src, dst string, perm os.FileMode) bool {
 
 // HealSSLCertPathsOnStartup: SSL'li domain'lerin cert'i HOME'daysa (user_home_t → nginx
 // httpd_t okuyamaz, Enforcing'de "cannot load certificate ... Permission denied" → reload
-// fail → site down) /etc/pki/sanalpanel/<domain>/'ye TAŞIR: kopyala + restorecon (cert_t)
+// fail → site down) /etc/pki/sanalcp/<domain>/'ye TAŞIR: kopyala + restorecon (cert_t)
 // + DB cert_path/key_path repoint + vhost re-render + home artığını temizle. İdempotent
 // (cert zaten sistemdeyse WHERE ile hiç seçilmez). Init'ten her boot çağrılır → mevcut
 // bozuk kurulumlar update'te self-heal olur.
@@ -1265,7 +1265,7 @@ var ensureArchiveToolsOnce sync.Once
 // araçlarını sistemde GARANTİ EDER — panel açılışında, HealHomePerms + dosya yöneticisi RAR
 // extract onlara güvenmeden ÖNCE.
 //
-// 🔴 Neden gerekli (chicken-egg): `sanalpanel-update` önce KENDİNİ günceller; araç kuran
+// 🔴 Neden gerekli (chicken-egg): `sanalcp-update` önce KENDİNİ günceller; araç kuran
 // `dnf install acl bsdtar` adımı yalnız YENİ update-script'te vardır → İLK update'te çalışmaz.
 // Araçlar yoksa hardenHomePerms fail-safe grup=nginx modeline düşer (per-user ACL ancak 2.
 // update'te gelir) ve .rar açılamaz. Bu heal, araçları panelin kendi açılışında kurar → İLK
@@ -1311,7 +1311,7 @@ func aclVar() bool {
 // olduğunu işaretler. Recursive setfacl O(dosya) olduğu için her boot'ta değil yalnız ilk
 // dönüşümde çalışır (default-ACL sayesinde sonraki dosyalar OTOMATİK miras alır → tekrar gereksiz).
 // Silinirse bir sonraki panel restart'ında recursive dönüşüm yeniden koşar (elle yeniden tetik).
-const permsACLSentinel = "/var/lib/sanalpanel/.perms_acl_v1_done"
+const permsACLSentinel = "/var/lib/sanalcp/.perms_acl_v1_done"
 
 // hardenHomePerms: tenant ev dizini + public_html için PER-USER (Plesk benzeri) izolasyon
 // izinlerini uygular. Dosyalar sitenin KENDİ kullanıcısındadır (c_X:c_X — grup nginx DEĞİL);
@@ -1439,7 +1439,7 @@ func SuspendUserRuntime(sk string, suspend bool) {
 	if !strings.HasPrefix(sk, "c_") {
 		return // güvenlik: yalnız tenant user
 	}
-	const suspendStore = "/var/lib/sanalpanel/cron-suspended"
+	const suspendStore = "/var/lib/sanalcp/cron-suspended"
 	cronSpool := "/var/spool/cron/" + sk
 	stored := filepath.Join(suspendStore, sk)
 
@@ -1490,7 +1490,7 @@ func welcomeHTML(domain string) string {
   <h1>%s</h1>
   <p>Web sitesi başarıyla oluşturuldu.</p>
   <p>İçerik yüklemek için FTP veya dosya yöneticisini kullanın.</p>
-  <p class="muted">Web kökü: <code>public_html/</code> · PHP destekli · SanalPanel ile yönetiliyor</p>
+  <p class="muted">Web kökü: <code>public_html/</code> · PHP destekli · SanalCP ile yönetiliyor</p>
 </div>
 </body>
 </html>`, domain, domain)
@@ -1682,7 +1682,7 @@ func buildProtectedBlocks(db *sql.DB, domainID int64, socket string) string {
 // vhostHardenSentinel: retroaktif vhost/pool re-render'inin YALNIZ BIR KEZ
 // calismasini garanti eden isaret dosyasi. Silinirse bir sonraki panel restart'inda
 // re-render tekrar calisir (elle yeniden tetikleme).
-const vhostHardenSentinel = "/var/lib/sanalpanel/.vhost_hardening_v2_done"
+const vhostHardenSentinel = "/var/lib/sanalcp/.vhost_hardening_v2_done"
 
 // HealVhostsOnStartup: MEVCUT tum domainlerin php-fpm pool + nginx vhost'unu YENI
 // (sertlestirilmis) template ile bir kez yeniden render eder. Template degisikligi

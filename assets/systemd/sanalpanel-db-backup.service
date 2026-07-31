@@ -1,6 +1,0 @@
-[Unit]
-Description=SanalPanel panel DB yedegi
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/sanalpanel-db-backup

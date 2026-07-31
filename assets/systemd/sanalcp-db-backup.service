@@ -1,0 +1,6 @@
+[Unit]
+Description=SanalCP panel DB yedegi
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanalcp-db-backup

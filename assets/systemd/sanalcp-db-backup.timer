@@ -1,5 +1,5 @@
 [Unit]
-Description=SanalPanel gunluk DB yedegi
+Description=SanalCP gunluk DB yedegi
 
 [Timer]
 OnCalendar=*-*-* 03:30:00

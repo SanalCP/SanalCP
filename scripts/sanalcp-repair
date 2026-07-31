@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# sanalpanel-repair — dizin / sahiplik / izin / SELinux onarım aracı
+# sanalcp-repair — dizin / sahiplik / izin / SELinux onarım aracı
 # Idempotent + TAHRİBATSIZ: yalnızca chown/chmod/mkdir/restorecon/semanage yapar.
 # Asla silmez, fuser çağırmaz, çalışan servisi bozmaz. Tekrar tekrar güvenle çalışır.
 #
 # Kullanım:
-#   sanalpanel-repair [--dry-run] [--deep] [--only <bölümler>] [--quiet]
+#   sanalcp-repair [--dry-run] [--deep] [--only <bölümler>] [--quiet]
 #   bölümler (virgülle): phpmyadmin,domains,htpasswd,binary,clamav,frontend,signon,mail  (varsayılan: hepsi)
 #   --dry-run : değişiklikleri UYGULAMADAN neyin düzeltileceğini göster
 #   --deep    : domain ev dizinlerinde RECURSIVE sahiplik onarımı (yavaş, büyük siteler)
 #
-#   sanalpanel-repair restore [...]  → CORE DOSYA İÇERİK onarımı (0-byte frontend / bozuk
+#   sanalcp-repair restore [...]  → CORE DOSYA İÇERİK onarımı (0-byte frontend / bozuk
 #     binary / eksik ops-tool) canonical release'ten atomik+doğrulanmış geri yükleme. secret/veri
-#     KORUNUR. Ayrı sanalpanel-restore aracına devreder (arg'lar aynen iletilir).
+#     KORUNUR. Ayrı sanalcp-restore aracına devreder (arg'lar aynen iletilir).
 set -uo pipefail
 
 # 'restore' ALT-KOMUTU: içerik onarımını ayrı araca devret. GERİYE UYUMLU — mevcut çağrılar
@@ -19,10 +19,10 @@ set -uo pipefail
 # ilk argüman tam olarak 'restore' ise devreye girer (install.sh'ın --quiet çağrısı etkilenmez).
 if [ "${1:-}" = "restore" ]; then
   shift
-  command -v sanalpanel-restore >/dev/null 2>&1 && exec sanalpanel-restore "$@"
-  _rd="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/sanalpanel-restore"
+  command -v sanalcp-restore >/dev/null 2>&1 && exec sanalcp-restore "$@"
+  _rd="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/sanalcp-restore"
   [ -x "$_rd" ] && exec "$_rd" "$@"
-  echo "sanalpanel-restore bulunamadı (core içerik onarım aracı kurulu değil)" >&2; exit 127
+  echo "sanalcp-restore bulunamadı (core içerik onarım aracı kurulu değil)" >&2; exit 127
 fi
 
 DRY=0; DEEP=0; QUIET=0; ONLY="phpmyadmin,domains,htpasswd,binary,clamav,frontend,signon,mail"
@@ -141,7 +141,7 @@ sec_phpmyadmin() {
 sec_signon() {
   want signon || return 0
   head_ "pma-signon"
-  local S=/opt/sanalpanel/pma-signon
+  local S=/opt/sanalcp/pma-signon
   [ -d "$S" ] || { warn "$S yok"; return 0; }
   ensure_context "$S" httpd_sys_content_t -R
 }
@@ -149,7 +149,7 @@ sec_signon() {
 sec_frontend() {
   want frontend || return 0
   head_ "frontend-dist"
-  local F=/opt/sanalpanel/frontend-dist
+  local F=/opt/sanalcp/frontend-dist
   [ -d "$F" ] || { warn "$F yok"; return 0; }
   ensure_owner "$F" "root:root"
   ensure_context "$F" httpd_sys_content_t -R
@@ -158,7 +158,7 @@ sec_frontend() {
 sec_binary() {
   want binary || return 0
   head_ "sunucu binary"
-  local B=/opt/sanalpanel/bin/sanalpanel-server
+  local B=/opt/sanalcp/bin/sanalcp-server
   [ -f "$B" ] || { warn "$B yok"; return 0; }
   ensure_mode "$B" 755
   # systemd exec bağlamı (203/EXEC hatası buradan) — restorecon varsayılana döndürür
@@ -254,7 +254,7 @@ sec_mail() {
 }
 
 # ================= ÇALIŞTIR =================
-say "${c_b}SanalPanel Onarım${c_0}  ($([ $DRY -eq 1 ] && echo 'DRY-RUN — değişiklik yok' || echo 'canlı') | SELinux:$([ $SEL -eq 1 ] && echo on || echo off) | semanage:$([ $HAVE_SEMANAGE -eq 1 ] && echo var || echo yok))"
+say "${c_b}SanalCP Onarım${c_0}  ($([ $DRY -eq 1 ] && echo 'DRY-RUN — değişiklik yok' || echo 'canlı') | SELinux:$([ $SEL -eq 1 ] && echo on || echo off) | semanage:$([ $HAVE_SEMANAGE -eq 1 ] && echo var || echo yok))"
 sec_phpmyadmin
 sec_domains
 sec_htpasswd

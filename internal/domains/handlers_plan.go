@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kaynaklimit"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kaynaklimit"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )

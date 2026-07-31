@@ -13,15 +13,15 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // Reboot — POST /system/reboot: sunucuyu ~5sn sonra yeniden başlatır.
 func Reboot(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("systemd-run",
 		"--on-active=5",
-		"--unit=sanalpanel-reboot",
-		"--description=SanalPanel: sunucu yeniden başlatma",
+		"--unit=sanalcp-reboot",
+		"--description=SanalCP: sunucu yeniden başlatma",
 		"--", "systemctl", "reboot")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))

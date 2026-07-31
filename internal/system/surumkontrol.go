@@ -9,7 +9,7 @@ package system
 // 🔒 GİZLİLİK — bilerek verilmiş kararlar:
 //   - İstek DÜZ bir GET'tir: sorgu dizesi YOK, gövde YOK, özel başlık YOK.
 //     Domain adı, hostname, IP, müşteri verisi, lisans — HİÇBİRİ gönderilmez.
-//   - Kurulum kimliği ÜRETİLİR (/etc/sanalpanel/kurulum-kimlik) ama
+//   - Kurulum kimliği ÜRETİLİR (/etc/sanalcp/kurulum-kimlik) ama
 //     GÖNDERİLMEZ. Şu anki uç statik bir dosya; kimliği sayan kimse yok, dolayısıyla
 //     göndermek karşılıksız bir kimlik sızıntısı olurdu. Kimliği şimdiden üretiyoruz
 //     ki ileride sayım ucuna geçilirse kurulumların kararlı kimliği hazır olsun.
@@ -31,13 +31,13 @@ import (
 	"sync"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (
-	surumUCVarsayilan = "https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/surum.json"
-	surumKimlikYol    = "/etc/sanalpanel/kurulum-kimlik"
-	surumOnbellekYol  = "/opt/sanalpanel/surum-onbellek.json"
+	surumUCVarsayilan = "https://raw.githubusercontent.com/sanalcp/sanalcp/main/surum.json"
+	surumKimlikYol    = "/etc/sanalcp/kurulum-kimlik"
+	surumOnbellekYol  = "/opt/sanalcp/surum-onbellek.json"
 	surumPeriyot      = 24 * time.Hour
 	surumGovdeSiniri  = 64 << 10 // 64KB — manifest küçüktür; fazlası kötüye kullanım
 )
@@ -148,7 +148,7 @@ func surumGetir() {
 	}
 	// Sürüm bilgisi yalnız User-Agent'ta; sunucu tarafı yayın dağılımını
 	// görmek isterse buradan görür, ayrı bir tanımlayıcı taşımaz.
-	req.Header.Set("User-Agent", "SanalPanel/"+surumMevcutOku())
+	req.Header.Set("User-Agent", "SanalCP/"+surumMevcutOku())
 
 	resp, err := cli.Do(req)
 	if err != nil {

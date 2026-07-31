@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"sanalpanel/internal/auth"
+	"sanalcp/internal/auth"
 )
 
 // istekRol: verilen rolde admin-tipi (auth.Claims) token taşıyan istek üretir.

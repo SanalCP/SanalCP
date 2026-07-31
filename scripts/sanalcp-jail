@@ -1,10 +1,10 @@
 #!/bin/bash
-# sanalpanel-jail: per-user chroot jail (cPanel "jailed shell" benzeri).
+# sanalcp-jail: per-user chroot jail (cPanel "jailed shell" benzeri).
 # Paylaşılan şablon (hardlink -> disk paylaşımı) + gerçek home bind-mount.
 # FTP/nginx/php gerçek /home/<user>'ı kullanmaya devam eder — jail sadece SSH oturumunu sınırlar.
 set -o pipefail
 JAILROOT=/home/jails
-TEMPLATE=/opt/sanalpanel/jail-template
+TEMPLATE=/opt/sanalcp/jail-template
 
 BINS="/usr/bin/bash /usr/bin/ls /usr/bin/cat /usr/bin/cp /usr/bin/mv /usr/bin/rm \
 /usr/bin/mkdir /usr/bin/rmdir /usr/bin/pwd /usr/bin/chmod /usr/bin/touch /usr/bin/ln \
@@ -53,17 +53,17 @@ build_template() {
   echo "root:x:0:" > "$TEMPLATE/etc/group"
   echo "127.0.0.1 localhost" > "$TEMPLATE/etc/hosts"
   printf 'export PS1="[\\u@%s \\W]\\$ "\nexport PATH=/bin:/usr/bin\nexport TERM=${TERM:-xterm}\numask 022\n' "sanal-jail" > "$TEMPLATE/etc/profile"
-  # sanalpanel CLI dispatcher (CloudPanel clpctl esdegeri site-kullanicisi komutlari)
-  cat > "$TEMPLATE/usr/bin/sanalpanel" <<'CLIEOF'
+  # sanalcp CLI dispatcher (CloudPanel clpctl esdegeri site-kullanicisi komutlari)
+  cat > "$TEMPLATE/usr/bin/sanalcp" <<'CLIEOF'
 #!/bin/bash
-# sanalpanel: site kullanicisi icin kisa komutlar (CloudPanel clpctl esdegeri)
+# sanalcp: site kullanicisi icin kisa komutlar (CloudPanel clpctl esdegeri)
 set -euo pipefail
 
 CLI_API="http://127.0.0.1:8090"
-TOKEN_FILE="$HOME/.sanalpanel/token"
+TOKEN_FILE="$HOME/.sanalcp/token"
 
 usage() {
-  echo "kullanım: sanalpanel <komut> [--flag=değer ...]"
+  echo "kullanım: sanalcp <komut> [--flag=değer ...]"
   echo "komutlar: db:export db:import permissions:reset cache:purge"
   exit 1
 }
@@ -138,7 +138,7 @@ case "$cmd" in
   *) usage ;;
 esac
 CLIEOF
-  chmod 755 "$TEMPLATE/usr/bin/sanalpanel"
+  chmod 755 "$TEMPLATE/usr/bin/sanalcp"
 
   chown -R root:root "$TEMPLATE"
   echo "template OK: $TEMPLATE ($(du -sh "$TEMPLATE" 2>/dev/null | cut -f1))"

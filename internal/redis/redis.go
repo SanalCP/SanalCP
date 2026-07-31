@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -175,11 +175,11 @@ func wpCozdur(sk string) {
 }
 
 type durumResp struct {
-	Aktif     bool   `json:"aktif"`
-	Host      string `json:"host"`
-	Port      int    `json:"port"`
-	Kullanici string `json:"kullanici"`
-	Parola    string `json:"parola,omitempty"`
+	Aktif      bool   `json:"aktif"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Kullanici  string `json:"kullanici"`
+	Parola     string `json:"parola,omitempty"`
 	Prefix     string `json:"prefix"`
 	WPSnippet  string `json:"wp_snippet,omitempty"`
 	WPBaglandi int    `json:"wp_baglandi,omitempty"`
@@ -195,7 +195,7 @@ func (h *Handlers) domainSK(r *http.Request) (id int64, sk string, ok bool) {
 }
 
 func wpSnippet(sk, pass string) string {
-	return "// SanalPanel Redis object cache\n" +
+	return "// SanalCP Redis object cache\n" +
 		"define( 'WP_REDIS_HOST', '" + redisHost + "' );\n" +
 		"define( 'WP_REDIS_PORT', " + strconv.Itoa(redisPort) + " );\n" +
 		"define( 'WP_REDIS_PASSWORD', array( '" + sk + "', '" + pass + "' ) );\n" +

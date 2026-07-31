@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"sanalpanel/internal/dns"
+	"sanalcp/internal/dns"
 )
 
 // MailUygula: bir domain için maili etkinleştirir (idempotent) — mail_domains satırını

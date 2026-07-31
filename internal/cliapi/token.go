@@ -44,10 +44,10 @@ func hashToken(raw string) string {
 }
 
 // WriteTokenFile: ham token'i site kullanicisinin home dizinine yazar
-// (/home/<sk>/.sanalpanel/token, chmod 600, sahibi sk:sk) — jail bu home'u
+// (/home/<sk>/.sanalcp/token, chmod 600, sahibi sk:sk) — jail bu home'u
 // bind-mount ettigi icin kullanici jail icinden okuyabilir.
 func WriteTokenFile(sk, raw string, uid, gid int) error {
-	dir := "/home/" + sk + "/.sanalpanel"
+	dir := "/home/" + sk + "/.sanalcp"
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("dizin oluşturulamadı: %w", err)
 	}

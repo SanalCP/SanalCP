@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net/http"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // GET /domains/{id}/backup-schedule

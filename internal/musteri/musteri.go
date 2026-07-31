@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/httpx"
 )
 
 type Handlers struct {

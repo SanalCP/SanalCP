@@ -1,6 +1,7 @@
 package domains
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -8,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -106,7 +107,14 @@ func (h *Handlers) SSLIssue(w http.ResponseWriter, r *http.Request) {
 		bitis = time.Now().Add(90 * 24 * time.Hour)
 	}
 
-	if _, err := h.DB.ExecContext(r.Context(),
+	// Sertifika kurulumu (EnableLetsEncrypt/EnableSelfSigned) burada zaten
+	// TAMAMLANDI — sunucuda gerçekten kuruldu. İstemci bu noktaya kadar
+	// beklerken axios timeout'una (30s) takılıp bağlantıyı keserse r.Context()
+	// iptal edilir ve aşağıdaki UPDATE hiç yazılmaz; halbuki iş fiilen bitmiştir.
+	// Bu yüzden bu son DB yazımını istek bağlamından bağımsız tutuyoruz.
+	dbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := h.DB.ExecContext(dbCtx,
 		`UPDATE domains SET ssl_aktif=1, ssl_kaynak=?, cert_path=?, key_path=?, ssl_bitis=?
 		 WHERE id=?`, gercekTip, certYol, keyYol, bitis, id); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB güncelleme: "+err.Error())

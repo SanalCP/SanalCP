@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# sanalpanel-install — boş AlmaLinux 10 sunucuyu komple SanalPanel'e çevirir.
+# sanalcp-install — boş AlmaLinux 10 sunucuyu komple SanalCP'e çevirir.
 # Idempotent olacak şekilde tasarlandı (tekrar çalıştırılabilir). root ile çalıştır.
 #
-#   ./sanalpanel-install.sh [--admin-parola <p>] [--admin-eposta <e>]
+#   ./sanalcp-install.sh [--admin-parola <p>] [--admin-eposta <e>]
 #
 # assets/ dizini bu script'in yanında olmalı:
-#   sanalpanel-server  sanalpanel-seed-admin  frontend-dist.tar.gz
+#   sanalcp-server  sanalcp-seed-admin  frontend-dist.tar.gz
 #   migrations.tar.gz  nginx/*  php-fpm/*  phpmyadmin/*  systemd/*  ops/*  ssh/*
 set -uo pipefail
 
@@ -126,7 +126,7 @@ else ok "wp-cli (mevcut)"; fi
 step "4) MariaDB"
 systemctl enable --now mariadb >/dev/null 2>&1; sleep 2
 systemctl is-active --quiet mariadb || die "MariaDB başlamadı"
-# İdempotent re-run: /etc/sanalpanel/env zaten varsa mevcut sırları (DB parolası,
+# İdempotent re-run: /etc/sanalcp/env zaten varsa mevcut sırları (DB parolası,
 # JWT secret, redis admin parolası) KORU, yeniden üretme. Aksi halde her re-run
 # MariaDB'deki panel parolasını değiştirir ama HALİHAZIRDA ÇALIŞAN panel süreci
 # restart olmadan bunu öğrenemez (env dosyasını sadece açılışta okur) — mevcut DB
@@ -134,10 +134,10 @@ systemctl is-active --quiet mariadb || die "MariaDB başlamadı"
 # başarısız olur; bu da login dahil TÜM sorguları bozar (2FA kontrolü fail-closed
 # olduğundan hata "2FA durumu doğrulanamadı" gibi yanıltıcı görünür — gerçek sebep
 # parola uyuşmazlığıdır).
-if [ -s /etc/sanalpanel/env ]; then
-  DBPASS=$(sed -n 's/^PANEL_DB_DSN=panel:\([^@]*\)@.*/\1/p' /etc/sanalpanel/env)
-  JWT=$(sed -n 's/^PANEL_JWT_SECRET=//p' /etc/sanalpanel/env)
-  RADMIN=$(sed -n 's/^PANEL_REDIS_ADMIN_PASS=//p' /etc/sanalpanel/env)
+if [ -s /etc/sanalcp/env ]; then
+  DBPASS=$(sed -n 's/^PANEL_DB_DSN=panel:\([^@]*\)@.*/\1/p' /etc/sanalcp/env)
+  JWT=$(sed -n 's/^PANEL_JWT_SECRET=//p' /etc/sanalcp/env)
+  RADMIN=$(sed -n 's/^PANEL_REDIS_ADMIN_PASS=//p' /etc/sanalcp/env)
 fi
 [ -n "${DBPASS:-}" ] || DBPASS=$(openssl rand -hex 16)
 [ -n "${JWT:-}" ]    || JWT=$(openssl rand -hex 32)
@@ -153,10 +153,10 @@ ok "panel DB + kullanıcı (panel@127.0.0.1)"
 
 # ============ 5) DİZİNLER + ENV ============
 step "5) Dizinler + env"
-mkdir -p /opt/sanalpanel/bin /opt/sanalpanel/frontend-dist /opt/sanalpanel/src/migrations \
-         /opt/sanalpanel/src/mail-templates /opt/sanalpanel/src/scripts /opt/sanalpanel/pma-signon \
-         /etc/sanalpanel /etc/ssl/sanalpanel
-cat > /etc/sanalpanel/env <<ENV
+mkdir -p /opt/sanalcp/bin /opt/sanalcp/frontend-dist /opt/sanalcp/src/migrations \
+         /opt/sanalcp/src/mail-templates /opt/sanalcp/src/scripts /opt/sanalcp/pma-signon \
+         /etc/sanalcp /etc/ssl/sanalcp
+cat > /etc/sanalcp/env <<ENV
 PANEL_LISTEN=127.0.0.1:8080
 PANEL_ENV=production
 PANEL_DB_DSN=panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci
@@ -164,43 +164,43 @@ PANEL_JWT_SECRET=${JWT}
 PANEL_JWT_LIFETIME_SEC=43200
 PANEL_REDIS_ADMIN_PASS=${RADMIN}
 ENV
-chmod 600 /etc/sanalpanel/env
-ok "/etc/sanalpanel/env (JWT + DB DSN + Redis admin — mevcutsa korundu, yoksa üretildi)"
+chmod 600 /etc/sanalcp/env
+ok "/etc/sanalcp/env (JWT + DB DSN + Redis admin — mevcutsa korundu, yoksa üretildi)"
 
 # ============ 6) ARTIFACT DEPLOY ============
 step "6) Panel binary + frontend + migration"
-install -m 0755 "$A/sanalpanel-server" /opt/sanalpanel/bin/sanalpanel-server
-[ -f "$A/sanalpanel-seed-admin" ] && install -m 0755 "$A/sanalpanel-seed-admin" /opt/sanalpanel/bin/sanalpanel-seed-admin
-tar xzf "$A/frontend-dist.tar.gz" -C /opt/sanalpanel/frontend-dist && ok "frontend-dist"
-tar xzf "$A/migrations.tar.gz" -C /opt/sanalpanel/src/migrations && ok "migrations ($(ls /opt/sanalpanel/src/migrations/*.sql 2>/dev/null | wc -l) sql)"
-[ -d "$A/mail" ] && cp -r "$A/mail/"* /opt/sanalpanel/src/mail-templates/ && ok "mail config template'leri (postfix/dovecot/opendkim/roundcube)"
+install -m 0755 "$A/sanalcp-server" /opt/sanalcp/bin/sanalcp-server
+[ -f "$A/sanalcp-seed-admin" ] && install -m 0755 "$A/sanalcp-seed-admin" /opt/sanalcp/bin/sanalcp-seed-admin
+tar xzf "$A/frontend-dist.tar.gz" -C /opt/sanalcp/frontend-dist && ok "frontend-dist"
+tar xzf "$A/migrations.tar.gz" -C /opt/sanalcp/src/migrations && ok "migrations ($(ls /opt/sanalcp/src/migrations/*.sql 2>/dev/null | wc -l) sql)"
+[ -d "$A/mail" ] && cp -r "$A/mail/"* /opt/sanalcp/src/mail-templates/ && ok "mail config template'leri (postfix/dovecot/opendkim/roundcube)"
 [ -f "$A/php-fpm/roundcube.conf" ] && install -m 0644 "$A/php-fpm/roundcube.conf" /etc/php-fpm.d/roundcube.conf
 # ops tool + signon
 for t in "$A"/ops/*; do
   bn=$(basename "$t"); nm="${bn%.sh}"
   install -m 0755 "$t" "/usr/local/bin/$nm" 2>/dev/null
 done
-cp "$A/ops/"* /opt/sanalpanel/src/scripts/ 2>/dev/null
+cp "$A/ops/"* /opt/sanalcp/src/scripts/ 2>/dev/null
 ok "ops-tool'lar (/usr/local/bin: update, optimize, redis-setup, ftp-setup, backup-all, repair, jail, wp-redis)"
-# sshaccess.EnsureInfra bunu /opt/sanalpanel/src/scripts/50-sanal-jail.conf'tan okuyup
+# sshaccess.EnsureInfra bunu /opt/sanalcp/src/scripts/50-sanal-jail.conf'tan okuyup
 # /etc/ssh/sshd_config.d/'e uygular (panel açılışında, idempotent) — burada sadece kaynağı yerleştiriyoruz.
-[ -f "$A/ssh/50-sanal-jail.conf" ] && install -m 0644 "$A/ssh/50-sanal-jail.conf" /opt/sanalpanel/src/scripts/50-sanal-jail.conf \
-  && ok "SSH jail sshd_config şablonu (/opt/sanalpanel/src/scripts)"
+[ -f "$A/ssh/50-sanal-jail.conf" ] && install -m 0644 "$A/ssh/50-sanal-jail.conf" /opt/sanalcp/src/scripts/50-sanal-jail.conf \
+  && ok "SSH jail sshd_config şablonu (/opt/sanalcp/src/scripts)"
 
 # ============ 7) PANEL SSL (self-signed) ============
 step "7) Panel SSL (:8443 self-signed)"
-if [ ! -f /etc/ssl/sanalpanel/panel.crt ]; then
+if [ ! -f /etc/ssl/sanalcp/panel.crt ]; then
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-    -keyout /etc/ssl/sanalpanel/panel.key -out /etc/ssl/sanalpanel/panel.crt \
-    -subj "/CN=sanalpanel" >/dev/null 2>&1
+    -keyout /etc/ssl/sanalcp/panel.key -out /etc/ssl/sanalcp/panel.crt \
+    -subj "/CN=sanalcp" >/dev/null 2>&1
 fi
-chmod 600 /etc/ssl/sanalpanel/panel.key
+chmod 600 /etc/ssl/sanalcp/panel.key
 ok "panel.crt / panel.key"
 
 # ============ 8) NGINX ============
 step "8) nginx (panel vhost + phpMyAdmin + perf)"
 # http-seviyesi ayar (client_max_body_size 10240m) — idempotent.
-# NOT: server_names_hash_bucket_size EKLENMEZ — sanalpanel-optimize'ın 00-perf.conf'unda
+# NOT: server_names_hash_bucket_size EKLENMEZ — sanalcp-optimize'ın 00-perf.conf'unda
 # zaten var; burada da eklersek "duplicate directive" ile nginx -t patlar.
 grep -q "client_max_body_size 10240m" /etc/nginx/nginx.conf || \
   sed -i '/^http {/a\    client_max_body_size 10240m;' /etc/nginx/nginx.conf
@@ -218,7 +218,7 @@ if [ ! -f /opt/phpmyadmin/index.php ]; then
   if curl -fsSL -o "$TMP/pma.tar.gz" https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-all-languages.tar.gz \
      && tar xzf "$TMP/pma.tar.gz" -C /opt/phpmyadmin --strip-components=1; then
     ok "phpMyAdmin indirildi + açıldı"
-  else warn "phpMyAdmin indirilemedi (ağ?) — sonra elle: sanalpanel-repair"; fi
+  else warn "phpMyAdmin indirilemedi (ağ?) — sonra elle: sanalcp-repair"; fi
   rm -rf "$TMP"
 fi
 if [ -f "$A/phpmyadmin/config.inc.php" ]; then
@@ -238,13 +238,13 @@ FLUSH PRIVILEGES;
 SQL
   [ -f /opt/phpmyadmin/sql/create_tables.sql ] && mysql -u root phpmyadmin < /opt/phpmyadmin/sql/create_tables.sql 2>/dev/null
 fi
-[ -f "$A/phpmyadmin/pma-signon.php" ] && cp "$A/phpmyadmin/pma-signon.php" /opt/sanalpanel/pma-signon/ 2>/dev/null
+[ -f "$A/phpmyadmin/pma-signon.php" ] && cp "$A/phpmyadmin/pma-signon.php" /opt/sanalcp/pma-signon/ 2>/dev/null
 # pma internal-auth token (pma-signon.php + panel API aynı dosyayı okur → rastgele değer eşleşir).
 # Yoksa üret (root:apache 0640 → pma FPM pool [apache] okur, başkası okuyamaz). Var olana dokunma.
-if [ ! -s /etc/sanalpanel/pma-internal.token ]; then
-  openssl rand -hex 32 > /etc/sanalpanel/pma-internal.token
-  chown root:apache /etc/sanalpanel/pma-internal.token 2>/dev/null || true
-  chmod 640 /etc/sanalpanel/pma-internal.token
+if [ ! -s /etc/sanalcp/pma-internal.token ]; then
+  openssl rand -hex 32 > /etc/sanalcp/pma-internal.token
+  chown root:apache /etc/sanalcp/pma-internal.token 2>/dev/null || true
+  chmod 640 /etc/sanalcp/pma-internal.token
 fi
 cp "$A/php-fpm/phpmyadmin.conf" /etc/php-fpm.d/phpmyadmin.conf
 mkdir -p /var/lib/phpmyadmin/{tmp,sessions}
@@ -255,17 +255,17 @@ ok "phpMyAdmin pool + config + izinler"
 
 # ============ 10) systemd + servisler ============
 step "10) systemd + servisler"
-cp "$A/systemd/sanalpanel.service" /etc/systemd/system/sanalpanel.service
+cp "$A/systemd/sanalcp.service" /etc/systemd/system/sanalcp.service
 # panel DB'sinin günlük yedeği (03:30) — dosyayı kopyalamak YETMEZ, aşağıda enable --now
 # edilir; aksi halde timer hiç ateşlenmez ve kurulum sessizce YEDEKSİZ kalırdı.
-for u in sanalpanel-db-backup.service sanalpanel-db-backup.timer; do
+for u in sanalcp-db-backup.service sanalcp-db-backup.timer; do
   [ -f "$A/systemd/$u" ] && cp "$A/systemd/$u" "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
-if [ -f /etc/systemd/system/sanalpanel-db-backup.timer ]; then
-  systemctl enable --now sanalpanel-db-backup.timer >/dev/null 2>&1
-  systemctl is-active --quiet sanalpanel-db-backup.timer \
-    && ok "günlük panel DB yedeği ACTIVE (03:30 → /var/backups/sanalpanel/db, 14 gün)" \
+if [ -f /etc/systemd/system/sanalcp-db-backup.timer ]; then
+  systemctl enable --now sanalcp-db-backup.timer >/dev/null 2>&1
+  systemctl is-active --quiet sanalcp-db-backup.timer \
+    && ok "günlük panel DB yedeği ACTIVE (03:30 → /var/backups/sanalcp/db, 14 gün)" \
     || warn "DB yedek timer'ı başlatılamadı — günlük panel DB yedeği çalışmayabilir"
 fi
 systemctl enable --now php-fpm >/dev/null 2>&1
@@ -282,15 +282,15 @@ if [ -f "$NC" ]; then
   # açık-çözücü (open resolver / DNS amplification) olmasın — yalnızca yetkili DNS
   sed -i -E 's/recursion yes/recursion no/' "$NC"
   # panel zone include'u (WriteZone bunu doldurur) — idempotent
-  grep -q 'sanalpanel-zones.conf' "$NC" || \
-    echo 'include "/etc/named/sanalpanel-zones.conf";' >> "$NC"
+  grep -q 'sanalcp-zones.conf' "$NC" || \
+    echo 'include "/etc/named/sanalcp-zones.conf";' >> "$NC"
 fi
 # panel zone include dosyası (boş başlar; panel domain ekledikçe dolar)
 mkdir -p /etc/named
-[ -f /etc/named/sanalpanel-zones.conf ] || \
-  printf '// sanalpanel — otomatik üretildi\n' > /etc/named/sanalpanel-zones.conf
-chown root:named /etc/named/sanalpanel-zones.conf 2>/dev/null || true
-chmod 640 /etc/named/sanalpanel-zones.conf 2>/dev/null || true
+[ -f /etc/named/sanalcp-zones.conf ] || \
+  printf '// sanalcp — otomatik üretildi\n' > /etc/named/sanalcp-zones.conf
+chown root:named /etc/named/sanalcp-zones.conf 2>/dev/null || true
+chmod 640 /etc/named/sanalcp-zones.conf 2>/dev/null || true
 # zone dosyaları /var/named altında (SELinux named_zone_t context ŞART)
 restorecon -R /var/named /etc/named >/dev/null 2>&1 || true
 if named-checkconf >/dev/null 2>&1; then
@@ -371,12 +371,12 @@ if [ ! -x /usr/local/bin/composer ]; then
 fi
 [ -x /usr/local/bin/composer ] && ok "composer ($(/usr/local/bin/composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))" || warn "composer kurulamadı"
 
-# ---- günlük yedek cron (sanalpanel-backup-all 03:00 UTC) ----
-cat > /etc/cron.d/sanalpanel-backup <<'CRON'
-# sanalpanel — günlük planlı yedek 03:00 UTC
+# ---- günlük yedek cron (sanalcp-backup-all 03:00 UTC) ----
+cat > /etc/cron.d/sanalcp-backup <<'CRON'
+# sanalcp — günlük planlı yedek 03:00 UTC
 SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
-0 3 * * * root /usr/local/bin/sanalpanel-backup-all
+0 3 * * * root /usr/local/bin/sanalcp-backup-all
 CRON
 # crond'u ŞİMDİ başlat + enable et (AlmaLinux preset yalnız enable eder, reboot'a kadar
 # başlatmaz → yedek cron'u ilk reboot'a kadar çalışmazdı). enable --now idempotent.
@@ -389,7 +389,7 @@ setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 && ok "SELinux httpd_ca
 # KAPALI iken try_files dosyayı "yok" sanar → tüm siteler 404. (Panel açılışında
 # ensureHTTPDHomeBooleans ile de garanti edilir; bu satır ilk-boot için.)
 setsebool -P httpd_enable_homedirs=on httpd_read_user_content=on >/dev/null 2>&1 && ok "SELinux httpd home okuma (homedirs + user_content)"
-restorecon -R /opt/sanalpanel/bin /opt/sanalpanel/frontend-dist >/dev/null 2>&1
+restorecon -R /opt/sanalcp/bin /opt/sanalcp/frontend-dist >/dev/null 2>&1
 # Batch5A: per-tenant php-fpm socket dizinleri /run/php-fpm-<sk>/ için fcontext (httpd_var_run_t).
 # Mevcut /run/php-fpm(/.*)? kuralı tireli yolu kapsamaz → nginx→FPM 500. Idempotent.
 # (Panel açılışında da ensureFPMSELinuxFcontext ile garanti edilir; bu satır ilk boot öncesi içindir.)
@@ -401,33 +401,33 @@ fi
 
 # ============ 11) Valkey + optimize ============
 step "11) Valkey (Redis) + performans tuning"
-command -v sanalpanel-redis-setup >/dev/null 2>&1 && sanalpanel-redis-setup >/dev/null 2>&1 && ok "sanalpanel-redis-setup" || warn "redis-setup atlandı"
-command -v sanalpanel-optimize >/dev/null 2>&1 && sanalpanel-optimize >/dev/null 2>&1 && ok "sanalpanel-optimize" || warn "optimize atlandı"
+command -v sanalcp-redis-setup >/dev/null 2>&1 && sanalcp-redis-setup >/dev/null 2>&1 && ok "sanalcp-redis-setup" || warn "redis-setup atlandı"
+command -v sanalcp-optimize >/dev/null 2>&1 && sanalcp-optimize >/dev/null 2>&1 && ok "sanalcp-optimize" || warn "optimize atlandı"
 
 # ============ 12) Panel başlat (migration startup'ta koşar) ============
 step "12) Panel başlatılıyor"
-systemctl enable --now sanalpanel >/dev/null 2>&1; sleep 3
+systemctl enable --now sanalcp >/dev/null 2>&1; sleep 3
 systemctl enable --now nginx >/dev/null 2>&1; systemctl restart nginx >/dev/null 2>&1
-if systemctl is-active --quiet sanalpanel; then ok "sanalpanel ACTIVE"; else journalctl -u sanalpanel --no-pager -n 20; die "panel başlamadı"; fi
+if systemctl is-active --quiet sanalcp; then ok "sanalcp ACTIVE"; else journalctl -u sanalcp --no-pager -n 20; die "panel başlamadı"; fi
 
 # ---- FTP setup (Pure-FTPd) — ŞİMDİ çalışır: migration ftp_accounts tablosunu oluşturdu ----
 # (step 11'de değil çünkü GRANT SELECT ON panel.ftp_accounts tablo yokken patlıyordu)
 sleep 2
-command -v sanalpanel-ftp-setup >/dev/null 2>&1 && sanalpanel-ftp-setup >/dev/null 2>&1 && ok "sanalpanel-ftp-setup (Pure-FTPd, MySQL backend)" || warn "ftp-setup atlandı"
+command -v sanalcp-ftp-setup >/dev/null 2>&1 && sanalcp-ftp-setup >/dev/null 2>&1 && ok "sanalcp-ftp-setup (Pure-FTPd, MySQL backend)" || warn "ftp-setup atlandı"
 
 # ---- Posta sunucusu (Postfix/Dovecot/OpenDKIM) — AYNI SEBEPLE ftp-setup ile aynı yerde:
 # GRANT SELECT ON panel.mail_domains/mailboxes/mail_aliases, migration bu tabloları
 # oluşturana kadar (panel ilk açılışı) patlıyor.
-command -v sanalpanel-mail-setup >/dev/null 2>&1 && sanalpanel-mail-setup >/dev/null 2>&1 && ok "sanalpanel-mail-setup (Postfix/Dovecot/OpenDKIM)" || warn "mail-setup atlandı"
+command -v sanalcp-mail-setup >/dev/null 2>&1 && sanalcp-mail-setup >/dev/null 2>&1 && ok "sanalcp-mail-setup (Postfix/Dovecot/OpenDKIM)" || warn "mail-setup atlandı"
 
 # ============ 13) Yönetici erişimi ============
 # 🔴 Panel admin girişi = sunucunun ROOT kullanıcısı (PAM/shadow doğrulaması).
 # Ayrı panel parolası YOKTUR. Giriş: kullanıcı 'root' + bu sunucunun root parolası.
 step "13) Yönetici erişimi (root + PAM)"
 DSN="panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true"
-if [ -x /opt/sanalpanel/bin/sanalpanel-seed-admin ]; then
+if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
   # yardımcı users kaydı (ownership/audit); giriş yine root+PAM ile doğrulanır
-  /opt/sanalpanel/bin/sanalpanel-seed-admin -dsn "$DSN" -kullanici root \
+  /opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici root \
     -parola "$(openssl rand -hex 16)" -eposta "$ADMIN_EPOSTA" >/dev/null 2>&1 \
     && ok "yönetici kaydı hazır" || warn "seed atlandı (kritik değil)"
 fi
@@ -438,20 +438,20 @@ ok "Giriş: kullanıcı 'root' + bu sunucunun root parolası"
 
 # ============ 14) İzin onarımı ============
 step "14) İzin/SELinux onarımı"
-command -v sanalpanel-repair >/dev/null 2>&1 && sanalpanel-repair --quiet >/dev/null 2>&1 && ok "sanalpanel-repair" || warn "repair atlandı"
+command -v sanalcp-repair >/dev/null 2>&1 && sanalcp-repair --quiet >/dev/null 2>&1 && ok "sanalcp-repair" || warn "repair atlandı"
 
 # ============ 15) DOĞRULAMA ============
 step "15) Doğrulama"
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 CODE=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ 2>/dev/null)
 API=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/api/v1/domains 2>/dev/null)
-echo -e "  servisler: $(systemctl is-active mariadb nginx valkey php-fpm named pure-ftpd sanalpanel crond | tr '\n' ' ')"
+echo -e "  servisler: $(systemctl is-active mariadb nginx valkey php-fpm named pure-ftpd sanalcp crond | tr '\n' ' ')"
 echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active named)   ·   FTP :21 → $(systemctl is-active pure-ftpd)"
 echo -e "  araçlar: SSL/acme.sh $([ -x /root/.acme.sh/acme.sh ] && echo ✓ || echo ✗)   ·   firewall/nft $(command -v nft >/dev/null && echo ✓ || echo ✗)   ·   unzip/zip $(command -v unzip >/dev/null && command -v zip >/dev/null && echo ✓ || echo ✗)   ·   composer $(command -v composer >/dev/null && echo ✓ || echo ✗)   ·   apache/httpd $(systemctl is-active httpd)"
 echo -e "  izolasyon: plan-driven kaynak limitleri (cgroup slice) + per-tenant PHP-FPM (CageFS eşdeğeri) HAZIR   ·   bubblewrap $(command -v bwrap >/dev/null && echo ✓ || echo ✗)"
 echo
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"
-echo -e "${c_g} ✓ SanalPanel kurulumu tamamlandı${c_0}"
+echo -e "${c_g} ✓ SanalCP kurulumu tamamlandı${c_0}"
 echo -e "   Panel:  ${c_b}https://${IP:-SUNUCU_IP}:8443${c_0}"
 echo -e "   Kullanıcı: ${c_b}root${c_0}   Parola: ${c_b}bu sunucunun root parolası${c_0}"
 echo -e "   (panel admin girişi sunucu root'unu PAM ile doğrular)"

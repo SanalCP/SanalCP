@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sanalpanel-redis-setup — per-tenant izole Redis (Valkey) altyapısını kurar.
+# sanalcp-redis-setup — per-tenant izole Redis (Valkey) altyapısını kurar.
 # Idempotent. Kurulumda çalıştırılır; panelin "Redis Cache aç" özelliği bunu gerektirir.
 set -uo pipefail
 log(){ printf '  %s\n' "$*"; }
@@ -13,7 +13,7 @@ dnf install -y valkey php-pecl-redis6 $PHP_REDIS_PKGS >/tmp/redis-setup.log 2>&1
   && log "valkey + php-redis kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
 
 echo "════ Admin parolası + ACL dosyası ════"
-ENV=/etc/sanalpanel/env
+ENV=/etc/sanalcp/env
 ADMIN=$(grep -oP '^PANEL_REDIS_ADMIN_PASS=\K.*' "$ENV" 2>/dev/null)
 if [ -z "$ADMIN" ]; then
   ADMIN=$(openssl rand -hex 24)
@@ -30,10 +30,10 @@ chown valkey:valkey "$ACLF" 2>/dev/null; chmod 640 "$ACLF"
 
 echo "════ valkey.conf cache tuning ════"
 CONF=/etc/valkey/valkey.conf
-if ! grep -q 'sanalpanel-cache' "$CONF"; then
+if ! grep -q 'sanalcp-cache' "$CONF"; then
 cat >> "$CONF" <<VK
 
-# ===== sanalpanel-cache =====
+# ===== sanalcp-cache =====
 maxmemory 256mb
 maxmemory-policy allkeys-lru
 save ""

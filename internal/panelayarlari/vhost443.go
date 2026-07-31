@@ -26,7 +26,7 @@ import (
 
 const panelDomainVhostYol = "/etc/nginx/conf.d/_panel_domain.conf"
 
-const panelDomainVhostSablon = `# SanalPanel — özel panel alan adı (internal/panelayarlari tarafından yazılır/silinir,
+const panelDomainVhostSablon = `# SanalCP — özel panel alan adı (internal/panelayarlari tarafından yazılır/silinir,
 # Kaydet/Kaldır işlemleri üzerine yazar — elle düzenlemeyin).
 server {
     listen 80;

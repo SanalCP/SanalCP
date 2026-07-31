@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )

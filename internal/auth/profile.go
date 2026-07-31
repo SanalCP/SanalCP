@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // claims: RequireAuth middleware zaten doğruladı; header'dan tekrar parse ederek
@@ -138,7 +138,7 @@ func (h *Handlers) TwoFASetup(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "secret üretilemedi")
 		return
 	}
-	uri := TOTPURI(secret, "root", "SanalPanel")
+	uri := TOTPURI(secret, "root", "SanalCP")
 	resp := map[string]any{
 		"secret":      secret,
 		"otpauth":     uri, // geriye dönük uyum (elle giriş fallback)

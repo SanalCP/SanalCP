@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // Servis yönetimi: Genel Ayarlar'dan izin verilen servisleri restart/reload etme.

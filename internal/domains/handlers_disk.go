@@ -1,14 +1,14 @@
 package domains
 
 import (
-	"errors"
 	"database/sql"
+	"errors"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )

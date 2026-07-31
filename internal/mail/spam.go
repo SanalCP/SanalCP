@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const rspamdSettingsPath = "/etc/rspamd/local.d/settings.conf"
@@ -146,7 +146,7 @@ func ApplyRspamdSettings(db *sql.DB) error {
 	}
 	defer rows.Close()
 	var out bytes.Buffer
-	out.WriteString("# SanalPanel tarafından üretilir; panelden değiştirin.\n")
+	out.WriteString("# SanalCP tarafından üretilir; panelden değiştirin.\n")
 	for rows.Next() {
 		var id int64
 		var domain string

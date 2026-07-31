@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // eklenti/tema slug'ları: arg-injection'ı önlemek için katı doğrulama (başında '-' olamaz).

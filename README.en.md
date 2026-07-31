@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://github.com/sanalpanel/sanalpanel"><b>🌐 GitHub</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/sanalcp/sanalcp"><b>🌐 GitHub</b></a> &nbsp;·&nbsp;
   <a href="README.md">Türkçe</a> &nbsp;·&nbsp;
   <a href="README.en.md">English</a>
 </p>
 
-# SanalPanel
+# SanalCP
 
 Turns a blank **AlmaLinux 10** server into a complete hosting control panel with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + phpMyAdmin + firewall, all installed and configured automatically.
 
@@ -13,7 +13,7 @@ Turns a blank **AlmaLinux 10** server into a complete hosting control panel with
 On a clean AlmaLinux 10 server (min. 2 GB RAM), as **root**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
 ```
 
 Installation takes ~5-10 minutes (package downloads). When it finishes, the panel URL and login credentials are printed to the screen.
@@ -34,7 +34,7 @@ Installation takes ~5-10 minutes (package downloads). When it finishes, the pane
 | **Cache** | Valkey (Redis) — per-tenant isolated object cache (auto-connects to WordPress) |
 | **Email** | Postfix + Dovecot + OpenDKIM — SMTP AUTH (587), IMAP, automatic DKIM/SPF/DMARC; webmail (Roundcube, `/webmail/`) |
 | **Security** | nftables firewall, SELinux-compatible, ClamAV |
-| **Performance** | Automatic MariaDB + nginx + OPcache tuning (`sanalpanel-optimize`) |
+| **Performance** | Automatic MariaDB + nginx + OPcache tuning (`sanalcp-optimize`) |
 
 ## Panel features
 
@@ -81,12 +81,12 @@ The panel's standard settings (security headers, caching, the "extra directives"
 Installation places these tools in `/usr/local/bin`:
 
 ```bash
-sanalpanel-update        # safely update the panel from GitHub (see below)
-sanalpanel-optimize      # re-tune MariaDB/nginx/PHP for the server's resources
-sanalpanel-redis-setup   # install/repair the Valkey (Redis) infrastructure
-sanalpanel-wp-redis <sk> # connect/disconnect Redis cache for a domain's WordPress
-sanalpanel-repair        # permission / SELinux / ownership repair (idempotent)
-sanalpanel-db-backup     # take a compressed dump of the panel DB (see below)
+sanalcp-update        # safely update the panel from GitHub (see below)
+sanalcp-optimize      # re-tune MariaDB/nginx/PHP for the server's resources
+sanalcp-redis-setup   # install/repair the Valkey (Redis) infrastructure
+sanalcp-wp-redis <sk> # connect/disconnect Redis cache for a domain's WordPress
+sanalcp-repair        # permission / SELinux / ownership repair (idempotent)
+sanalcp-db-backup     # take a compressed dump of the panel DB (see below)
 ```
 
 ## Backups
@@ -97,67 +97,67 @@ A **daily automatic backup** is included from install — you don't need to set 
 
 | | |
 |---|---|
-| **When** | Every day at **03:30** (`sanalpanel-db-backup.timer`, ±5 min random jitter) |
-| **Where** | `/var/backups/sanalpanel/db/panel-<DATE>.sql.gz` (directory `0700`, dump `0600`) |
+| **When** | Every day at **03:30** (`sanalcp-db-backup.timer`, ±5 min random jitter) |
+| **Where** | `/var/backups/sanalcp/db/panel-<DATE>.sql.gz` (directory `0700`, dump `0600`) |
 | **Retention** | **14 days** — older backups are removed automatically |
 | **Scope** | the `panel` schema + routines/triggers/events (`mysqldump --single-transaction` → lock-free consistent snapshot) |
 
 To take a manual backup (prints the path of the resulting file):
 
 ```bash
-sanalpanel-db-backup
-# /var/backups/sanalpanel/db/panel-2026-07-17-143052.sql.gz
+sanalcp-db-backup
+# /var/backups/sanalcp/db/panel-2026-07-17-143052.sql.gz
 ```
 
 To check the timer's status / see when it next runs:
 
 ```bash
-systemctl list-timers sanalpanel-db-backup.timer
-systemctl status sanalpanel-db-backup.timer
-journalctl -u sanalpanel-db-backup -n 20    # log of recent backups
+systemctl list-timers sanalcp-db-backup.timer
+systemctl status sanalcp-db-backup.timer
+journalctl -u sanalcp-db-backup -n 20    # log of recent backups
 ```
 
 To restore a backup:
 
 ```bash
-systemctl stop sanalpanel
-zcat /var/backups/sanalpanel/db/panel-2026-07-17-143052.sql.gz | mysql
-systemctl start sanalpanel
+systemctl stop sanalcp
+zcat /var/backups/sanalcp/db/panel-2026-07-17-143052.sql.gz | mysql
+systemctl start sanalcp
 ```
 
 > Backups are **fail-closed**: if gzip integrity can't be verified, or the file is suspiciously small, the dump does **not** get named `panel-*.sql.gz` — a half-written dump never looks like a valid backup.
 
 ### Automatic pre-update backup
 
-`sanalpanel-update` takes a full dump of the panel DB **before applying migrations**. If the dump fails, **the update never starts** (a migration without a backup is refused). See the "Update" section below for details.
+`sanalcp-update` takes a full dump of the panel DB **before applying migrations**. If the dump fails, **the update never starts** (a migration without a backup is refused). See the "Update" section below for details.
 
 ### Customer sites
 
-Customer sites + databases are backed up by a separate process: `sanalpanel-backup-all` (cron, daily at 03:00 UTC, `/var/backups/sanalpanel/<system_user>/`, 14-day retention). The panel DB backup never touches these directories.
+Customer sites + databases are backed up by a separate process: `sanalcp-backup-all` (cron, daily at 03:00 UTC, `/var/backups/sanalcp/<system_user>/`, 14-day retention). The panel DB backup never touches these directories.
 
 ## Update (SSH / CLI)
 
 On an installed panel, over SSH as root, a single command:
 
 ```bash
-sanalpanel-update            # pull the latest release from GitHub → swap binary+frontend+migrations → restart
-sanalpanel-update --dry-run  # show what it would do first (no changes)
-sanalpanel-update --force    # re-apply even if the binary is unchanged
-sanalpanel-update --branch X # use a different branch
+sanalcp-update            # pull the latest release from GitHub → swap binary+frontend+migrations → restart
+sanalcp-update --dry-run  # show what it would do first (no changes)
+sanalcp-update --force    # re-apply even if the binary is unchanged
+sanalcp-update --branch X # use a different branch
 ```
 
-- **Safe and data-preserving:** `/etc/sanalpanel/env` (JWT/DB/Redis secrets), the MariaDB `panel` database, and `/home/c_*` customer sites are **never deleted**. Unlike `install.sh`, it does not generate new secrets.
+- **Safe and data-preserving:** `/etc/sanalcp/env` (JWT/DB/Redis secrets), the MariaDB `panel` database, and `/home/c_*` customer sites are **never deleted**. Unlike `install.sh`, it does not generate new secrets.
 - New migrations are applied **automatically and idempotently** when the service restarts.
 - If the binary hasn't changed (SHA matches), nothing happens.
-- **A full dump of the panel DB is taken before migrations run** → `/var/backups/sanalpanel/db/`.
+- **A full dump of the panel DB is taken before migrations run** → `/var/backups/sanalcp/db/`.
 - **Fail-closed:** if the dump fails, the update **never starts** — the binary, frontend, and migrations are left untouched. A migration without a backup is never accepted.
 - If the new version doesn't start up healthy, it **automatically rolls back to the previous binary _and_ the pre-update DB** (no write loss, since the panel is already stopped at that point).
 
-> Deploying your own fork: build from source (`GOAMD64=v1 go build` + `npm run build`), update `assets/sanalpanel-server` + `assets/frontend-dist.tar.gz`, push to your repo — `sanalpanel-update` on your servers will pull the new release. **Always build the binary with `GOAMD64=v1`** (see the warning under "Backend (Go)" below) — otherwise the panel won't start on older customer-server CPUs.
+> Deploying your own fork: build from source (`GOAMD64=v1 go build` + `npm run build`), update `assets/sanalcp-server` + `assets/frontend-dist.tar.gz`, push to your repo — `sanalcp-update` on your servers will pull the new release. **Always build the binary with `GOAMD64=v1`** (see the warning under "Backend (Go)" below) — otherwise the panel won't start on older customer-server CPUs.
 
 ## Notes
 
-- Installation is **not idempotent** — every run generates new secrets (JWT/DB password). Use `sanalpanel-repair` / `sanalpanel-optimize` instead of re-running it.
+- Installation is **not idempotent** — every run generates new secrets (JWT/DB password). Use `sanalcp-repair` / `sanalcp-optimize` instead of re-running it.
 - The panel is served over HTTP/2 + self-signed SSL on :8443; a real domain with Let's Encrypt can be added through the panel itself.
 
 ---
@@ -174,17 +174,17 @@ This project is **fully open source** (MIT). Instead of installing the prebuilt 
 
 ### Backend (Go)
 
-> ⚠️ **The release binary must be built with `GOAMD64=v1`.** AlmaLinux 10 (go1.26+) defaults to producing `GOAMD64=v3`; a binary built with v3 will simply **not run** on older/common customer CPUs that lack v3 microarchitecture support (AVX2 etc.), failing with `"This program can only be run on AMD64 processors with v3 microarchitecture support"`. `assets/sanalpanel-server` must always be built with `GOAMD64=v1`
+> ⚠️ **The release binary must be built with `GOAMD64=v1`.** AlmaLinux 10 (go1.26+) defaults to producing `GOAMD64=v3`; a binary built with v3 will simply **not run** on older/common customer CPUs that lack v3 microarchitecture support (AVX2 etc.), failing with `"This program can only be run on AMD64 processors with v3 microarchitecture support"`. `assets/sanalcp-server` must always be built with `GOAMD64=v1`
 > (use `scripts/build-assets.sh` for convenience — it already pins this).
 
 ```bash
 # build a single static binary (GOAMD64=v1 is REQUIRED for old-CPU compatibility)
-CGO_ENABLED=0 GOAMD64=v1 go build -o sanalpanel-server ./cmd/server
+CGO_ENABLED=0 GOAMD64=v1 go build -o sanalcp-server ./cmd/server
 
 # run it (with environment variables)
 PANEL_JWT_SECRET="$(openssl rand -hex 32)" \
 PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
-./sanalpanel-server
+./sanalcp-server
 ```
 
 The backend API lives under `/api/v1`; health check at `/healthz`. Admin login is authenticated against the OS root account via PAM in production; in development you can seed a separate admin with `scripts/seed_admin.go`:
@@ -218,7 +218,7 @@ frontend/src/     React UI (pages/, components/, lib/)
 migrations/       SQL schema migrations (applied on startup)
 scripts/          Ops helper scripts (optimize, repair, redis-setup, seed_admin, ...)
 assets/           Prebuilt release artifacts used by the installer
-install.sh        One-line bootstrap (downloads the repo → runs sanalpanel-install.sh)
+install.sh        One-line bootstrap (downloads the repo → runs sanalcp-install.sh)
 ```
 
 > The prebuilt binary and `frontend-dist.tar.gz` under `assets/` exist so the `curl | bash` install works without building from source. When you publish your own changes, update these from the `go build` / `npm run build` output above.
@@ -233,28 +233,28 @@ install.sh        One-line bootstrap (downloads the repo → runs sanalpanel-ins
 To update the panel to the latest release, on the server:
 
 ```bash
-sanalpanel-update              # install the latest release
-sanalpanel-update --dry-run    # only show what it would do
-sanalpanel-update --force      # re-apply even if it's the same version
+sanalcp-update              # install the latest release
+sanalcp-update --dry-run    # only show what it would do
+sanalcp-update --force      # re-apply even if it's the same version
 ```
 
 You can also update from inside the panel: **Tools & Settings → Panel Update → "Check for and install updates"**.
 
-The update **preserves** (never touches): `/etc/sanalpanel/env` (JWT/DB/Redis secrets), the MariaDB `panel` database + all customer data, and `/home/c_*` sites.
+The update **preserves** (never touches): `/etc/sanalcp/env` (JWT/DB/Redis secrets), the MariaDB `panel` database + all customer data, and `/home/c_*` sites.
 
-Before applying migrations, the update takes a full dump of the panel DB into `/var/backups/sanalpanel/db/`. If the dump fails, the update **never starts** (a migration without a backup is refused). If the new version doesn't come up healthy, it automatically **rolls back to the previous binary + the pre-update DB**.
+Before applying migrations, the update takes a full dump of the panel DB into `/var/backups/sanalcp/db/`. If the dump fails, the update **never starts** (a migration without a backup is refused). If the new version doesn't come up healthy, it automatically **rolls back to the previous binary + the pre-update DB**.
 
-### If you get "sanalpanel-update: command not found"
+### If you get "sanalcp-update: command not found"
 
 If you installed your panel before the update tool was added to the distribution, the command won't exist on your server yet. Since the only way to get the tool is the tool itself, this is a one-time chicken-and-egg problem — fix it with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/assets/ops/sanalpanel-update \
-  -o /usr/local/bin/sanalpanel-update && chmod +x /usr/local/bin/sanalpanel-update
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/assets/ops/sanalcp-update \
+  -o /usr/local/bin/sanalcp-update && chmod +x /usr/local/bin/sanalcp-update
 
-sanalpanel-update
+sanalcp-update
 ```
 
-You only need to do this **once**: every time `sanalpanel-update` runs, it reinstalls all the tools under `assets/ops/` into `/usr/local/bin`, keeping itself up to date too. After this, you can also use the **Panel Update** button inside the panel.
+You only need to do this **once**: every time `sanalcp-update` runs, it reinstalls all the tools under `assets/ops/` into `/usr/local/bin`, keeping itself up to date too. After this, you can also use the **Panel Update** button inside the panel.
 
 > The in-panel update button **downloads the tool automatically** if it's missing — so clicking it is enough on its own; the command above is only for cases where you can't reach the panel at all.

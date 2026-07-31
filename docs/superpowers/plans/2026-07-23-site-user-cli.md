@@ -4,7 +4,7 @@
 
 **Goal:** Jail'li site kullanıcılarının CloudPanel'in `clpctl` site-user komutlarına eşdeğer 4 kısa komutu (`db:export`, `db:import`, `permissions:reset`, `cache:purge`) kendi SSH oturumlarından çalıştırabilmesi.
 
-**Architecture:** `permissions:reset` jail içinde doğrudan `chmod`/`find` ile çalışır (root gerekmez). Diğer 3 komut, jail'e eklenecek bir bash dispatcher script (`sanalpanel`) üzerinden, panel sunucusunun **sadece 127.0.0.1'de dinleyen ayrı bir HTTP listener'ına** (`/api/cli/*`), domain başına üretilen bir bearer token ile istek atar. Sunucu tarafı: `mysqldump`/`mysql` (db:export/import, mevcut `db_accounts` ile sahiplik doğrulaması), Redis ACL-scoped key silme + nginx fastcgi cache-version sayacını artırıp vhost'u yeniden render/reload etme (cache:purge).
+**Architecture:** `permissions:reset` jail içinde doğrudan `chmod`/`find` ile çalışır (root gerekmez). Diğer 3 komut, jail'e eklenecek bir bash dispatcher script (`sanalcp`) üzerinden, panel sunucusunun **sadece 127.0.0.1'de dinleyen ayrı bir HTTP listener'ına** (`/api/cli/*`), domain başına üretilen bir bearer token ile istek atar. Sunucu tarafı: `mysqldump`/`mysql` (db:export/import, mevcut `db_accounts` ile sahiplik doğrulaması), Redis ACL-scoped key silme + nginx fastcgi cache-version sayacını artırıp vhost'u yeniden render/reload etme (cache:purge).
 
 **Tech Stack:** Go (chi router, `database/sql`, `os/exec`), bash (jail dispatcher script), MariaDB migration, mevcut `internal/provisioner` nginx vhost render altyapısı.
 
@@ -15,7 +15,7 @@
 - Ham CLI token hiçbir zaman DB'ye yazılmaz, sadece SHA-256 hash'i saklanır.
 - `databaseName` girdisi her zaman mevcut `hesaplar.GecerliDBKimlik` ile doğrulanır ve `db_accounts` tablosundan domain sahipliği kontrol edilir.
 - Migration dosyaları `IF NOT EXISTS` / idempotent olmalı (mevcut `migrations/` deseni).
-- Jail template'e yapılan değişiklikler **hem** `scripts/sanalpanel-jail` **hem** `assets/ops/sanalpanel-jail` dosyasına aynı şekilde uygulanmalı (ikisi de aynı içerikte tutulan, elle senkronize edilen kopyalar — bkz. Task 10).
+- Jail template'e yapılan değişiklikler **hem** `scripts/sanalcp-jail` **hem** `assets/ops/sanalcp-jail` dosyasına aynı şekilde uygulanmalı (ikisi de aynı içerikte tutulan, elle senkronize edilen kopyalar — bkz. Task 10).
 
 ---
 
@@ -34,7 +34,7 @@
 -- 0045 - Site kullanicisi CLI komutlari: token tablosu + fastcgi cache-version sayaci
 --
 -- cli_tokens: her domain icin tek bir CLI bearer token'inin SHA-256 hash'ini tutar.
--- Ham token asla DB'ye yazilmaz — sadece /home/<sk>/.sanalpanel/token dosyasinda bulunur
+-- Ham token asla DB'ye yazilmaz — sadece /home/<sk>/.sanalcp/token dosyasinda bulunur
 -- (bkz. internal/cliapi paketi). domain_id PRIMARY KEY: domain basina tek token,
 -- ON DUPLICATE KEY UPDATE ile rotasyon (cp_domain_redis ile ayni desen).
 CREATE TABLE IF NOT EXISTS cli_tokens (
@@ -152,10 +152,10 @@ func hashToken(raw string) string {
 }
 
 // WriteTokenFile: ham token'i site kullanicisinin home dizinine yazar
-// (/home/<sk>/.sanalpanel/token, chmod 600, sahibi sk:sk) — jail bu home'u
+// (/home/<sk>/.sanalcp/token, chmod 600, sahibi sk:sk) — jail bu home'u
 // bind-mount ettigi icin kullanici jail icinden okuyabilir.
 func WriteTokenFile(sk, raw string, uid, gid int) error {
-	dir := "/home/" + sk + "/.sanalpanel"
+	dir := "/home/" + sk + "/.sanalcp"
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("dizin oluşturulamadı: %w", err)
 	}
@@ -194,13 +194,13 @@ git commit -m "feat(cliapi): CLI token üretim/hash/lookup + home dizinine yazma
 
 **Interfaces:**
 - Consumes: `cliapi.GenerateToken`, `cliapi.WriteTokenFile` (Task 2), mevcut `uidGidOf(pr.SistemKullanici)` (aynı fonksiyonda FTP adımı için zaten hesaplanıyor).
-- Produces: Her yeni domain oluşturulduğunda `/home/<sk>/.sanalpanel/token` dosyası + `cli_tokens` satırı.
+- Produces: Her yeni domain oluşturulduğunda `/home/<sk>/.sanalcp/token` dosyası + `cli_tokens` satırı.
 
 - [ ] **Step 1: Import ekle**
 
-`internal/domains/handlers.go` dosyasının import bloğuna ekle (mevcut `"sanalpanel/internal/hesaplar"` satırının yanına, alfabetik sırayla):
+`internal/domains/handlers.go` dosyasının import bloğuna ekle (mevcut `"sanalcp/internal/hesaplar"` satırının yanına, alfabetik sırayla):
 ```go
-	"sanalpanel/internal/cliapi"
+	"sanalcp/internal/cliapi"
 ```
 
 - [ ] **Step 2: Provisioning adımını ekle**
@@ -274,7 +274,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -439,7 +439,7 @@ import (
 	"net/http"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 type ctxKey int
@@ -551,8 +551,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -699,9 +699,9 @@ import (
 	"net/http"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
-	"sanalpanel/internal/redis"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
+	"sanalcp/internal/redis"
 )
 
 // POST /cache/purge  (form body: purge=all|fastcgi|redis, varsayılan "all")
@@ -855,9 +855,9 @@ ve mevcut:
 
 - [ ] **Step 3: `cmd/server/main.go` — import ekle**
 
-Mevcut import bloğuna (`"sanalpanel/internal/backups"` satırının yanına, alfabetik sırayla) ekle:
+Mevcut import bloğuna (`"sanalcp/internal/backups"` satırının yanına, alfabetik sırayla) ekle:
 ```go
-	"sanalpanel/internal/cliapi"
+	"sanalcp/internal/cliapi"
 ```
 
 - [ ] **Step 4: İkinci HTTP server'ı başlat**
@@ -890,7 +890,7 @@ hemen altına (mevcut `monitor.StartYukSampler(...)` satırından ÖNCE) ekle:
 Mevcut kod:
 ```go
 	go func() {
-		log.Printf("sanalpanel %s — %s üzerinde dinleniyor (env=%s)", version, cfg.ListenAddr, cfg.Env)
+		log.Printf("sanalcp %s — %s üzerinde dinleniyor (env=%s)", version, cfg.ListenAddr, cfg.Env)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}
@@ -899,7 +899,7 @@ Mevcut kod:
 hemen altına ekle:
 ```go
 	go func() {
-		log.Printf("sanalpanel CLI API — %s üzerinde dinleniyor (loopback-only)", cfg.CLIListenAddr)
+		log.Printf("sanalcp CLI API — %s üzerinde dinleniyor (loopback-only)", cfg.CLIListenAddr)
 		if err := cliSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("cli listen: %v", err)
 		}
@@ -960,33 +960,33 @@ git commit -m "feat(cliapi): /api/cli/* için 127.0.0.1-only ikinci HTTP listene
 ### Task 10: CLI dispatcher script + jail template'e ekleme
 
 **Files:**
-- Modify: `scripts/sanalpanel-jail`
-- Modify: `assets/ops/sanalpanel-jail` (aynı değişiklik — bu ikisi elle senkronize edilen kopyalar)
+- Modify: `scripts/sanalcp-jail`
+- Modify: `assets/ops/sanalcp-jail` (aynı değişiklik — bu ikisi elle senkronize edilen kopyalar)
 
 **Interfaces:**
 - Consumes: mevcut `build_template()` fonksiyonu, `curl` (zaten `BINS` listesinde).
-- Produces: her jail'de `/usr/bin/sanalpanel` komutu.
+- Produces: her jail'de `/usr/bin/sanalcp` komutu.
 
 - [ ] **Step 1: Dispatcher script içeriğini `build_template()` içine ekle**
 
-Her iki dosyada da (`scripts/sanalpanel-jail` VE `assets/ops/sanalpanel-jail`), `build_template()` fonksiyonu içinde mevcut şu satırın:
+Her iki dosyada da (`scripts/sanalcp-jail` VE `assets/ops/sanalcp-jail`), `build_template()` fonksiyonu içinde mevcut şu satırın:
 ```bash
   chown -R root:root "$TEMPLATE"
   echo "template OK: $TEMPLATE ($(du -sh "$TEMPLATE" 2>/dev/null | cut -f1))"
 ```
 HEMEN ÜSTÜNE ekle:
 ```bash
-  # sanalpanel CLI dispatcher (CloudPanel clpctl esdegeri site-kullanicisi komutlari)
-  cat > "$TEMPLATE/usr/bin/sanalpanel" <<'CLIEOF'
+  # sanalcp CLI dispatcher (CloudPanel clpctl esdegeri site-kullanicisi komutlari)
+  cat > "$TEMPLATE/usr/bin/sanalcp" <<'CLIEOF'
 #!/bin/bash
-# sanalpanel: site kullanicisi icin kisa komutlar (CloudPanel clpctl esdegeri)
+# sanalcp: site kullanicisi icin kisa komutlar (CloudPanel clpctl esdegeri)
 set -euo pipefail
 
 CLI_API="http://127.0.0.1:8090"
-TOKEN_FILE="$HOME/.sanalpanel/token"
+TOKEN_FILE="$HOME/.sanalcp/token"
 
 usage() {
-  echo "kullanım: sanalpanel <komut> [--flag=değer ...]"
+  echo "kullanım: sanalcp <komut> [--flag=değer ...]"
   echo "komutlar: db:export db:import permissions:reset cache:purge"
   exit 1
 }
@@ -1061,7 +1061,7 @@ case "$cmd" in
   *) usage ;;
 esac
 CLIEOF
-  chmod 755 "$TEMPLATE/usr/bin/sanalpanel"
+  chmod 755 "$TEMPLATE/usr/bin/sanalcp"
 
   chown -R root:root "$TEMPLATE"
   echo "template OK: $TEMPLATE ($(du -sh "$TEMPLATE" 2>/dev/null | cut -f1))"
@@ -1069,19 +1069,19 @@ CLIEOF
 
 - [ ] **Step 2: İki dosyanın birebir aynı olduğunu doğrula**
 
-Run: `diff scripts/sanalpanel-jail assets/ops/sanalpanel-jail`
+Run: `diff scripts/sanalcp-jail assets/ops/sanalcp-jail`
 Expected: (çıktı yok — fark yok)
 
 - [ ] **Step 3: Bash sözdizimi kontrolü**
 
-Run: `bash -n scripts/sanalpanel-jail && bash -n assets/ops/sanalpanel-jail`
+Run: `bash -n scripts/sanalcp-jail && bash -n assets/ops/sanalcp-jail`
 Expected: hata yok (exit 0)
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/sanalpanel-jail assets/ops/sanalpanel-jail
-git commit -m "feat(jail): sanalpanel CLI dispatcher script'i jail template'e ekle"
+git add scripts/sanalcp-jail assets/ops/sanalcp-jail
+git commit -m "feat(jail): sanalcp CLI dispatcher script'i jail template'e ekle"
 ```
 
 ---
@@ -1096,21 +1096,21 @@ git commit -m "feat(jail): sanalpanel CLI dispatcher script'i jail template'e ek
 
 ```bash
 git push origin main   # yalnızca yusuf onaylarsa
-ssh <vps> "sanalpanel-update"
+ssh <vps> "sanalcp-update"
 ```
-Expected: `sanalpanel-update` migration'ı uygular (`0045_site_cli.sql`), yeni binary'yi devreye alır, health check geçer.
+Expected: `sanalcp-update` migration'ı uygular (`0045_site_cli.sql`), yeni binary'yi devreye alır, health check geçer.
 
 - [ ] **Step 2: Jail template'i yeniden kur + mevcut bir test kullanıcısı için jail'i tazele**
 
 ```bash
-ssh <vps> "sanalpanel-jail template && sanalpanel-jail setup <test_sk>"
+ssh <vps> "sanalcp-jail template && sanalcp-jail setup <test_sk>"
 ```
-Expected: "template OK" ve "setup OK" çıktısı; `ssh <vps> "test -x /home/jails/<test_sk>/usr/bin/sanalpanel && echo VAR"` → `VAR`
+Expected: "template OK" ve "setup OK" çıktısı; `ssh <vps> "test -x /home/jails/<test_sk>/usr/bin/sanalcp && echo VAR"` → `VAR`
 
 - [ ] **Step 3: Test domain'i için token dosyasının oluştuğunu doğrula**
 
 ```bash
-ssh <vps> "cat /home/<test_sk>/.sanalpanel/token | wc -c"
+ssh <vps> "cat /home/<test_sk>/.sanalcp/token | wc -c"
 ```
 Expected: `65` (64 hex karakter + newline) — eğer domain bu migration'dan ÖNCE oluşturulduysa dosya yoktur; bu durumda test için yeni bir domain oluştur (panel UI'den) ve onunla devam et.
 
@@ -1118,7 +1118,7 @@ Expected: `65` (64 hex karakter + newline) — eğer domain bu migration'dan ÖN
 
 ```bash
 ssh -o ProxyCommand="ssh <vps> -W %h:%p" <test_sk>@localhost \
-  "cd public_html && touch deneme.txt && chmod 777 deneme.txt && sanalpanel permissions:reset --path=. && stat -c '%a' deneme.txt"
+  "cd public_html && touch deneme.txt && chmod 777 deneme.txt && sanalcp permissions:reset --path=. && stat -c '%a' deneme.txt"
 ```
 (Alternatif: doğrudan jail'e `ssh <test_sk>@<vps-ip>` ile bağlanıp elle çalıştır.)
 Expected: `644` (dosya, `--files=660` varsayılanına göre... NOT: varsayılan `660` — çıktı `660` olmalı, `777` değil)
@@ -1127,7 +1127,7 @@ Expected: `644` (dosya, `--files=660` varsayılanına göre... NOT: varsayılan 
 
 Jail içinden (test kullanıcısı olarak):
 ```bash
-sanalpanel db:export --databaseName=<test_sk>_main --file=/home/<test_sk>/yedek.sql.gz
+sanalcp db:export --databaseName=<test_sk>_main --file=/home/<test_sk>/yedek.sql.gz
 gunzip -t /home/<test_sk>/yedek.sql.gz && echo "gzip GEÇERLİ"
 zcat /home/<test_sk>/yedek.sql.gz | head -5
 ```
@@ -1136,14 +1136,14 @@ Expected: "dışa aktarıldı: ..." mesajı, "gzip GEÇERLİ", dump içeriğinde
 - [ ] **Step 6: Yabancı bir DB adıyla `db:export`'un reddedildiğini doğrula (güvenlik testi)**
 
 ```bash
-sanalpanel db:export --databaseName=panel --file=/tmp/x.sql
+sanalcp db:export --databaseName=panel --file=/tmp/x.sql
 ```
 Expected: `HATA: export başarısız (HTTP 403)` — panel'in kendi (başka domain'e ait) veritabanına erişim reddedilir.
 
 - [ ] **Step 7: `db:import` komutunu test et**
 
 ```bash
-sanalpanel db:import --databaseName=<test_sk>_main --file=/home/<test_sk>/yedek.sql.gz
+sanalcp db:import --databaseName=<test_sk>_main --file=/home/<test_sk>/yedek.sql.gz
 ```
 Expected: "içe aktarıldı: ..." — hatasız tamamlanır (Step 5'te alınan dump'ı kendi DB'sine geri yüklüyor, no-op'a yakın ama komutun uçtan uca çalıştığını kanıtlar).
 
@@ -1151,7 +1151,7 @@ Expected: "içe aktarıldı: ..." — hatasız tamamlanır (Step 5'te alınan du
 
 Önce panel UI'den test domain'inde FastCGI cache'i aç (nginx-settings), bir sayfayı iki kez ziyaret edip `X-Cache-Status: HIT` görülene kadar bekle, sonra:
 ```bash
-sanalpanel cache:purge --purge=fastcgi
+sanalcp cache:purge --purge=fastcgi
 ```
 Expected: "fastcgi: cache-version artırıldı, nginx reload edildi"; ardından aynı sayfayı tekrar ziyaret et → `X-Cache-Status: MISS` (yeni cache-key nedeniyle eski girdi eşleşmiyor), sunucuda `nginx -t` hata vermedi (`ssh <vps> "journalctl -u nginx --since '5 min ago' | grep -i error"` boş dönmeli).
 

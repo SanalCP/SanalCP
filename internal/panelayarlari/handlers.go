@@ -15,15 +15,15 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 )
 
 const (
-	certYol      = "/etc/ssl/sanalpanel/panel.crt"
-	keyYol       = "/etc/ssl/sanalpanel/panel.key"
-	certYedekYol = "/etc/ssl/sanalpanel/panel.crt.selfsigned-bak"
-	keyYedekYol  = "/etc/ssl/sanalpanel/panel.key.selfsigned-bak"
+	certYol      = "/etc/ssl/sanalcp/panel.crt"
+	keyYol       = "/etc/ssl/sanalcp/panel.key"
+	certYedekYol = "/etc/ssl/sanalcp/panel.crt.selfsigned-bak"
+	keyYedekYol  = "/etc/ssl/sanalcp/panel.key.selfsigned-bak"
 	acmeWebroot  = "/var/www/_acme"
 	acmeBinYolu  = "/root/.acme.sh/acme.sh"
 )
@@ -159,7 +159,7 @@ func sslKur(domain string) (durum, hata, bitis string) {
 		// kullanıp AYNI invalidContact hatasını tekrarlar, hesap LE'de HİÇ oluşmaz ve her
 		// --issue çağrısı (domain'in kendisi geçerli olsa bile) SÜREKLİ başarısız olur. İki
 		// dosyadaki eski email'i temizleyip yeniden kaydet — bu kalıcı-kilitlenmeyi kırar
-		// (bkz. sanalpanel-install.sh'daki aynı sınıf düzeltme).
+		// (bkz. sanalcp-install.sh'daki aynı sınıf düzeltme).
 		acmeContactTemizle()
 		_, _ = exec.Command(acmeBinYolu, "--register-account", "--server", "letsencrypt").CombinedOutput()
 		out, err = exec.Command(acmeBinYolu, issueArgs...).CombinedOutput()

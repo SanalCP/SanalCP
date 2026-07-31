@@ -62,7 +62,7 @@ const fpmSocketFcontextSpec = "/run/php-fpm-[^/]+(/.*)?"
 // semanage fcontext -l yavaş olduğu için tekrar tekrar çağrılmaz. SELinux Disabled /
 // semanage yok ise sessiz atlar. Kuralın YALNIZ VARLIĞINI garanti eder — asıl etiketleme
 // (restorecon) EnableTenantFPM içinde socket oluştuktan sonra AYRI yapılır.
-// (Desen: sanalpanel-repair ensure_context.)
+// (Desen: sanalcp-repair ensure_context.)
 func ensureFPMSELinuxFcontext() {
 	fcontextMu.Lock()
 	defer fcontextMu.Unlock()
@@ -374,7 +374,7 @@ include=%s/pool.conf
 // renderTenantUnit: per-tenant php-fpm systemd unit'i (slice + sandbox).
 func renderTenantUnit(sk, fpmBin string) string {
 	return fmt.Sprintf(`[Unit]
-Description=SanalPanel per-tenant PHP-FPM — %s
+Description=SanalCP per-tenant PHP-FPM — %s
 After=network.target
 Before=nginx.service
 
@@ -738,7 +738,7 @@ func renderDebugPrependPHP(sk, orig string) string {
 	logPath := tenantDebugLogPath(sk)
 	var b strings.Builder
 	b.WriteString("<?php\n")
-	b.WriteString("// SanalPanel PHP Debug Modu — otomatik uretildi, ELLE DUZENLEMEYIN.\n")
+	b.WriteString("// SanalCP PHP Debug Modu — otomatik uretildi, ELLE DUZENLEMEYIN.\n")
 	b.WriteString("register_shutdown_function(function(){\n")
 	b.WriteString("  $e=error_get_last();\n")
 	b.WriteString("  if($e && in_array($e['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR,E_RECOVERABLE_ERROR],true)){\n")

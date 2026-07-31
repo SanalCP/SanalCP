@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // StartYukSampler: her `every` sürede /proc/loadavg + /proc/meminfo örnekler, sistem_yuk'e yazar.

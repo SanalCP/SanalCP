@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -30,9 +30,9 @@ func randomHex(n int) string {
 }
 
 // internalAuthToken: signon.php'nin panel'i çağırırken kullandığı statik token
-// Dosyadan okur (/etc/sanalpanel/pma-internal.token). Yoksa erişim engellenir.
+// Dosyadan okur (/etc/sanalcp/pma-internal.token). Yoksa erişim engellenir.
 func internalAuthToken() string {
-	b, err := os.ReadFile("/etc/sanalpanel/pma-internal.token")
+	b, err := os.ReadFile("/etc/sanalcp/pma-internal.token")
 	if err != nil {
 		return ""
 	}

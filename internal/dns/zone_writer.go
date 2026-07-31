@@ -17,7 +17,7 @@ import (
 
 const (
 	ZoneDir          = "/var/named"
-	NamedConfInclude = "/etc/named/sanalpanel-zones.conf"
+	NamedConfInclude = "/etc/named/sanalcp-zones.conf"
 	// DNSSECKeyDir: dnssec-policy anahtar dizini. /var/named/dynamic zaten named_cache_t
 	// SELinux etiketli ve named'e yazılabilir (ekstra SELinux ayarı gerektirmez).
 	DNSSECKeyDir = "/var/named/dynamic"
@@ -256,7 +256,7 @@ func buildZoneIncludes(ctx context.Context, db *sql.DB) (string, error) {
 	}
 	defer rows.Close()
 	var sb strings.Builder
-	sb.WriteString("// sanalpanel — otomatik üretildi\n")
+	sb.WriteString("// sanalcp — otomatik üretildi\n")
 	for rows.Next() {
 		var alanAdi string
 		var dnssec int

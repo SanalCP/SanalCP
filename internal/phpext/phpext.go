@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/phpsurum"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/phpsurum"
 
 	"github.com/go-chi/chi/v5"
 )

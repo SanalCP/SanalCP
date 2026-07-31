@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // Anasayfa (dashboard) widget düzeni — kullanıcıya özel, sürükle-bırak sırası.

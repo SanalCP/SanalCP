@@ -17,13 +17,13 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (
-	kcUnit    = "sanalpanel-kernelcare-update"
-	kcLogYol  = "/opt/sanalpanel/logs/kernelcare-update.log"
-	kcWrapper = "/opt/sanalpanel/kernelcare-update.sh"
+	kcUnit    = "sanalcp-kernelcare-update"
+	kcLogYol  = "/opt/sanalcp/logs/kernelcare-update.log"
+	kcWrapper = "/opt/sanalcp/kernelcare-update.sh"
 )
 
 // KcDurum — KernelCare ajan durumu (CVE özetine gömülür).
@@ -136,7 +136,7 @@ func KernelcareYamala(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, "canlı yama zaten çalışıyor")
 		return
 	}
-	_ = os.MkdirAll("/opt/sanalpanel/logs", 0o750)
+	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
 	if err := kcWrapperYaz(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
 		return
@@ -149,7 +149,7 @@ func KernelcareYamala(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("systemd-run",
 		"--collect",
 		"--unit", kcUnit,
-		"--description", "SanalPanel KernelCare canlı çekirdek yaması",
+		"--description", "SanalCP KernelCare canlı çekirdek yaması",
 		"-p", "StandardOutput=append:"+kcLogYol,
 		"-p", "StandardError=append:"+kcLogYol,
 		kcWrapper)

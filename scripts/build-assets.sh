@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# build-assets.sh — SanalPanel release binary'lerini DOĞRU bayraklarla derler.
+# build-assets.sh — SanalCP release binary'lerini DOĞRU bayraklarla derler.
 #
 # 🔴 NEDEN GOAMD64=v1 ZORUNLU:
 #   AlmaLinux 10 / go1.26+ varsayılan olarak `go env GOAMD64=v3` üretir. v3 ile derlenen
 #   binary, v3 mikromimari (AVX2 vb.) desteklemeyen eski/yaygın müşteri CPU'larında
 #     "This program can only be run on AMD64 processors with v3 microarchitecture support"
-#   verip HİÇ ÇALIŞMAZ. Bu yüzden yayınlanan `assets/sanalpanel-server` DAİMA
+#   verip HİÇ ÇALIŞMAZ. Bu yüzden yayınlanan `assets/sanalcp-server` DAİMA
 #   GOAMD64=v1 ile derlenmelidir. Bu script bunu sabitler — elle `go build` YAPMA.
 #
 # Kullanım:
@@ -25,16 +25,16 @@ export GOARCH=amd64
 export GOAMD64=v1
 
 BUILD_TARIHI="$(date -u +%Y-%m-%d)"
-echo "== sanalpanel-server derleniyor (GOAMD64=$GOAMD64, CGO_ENABLED=$CGO_ENABLED, build_tarihi=$BUILD_TARIHI) =="
-go build -ldflags "-X main.buildDate=$BUILD_TARIHI" -o assets/sanalpanel-server ./cmd/server
+echo "== sanalcp-server derleniyor (GOAMD64=$GOAMD64, CGO_ENABLED=$CGO_ENABLED, build_tarihi=$BUILD_TARIHI) =="
+go build -ldflags "-X main.buildDate=$BUILD_TARIHI" -o assets/sanalcp-server ./cmd/server
 
 # seed-admin: scripts/seed_admin.go içinde //go:build ignore var → dosyayı doğrudan derle.
 if [ -f scripts/seed_admin.go ]; then
-  echo "== sanalpanel-seed-admin derleniyor (GOAMD64=$GOAMD64) =="
-  go build -o assets/sanalpanel-seed-admin scripts/seed_admin.go
+  echo "== sanalcp-seed-admin derleniyor (GOAMD64=$GOAMD64) =="
+  go build -o assets/sanalcp-seed-admin scripts/seed_admin.go
 fi
 
 echo "== doğrulama: GOAMD64 damgası v1 olmalı =="
-go version -m assets/sanalpanel-server | grep -E "GOAMD64" || true
+go version -m assets/sanalcp-server | grep -E "GOAMD64" || true
 
 echo "✓ Bitti. 'assets/frontend-dist.tar.gz'i güncellemek için ayrıca: (cd frontend && npm run build) sonra dist'i paketle."

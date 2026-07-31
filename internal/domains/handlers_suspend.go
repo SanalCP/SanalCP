@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )

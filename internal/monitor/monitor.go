@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -75,11 +75,11 @@ func Processes(w http.ResponseWriter, r *http.Request) {
 }
 
 type SSLBilgi struct {
-	Gecerli      bool   `json:"gecerli"`
-	BitisTarihi  string `json:"bitis_tarihi"`
-	KalanGun     int    `json:"kalan_gun"`
-	Cikaran      string `json:"cikaran,omitempty"`
-	OznName      string `json:"ozne,omitempty"`
+	Gecerli     bool   `json:"gecerli"`
+	BitisTarihi string `json:"bitis_tarihi"`
+	KalanGun    int    `json:"kalan_gun"`
+	Cikaran     string `json:"cikaran,omitempty"`
+	OznName     string `json:"ozne,omitempty"`
 }
 
 type DomainHealth struct {
@@ -129,8 +129,8 @@ func probe(targetURL string) DomainHealth {
 
 	tlsCfg := &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}
 	tr := &http.Transport{
-		TLSClientConfig:   tlsCfg,
-		DisableKeepAlives: true,
+		TLSClientConfig:       tlsCfg,
+		DisableKeepAlives:     true,
 		ResponseHeaderTimeout: 6 * time.Second,
 	}
 	client := &http.Client{
@@ -147,7 +147,7 @@ func probe(targetURL string) DomainHealth {
 
 	start := time.Now()
 	req, _ := http.NewRequest("GET", targetURL, nil)
-	req.Header.Set("User-Agent", "SanalPanel-Monitor/1.0")
+	req.Header.Set("User-Agent", "SanalCP-Monitor/1.0")
 	req.Header.Set("Accept", "text/html,*/*")
 	resp, err := client.Do(req)
 	res.YanitSuresiMs = float64(time.Since(start).Microseconds()) / 1000.0

@@ -12,17 +12,17 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/cliapi"
-	"sanalpanel/internal/dns"
-	"sanalpanel/internal/domainek"
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kaynaklimit"
-	"sanalpanel/internal/kota"
-	"sanalpanel/internal/mail"
-	"sanalpanel/internal/middleware"
-	"sanalpanel/internal/provisioner"
-	"sanalpanel/internal/redis"
+	"sanalcp/internal/cliapi"
+	"sanalcp/internal/dns"
+	"sanalcp/internal/domainek"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kaynaklimit"
+	"sanalcp/internal/kota"
+	"sanalcp/internal/mail"
+	"sanalcp/internal/middleware"
+	"sanalcp/internal/provisioner"
+	"sanalcp/internal/redis"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -384,7 +384,7 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 		// DB satırları aşağıdaki DELETE FROM domains ile otomatik silinir. KapatDomain yine de
 		// çağrılır (redis.KapatDomain ile aynı simetri) — ileride cascade-dışı bir yan etki eklenirse.
 		mail.KapatDomain(h.DB, id, sk)
-		// NOT: /var/backups/sanalpanel/<sk>/ dizini KASITLI olarak korunur.
+		// NOT: /var/backups/sanalcp/<sk>/ dizini KASITLI olarak korunur.
 		// Müşteri domaini yanlışlıkla silmiş olabilir → yedekler kurtarma için saklanır.
 		// (Manuel temizlik için backups.RemoveDomainBackups mevcut.)
 	}

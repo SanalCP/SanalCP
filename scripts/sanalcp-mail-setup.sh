@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sanalpanel-mail-setup — Postfix + Dovecot + OpenDKIM sanal posta kutusu altyapısını
+# sanalcp-mail-setup — Postfix + Dovecot + OpenDKIM sanal posta kutusu altyapısını
 # + Roundcube webmail'i kurar/onarır. Idempotent. Kurulumda çalıştırılır; panelin
 # "E-posta" özelliği bunu gerektirir.
 #
@@ -13,9 +13,9 @@ log(){ printf '  %s\n' "$*"; }
 
 # TMPL: config template'lerinin okunacağı yer. Üretimde /usr/local/bin'e install edilen
 # betiğin yanında assets/ YOKTUR — install.sh assets/mail/*'i kalıcı olarak
-# /opt/sanalpanel/src/mail-templates'e kopyalar (migrations/scripts ile aynı desen).
+# /opt/sanalcp/src/mail-templates'e kopyalar (migrations/scripts ile aynı desen).
 # Repo checkout'undan doğrudan çalıştırılıyorsa (yerel geliştirme/test) yanındaki assets/'e düşer.
-TMPL="/opt/sanalpanel/src/mail-templates"
+TMPL="/opt/sanalcp/src/mail-templates"
 if [ ! -d "$TMPL" ]; then
   HERE="$(cd "$(dirname "$0")" && pwd)"
   for cand in "$HERE/../assets/mail" "$HERE/assets/mail"; do
@@ -23,7 +23,7 @@ if [ ! -d "$TMPL" ]; then
   done
 fi
 [ -d "$TMPL" ] || { log "✗ mail template dizini bulunamadı ($TMPL)"; exit 1; }
-ENV=/etc/sanalpanel/env
+ENV=/etc/sanalcp/env
 
 echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # GERÇEK VPS'TE BULUNDU: postfix-mysql / dovecot-mysql AYRI paketler — temel postfix/dovecot
@@ -84,7 +84,7 @@ done
 log "5 mysql-virtual-*.cf dosyası yazıldı (root:postfix 0640)"
 
 echo "════ Postfix: main.cf / master.cf ════"
-if ! grep -q 'sanalpanel-mail' /etc/postfix/main.cf; then
+if ! grep -q 'sanalcp-mail' /etc/postfix/main.cf; then
   # Alma/RHEL stok main.cf bu dört anahtarı zaten tanımlar. Aynı anahtarları alta
   # eklemek çalışsa da her postconf/postfix çağrısında "overriding earlier entry"
   # üretir; önce stok tanımları kaldırıp tek bir kanonik blok yaz.
@@ -93,7 +93,7 @@ if ! grep -q 'sanalpanel-mail' /etc/postfix/main.cf; then
   postconf -X smtpd_tls_cert_file
   postconf -X smtpd_tls_key_file
   cat "$TMPL/postfix/main.cf.append" >> /etc/postfix/main.cf
-  log "main.cf'e sanalpanel-mail bloğu eklendi"
+  log "main.cf'e sanalcp-mail bloğu eklendi"
 fi
 if ! grep -qE '^submission\s+inet' /etc/postfix/master.cf; then
   cat "$TMPL/postfix/master.cf.append" >> /etc/postfix/master.cf
@@ -104,8 +104,8 @@ echo "════ Dovecot: SQL auth + drop-in config ════"
 sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
 chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
 chmod 640 /etc/dovecot/dovecot-sql.conf.ext
-cp "$TMPL/dovecot/10-sanalpanel-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalpanel-mail.conf
-log "dovecot-sql.conf.ext + conf.d/10-sanalpanel-mail.conf"
+cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+log "dovecot-sql.conf.ext + conf.d/10-sanalcp-mail.conf"
 
 echo "════ OpenDKIM ════"
 mkdir -p /etc/opendkim/keys
@@ -148,7 +148,7 @@ systemctl restart rspamd
 log "rspamd milter 127.0.0.1:11332 + Redis etkin"
 
 echo "════ Maildir kök dizinleri (mevcut aktif mail_domains için, varsa) ════"
-# GÜVENLİK/SIRALAMA: bu betik sanalpanel-install.sh'ta panel İLK KEZ başlatıldıktan
+# GÜVENLİK/SIRALAMA: bu betik sanalcp-install.sh'ta panel İLK KEZ başlatıldıktan
 # (migration'lar uygulandıktan) SONRA çağrılır — ftp-setup ile birebir aynı sebep: aşağıdaki
 # GRANT SELECT ifadeleri mail_domains/mailboxes/mail_aliases tabloları yokken ERROR 1146
 # ile patlar (gerçek MariaDB'ye karşı doğrulandı). Elle/farklı sırada çalıştırırsan önce
@@ -162,9 +162,9 @@ done
 echo "════ SELinux ════"
 setsebool -P httpd_can_network_connect_db 1 2>/dev/null && log "httpd_can_network_connect_db=1"
 if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ]; then
-  log "UYARI: SELinux enforcing — postfix_t/dovecot_t'nin /etc/pki/sanalpanel ve /home/*/mail" \
+  log "UYARI: SELinux enforcing — postfix_t/dovecot_t'nin /etc/pki/sanalcp ve /home/*/mail" \
       "okuma/yazmasında AVC red'i olabilir. 'ausearch -m avc -ts recent' ile kontrol et; gerekirse" \
-      "'sanalpanel-repair --only mail' veya elle semanage/setsebool ile düzelt."
+      "'sanalcp-repair --only mail' veya elle semanage/setsebool ile düzelt."
 fi
 
 echo "════ postfix + dovecot + opendkim + rspamd enable + (re)start ════"

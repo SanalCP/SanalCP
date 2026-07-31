@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# sanalpanel-wp-redis — bir domain kullanıcısının WordPress kurulumlarına
+# sanalcp-wp-redis — bir domain kullanıcısının WordPress kurulumlarına
 # per-tenant izole Redis (Valkey) object cache bağlar/çözer. Idempotent. root ile çalıştır.
 #
-#   sanalpanel-wp-redis <sistem_kullanici>        # BAĞLA
-#   sanalpanel-wp-redis <sistem_kullanici> off    # ÇÖZ
+#   sanalcp-wp-redis <sistem_kullanici>        # BAĞLA
+#   sanalcp-wp-redis <sistem_kullanici> off    # ÇÖZ
 #
 # Panelin "Redis Cache" özelliğiyle aynı reçete:
 #   ACL user (~<sk>:* key-prefix, @dangerous kapalı + info/dbsize açık)
@@ -13,13 +13,13 @@ set -uo pipefail
 SK="${1:?kullanim: $0 <sistem_kullanici> [off]}"
 ACTION="${2:-on}"
 HOST=127.0.0.1; PORT=6379
-ENV=/etc/sanalpanel/env
+ENV=/etc/sanalcp/env
 
 # --- guardlar ---
 if ! [[ "$SK" =~ ^[a-z0-9_]{1,32}$ ]]; then echo "gecersiz kullanici adi: $SK"; exit 1; fi
 [ "$(id -u)" = 0 ] || { echo "root gerekli"; exit 1; }
 ADMIN=$(grep -oP '^PANEL_REDIS_ADMIN_PASS=\K.*' "$ENV" 2>/dev/null)
-[ -z "$ADMIN" ] && { echo "PANEL_REDIS_ADMIN_PASS yok -> once: sanalpanel-redis-setup"; exit 1; }
+[ -z "$ADMIN" ] && { echo "PANEL_REDIS_ADMIN_PASS yok -> once: sanalcp-redis-setup"; exit 1; }
 id "$SK" >/dev/null 2>&1 || { echo "sistem kullanicisi yok: $SK"; exit 1; }
 
 vc(){ REDISCLI_AUTH="$ADMIN" valkey-cli "$@"; }

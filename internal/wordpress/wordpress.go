@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )

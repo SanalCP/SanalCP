@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -19,7 +19,7 @@ import (
 // Subdomain SSL: self-signed veya Let's Encrypt. Parent domain ile AYNI mantık
 // (openssl / acme.sh --webroot /var/www/_acme) ama subdomain vhost'una (sub_*.conf) uygulanır.
 
-func sslDir(sk string) string      { return "/home/" + sk + "/ssl" }
+func sslDir(sk string) string { return "/home/" + sk + "/ssl" }
 func certYolu(sk, tamAd string) (string, string) {
 	d := sslDir(sk)
 	return filepath.Join(d, tamAd+".crt"), filepath.Join(d, tamAd+".key")

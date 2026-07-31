@@ -36,8 +36,8 @@ func TestHostnameKaydet(t *testing.T) {
 		hostnameDosyasi, cloudInitDosyasi, nmDosyasi, hostnameAyarla = eskiHostname, eskiCloud, eskiNM, eskiAyarla
 	})
 	hostnameDosyasi = filepath.Join(tmp, "etc/hostname")
-	cloudInitDosyasi = filepath.Join(tmp, "etc/cloud/cloud.cfg.d/99-sanalpanel-hostname.cfg")
-	nmDosyasi = filepath.Join(tmp, "etc/NetworkManager/conf.d/99-sanalpanel-hostname.conf")
+	cloudInitDosyasi = filepath.Join(tmp, "etc/cloud/cloud.cfg.d/99-sanalcp-hostname.cfg")
+	nmDosyasi = filepath.Join(tmp, "etc/NetworkManager/conf.d/99-sanalcp-hostname.conf")
 	var uygulanan string
 	hostnameAyarla = func(_ context.Context, ad string) error { uygulanan = ad; return nil }
 

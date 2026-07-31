@@ -19,13 +19,13 @@ import (
 	"sync"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (
-	cveUnit    = "sanalpanel-cve-update"
-	cveLogYol  = "/opt/sanalpanel/logs/cve-update.log"
-	cveWrapper = "/opt/sanalpanel/cve-update.sh"
+	cveUnit    = "sanalcp-cve-update"
+	cveLogYol  = "/opt/sanalcp/logs/cve-update.log"
+	cveWrapper = "/opt/sanalcp/cve-update.sh"
 )
 
 type CveKayit struct {
@@ -237,7 +237,7 @@ func CveGuncelle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, "panel güncellemesi sürüyor — bitince tekrar deneyin")
 		return
 	}
-	_ = os.MkdirAll("/opt/sanalpanel/logs", 0o750)
+	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
 	if err := cveWrapperYaz(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
 		return
@@ -250,7 +250,7 @@ func CveGuncelle(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("systemd-run",
 		"--collect",
 		"--unit", cveUnit,
-		"--description", "SanalPanel güvenlik güncellemeleri",
+		"--description", "SanalCP güvenlik güncellemeleri",
 		"-p", "StandardOutput=append:"+cveLogYol,
 		"-p", "StandardError=append:"+cveLogYol,
 		cveWrapper)

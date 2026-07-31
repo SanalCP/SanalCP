@@ -2,7 +2,7 @@ package system
 
 // Panel içi güncelleme — CLI'ya bağımlı olmadan panelden güncelleme.
 //
-// NEDEN: sanalpanel-update scriptini dağıtan tek mekanizma yine kendisiydi;
+// NEDEN: sanalcp-update scriptini dağıtan tek mekanizma yine kendisiydi;
 // script eklenmeden önce kurulum yapan müşteriler kısır döngüye giriyordu
 // ("command not found" → güncelleyemiyor → scripti alamıyor). Bu uç nokta
 // scripti gerekirse repo'dan indirip (bootstrap) çalıştırır.
@@ -22,14 +22,14 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (
-	guncelleScript = "/usr/local/bin/sanalpanel-update"
-	guncelleRawURL = "https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/assets/ops/sanalpanel-update"
-	guncelleLogYol = "/opt/sanalpanel/logs/guncelleme.log"
-	guncelleUnit   = "sanalpanel-guncelleme"
+	guncelleScript = "/usr/local/bin/sanalcp-update"
+	guncelleRawURL = "https://raw.githubusercontent.com/sanalcp/sanalcp/main/assets/ops/sanalcp-update"
+	guncelleLogYol = "/opt/sanalcp/logs/guncelleme.log"
+	guncelleUnit   = "sanalcp-guncelleme"
 )
 
 // guncelleCalisiyor — transient unit hâlâ çalışıyor mu.
@@ -90,7 +90,7 @@ func GuncellemeBaslat(w http.ResponseWriter, r *http.Request) {
 		aracIndirildi = true
 	}
 
-	_ = os.MkdirAll("/opt/sanalpanel/logs", 0o750)
+	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
 	bas := fmt.Sprintf("=== Güncelleme başlatıldı: %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
 	if aracIndirildi {
 		bas += "(güncelleme aracı eksikti — repo'dan indirildi)\n"
@@ -104,7 +104,7 @@ func GuncellemeBaslat(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("systemd-run",
 		"--collect", // bitince unit'i temizle (failed olsa da)
 		"--unit", guncelleUnit,
-		"--description", "SanalPanel güncelleme",
+		"--description", "SanalCP güncelleme",
 		"/bin/bash", "-lc", fmt.Sprintf("%s >>%s 2>&1", guncelleScript, guncelleLogYol))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))

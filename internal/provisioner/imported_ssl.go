@@ -73,7 +73,7 @@ func hasServerAuth(usages []x509.ExtKeyUsage) bool {
 }
 
 func writeImportedPEM(target string, data []byte, mode os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(target), ".sanalpanel-import-*")
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".sanalcp-import-*")
 	if err != nil {
 		return err
 	}

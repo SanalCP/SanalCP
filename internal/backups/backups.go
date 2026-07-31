@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
 
-const BackupRoot = "/var/backups/sanalpanel"
+const BackupRoot = "/var/backups/sanalcp"
 
 // RemoveDomainBackups: bir domainin per-domain backup dizinini kaldırır.
 // ÖNEMLİ: Domain silme akışından ÇAĞRILMAZ — müşteri yanlışlıkla silmiş olabilir,
