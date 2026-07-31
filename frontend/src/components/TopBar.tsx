@@ -342,7 +342,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
         <LanguageSwitcher />
         <button onClick={temaDegistir}
           className="p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition"
-          title={`Tema: ${tema} — tıkla değiştir`}>
+          title={t('TopBar:theme_toggle_title', { theme: tema })}>
           {tema === 'dark' ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
@@ -357,7 +357,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
             </svg>
           )}
         </button>
-        <button className="hidden sm:inline-flex p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition" title="Bildirimler">
+        <button className="hidden sm:inline-flex p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition" title={t('TopBar:notifications')}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
@@ -367,7 +367,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
           <button
             onClick={() => setMenuAcik((v) => !v)}
             className="flex items-center gap-2 px-1.5 sm:px-2 py-1.5 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 rounded-md transition"
-            aria-label="Hesap menüsü"
+            aria-label={t('TopBar:account_menu')}
           >
             <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-semibold text-xs flex items-center justify-center flex-shrink-0">
               {(kullanici?.ad_soyad || kullanici?.adi || '?').slice(0, 1).toUpperCase()}
@@ -391,14 +391,14 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
                   onClick={() => { setMenuAcik(false); navigate('/profil') }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
                 >
-                  Profil ve Tercihler
+                  {t('TopBar:profile_prefs')}
                 </button>
                 <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                 <button
                   onClick={onCikis}
                   className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20"
                 >
-                  Çıkış Yap
+                  {t('TopBar:logout')}
                 </button>
               </div>
             </>
