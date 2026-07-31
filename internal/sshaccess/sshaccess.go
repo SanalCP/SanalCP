@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -142,13 +142,13 @@ func (h *Handlers) Ayarla(w http.ResponseWriter, r *http.Request) {
 		// SSH parolasını FTP parolasıyla eşitle (parola = FTP)
 		_ = hesaplar.SyncSSHPassword(h.DB, sk)
 		// Chroot jail kur + sanal-ssh grubuna ekle (kendi home'una hapset)
-		_ = exec.Command("/usr/local/bin/sanalpanel-jail", "setup", sk).Run()
+		_ = exec.Command("/usr/local/bin/sanalcp-jail", "setup", sk).Run()
 		_ = exec.Command("groupadd", "-f", "sanal-ssh").Run()
 		_ = exec.Command("gpasswd", "-a", sk, "sanal-ssh").Run()
 	} else {
 		// SSH kapalı: gruptan çıkar + jail söktür + parolayı kilitle
 		_ = exec.Command("gpasswd", "-d", sk, "sanal-ssh").Run()
-		_ = exec.Command("/usr/local/bin/sanalpanel-jail", "teardown", sk).Run()
+		_ = exec.Command("/usr/local/bin/sanalcp-jail", "teardown", sk).Run()
 		_ = hesaplar.LockSSHPassword(sk)
 	}
 	if _, err := h.DB.ExecContext(r.Context(),
@@ -224,16 +224,16 @@ func b2i(b bool) int {
 }
 
 // EnsureInfra: panel açılışında SSH jail altyapısını hazırlar (idempotent + best-effort).
-//   - sanalpanel-jail script'ini /usr/local/bin'e yerleştirir
+//   - sanalcp-jail script'ini /usr/local/bin'e yerleştirir
 //   - sanal-ssh grubunu oluşturur
 //   - sshd Match chroot config'ini yerleştirir — YALNIZCA `sshd -t` geçerse reload eder,
 //     geçersizse eski haline döndürür (sshd'yi asla bozmaz).
 func EnsureInfra() {
-	const srcDir = "/opt/sanalpanel/src/scripts"
+	const srcDir = "/opt/sanalcp/src/scripts"
 	// 1) jail script
-	if data, err := os.ReadFile(srcDir + "/sanalpanel-jail"); err == nil {
-		if e := os.WriteFile("/usr/local/bin/sanalpanel-jail", data, 0o755); e == nil {
-			_ = os.Chmod("/usr/local/bin/sanalpanel-jail", 0o755)
+	if data, err := os.ReadFile(srcDir + "/sanalcp-jail"); err == nil {
+		if e := os.WriteFile("/usr/local/bin/sanalcp-jail", data, 0o755); e == nil {
+			_ = os.Chmod("/usr/local/bin/sanalcp-jail", 0o755)
 		}
 	}
 	// 2) sanal-ssh grubu

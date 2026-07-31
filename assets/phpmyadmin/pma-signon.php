@@ -20,7 +20,7 @@ if (!preg_match('/^[a-f0-9]{16,128}$/', $token)) {
     die('Token formati gecersiz.');
 }
 
-$internalToken = trim((string)@file_get_contents('/etc/sanalpanel/pma-internal.token'));
+$internalToken = trim((string)@file_get_contents('/etc/sanalcp/pma-internal.token'));
 if ($internalToken === '') {
     http_response_code(500);
     die('PMA internal token sunucuda yok.');

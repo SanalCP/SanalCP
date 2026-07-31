@@ -11,7 +11,7 @@ package system
 //
 // AKIŞ (sabit wrapper script):
 //   1) sistem paket güncellemesi: dnf -y update (yoksa yum -y update)
-//   2) MariaDB/nginx/PHP performans ayarı: sanalpanel-optimize
+//   2) MariaDB/nginx/PHP performans ayarı: sanalcp-optimize
 
 import (
 	"fmt"
@@ -21,18 +21,18 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (
-	optimizeUnit    = "sanalpanel-optimize-run"
-	optimizeLogYol  = "/opt/sanalpanel/logs/optimize.log"
-	optimizeWrapper = "/opt/sanalpanel/optimize-run.sh"
+	optimizeUnit    = "sanalcp-optimize-run"
+	optimizeLogYol  = "/opt/sanalcp/logs/optimize.log"
+	optimizeWrapper = "/opt/sanalcp/optimize-run.sh"
 )
 
 // optimizeWrapperIcerik — SABİT script. Kullanıcı girdisi İÇERMEZ; her başlatmada
 // diske atomik yazılır (kaynak-doğruluğu Go tarafında tek yerde). dnf/yum -y update
-// + sanalpanel-optimize. Her adım kendi başına idempotent + güvenli.
+// + sanalcp-optimize. Her adım kendi başına idempotent + güvenli.
 const optimizeWrapperIcerik = `#!/usr/bin/env bash
 set -uo pipefail
 echo "════════ Sunucu Optimizasyonu — $(date "+%Y-%m-%d %H:%M:%S") ════════"
@@ -47,10 +47,10 @@ else
 fi
 echo
 echo "▶ 2/2 · MariaDB / nginx / PHP performans ayarı"
-if command -v sanalpanel-optimize >/dev/null 2>&1; then
-  sanalpanel-optimize
+if command -v sanalcp-optimize >/dev/null 2>&1; then
+  sanalcp-optimize
 else
-  echo "  (sanalpanel-optimize bulunamadı — tuning atlandı)"
+  echo "  (sanalcp-optimize bulunamadı — tuning atlandı)"
 fi
 echo
 echo "════════ ✓ Optimizasyon tamamlandı ════════"
@@ -92,7 +92,7 @@ func OptimizeBaslat(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, "panel güncellemesi sürüyor — bitince tekrar deneyin")
 		return
 	}
-	_ = os.MkdirAll("/opt/sanalpanel/logs", 0o750)
+	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
 	if err := optimizeWrapperYaz(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
 		return
@@ -107,7 +107,7 @@ func OptimizeBaslat(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command("systemd-run",
 		"--collect",
 		"--unit", optimizeUnit,
-		"--description", "SanalPanel sunucu optimizasyonu",
+		"--description", "SanalCP sunucu optimizasyonu",
 		"-p", "StandardOutput=append:"+optimizeLogYol,
 		"-p", "StandardError=append:"+optimizeLogYol,
 		optimizeWrapper)

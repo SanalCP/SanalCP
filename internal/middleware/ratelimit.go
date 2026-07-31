@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 const (

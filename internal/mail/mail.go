@@ -15,11 +15,11 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kota"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kota"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )

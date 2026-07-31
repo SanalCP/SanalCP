@@ -16,7 +16,7 @@ import (
 // muPluginPHP: süresi dolmayan bakım modu mu-plugin'i.
 const muPluginPHP = `<?php
 /*
- * Plugin Name: SanalPanel Bakım Modu
+ * Plugin Name: SanalCP Bakım Modu
  * Description: Panel tarafından yönetilen kalıcı bakım modu (WP 10dk auto-expiry'sini bypass eder).
  */
 if (php_sapi_name() === 'cli') { return; }

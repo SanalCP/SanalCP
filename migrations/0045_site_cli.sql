@@ -1,7 +1,7 @@
 -- 0045 - Site kullanicisi CLI komutlari: token tablosu + fastcgi cache-version sayaci
 --
 -- cli_tokens: her domain icin tek bir CLI bearer token'inin SHA-256 hash'ini tutar.
--- Ham token asla DB'ye yazilmaz — sadece /home/<sk>/.sanalpanel/token dosyasinda bulunur
+-- Ham token asla DB'ye yazilmaz — sadece /home/<sk>/.sanalcp/token dosyasinda bulunur
 -- (bkz. internal/cliapi paketi). domain_id PRIMARY KEY: domain basina tek token,
 -- ON DUPLICATE KEY UPDATE ile rotasyon (cp_domain_redis ile ayni desen).
 CREATE TABLE IF NOT EXISTS cli_tokens (

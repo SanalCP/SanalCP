@@ -1,9 +1,9 @@
 #!/bin/bash
-# SanalPanel — panel DB yedeği (günlük timer + update öncesi çağrılır).
+# SanalCP — panel DB yedeği (günlük timer + update öncesi çağrılır).
 # Kimlik: root unix-socket (parolasız). Çıktı: üretilen dump yolunu stdout'a basar.
 set -euo pipefail
 
-DIR=/var/backups/sanalpanel/db      # SADECE burası; kardeş dizinler domain yedeği → DOKUNMA
+DIR=/var/backups/sanalcp/db      # SADECE burası; kardeş dizinler domain yedeği → DOKUNMA
 TUT_GUN=14
 mkdir -p "$DIR"; chmod 700 "$DIR"
 

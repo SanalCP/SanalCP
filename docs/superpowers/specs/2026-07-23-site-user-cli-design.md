@@ -5,18 +5,18 @@
 
 ## Amaç
 
-CloudPanel'in [site-user-commands](https://www.cloudpanel.io/docs/v2/cloudpanel-cli/site-user-commands/) sayfasındaki gibi, SanalPanel'de barındırılan sitelerin **site kullanıcılarının** (jail'li SSH hesapları) kendi başlarına çalıştırabileceği kısa komutlar eklemek. Şu an jail'de standart unix araçları var ama panel'e özel hiçbir CLI yok; DB export/import, izin sıfırlama, cache temizleme gibi işler için ya admin paneline girmeleri ya da bana yazmaları gerekiyor.
+CloudPanel'in [site-user-commands](https://www.cloudpanel.io/docs/v2/cloudpanel-cli/site-user-commands/) sayfasındaki gibi, SanalCP'de barındırılan sitelerin **site kullanıcılarının** (jail'li SSH hesapları) kendi başlarına çalıştırabileceği kısa komutlar eklemek. Şu an jail'de standart unix araçları var ama panel'e özel hiçbir CLI yok; DB export/import, izin sıfırlama, cache temizleme gibi işler için ya admin paneline girmeleri ya da bana yazmaları gerekiyor.
 
 **Kapsam dışı (bilinçli):** CloudPanel'in [root-user-commands](https://www.cloudpanel.io/docs/v2/cloudpanel-cli/root-user-commands/) sayfasındaki admin komutları (`user:add`, `site:add:*`, `lets-encrypt:*`, `vhost-template:*` vb.) bu spec'in konusu değil — ayrı, sonraki bir iş.
 
 ## v1 Komut Listesi
 
-CloudPanel site-user sayfasındaki 4 komutun SanalPanel'e uyarlanmış hali:
+CloudPanel site-user sayfasındaki 4 komutun SanalCP'e uyarlanmış hali:
 
-1. `sanalpanel db:export --databaseName=<ad> --file=<yol>`
-2. `sanalpanel db:import --databaseName=<ad> --file=<yol>`
-3. `sanalpanel permissions:reset --directories=770 --files=660 --path=.`
-4. `sanalpanel cache:purge --purge=all|fastcgi|redis`
+1. `sanalcp db:export --databaseName=<ad> --file=<yol>`
+2. `sanalcp db:import --databaseName=<ad> --file=<yol>`
+3. `sanalcp permissions:reset --directories=770 --files=660 --path=.`
+4. `sanalcp cache:purge --purge=all|fastcgi|redis`
 
 Başka komut yok (cron listeleme, php versiyonu vb. bilinçli olarak dışarıda bırakıldı — YAGNI).
 
@@ -29,10 +29,10 @@ Komutlar iki kategoriye ayrılıyor:
 
 ```
 [jail: site kullanıcısı]
-   └─ sanalpanel <komut>   (bash dispatcher, /usr/local/bin/sanalpanel)
+   └─ sanalcp <komut>   (bash dispatcher, /usr/local/bin/sanalcp)
         ├─ permissions:reset → doğrudan chmod/find (yerel, API'ye gitmez)
         └─ db:export / db:import / cache:purge
-             └─ curl -H "Authorization: Bearer <~/.sanalpanel/token>" 127.0.0.1:<cli-port>/api/cli/...
+             └─ curl -H "Authorization: Bearer <~/.sanalcp/token>" 127.0.0.1:<cli-port>/api/cli/...
                   └─ [panel sunucusu, root]
                        ├─ token → sk (sistem_kullanici) eşlemesi doğrulanır
                        ├─ db:export/import → mysqldump/mysql (mevcut db_accounts doğrulamasıyla)
@@ -41,20 +41,20 @@ Komutlar iki kategoriye ayrılıyor:
 
 ## Bileşenler
 
-### 1. CLI dispatcher script (`/usr/local/bin/sanalpanel`)
+### 1. CLI dispatcher script (`/usr/local/bin/sanalcp`)
 
-Bash script, `scripts/sanalpanel-jail` şablon inşasına (`build_template`, `BINS` listesi) eklenecek — `curl` zaten jail'de mevcut, ek binary gerekmiyor. Script:
+Bash script, `scripts/sanalcp-jail` şablon inşasına (`build_template`, `BINS` listesi) eklenecek — `curl` zaten jail'de mevcut, ek binary gerekmiyor. Script:
 
 - Argümanları parse eder (`db:export`, `db:import`, `permissions:reset`, `cache:purge`).
 - `permissions:reset` için doğrudan `find "$path" -type d -exec chmod "$directories" {} +` / dosyalar için `chmod "$files"`.
-- Diğerleri için `~/.sanalpanel/token` dosyasını okuyup ilgili `/api/cli/*` uç noktasına `curl` çağrısı yapar; `db:export` yanıtını `-o "$file"` ile doğrudan diske yazar, `db:import` dosyayı `--data-binary @"$file"` ile gönderir.
+- Diğerleri için `~/.sanalcp/token` dosyasını okuyup ilgili `/api/cli/*` uç noktasına `curl` çağrısı yapar; `db:export` yanıtını `-o "$file"` ile doğrudan diske yazar, `db:import` dosyayı `--data-binary @"$file"` ile gönderir.
 - Türkçe, kullanıcı dostu çıktı ve anlamlı exit code'lar (0 başarı, 1 genel hata, kimlik doğrulama/yetki hataları için de 1 ama farklı mesaj — CloudPanel gibi ayrı exit code şeması gerekmiyor, YAGNI).
 
 ### 2. Token provisioning
 
 Domain oluşturulurken (`internal/domains/handlers.go`, `dbUser`/`dbName` türetildiği aynı akışta — `pr.SistemKullanici + "_db"` / `"_main"` deseninin hemen yanı) rastgele bir CLI token üretilir:
 
-- Ham token bir kere `/home/<sk>/.sanalpanel/token` dosyasına yazılır (`chmod 600`, sahibi `sk:sk`) — jail gerçek home'u bind-mount ettiği için kullanıcı bunu görür.
+- Ham token bir kere `/home/<sk>/.sanalcp/token` dosyasına yazılır (`chmod 600`, sahibi `sk:sk`) — jail gerçek home'u bind-mount ettiği için kullanıcı bunu görür.
 - Sunucu tarafında sadece **hash'i** saklanır, yeni bir `cli_tokens` tablosunda (`domain_id`, `token_hash`, `created_at`) — `db_accounts`/`cp_domain_redis` gibi mevcut per-domain yardımcı tablo desenine uygun, ayrı tutulması iptal/rotasyonu domain satırına dokunmadan yapılabilir kılar. Ham token hiçbir yerde tekrar okunmaz/loglanmaz.
 - Domain silinirken/sistem kullanıcısı kaldırılırken token da geçersiz kılınır (mevcut `MySQLDropAllForDomain` gibi temizlik akışlarının yanına eklenir).
 
@@ -87,12 +87,12 @@ Auth middleware: `Authorization: Bearer <token>` header'ını hash'leyip DB'deki
 ## Test Planı
 
 - Go unit testler: yeni auth middleware (token→domain eşlemesi, geçersiz/yabancı token senaryoları), `databaseName` ownership doğrulaması, cache-version artırma mantığı.
-- Gerçek VPS'te bir jail içinden uçtan uca canlı doğrulama: `sanalpanel db:export`/`import`/`permissions:reset`/`cache:purge` gerçek bir test domain'iyle çalıştırılıp sonuç doğrulanır (mevcut çalışma tarzıyla tutarlı — DB/cache üzerinde doğrudan kontrol, UI'ye güvenmeden).
+- Gerçek VPS'te bir jail içinden uçtan uca canlı doğrulama: `sanalcp db:export`/`import`/`permissions:reset`/`cache:purge` gerçek bir test domain'iyle çalıştırılıp sonuç doğrulanır (mevcut çalışma tarzıyla tutarlı — DB/cache üzerinde doğrudan kontrol, UI'ye güvenmeden).
 
 ## Uygulama Notları (sonraki adım: writing-plans)
 
 - `internal/domains/handlers.go` içindeki domain oluşturma akışına token üretimi eklenecek.
-- `scripts/sanalpanel-jail` (ve `assets/ops/` altındaki güncel kopyası varsa) jail template'ine dispatcher script eklenecek.
+- `scripts/sanalcp-jail` (ve `assets/ops/` altındaki güncel kopyası varsa) jail template'ine dispatcher script eklenecek.
 - Yeni `internal/clicommands/` paketi + `cmd/server/main.go`'da ikinci (loopback-only) listener.
 - Vhost template'inde (`internal/provisioner/provisioner.go` civarı) cache-version mekanizması için değişiklik.
 - Migration: `cli_tokens` tablosu (`migrations/` altına).

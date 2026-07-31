@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# sanalpanel-optimize — MariaDB + nginx'i sunucu kaynaklarına göre optimize eder.
+# sanalcp-optimize — MariaDB + nginx'i sunucu kaynaklarına göre optimize eder.
 # Kaynak-farkında · idempotent · güvenli (validate + rollback). Kurulumda ve sonradan çalıştırılabilir.
 #
 # Kullanım:
-#   sanalpanel-optimize            # hesapla, uygula (MariaDB restart dahil)
-#   sanalpanel-optimize --no-restart   # config yaz + dinamikleri SET GLOBAL ile uygula, MariaDB restart ETME
-#   sanalpanel-optimize --dry-run      # sadece hesaplanan değerleri göster
+#   sanalcp-optimize            # hesapla, uygula (MariaDB restart dahil)
+#   sanalcp-optimize --no-restart   # config yaz + dinamikleri SET GLOBAL ile uygula, MariaDB restart ETME
+#   sanalcp-optimize --dry-run      # sadece hesaplanan değerleri göster
 set -uo pipefail
 
 NO_RESTART=0; DRY=0
@@ -50,10 +50,10 @@ TS=$(date +%s)
 
 # ================= MARIADB =================
 echo "════════ MariaDB ════════"
-MYSQL_CNF=/etc/my.cnf.d/sanalpanel-tuning.cnf
+MYSQL_CNF=/etc/my.cnf.d/sanalcp-tuning.cnf
 [ -f "$MYSQL_CNF" ] && cp -a "$MYSQL_CNF" "${MYSQL_CNF}.bak.${TS}"
 cat > "$MYSQL_CNF" <<CNF
-# SanalPanel tuning — otomatik üretildi (RAM=${RAM_MB}MB, CPU=${CPU}). sanalpanel-optimize ile yenile.
+# SanalCP tuning — otomatik üretildi (RAM=${RAM_MB}MB, CPU=${CPU}). sanalcp-optimize ile yenile.
 [mysqld]
 # --- InnoDB buffer pool (en önemli cache; RAM'in %${BP_PCT}'i) ---
 innodb_buffer_pool_size          = ${BP_MB}M
@@ -127,7 +127,7 @@ log "dinamik ayarlar SET GLOBAL ile uygulandı (restart'sız)"
 # ⚠️ 'infinity' KULLANMA: MariaDB open_files_limit'i 64'e çökertir. Somut yüksek değer ver.
 LIMITS_DIR=/etc/systemd/system/mariadb.service.d
 mkdir -p "$LIMITS_DIR"
-cat > "$LIMITS_DIR/sanalpanel-limits.conf" <<LIM
+cat > "$LIMITS_DIR/sanalcp-limits.conf" <<LIM
 [Service]
 LimitNOFILE=1048576
 LIM
@@ -153,7 +153,7 @@ fi
 # ================= NGINX =================
 echo "════════ nginx ════════"
 NGINX_CONF=/etc/nginx/nginx.conf
-NGX_PERF=/etc/nginx/conf.d/00-sanalpanel-perf.conf
+NGX_PERF=/etc/nginx/conf.d/00-sanalcp-perf.conf
 cp -a "$NGINX_CONF" "${NGINX_CONF}.bak.${TS}"
 
 # 1) main + events (idempotent, nginx.conf içinde olmalı)
@@ -165,7 +165,7 @@ grep -q 'multi_accept' "$NGINX_CONF" || sed -i '/worker_connections/a\    multi_
 # Not: client_max_body_size + types_hash_max_size nginx.conf http{}'de ZATEN tanımlı
 # (panel yönetir) → burada TEKRAR ETME, yoksa "duplicate directive" ile nginx -t patlar.
 cat > "$NGX_PERF" <<'NGX'
-# SanalPanel nginx performans tuning — otomatik üretildi. sanalpanel-optimize ile yenile.
+# SanalCP nginx performans tuning — otomatik üretildi. sanalcp-optimize ile yenile.
 server_tokens off;
 tcp_nodelay on;
 reset_timedout_connection on;
@@ -212,11 +212,11 @@ fi
 # Büyük form/import (phpMyAdmin, WordPress) takılmasın: max_input_vars=10000
 # tüm PHP sürümlerine + phpMyAdmin pool'una uygula.
 echo "════════ PHP ════════"
-PHP_DROPIN='; SanalPanel: büyük form/import (phpMyAdmin, WordPress) — takılma önler
+PHP_DROPIN='; SanalCP: büyük form/import (phpMyAdmin, WordPress) — takılma önler
 max_input_vars = 10000'
 PHP_RESTART=0
 # OPcache tuning (yoğun PHP yükü için; JIT sadece 8.x'te)
-OPC_COMMON='; SanalPanel OPcache tuning — yoğun PHP yükü için
+OPC_COMMON='; SanalCP OPcache tuning — yoğun PHP yükü için
 opcache.memory_consumption=256
 opcache.interned_strings_buffer=16
 opcache.max_accelerated_files=32531
@@ -229,8 +229,8 @@ opcache.fast_shutdown=1'
 # remi sürümleri (varsa)
 for d in /etc/opt/remi/php*/php.d; do
   [ -d "$d" ] || continue
-  printf '%s\n' "$PHP_DROPIN" > "$d/99-sanalpanel-input.ini"
-  printf '%s\n' "$OPC_COMMON" > "$d/99-sanalpanel-opcache.ini"
+  printf '%s\n' "$PHP_DROPIN" > "$d/99-sanalcp-input.ini"
+  printf '%s\n' "$OPC_COMMON" > "$d/99-sanalcp-opcache.ini"
   # NOT: opcache JIT KASITLI kapalı — bazı kutularda opcode-handler eklentileriyle
   # çakışıp "JIT disabled" uyarısı basıyor (wp-cli çıktısını kirletiyor) + zaten
   # auto-disable oluyor. OPcache mem/file tuning gerçek kazanç; JIT marjinal.
@@ -238,8 +238,8 @@ for d in /etc/opt/remi/php*/php.d; do
 done
 # base php (phpMyAdmin base php-fpm)
 if [ -d /etc/php.d ]; then
-  printf '%s\n' "$PHP_DROPIN" > /etc/php.d/99-sanalpanel-input.ini
-  printf '%s\n' "$OPC_COMMON" > /etc/php.d/99-sanalpanel-opcache.ini
+  printf '%s\n' "$PHP_DROPIN" > /etc/php.d/99-sanalcp-input.ini
+  printf '%s\n' "$OPC_COMMON" > /etc/php.d/99-sanalcp-opcache.ini
   PHP_RESTART=1
 fi
 # phpMyAdmin pool açık satır (php_value)

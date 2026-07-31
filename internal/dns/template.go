@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // TemplateRow: şablondaki tek kayıt satırı.

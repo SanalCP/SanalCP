@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kaynaklimit"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kaynaklimit"
 
 	"github.com/go-chi/chi/v5"
 )

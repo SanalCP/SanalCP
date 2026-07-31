@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/archivex"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/archivex"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )

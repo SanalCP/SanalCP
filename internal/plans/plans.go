@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )

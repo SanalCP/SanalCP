@@ -11,8 +11,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -106,7 +106,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw, err := os.CreateTemp("", "sanalpanel-db-import-*.upload")
+	raw, err := os.CreateTemp("", "sanalcp-db-import-*.upload")
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "geçici dosya oluşturulamadı")
 		return
@@ -137,7 +137,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		}
 		defer gzr.Close()
 
-		expanded, err := os.CreateTemp("", "sanalpanel-db-import-*.sql")
+		expanded, err := os.CreateTemp("", "sanalcp-db-import-*.sql")
 		if err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "geçici SQL dosyası oluşturulamadı")
 			return

@@ -15,11 +15,11 @@ import (
 	"syscall"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kaynaklimit"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kaynaklimit"
 )
 
-const PanelSurum = "SanalPanel 0.2.0"
+const PanelSurum = "SanalCP 0.2.0"
 
 type CPUUsage struct {
 	Yuzde    float64 `json:"yuzde"`
@@ -513,7 +513,7 @@ func utsToString(b []int8) string {
 }
 
 var servisListesi = []struct{ ad, etiket string }{
-	{"sanalpanel", "Panel"},
+	{"sanalcp", "Panel"},
 	{"nginx", "Nginx"},
 	{"mariadb", "MariaDB"},
 	{"pure-ftpd-mysql", "FTP (Pure-FTPd)"},

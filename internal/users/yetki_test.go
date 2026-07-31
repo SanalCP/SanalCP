@@ -12,8 +12,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-chi/chi/v5"
 
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/middleware"
 )
 
 // Panel hesabı yönetiminin yetki regresyon paketi (Faz 5F).

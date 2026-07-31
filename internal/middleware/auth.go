@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )

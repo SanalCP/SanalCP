@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/provisioner"
 )
 
 // Limitler: plan tablosundan okunan aktif değerler.
@@ -81,9 +81,9 @@ func slicePath(sk string) string {
 // CPUQuota, MemoryMax, TasksMax, IOWeight + (varsa) MUTLAK disk G/Ç throttle'ları
 // (IO{Read,Write}BandwidthMax / IO{Read,Write}IOPSMax) kural setini kullanır (cgroup v2).
 func SystemdSliceYaz(sk string, l Limitler) error {
-	content := fmt.Sprintf(`# SanalPanel per-domain resource slice — %s
+	content := fmt.Sprintf(`# SanalCP per-domain resource slice — %s
 [Unit]
-Description=SanalPanel tenant slice for %s
+Description=SanalCP tenant slice for %s
 Before=slices.target
 
 [Slice]
@@ -328,7 +328,7 @@ func mountKotaAktif() (accounting, enforcement bool) {
 // veya uqnoenforce → accounting açık/enforce kapalı) TÜM kota işlemleri sessizce no-op olur.
 // Operatör "kota aktif" sanmasın diye HealKotaOnStartup açılışta bu sentinel'i YAZAR;
 // enforcement aktifken SİLER. Status endpoint bunu okuyup UI'a reboot-gerekli bayrağı düşürür.
-const kotaSentinelDir = "/etc/sanalpanel"
+const kotaSentinelDir = "/etc/sanalcp"
 const kotaRebootSentinel = kotaSentinelDir + "/reboot-required-quota"
 
 // kotaSentinelYaz: reboot-gerekli sentinel'ini idempotent yazar. Sabit yol; os.WriteFile =
@@ -806,7 +806,7 @@ func servisAktif(unit string) bool {
 //     provisioner.RollbackToSharedFPM + slice sil → site paylaşılan düzende 200 kalır.
 //
 // İdempotent (migrate olanı atlar), SIRALI (thundering yok), ARKA PLANDA çağrılır
-// (panel boot'unu bloklamaz). sanalpanel-update her panel restart'ında tetikler →
+// (panel boot'unu bloklamaz). sanalcp-update her panel restart'ında tetikler →
 // update için plan-driven cutover mekanizması. Plan atanmamış domain'e DOKUNMAZ.
 func HealTenantFPM(ctx context.Context, db *sql.DB) {
 	if db == nil {

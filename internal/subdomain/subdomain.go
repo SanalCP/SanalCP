@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/dns"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/dns"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -249,7 +249,7 @@ func vhost(tamAd, docroot, socket string) string {
 
     location ~ /\.(?!well-known) { deny all; }
 
-    # SanalPanel subdomain — ` + tamAd + `
+    # SanalCP subdomain — ` + tamAd + `
 }
 `
 }

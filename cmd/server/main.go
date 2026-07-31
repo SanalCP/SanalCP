@@ -16,55 +16,55 @@ import (
 	"syscall"
 	"time"
 
-	"sanalpanel/internal/accounts"
-	"sanalpanel/internal/antivirus"
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/backups"
-	"sanalpanel/internal/bayipaketleri"
-	"sanalpanel/internal/cliapi"
-	"sanalpanel/internal/composer"
-	"sanalpanel/internal/config"
-	"sanalpanel/internal/cron"
-	"sanalpanel/internal/db"
-	"sanalpanel/internal/dns"
-	"sanalpanel/internal/domainek"
-	"sanalpanel/internal/domains"
-	"sanalpanel/internal/eklenti"
-	"sanalpanel/internal/files"
-	"sanalpanel/internal/genelbakis"
-	"sanalpanel/internal/git"
-	githubpkg "sanalpanel/internal/github"
-	"sanalpanel/internal/gocis"
-	"sanalpanel/internal/guvenlikduvari"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/istatistik"
-	"sanalpanel/internal/kaynak"
-	"sanalpanel/internal/kaynaklimit"
-	"sanalpanel/internal/logs"
-	"sanalpanel/internal/mail"
-	"sanalpanel/internal/middleware"
-	"sanalpanel/internal/monitor"
-	"sanalpanel/internal/musteri"
-	"sanalpanel/internal/nginxset"
-	"sanalpanel/internal/paketler"
-	"sanalpanel/internal/panelayarlari"
-	"sanalpanel/internal/performans"
-	"sanalpanel/internal/php"
-	"sanalpanel/internal/phpext"
-	"sanalpanel/internal/phpsurum"
-	"sanalpanel/internal/plans"
-	"sanalpanel/internal/pma"
-	"sanalpanel/internal/provisioner"
-	"sanalpanel/internal/redis"
-	"sanalpanel/internal/sifrekoruma"
-	"sanalpanel/internal/sitekopya"
-	"sanalpanel/internal/sshaccess"
-	"sanalpanel/internal/subdomain"
-	"sanalpanel/internal/system"
-	"sanalpanel/internal/transfers"
-	"sanalpanel/internal/users"
-	"sanalpanel/internal/waf"
-	"sanalpanel/internal/wordpress"
+	"sanalcp/internal/accounts"
+	"sanalcp/internal/antivirus"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/backups"
+	"sanalcp/internal/bayipaketleri"
+	"sanalcp/internal/cliapi"
+	"sanalcp/internal/composer"
+	"sanalcp/internal/config"
+	"sanalcp/internal/cron"
+	"sanalcp/internal/db"
+	"sanalcp/internal/dns"
+	"sanalcp/internal/domainek"
+	"sanalcp/internal/domains"
+	"sanalcp/internal/eklenti"
+	"sanalcp/internal/files"
+	"sanalcp/internal/genelbakis"
+	"sanalcp/internal/git"
+	githubpkg "sanalcp/internal/github"
+	"sanalcp/internal/gocis"
+	"sanalcp/internal/guvenlikduvari"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/istatistik"
+	"sanalcp/internal/kaynak"
+	"sanalcp/internal/kaynaklimit"
+	"sanalcp/internal/logs"
+	"sanalcp/internal/mail"
+	"sanalcp/internal/middleware"
+	"sanalcp/internal/monitor"
+	"sanalcp/internal/musteri"
+	"sanalcp/internal/nginxset"
+	"sanalcp/internal/paketler"
+	"sanalcp/internal/panelayarlari"
+	"sanalcp/internal/performans"
+	"sanalcp/internal/php"
+	"sanalcp/internal/phpext"
+	"sanalcp/internal/phpsurum"
+	"sanalcp/internal/plans"
+	"sanalcp/internal/pma"
+	"sanalcp/internal/provisioner"
+	"sanalcp/internal/redis"
+	"sanalcp/internal/sifrekoruma"
+	"sanalcp/internal/sitekopya"
+	"sanalcp/internal/sshaccess"
+	"sanalcp/internal/subdomain"
+	"sanalcp/internal/system"
+	"sanalcp/internal/transfers"
+	"sanalcp/internal/users"
+	"sanalcp/internal/waf"
+	"sanalcp/internal/wordpress"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -90,7 +90,7 @@ func geciciDizinAyarla() {
 	if strings.TrimSpace(os.Getenv("TMPDIR")) != "" {
 		return
 	}
-	const dizin = "/var/lib/sanalpanel/tmp"
+	const dizin = "/var/lib/sanalcp/tmp"
 	if err := os.MkdirAll(dizin, 0o700); err != nil {
 		log.Printf("geçici dizin oluşturulamadı (%s), /tmp kullanılacak: %v", dizin, err)
 		return
@@ -163,7 +163,7 @@ func main() {
 	}
 	// Batch5A: mevcut planlı domain'leri per-tenant FPM'e (Seçenek A) ARKA PLANDA + GÜVENLE
 	// (baseline/post self-check + auto-rollback) migrate et. Panel her restart'ında
-	// (sanalpanel-update) otomatik döner → mevcut-müşteri cutover'ı plan-driven tamamlanır.
+	// (sanalcp-update) otomatik döner → mevcut-müşteri cutover'ı plan-driven tamamlanır.
 	// Boot'u bloklamaz (bg goroutine, kendi context'i).
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -178,7 +178,7 @@ func main() {
 	// (tek seferlik reboot bekliyor) sessizce atla. Boot'u bloklamaz (bg goroutine).
 	go kaynaklimit.HealKotaOnStartup(context.Background(), d)
 	// Mail: Postfix/Dovecot config dosyalarının varlığını doğrula + aktif mail_domains'lerin
-	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalpanel-mail-setup henüz
+	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalcp-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
 	mail.HealMailOnStartup(context.Background(), d)
 	mail.StartPolicyServer(d, "127.0.0.1:10040")
@@ -600,14 +600,14 @@ func main() {
 	system.SurumBaslat(version, buildDate)
 
 	go func() {
-		log.Printf("sanalpanel %s — %s üzerinde dinleniyor (env=%s)", version, cfg.ListenAddr, cfg.Env)
+		log.Printf("sanalcp %s — %s üzerinde dinleniyor (env=%s)", version, cfg.ListenAddr, cfg.Env)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}
 	}()
 
 	go func() {
-		log.Printf("sanalpanel CLI API — %s üzerinde dinleniyor (loopback-only)", cfg.CLIListenAddr)
+		log.Printf("sanalcp CLI API — %s üzerinde dinleniyor (loopback-only)", cfg.CLIListenAddr)
 		if err := cliSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("cli listen: %v", err)
 		}
@@ -628,7 +628,7 @@ func main() {
 }
 
 func runMigrations(d *sql.DB) error {
-	dir := "/opt/sanalpanel/src/migrations"
+	dir := "/opt/sanalcp/src/migrations"
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("dizin okunamadı: %w", err)

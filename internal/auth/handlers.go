@@ -13,7 +13,7 @@ import (
 
 	yescrypt "github.com/openwall/yescrypt-go"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 type Handlers struct {

@@ -33,7 +33,7 @@ func ValidateNginxDirectives(direktifler string) error {
 	// katılmaz. Bu yüzden gerçek ".conf" adına taşıyoruz.
 	finalPath := strings.TrimSuffix(tmpPath, ".tmp")
 
-	block := fmt.Sprintf(`# SanalPanel geçici plan direktif doğrulaması — otomatik silinir
+	block := fmt.Sprintf(`# SanalCP geçici plan direktif doğrulaması — otomatik silinir
 server {
     listen 127.0.0.1:65071;
     server_name _sanal_plan_validate;

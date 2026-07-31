@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 var (
 	hostnameOku      = os.Hostname
 	hostnameDosyasi  = "/etc/hostname"
-	cloudInitDosyasi = "/etc/cloud/cloud.cfg.d/99-sanalpanel-hostname.cfg"
-	nmDosyasi        = "/etc/NetworkManager/conf.d/99-sanalpanel-hostname.conf"
+	cloudInitDosyasi = "/etc/cloud/cloud.cfg.d/99-sanalcp-hostname.cfg"
+	nmDosyasi        = "/etc/NetworkManager/conf.d/99-sanalcp-hostname.conf"
 	hostnameAyarla   = func(ctx context.Context, ad string) error {
 		return exec.CommandContext(ctx, "hostnamectl", "set-hostname", ad).Run()
 	}
@@ -61,7 +61,7 @@ func atomikYaz(yol, icerik string, mod os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(yol), 0755); err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(filepath.Dir(yol), ".sanalpanel-hostname-*")
+	f, err := os.CreateTemp(filepath.Dir(yol), ".sanalcp-hostname-*")
 	if err != nil {
 		return err
 	}
@@ -84,11 +84,11 @@ func atomikYaz(yol, icerik string, mod os.FileMode) error {
 
 func hostnameKorumasiYaz() error {
 	if err := atomikYaz(cloudInitDosyasi,
-		"# SanalPanel: sağlayıcı/cloud-init hostname'i geri yazmasın\npreserve_hostname: true\n", 0644); err != nil {
+		"# SanalCP: sağlayıcı/cloud-init hostname'i geri yazmasın\npreserve_hostname: true\n", 0644); err != nil {
 		return err
 	}
 	return atomikYaz(nmDosyasi,
-		"# SanalPanel: DHCP/NetworkManager statik hostname'i değiştirmesin\n[main]\nhostname-mode=none\n", 0644)
+		"# SanalCP: DHCP/NetworkManager statik hostname'i değiştirmesin\n[main]\nhostname-mode=none\n", 0644)
 }
 
 // HostnameDurum — GET /system/hostname.

@@ -15,13 +15,13 @@ import (
 func TestS3RequestURLPathStyle(t *testing.T) {
 	d := &Destination{
 		Tip: "b2", Endpoint: "https://s3.us-west-004.backblazeb2.com",
-		Bucket: "firma-yedekleri", UzakDizin: "/sanalpanel/example.com/", PathStyle: true,
+		Bucket: "firma-yedekleri", UzakDizin: "/sanalcp/example.com/", PathStyle: true,
 	}
 	u, err := s3RequestURL(d, "backup 01.tar.gz")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "https://s3.us-west-004.backblazeb2.com/firma-yedekleri/sanalpanel/example.com/backup%2001.tar.gz"
+	want := "https://s3.us-west-004.backblazeb2.com/firma-yedekleri/sanalcp/example.com/backup%2001.tar.gz"
 	if u.String() != want {
 		t.Fatalf("URL = %q, want %q", u.String(), want)
 	}

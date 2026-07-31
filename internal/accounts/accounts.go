@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kota"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kota"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )

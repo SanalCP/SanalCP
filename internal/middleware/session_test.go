@@ -8,7 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
-	"sanalpanel/internal/auth"
+	"sanalcp/internal/auth"
 )
 
 func TestRequireAuthOturumSurumu(t *testing.T) {

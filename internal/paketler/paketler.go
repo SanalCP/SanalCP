@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // Kritik paketler — kaldirilirsa sistem coker
@@ -281,4 +281,3 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, res)
 }
-

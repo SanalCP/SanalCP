@@ -25,7 +25,7 @@ func Issue(secret []byte, lifetimeSec int, uid int64, username, role string, ver
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(lifetimeSec) * time.Second)),
-			Issuer:    "sanalpanel",
+			Issuer:    "sanalcp",
 		},
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
@@ -46,7 +46,7 @@ func Parse(secret []byte, raw string) (*Claims, error) {
 	if err != nil || !tok.Valid {
 		return nil, errors.New("geçersiz token")
 	}
-	if c.Issuer != "sanalpanel" || c.Role == "" {
+	if c.Issuer != "sanalcp" || c.Role == "" {
 		return nil, errors.New("admin token değil")
 	}
 	return c, nil

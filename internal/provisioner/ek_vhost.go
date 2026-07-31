@@ -82,7 +82,7 @@ func EkVhostIcerik(alanAdi, docroot, socket, certPath, keyPath string) string {
 			"    server_name " + adlar + ";\n\n" +
 			acme + "\n" +
 			govde + "\n" +
-			"    # SanalPanel ek alan adı — " + alanAdi + "\n" +
+			"    # SanalCP ek alan adı — " + alanAdi + "\n" +
 			"}\n"
 	}
 
@@ -105,7 +105,7 @@ func EkVhostIcerik(alanAdi, docroot, socket, certPath, keyPath string) string {
 		"    ssl_session_cache shared:SSL:10m;\n" +
 		"    ssl_session_timeout 1d;\n\n" +
 		govde + "\n" +
-		"    # SanalPanel ek alan adı (SSL) — " + alanAdi + "\n" +
+		"    # SanalCP ek alan adı (SSL) — " + alanAdi + "\n" +
 		"}\n"
 }
 

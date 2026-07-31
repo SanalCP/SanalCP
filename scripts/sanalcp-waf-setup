@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# sanalpanel-waf-setup — ModSecurity v3 + OWASP CRS kurulumu (IDEMPOTENT).
+# sanalcp-waf-setup — ModSecurity v3 + OWASP CRS kurulumu (IDEMPOTENT).
 #
-#   sanalpanel-waf-setup            # eksikleri kur; her sey hazirsa hizlica cik
-#   sanalpanel-waf-setup --force    # connector'i yeniden derle (nginx ABI degisti sansa karsi)
-#   sanalpanel-waf-setup --status   # yalniz durum raporu, degisiklik yapma
+#   sanalcp-waf-setup            # eksikleri kur; her sey hazirsa hizlica cik
+#   sanalcp-waf-setup --force    # connector'i yeniden derle (nginx ABI degisti sansa karsi)
+#   sanalcp-waf-setup --status   # yalniz durum raporu, degisiklik yapma
 #
 # NE YAPAR (yalniz eksik olani):
 #   1) libmodsecurity v3 (yoksa kaynaktan derle → /usr/local/modsecurity)
@@ -33,7 +33,7 @@ ABI_STAMP=$MODSEC_DIR/.built_for_nginx
 AUDIT_LOG=/var/log/nginx/modsec_audit.log
 WORK_DIR=/var/cache/nginx/modsec
 LOADLINE="load_module $MODULE;"
-MARK="# sanalpanel-waf: ModSecurity modulu (main-context, per-domain opt-in)"
+MARK="# sanalcp-waf: ModSecurity modulu (main-context, per-domain opt-in)"
 
 FORCE=0; STATUS=0
 while [ $# -gt 0 ]; do
@@ -77,7 +77,7 @@ if [ "$STATUS" = 1 ]; then
   exit 0
 fi
 
-step "SanalPanel WAF kurulum (ModSecurity $MODSEC_VER + CRS $CRS_VER, nginx $NGVER)"
+step "SanalCP WAF kurulum (ModSecurity $MODSEC_VER + CRS $CRS_VER, nginx $NGVER)"
 
 # Her sey hazir + ABI uyumlu + zorlanmiyorsa → hizli cik (agir derleme atlanir).
 if have_lib && have_module && abi_ok && have_crs && module_loaded && [ "$FORCE" = 0 ]; then
@@ -169,7 +169,7 @@ fi
 
 # modsecurity.conf (temel yapilandirma — per-domain SecRuleEngine BUNU override eder)
 cat > "$MODSEC_DIR/modsecurity.conf" <<MODSECEOF
-# SanalPanel — ModSecurity temel yapilandirmasi.
+# SanalCP — ModSecurity temel yapilandirmasi.
 # NOT: SecRuleEngine burada DetectionOnly; per-domain conf (Include sonrasi) On/DetectionOnly
 # olarak override eder → gercek mod her zaman panel ayarindan gelir.
 SecRuleEngine DetectionOnly
@@ -198,7 +198,7 @@ MODSECEOF
 
 # main.conf — GLOBAL varsayilan referans paketi (per-domain conf'lar bunun parcalarini kullanir).
 cat > "$MODSEC_DIR/main.conf" <<MAINEOF
-# SanalPanel — WAF global referans (per-domain conf'lar /etc/nginx/modsec/domains/<sk>.conf).
+# SanalCP — WAF global referans (per-domain conf'lar /etc/nginx/modsec/domains/<sk>.conf).
 # Bu dosya dogrudan bir vhost'a baglanmaz; tam kural paketini tek yerde gormek icindir.
 Include $MODSEC_DIR/modsecurity.conf
 Include $CRS_DIR/crs-setup.conf

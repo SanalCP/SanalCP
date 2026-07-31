@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -82,7 +82,7 @@ func deployKeyDir(sk string) string {
 func generateDeployKey(sk string) (pubKey string, err error) {
 	dir := deployKeyDir(sk)
 	_ = os.MkdirAll(dir, 0700)
-	priv := filepath.Join(dir, "sanalpanel_deploy")
+	priv := filepath.Join(dir, "sanalcp_deploy")
 	pub := priv + ".pub"
 
 	if _, err := os.Stat(pub); err == nil {
@@ -91,7 +91,7 @@ func generateDeployKey(sk string) (pubKey string, err error) {
 		return strings.TrimSpace(string(b)), nil
 	}
 	_, _ = exec.Command("rm", "-f", priv, pub).CombinedOutput()
-	out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-C", "deploy@sanalpanel/"+sk, "-f", priv).CombinedOutput()
+	out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-C", "deploy@sanalcp/"+sk, "-f", priv).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("ssh-keygen: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -105,7 +105,7 @@ func generateDeployKey(sk string) (pubKey string, err error) {
 	cfgBody := `Host github.com
     HostName github.com
     User git
-    IdentityFile ~/.ssh/sanalpanel_deploy
+    IdentityFile ~/.ssh/sanalcp_deploy
     StrictHostKeyChecking no
     UserKnownHostsFile=/dev/null
 `

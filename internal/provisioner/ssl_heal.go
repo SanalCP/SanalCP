@@ -20,7 +20,7 @@ import (
 // bunu "tam basarisizlik" sayip elindeki GECERLI cert'i yok sayiyor, vhost'u HTTP-only
 // yeniden yaziyor → origin'de 443 dinleyen kalmiyor → Cloudflare Full/strict altinda
 // 522/525 → site KOMPLE dusuyordu. Oysa gecerli cert acme store'da (/root/.acme.sh) ve/
-// veya /etc/pki/sanalpanel'de 90 gun GECERLI DURUYOR.
+// veya /etc/pki/sanalcp'de 90 gun GECERLI DURUYOR.
 //
 // COZUM (3 parca, hepsi installer+update yapisinda startup-heal ile):
 //  1. Reuse-before-issue: gecerli cert varsa yeni cekim YAPMA, onu deploy et (429'a hic girmez).
@@ -144,7 +144,7 @@ func enIyiCertBul(domain string, minGun int) (certPath, keyPath string, gercekCA
 	return bestCert, bestKey, bestReal
 }
 
-// certiPkiyeKur: srcCert/srcKey'i /etc/pki/sanalpanel/<domain>/'e kopyalar (cert 0644,
+// certiPkiyeKur: srcCert/srcKey'i /etc/pki/sanalcp/<domain>/'e kopyalar (cert 0644,
 // key 0600, root-owned, restorecon → cert_t). Kaynak zaten hedefse yalniz izin/baglam
 // uygular (idempotent). Doner: hedef cert/key yolu.
 func certiPkiyeKur(domain, srcCert, srcKey string) (certPath, keyPath string, err error) {
@@ -168,7 +168,7 @@ func certiPkiyeKur(domain, srcCert, srcKey string) (certPath, keyPath string, er
 	return certPath, keyPath, nil
 }
 
-// selfSignedUret: /etc/pki/sanalpanel/<domain>/'e 1 yillik self-signed cert uretir
+// selfSignedUret: /etc/pki/sanalcp/<domain>/'e 1 yillik self-signed cert uretir
 // (SAN: domain + www.domain). Vhost RENDER ETMEZ — cagiran sslVhostYaz ile baglar.
 func selfSignedUret(domain string) (certPath, keyPath string, err error) {
 	if verr := ValidateDomain(domain); verr != nil {
@@ -180,7 +180,7 @@ func selfSignedUret(domain string) (certPath, keyPath string, err error) {
 	}
 	certPath = filepath.Join(sslDir, domain+".crt")
 	keyPath = filepath.Join(sslDir, domain+".key")
-	subj := fmt.Sprintf("/C=TR/ST=Local/L=SanalPanel/O=%s/CN=%s", domain, domain)
+	subj := fmt.Sprintf("/C=TR/ST=Local/L=SanalCP/O=%s/CN=%s", domain, domain)
 	sanHostlar := wwwHostlar(domain)
 	san := make([]string, len(sanHostlar))
 	for i, h := range sanHostlar {

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"syscall"
 
-	"sanalpanel/internal/archivex"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/archivex"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
 )
 
 // jailJoinStrict: symlink-aware. Parent dizini EvalSymlinks ile resolve eder,

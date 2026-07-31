@@ -6,13 +6,13 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // logKaynaklari: kaynak anahtarı → systemd unit. Allowlist — komut enjeksiyonu YOK
 // (kullanıcı girdisi doğrudan komuta gitmez, sadece bu haritadan geçer).
 var logKaynaklari = map[string]string{
-	"panel":   "sanalpanel.service",
+	"panel":   "sanalcp.service",
 	"mariadb": "mariadb.service",
 	"named":   "named.service",
 	"sshd":    "sshd.service",

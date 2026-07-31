@@ -36,11 +36,11 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/dns"
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kota"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/dns"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kota"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )

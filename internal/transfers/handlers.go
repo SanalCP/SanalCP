@@ -21,12 +21,12 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/cron"
-	"sanalpanel/internal/domains"
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/mail"
-	"sanalpanel/internal/provisioner"
+	"sanalcp/internal/cron"
+	"sanalcp/internal/domains"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/mail"
+	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -118,9 +118,9 @@ type DBMap struct {
 	User   string `json:"user"`
 }
 
-// Import creates a new SanalPanel domain and restores the web root plus a
+// Import creates a new SanalCP domain and restores the web root plus a
 // cPanel databases. Additional databases share the domain's default DB user,
-// matching SanalPanel's supported one-user-to-many-databases model.
+// matching SanalCP's supported one-user-to-many-databases model.
 func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	if h.Domains == nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "domain sağlayıcısı hazır değil")
@@ -141,7 +141,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	tmp, err := os.CreateTemp("", "sanalpanel-cpanel-*.tar.gz")
+	tmp, err := os.CreateTemp("", "sanalcp-cpanel-*.tar.gz")
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "geçici arşiv oluşturulamadı")
 		return

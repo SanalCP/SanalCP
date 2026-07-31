@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
 
-const bundleKok = "/opt/sanalpanel/eklentiler"
+const bundleKok = "/opt/sanalcp/eklentiler"
 
 type Handlers struct{ DB *sql.DB }
 

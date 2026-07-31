@@ -1,5 +1,5 @@
 
-# ===== sanalpanel-mail (submission/587) =====
+# ===== sanalcp-mail (submission/587) =====
 # PHPMailer/mail istemcilerinin bağlandığı asıl uç nokta: <sunucu>:587, STARTTLS,
 # AUTH LOGIN/PLAIN (kullanıcı = kutu e-postası, panelde üretilen parola).
 submission inet n       -       n       -       -       smtpd

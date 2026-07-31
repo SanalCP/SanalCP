@@ -41,8 +41,8 @@ func TestEkVhostIcerikSSLsiz(t *testing.T) {
 }
 
 func TestEkVhostIcerikSSLli(t *testing.T) {
-	cert := "/etc/pki/sanalpanel/sille.org.tr/sille.org.tr.crt"
-	key := "/etc/pki/sanalpanel/sille.org.tr/sille.org.tr.key"
+	cert := "/etc/pki/sanalcp/sille.org.tr/sille.org.tr.crt"
+	key := "/etc/pki/sanalcp/sille.org.tr/sille.org.tr.key"
 	c := EkVhostIcerik("sille.org.tr", "/home/c_sille_tr/domains/sille.org.tr", "/run/x.sock", cert, key)
 
 	if !strings.Contains(c, "listen 443 ssl") {

@@ -11,13 +11,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"sanalpanel/internal/auth"
-	"sanalpanel/internal/bayipaketleri"
-	"sanalpanel/internal/domains"
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/kilit"
-	"sanalpanel/internal/kota"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/auth"
+	"sanalcp/internal/bayipaketleri"
+	"sanalcp/internal/domains"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/kilit"
+	"sanalcp/internal/kota"
+	"sanalcp/internal/middleware"
 )
 
 type Handlers struct {

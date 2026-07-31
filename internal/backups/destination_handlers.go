@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // GET /domains/{id}/backup-destination

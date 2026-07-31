@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"sanalpanel/internal/hesaplar"
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 type ctxKey int

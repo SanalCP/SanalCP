@@ -1,46 +1,46 @@
 #!/usr/bin/env bash
-# sanalpanel-restore — SanalPanel CORE dosyalarını canonical sürümden ONARIR.
+# sanalcp-restore — SanalCP CORE dosyalarını canonical sürümden ONARIR.
 #
-# AMAÇ (sanalpanel-update'ten FARKI):
+# AMAÇ (sanalcp-update'ten FARKI):
 #   • "onar", "en son sürüme yükselt" DEĞİL — çalışan sürümün BOZULMUŞ core dosyalarını
 #     (0-byte frontend, silinmiş/bozuk binary, eksik ops-tool) canonical release ile eşitler.
 #   • INTEGRITY-FIRST / FORCE: release hash aynı olsa bile bütünlük bozuksa (boş/eksik/ELF değil)
 #     yine de geri yükler. Update ise hash eşleşince "zaten güncel" deyip ATLAR.
 #
-#   sanalpanel-restore              # core'u canonical (main) ile onar → gerekliyse restart
-#   sanalpanel-restore --dry-run    # sadece teşhis + ne yapılacağını göster, HİÇBİR ŞEYE dokunma
-#   sanalpanel-restore --branch X   # farklı dal (varsayılan: main)
-#   sanalpanel-restore --no-db-dump # migration-öncesi DB dump'ını atla (acil durum; DİKKAT)
-#   sanalpanel-restore --no-restart # dosyaları onar ama servisi yeniden başlatma
+#   sanalcp-restore              # core'u canonical (main) ile onar → gerekliyse restart
+#   sanalcp-restore --dry-run    # sadece teşhis + ne yapılacağını göster, HİÇBİR ŞEYE dokunma
+#   sanalcp-restore --branch X   # farklı dal (varsayılan: main)
+#   sanalcp-restore --no-db-dump # migration-öncesi DB dump'ını atla (acil durum; DİKKAT)
+#   sanalcp-restore --no-restart # dosyaları onar ama servisi yeniden başlatma
 #
 # KORUR (repair ASLA dokunmaz — ne siler ne değiştirir):
-#   • /etc/sanalpanel/env        (JWT / DB / Redis secret'ları)
+#   • /etc/sanalcp/env        (JWT / DB / Redis secret'ları)
 #   • MariaDB `panel` DB + TÜM müşteri verisi
 #   • /home/c_*                     (müşteri siteleri)
-#   • /var/backups/sanalpanel/*  (mevcut yedekler — sadece güvenlik için YENİ dump EKLER)
+#   • /var/backups/sanalcp/*  (mevcut yedekler — sadece güvenlik için YENİ dump EKLER)
 # Yalnızca şu core yolları yazar: $BIN, $SEED, $FDIST, $MIGR (ekler), $SCRIPTS, /usr/local/bin ops.
 #
 # GÜVENLİK: frontend + binary ATOMİK + BÜTÜNLÜK-DOĞRULANMIŞ swap ile devreye alınır. Bozuk/kesik
-# indirme çalışan dosyaya ASLA dokunmaz (0-byte outage önlemi — sanalpanel-update ile aynı desen).
+# indirme çalışan dosyaya ASLA dokunmaz (0-byte outage önlemi — sanalcp-update ile aynı desen).
 # Migration'lar servis restart'ında uygulanır → önce FAIL-CLOSED DB dump alınır; sağlıksız
 # başlarsa eski binary + güncelleme-öncesi DB'ye rollback yapılır.
 set -euo pipefail
 
-REPO="${SANAL_REPO:-sanalpanel/sanalpanel}"
+REPO="${SANAL_REPO:-sanalcp/sanalcp}"
 BRANCH="main"; DRY=0; DODB=1; DORESTART=1
 
 # Yollar env ile override edilebilir (izole test için). Üretimde varsayılanlar geçerli.
-PREFIX="${SANAL_PREFIX:-/opt/sanalpanel}"
-BIN="${SANAL_BIN:-$PREFIX/bin/sanalpanel-server}"
-SEED="${SANAL_SEED:-$PREFIX/bin/sanalpanel-seed-admin}"
+PREFIX="${SANAL_PREFIX:-/opt/sanalcp}"
+BIN="${SANAL_BIN:-$PREFIX/bin/sanalcp-server}"
+SEED="${SANAL_SEED:-$PREFIX/bin/sanalcp-seed-admin}"
 FDIST="${SANAL_FDIST:-$PREFIX/frontend-dist}"
 MIGR="${SANAL_MIGR:-$PREFIX/src/migrations}"
 SCRIPTS="${SANAL_SCRIPTS:-$PREFIX/src/scripts}"
 OPSBIN="${SANAL_OPSBIN:-/usr/local/bin}"
-SVC="${SANAL_SVC:-sanalpanel}"
+SVC="${SANAL_SVC:-sanalcp}"
 HEALTH="${SANAL_HEALTH:-http://127.0.0.1:8080/healthz}"
-DBBK="${SANAL_DBBK:-/usr/local/bin/sanalpanel-db-backup}"  # panel DB dump aracı
-DBDIR="${SANAL_DBDIR:-/var/backups/sanalpanel/db}"         # dump'ların yeri
+DBBK="${SANAL_DBBK:-/usr/local/bin/sanalcp-db-backup}"  # panel DB dump aracı
+DBDIR="${SANAL_DBDIR:-/var/backups/sanalcp/db}"         # dump'ların yeri
 PREDUMP=""                                                    # onarım-öncesi dump (rollback'te geri yüklenir)
 
 while [ $# -gt 0 ]; do
@@ -65,11 +65,11 @@ step() { echo -e "${c_b}══ $* ══${c_0}"; }
 
 is_elf() { head -c4 "$1" 2>/dev/null | grep -q $'\x7fELF'; }
 
-[ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalpanel-restore)"
+[ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalcp-restore)"
 command -v curl >/dev/null || die "curl gerekli"
 command -v tar  >/dev/null || die "tar gerekli"
 
-step "SanalPanel core onarım (github.com/$REPO@$BRANCH)$([ $DRY = 1 ] && echo '  [DRY-RUN]')"
+step "SanalCP core onarım (github.com/$REPO@$BRANCH)$([ $DRY = 1 ] && echo '  [DRY-RUN]')"
 
 # ───────────────────────────────────────────────────────────────────────────
 # a) Canonical release'i getir → $A (assets dizini).
@@ -89,7 +89,7 @@ else
   A="$SRC/assets"
 fi
 [ -d "$A" ] || die "assets/ bulunamadı ($A) — repo yapısı beklenenden farklı"
-NEWBIN="$A/sanalpanel-server"
+NEWBIN="$A/sanalcp-server"
 [ -f "$NEWBIN" ] || die "$NEWBIN yok — canonical release bozuk/eksik, onarım iptal"
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -123,14 +123,14 @@ if [ "$DRY" = 1 ]; then
   echo "  • $SEED    → canonical seed-admin ile eşitlenir"
   echo "  • $MIGR/   → yeni .sql EKLENİR (mevcutlar korunur)"
   echo "  • $OPSBIN + $SCRIPTS → ops-tool'lar senkron"
-  echo "  • KORUNUR: /etc/sanalpanel/env · panel DB · /home/c_* · /var/backups/sanalpanel/*"
+  echo "  • KORUNUR: /etc/sanalcp/env · panel DB · /home/c_* · /var/backups/sanalcp/*"
   [ $DODB = 1 ] && echo "  • restart öncesi FAIL-CLOSED DB dump → $DBDIR (DRY-RUN'da ALINMAZ)"
   [ $DORESTART = 1 ] && echo "  • systemctl restart $SVC + /healthz (sağlıksızsa binary+DB rollback)"
   exit 0
 fi
 
 # ───────────────────────────────────────────────────────────────────────────
-# c) frontend-dist — ATOMİK + DOĞRULANMIŞ swap (sanalpanel-update deseni).
+# c) frontend-dist — ATOMİK + DOĞRULANMIŞ swap (sanalcp-update deseni).
 #    Yeni sürüm ayrı geçici dizine açılır → index.html DOLU + JS bundle DOĞRULANIR →
 #    atomik mv. Bozuk/kesik extraction çalışan frontend'e ASLA dokunmaz.
 # ───────────────────────────────────────────────────────────────────────────
@@ -175,10 +175,10 @@ if [ "$DO_BIN" = 1 ]; then
   install -m 0755 "$NEWBIN" "$BIN"
   ok "binary canonical'den devreye alındı (atomik)"
 fi
-if [ -f "$A/sanalpanel-seed-admin" ]; then
-  if is_elf "$A/sanalpanel-seed-admin"; then
+if [ -f "$A/sanalcp-seed-admin" ]; then
+  if is_elf "$A/sanalcp-seed-admin"; then
     [ -f "$SEED" ] && cp -f "$SEED" "$SEED.bak" 2>/dev/null || true
-    install -m 0755 "$A/sanalpanel-seed-admin" "$SEED"
+    install -m 0755 "$A/sanalcp-seed-admin" "$SEED"
     ok "seed-admin eşitlendi"
   else
     warn "canonical seed-admin ELF değil — atlandı"

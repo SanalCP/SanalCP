@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
-# sanalpanel-update — SanalPanel'i GitHub'dan güvenli in-place günceller.
+# sanalcp-update — SanalCP'i GitHub'dan güvenli in-place günceller.
 #
-#   sanalpanel-update            # son sürümü çek → binary+frontend+migration değiştir → yeniden başlat
-#   sanalpanel-update --dry-run  # sadece ne yapacağını göster, dokunma
-#   sanalpanel-update --force    # binary aynı olsa bile yeniden uygula
-#   sanalpanel-update --branch X # farklı dal (varsayılan: main)
+#   sanalcp-update            # son sürümü çek → binary+frontend+migration değiştir → yeniden başlat
+#   sanalcp-update --dry-run  # sadece ne yapacağını göster, dokunma
+#   sanalcp-update --force    # binary aynı olsa bile yeniden uygula
+#   sanalcp-update --branch X # farklı dal (varsayılan: main)
 #
-# KORUR (asla dokunmaz): /etc/sanalpanel/env (JWT/DB/Redis secret),
+# KORUR (asla dokunmaz): /etc/sanalcp/env (JWT/DB/Redis secret),
 # MariaDB `panel` DB + tüm müşteri verisi, /home/c_* siteleri.
 # Yeni migration'lar servis yeniden başlarken otomatik + idempotent uygulanır.
 #
 # DB DAYANIKLILIĞI:
-#  • Migration'lardan ÖNCE panel DB'sinin tam dump'ı alınır (/var/backups/sanalpanel/db).
+#  • Migration'lardan ÖNCE panel DB'sinin tam dump'ı alınır (/var/backups/sanalcp/db).
 #  • FAIL-CLOSED: dump alınamazsa güncelleme HİÇ BAŞLAMAZ (yedeksiz migration reddedilir).
 #  • Yeni sürüm sağlıklı başlamazsa ESKİ binary'ye + güncelleme öncesi DB'ye rollback yapar.
-#  • Günlük 03:30 yedek timer'ı (sanalpanel-db-backup.timer) kurulur + enable edilir.
+#  • Günlük 03:30 yedek timer'ı (sanalcp-db-backup.timer) kurulur + enable edilir.
 set -euo pipefail
 
-REPO="${SANAL_REPO:-sanalpanel/sanalpanel}"
+REPO="${SANAL_REPO:-sanalcp/sanalcp}"
 BRANCH="main"; DRY=0; FORCE=0
-PREFIX=/opt/sanalpanel
-BIN="$PREFIX/bin/sanalpanel-server"
-SEED="$PREFIX/bin/sanalpanel-seed-admin"
+PREFIX=/opt/sanalcp
+BIN="$PREFIX/bin/sanalcp-server"
+SEED="$PREFIX/bin/sanalcp-seed-admin"
 FDIST="$PREFIX/frontend-dist"
 MIGR="$PREFIX/src/migrations"
 SCRIPTS="$PREFIX/src/scripts"
-DBBK=/usr/local/bin/sanalpanel-db-backup   # panel DB dump aracı (assets/ops'tan kurulur)
-DBDIR=/var/backups/sanalpanel/db           # dump'ların yeri (kardeş dizinler = domain yedeği)
+DBBK=/usr/local/bin/sanalcp-db-backup   # panel DB dump aracı (assets/ops'tan kurulur)
+DBDIR=/var/backups/sanalcp/db           # dump'ların yeri (kardeş dizinler = domain yedeği)
 PREDUMP=""                                    # güncelleme öncesi dump yolu (rollback'te geri yüklenir)
 
 while [ $# -gt 0 ]; do
@@ -51,12 +51,12 @@ step() { echo -e "${c_b}══ $* ══${c_0}"; }
 # çalışan panelin /healthz'inden sürüm (binary'nin --version flag'i YOK, asla çalıştırmıyoruz)
 surum() { curl -fsS http://127.0.0.1:8080/healthz 2>/dev/null | grep -oE '"surum":"[^"]*"' | cut -d'"' -f4; }
 
-[ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalpanel-update)"
-[ -x "$BIN" ] || die "SanalPanel kurulu değil ($BIN yok) — önce install.sh çalıştırın"
+[ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalcp-update)"
+[ -x "$BIN" ] || die "SanalCP kurulu değil ($BIN yok) — önce install.sh çalıştırın"
 command -v curl >/dev/null || die "curl gerekli"
 command -v tar  >/dev/null || die "tar gerekli"
 
-step "SanalPanel güncelleme (github.com/$REPO@$BRANCH)"
+step "SanalCP güncelleme (github.com/$REPO@$BRANCH)"
 
 # 1) indir
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
@@ -65,8 +65,8 @@ curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar x
   || die "indirme başarısız — repo public mi / '$BRANCH' dalı var mı?"
 SRC=$(find "$TMP" -maxdepth 1 -type d -name "*-$BRANCH" | head -1)
 A="$SRC/assets"
-NEWBIN="$A/sanalpanel-server"
-[ -f "$NEWBIN" ] || die "$A/sanalpanel-server yok (repo yapısı beklenenden farklı)"
+NEWBIN="$A/sanalcp-server"
+[ -f "$NEWBIN" ] || die "$A/sanalcp-server yok (repo yapısı beklenenden farklı)"
 [ -f "$A/SHA256SUMS" ] || die "release bütünlük manifesti yok"
 (cd "$SRC" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
   die "release asset SHA-256 doğrulaması başarısız"
@@ -104,9 +104,9 @@ if [ "$DRY" = 1 ]; then
   echo "  • $FDIST/  (frontend-dist yeniden yazılır)"
   echo "  • $MIGR/  (yeni .sql eklenir, mevcutlar korunur)"
   echo "  • /usr/local/bin ops-tool'lar + $SCRIPTS"
-  echo "  • $DBBK + /etc/systemd/system/sanalpanel-db-backup.{service,timer} (timer enable --now)"
+  echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} (timer enable --now)"
   echo "  • migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)"
-  echo "  • systemctl restart sanalpanel  (env/DB/siteler KORUNUR)"
+  echo "  • systemctl restart sanalcp  (env/DB/siteler KORUNUR)"
   exit 0
 fi
 
@@ -116,21 +116,21 @@ fi
 # aracı hiç olmayan eski kurulumlarda dump imkânsız olurdu. Burada yalnızca db-backup'ı
 # kuruyoruz — çalışan updater'ın kendi dosyasını bu noktada ezmiyoruz (bash script'i
 # satır satır okur; kendini ortasından değiştirmek tehlikeli), o iş adım 9'da kalıyor.
-if [ -f "$A/ops/sanalpanel-db-backup" ]; then
-  install -m 0755 "$A/ops/sanalpanel-db-backup" "$DBBK"
+if [ -f "$A/ops/sanalcp-db-backup" ]; then
+  install -m 0755 "$A/ops/sanalcp-db-backup" "$DBBK"
   ok "DB yedek aracı kuruldu ($DBBK)"
 fi
 # systemd unit'leri: dosyayı kopyalamak YETMEZ — daemon-reload + enable --now olmadan
 # timer asla ateşlenmez (kurulumda unutulursa günlük yedek sessizce hiç çalışmaz).
 UNITS=0
-for u in sanalpanel-db-backup.service sanalpanel-db-backup.timer; do
+for u in sanalcp-db-backup.service sanalcp-db-backup.timer; do
   if [ -f "$A/systemd/$u" ]; then install -m 0644 "$A/systemd/$u" "/etc/systemd/system/$u"; UNITS=1; fi
 done
 if [ "$UNITS" = 1 ]; then
   systemctl daemon-reload >/dev/null 2>&1 || true
-  systemctl enable --now sanalpanel-db-backup.timer >/dev/null 2>&1 || true
-  if systemctl is-active --quiet sanalpanel-db-backup.timer; then
-    ok "günlük DB yedek timer'ı ACTIVE ($(systemctl show -p TimersCalendar --value sanalpanel-db-backup.timer 2>/dev/null | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1))"
+  systemctl enable --now sanalcp-db-backup.timer >/dev/null 2>&1 || true
+  if systemctl is-active --quiet sanalcp-db-backup.timer; then
+    ok "günlük DB yedek timer'ı ACTIVE ($(systemctl show -p TimersCalendar --value sanalcp-db-backup.timer 2>/dev/null | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1))"
   else
     warn "DB yedek timer'ı başlatılamadı — günlük yedek çalışmayabilir"
   fi
@@ -153,7 +153,7 @@ ok "mevcut binary yedeklendi ($BIN.bak)"
 
 # 6) binary swap (install = atomik replace; çalışan process eski inode'u restart'a kadar tutar — cp -f KULLANMA)
 install -m 0755 "$NEWBIN" "$BIN"
-[ -f "$A/sanalpanel-seed-admin" ] && install -m 0755 "$A/sanalpanel-seed-admin" "$SEED"
+[ -f "$A/sanalcp-seed-admin" ] && install -m 0755 "$A/sanalcp-seed-admin" "$SEED"
 ok "binary güncellendi"
 
 # 7) frontend-dist — ATOMİK + DOĞRULANMIŞ swap.
@@ -204,8 +204,8 @@ fi
 # 9b) WAF (ModSecurity + OWASP CRS) heal — IDEMPOTENT (her sey hazirsa saniyeler icinde ATLAR).
 # nginx sürümü değişmişse connector'ı ABI için yeniden derler. nginx -t GATE + rollback icerir →
 # ana nginx'i asla bozmaz. Modül yüklü değilse panel WAF'ı graceful atlar (site etkilenmez).
-if command -v sanalpanel-waf-setup >/dev/null 2>&1; then
-  sanalpanel-waf-setup >/dev/null 2>&1 && ok "WAF altyapısı senkron (ModSecurity+CRS)" || warn "waf-setup atlandı (WAF modülsüz graceful)"
+if command -v sanalcp-waf-setup >/dev/null 2>&1; then
+  sanalcp-waf-setup >/dev/null 2>&1 && ok "WAF altyapısı senkron (ModSecurity+CRS)" || warn "waf-setup atlandı (WAF modülsüz graceful)"
 fi
 
 # 10) izolasyon + araç prereq (eski kurulumlarda yoksa gelsin; idempotent) + SELinux context
@@ -227,7 +227,7 @@ command -v restorecon >/dev/null && restorecon -R "$PREFIX/bin" "$FDIST" >/dev/n
 command -v quota >/dev/null 2>&1 || dnf install -y quota xfsprogs >/dev/null 2>&1 || true
 QROOTFS=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 QROOTOPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
-QSENTINEL=/etc/sanalpanel/reboot-required-quota
+QSENTINEL=/etc/sanalcp/reboot-required-quota
 if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|quota'; then
   if ! grep -q 'rootflags=uquota' /etc/default/grub 2>/dev/null; then
     if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub 2>/dev/null; then
@@ -239,7 +239,7 @@ if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|qu
     grub2-mkconfig -o /boot/grub2/grub.cfg >/dev/null 2>&1 || true
     for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
   fi
-  mkdir -p /etc/sanalpanel
+  mkdir -p /etc/sanalcp
   echo "rootflags=uquota GRUB'a yazildi $(date -Is 2>/dev/null) — reboot bekleniyor" > "$QSENTINEL" 2>/dev/null || true
   warn "🔴 Disk kotası GRUB'a yazıldı — AKTİF olması için tek seferlik REBOOT gerekli (canlı sunucuda operatör zamanlar). OTO-REBOOT YAPILMADI."
 elif [ "$QROOTFS" = "xfs" ]; then
@@ -248,11 +248,11 @@ fi
 
 # 11) yeniden başlat + sağlık kontrolü (başarısızsa binary + DB rollback)
 step "Yeniden başlatılıyor"
-systemctl restart sanalpanel
+systemctl restart sanalcp
 HEALTHY=0
 for i in 1 2 3 4 5 6; do
   sleep 2
-  if systemctl is-active --quiet sanalpanel && curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1; then HEALTHY=1; break; fi
+  if systemctl is-active --quiet sanalcp && curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1; then HEALTHY=1; break; fi
 done
 
 if [ "$HEALTHY" = 1 ]; then
@@ -274,7 +274,7 @@ else
   # NOT: dump `--databases panel` ile alındı → her tablo için DROP+CREATE içerir; yeni
   # migration'ın EKLEDİĞİ tablolar dump'ta olmadığı için kalır (eski binary onları
   # görmez, zararsız). Kolon/veri değişiklikleri geri alınır.
-  systemctl stop sanalpanel >/dev/null 2>&1 || true
+  systemctl stop sanalcp >/dev/null 2>&1 || true
   if [ -n "$PREDUMP" ] && [ -f "$PREDUMP" ]; then
     if zcat "$PREDUMP" | mysql; then
       ok "DB güncelleme öncesi yedeğe geri yüklendi ($PREDUMP)"
@@ -285,10 +285,10 @@ else
     warn "güncelleme öncesi dump bulunamadı — yalnızca binary geri alındı"
   fi
 
-  systemctl restart sanalpanel; sleep 3
-  if systemctl is-active --quiet sanalpanel; then
-    die "rollback yapıldı — panel ESKİ sürüm + ESKİ DB ile ayakta. Yeni sürüm hatası: journalctl -u sanalpanel -n 40"
+  systemctl restart sanalcp; sleep 3
+  if systemctl is-active --quiet sanalcp; then
+    die "rollback yapıldı — panel ESKİ sürüm + ESKİ DB ile ayakta. Yeni sürüm hatası: journalctl -u sanalcp -n 40"
   else
-    die "KRİTİK: rollback sonrası da panel kalkmadı — journalctl -u sanalpanel -n 40 (DB yedeği: $PREDUMP)"
+    die "KRİTİK: rollback sonrası da panel kalkmadı — journalctl -u sanalcp -n 40 (DB yedeği: $PREDUMP)"
   fi
 fi

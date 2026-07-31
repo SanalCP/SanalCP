@@ -1,5 +1,5 @@
 
-# ===== sanalpanel-mail =====
+# ===== sanalcp-mail =====
 # GERÇEK VPS'TE BULUNDU: AlmaLinux'un stok main.cf'i inet_interfaces=localhost getiriyor
 # (RHEL ailesinde kasıtlı güvenli varsayılan) — bu satır olmadan Postfix yalnızca 127.0.0.1'i
 # dinler, ne dışarıdan gelen posta (port 25) ne de uzaktan SMTP AUTH (587) ASLA ulaşamaz.
@@ -25,11 +25,11 @@ smtpd_sasl_security_options = noanonymous
 broken_sasl_auth_clients = yes
 
 # TLS — varsayılan olarak panelin kendi self-signed sertifikası (kurulumda zaten
-# üretiliyor, /etc/ssl/sanalpanel). Bir müşteri domaininin kendi Let's Encrypt
+# üretiliyor, /etc/ssl/sanalcp). Bir müşteri domaininin kendi Let's Encrypt
 # sertifikasıyla mail sunmak istersen bu iki satırı elle o domainin
-# /etc/pki/sanalpanel/<domain>/<domain>.{crt,key} yoluna çevirebilirsin.
-smtpd_tls_cert_file = /etc/ssl/sanalpanel/panel.crt
-smtpd_tls_key_file  = /etc/ssl/sanalpanel/panel.key
+# /etc/pki/sanalcp/<domain>/<domain>.{crt,key} yoluna çevirebilirsin.
+smtpd_tls_cert_file = /etc/ssl/sanalcp/panel.crt
+smtpd_tls_key_file  = /etc/ssl/sanalcp/panel.key
 smtpd_tls_security_level = may
 smtp_tls_security_level = may
 smtpd_tls_loglevel = 1
@@ -38,14 +38,14 @@ smtpd_tls_loglevel = 1
 smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination
 smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
 
-# Kötüye-kullanım / hız sınırı (bkz. sanalpanel-mail-setup.sh yorumu) — SASL kullanıcı
+# Kötüye-kullanım / hız sınırı (bkz. sanalcp-mail-setup.sh yorumu) — SASL kullanıcı
 # bazında izlenir (anvil), tek bir bozuk/ele-geçirilmiş PHPMailer betiği IP'yi
 # kara-listeye düşürmesin diye.
 smtpd_client_connection_rate_limit = 30
 smtpd_client_message_rate_limit = 60
 anvil_rate_time_unit = 60s
 
-# SanalPanel policy servisi SMTP AUTH kullanıcısını saatlik/günlük limitlerle
+# SanalCP policy servisi SMTP AUTH kullanıcısını saatlik/günlük limitlerle
 # denetler; limit aşımında hesabı otomatik askıya alır. Kimlik doğrulamasız gelen
 # posta için DUNNO döner ve normal alım akışına dokunmaz.
 smtpd_end_of_data_restrictions = check_policy_service inet:127.0.0.1:10040

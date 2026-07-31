@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/middleware"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 )
 
 type Handlers struct{ DB *sql.DB }

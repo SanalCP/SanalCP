@@ -1,4 +1,4 @@
-module sanalpanel
+module sanalcp
 
 go 1.23
 

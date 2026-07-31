@@ -14,26 +14,26 @@ import (
 	"strconv"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
 
 const (
-	maxGorev    = 100
-	maxKomut    = 1024
-	bannerLine  = "# sanalpanel cron — bu dosya panel tarafindan yonetiliyor; elle duzenlemeyin"
+	maxGorev   = 100
+	maxKomut   = 1024
+	bannerLine = "# sanalcp cron — bu dosya panel tarafindan yonetiliyor; elle duzenlemeyin"
 )
 
 type Gorev struct {
-	Idx     int    `json:"idx"`
-	Dakika  string `json:"dakika"`
-	Saat    string `json:"saat"`
-	Gun     string `json:"gun"`
-	Ay      string `json:"ay"`
-	Hafta   string `json:"hafta"`
-	Komut   string `json:"komut"`
-	Yorum   string `json:"yorum,omitempty"`
+	Idx    int    `json:"idx"`
+	Dakika string `json:"dakika"`
+	Saat   string `json:"saat"`
+	Gun    string `json:"gun"`
+	Ay     string `json:"ay"`
+	Hafta  string `json:"hafta"`
+	Komut  string `json:"komut"`
+	Yorum  string `json:"yorum,omitempty"`
 }
 
 type Handlers struct {
@@ -95,7 +95,7 @@ func read(sk string) ([]Gorev, error) {
 		if strings.HasPrefix(line, "#") {
 			c := strings.TrimSpace(strings.TrimPrefix(line, "#"))
 			// kendi banner satirimizi atla
-			if !strings.HasPrefix(c, "sanalpanel") {
+			if !strings.HasPrefix(c, "sanalcp") {
 				lastYorum = c
 			}
 			continue
@@ -108,9 +108,9 @@ func read(sk string) ([]Gorev, error) {
 		out = append(out, Gorev{
 			Idx:    idx,
 			Dakika: fields[0], Saat: fields[1], Gun: fields[2],
-			Ay:     fields[3], Hafta: fields[4],
-			Komut:  strings.Join(fields[5:], " "),
-			Yorum:  lastYorum,
+			Ay: fields[3], Hafta: fields[4],
+			Komut: strings.Join(fields[5:], " "),
+			Yorum: lastYorum,
 		})
 		idx++
 		lastYorum = ""

@@ -24,11 +24,11 @@ echo "== Linux amd64/v1 binary =="
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
   go build -trimpath -buildvcs=false \
   -ldflags "-s -w -X main.buildDate=$BUILD_DATE" \
-  -o assets/sanalpanel-server ./cmd/server
+  -o assets/sanalcp-server ./cmd/server
 if [ -f scripts/seed_admin.go ]; then
   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
     go build -trimpath -buildvcs=false -ldflags "-s -w" \
-    -o assets/sanalpanel-seed-admin scripts/seed_admin.go
+    -o assets/sanalcp-seed-admin scripts/seed_admin.go
 fi
 
 echo "== Deterministik frontend/migration arşivleri =="

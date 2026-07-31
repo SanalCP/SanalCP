@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"sanalpanel/internal/httpx"
+	"sanalcp/internal/httpx"
 )
 
 // reHotlinkDomainGirdi: provisioner.reHotlinkDomain ile aynı kısıtlama — API

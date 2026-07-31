@@ -1,4 +1,4 @@
-# SanalPanel — Postfix/Dovecot sanal posta kutuları (bkz. internal/mail paketi).
+# SanalCP — Postfix/Dovecot sanal posta kutuları (bkz. internal/mail paketi).
 # Tek yeni drop-in dosyası olarak eklenir (stok 10-*.conf dosyaları elle düzenlenmez) —
 # /etc/dovecot/dovecot.conf zaten "!include conf.d/*.conf" ile bunu otomatik yükler,
 # bu yüzden idempotent kurulum/kaldırma tek dosyayı kopyalamak/silmek kadar basit.
@@ -44,7 +44,7 @@ plugin {
 
 # Varsayılan sertifika: panelin kendi self-signed sertifikası (kurulumda zaten üretiliyor).
 # Belirli bir müşteri domaininde gerçek Let's Encrypt sertifikasıyla IMAP/webmail sunmak
-# istersen bir local_name { } bloğuyla /etc/pki/sanalpanel/<domain>/... yoluna SNI
+# istersen bir local_name { } bloğuyla /etc/pki/sanalcp/<domain>/... yoluna SNI
 # override ekleyebilirsin (bkz. plan §2b) — v1'de yalnızca tek varsayılan sertifika var.
-ssl_cert = </etc/ssl/sanalpanel/panel.crt
-ssl_key = </etc/ssl/sanalpanel/panel.key
+ssl_cert = </etc/ssl/sanalcp/panel.crt
+ssl_key = </etc/ssl/sanalcp/panel.key

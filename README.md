@@ -1,10 +1,10 @@
 <p align="center">
-  <a href="https://github.com/sanalpanel/sanalpanel"><b>🌐 GitHub</b></a> &nbsp;·&nbsp;
+  <a href="https://github.com/sanalcp/sanalcp"><b>🌐 GitHub</b></a> &nbsp;·&nbsp;
   <a href="README.md">Türkçe</a> &nbsp;·&nbsp;
   <a href="README.en.md">English</a>
 </p>
 
-# SanalPanel
+# SanalCP
 
 Boş bir **AlmaLinux 10** sunucuyu tek komutla komple bir hosting kontrol paneline çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
 
@@ -13,7 +13,7 @@ Boş bir **AlmaLinux 10** sunucuyu tek komutla komple bir hosting kontrol paneli
 Temiz bir AlmaLinux 10 (min. 2 GB RAM) sunucuda **root** olarak:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
 ```
 
 Kurulum ~5-10 dakika sürer (paket indirmeleri). Bittiğinde panel adresi + giriş bilgileri ekrana yazılır.
@@ -34,7 +34,7 @@ Kurulum ~5-10 dakika sürer (paket indirmeleri). Bittiğinde panel adresi + giri
 | **Cache** | Valkey (Redis) — per-tenant izole object cache (WordPress'e otomatik bağlanır) |
 | **E-posta** | Postfix + Dovecot + OpenDKIM — SMTP AUTH (587), IMAP, otomatik DKIM/SPF/DMARC; webmail (Roundcube, `/webmail/`) |
 | **Güvenlik** | nftables güvenlik duvarı, SELinux uyumlu, ClamAV |
-| **Performans** | MariaDB + nginx + OPcache otomatik tuning (`sanalpanel-optimize`) |
+| **Performans** | MariaDB + nginx + OPcache otomatik tuning (`sanalcp-optimize`) |
 
 ## Panel özellikleri
 
@@ -81,12 +81,12 @@ Panelin standart ayarları (güvenlik başlıkları, cache, "ek direktifler" ala
 Kurulumla birlikte `/usr/local/bin`'e şu araçlar gelir:
 
 ```bash
-sanalpanel-update        # paneli GitHub'dan güvenli güncelle (aşağıya bak)
-sanalpanel-optimize      # MariaDB/nginx/PHP'yi sunucu kaynaklarına göre yeniden ayarla
-sanalpanel-redis-setup   # Valkey (Redis) altyapısını kur/onar
-sanalpanel-wp-redis <sk> # bir domainin WordPress'ine Redis cache bağla/çöz
-sanalpanel-repair        # izin / SELinux / sahiplik onarımı (idempotent)
-sanalpanel-db-backup     # panel DB'sinin sıkıştırılmış dump'ını al (aşağıya bak)
+sanalcp-update        # paneli GitHub'dan güvenli güncelle (aşağıya bak)
+sanalcp-optimize      # MariaDB/nginx/PHP'yi sunucu kaynaklarına göre yeniden ayarla
+sanalcp-redis-setup   # Valkey (Redis) altyapısını kur/onar
+sanalcp-wp-redis <sk> # bir domainin WordPress'ine Redis cache bağla/çöz
+sanalcp-repair        # izin / SELinux / sahiplik onarımı (idempotent)
+sanalcp-db-backup     # panel DB'sinin sıkıştırılmış dump'ını al (aşağıya bak)
 ```
 
 ## Yedekleme
@@ -97,67 +97,67 @@ Kurulumla birlikte **günlük otomatik yedek** gelir — ayrı bir şey yapmanı
 
 | | |
 |---|---|
-| **Ne zaman** | Her gün **03:30** (`sanalpanel-db-backup.timer`, ±5 dk rastgele gecikme) |
-| **Nereye** | `/var/backups/sanalpanel/db/panel-<TARİH>.sql.gz` (dizin `0700`, dump `0600`) |
+| **Ne zaman** | Her gün **03:30** (`sanalcp-db-backup.timer`, ±5 dk rastgele gecikme) |
+| **Nereye** | `/var/backups/sanalcp/db/panel-<TARİH>.sql.gz` (dizin `0700`, dump `0600`) |
 | **Saklama** | **14 gün** — daha eskiler otomatik silinir |
 | **Kapsam** | `panel` şeması + routine/trigger/event'ler (`mysqldump --single-transaction` → kilitsiz tutarlı anlık görüntü) |
 
 Elle yedek almak için (üretilen dosyanın yolunu ekrana basar):
 
 ```bash
-sanalpanel-db-backup
-# /var/backups/sanalpanel/db/panel-2026-07-17-143052.sql.gz
+sanalcp-db-backup
+# /var/backups/sanalcp/db/panel-2026-07-17-143052.sql.gz
 ```
 
 Timer'ın durumunu görmek / bir sonraki çalışmayı öğrenmek için:
 
 ```bash
-systemctl list-timers sanalpanel-db-backup.timer
-systemctl status sanalpanel-db-backup.timer
-journalctl -u sanalpanel-db-backup -n 20    # son yedeklerin logu
+systemctl list-timers sanalcp-db-backup.timer
+systemctl status sanalcp-db-backup.timer
+journalctl -u sanalcp-db-backup -n 20    # son yedeklerin logu
 ```
 
 Bir yedeği geri yüklemek için:
 
 ```bash
-systemctl stop sanalpanel
-zcat /var/backups/sanalpanel/db/panel-2026-07-17-143052.sql.gz | mysql
-systemctl start sanalpanel
+systemctl stop sanalcp
+zcat /var/backups/sanalcp/db/panel-2026-07-17-143052.sql.gz | mysql
+systemctl start sanalcp
 ```
 
 > Yedek **fail-closed**'dır: gzip bütünlüğü doğrulanmadan veya dosya şüpheli derecede küçükse dump `panel-*.sql.gz` adını **almaz** — yarım bir dump asla geçerli yedek gibi görünmez.
 
 ### Güncelleme öncesi otomatik yedek
 
-`sanalpanel-update`, **migration'ları uygulamadan önce** panel DB'sinin tam dump'ını alır. Dump alınamazsa **güncelleme hiç başlamaz** (yedeksiz migration reddedilir). Ayrıntı için aşağıdaki "Güncelleme" bölümüne bakın.
+`sanalcp-update`, **migration'ları uygulamadan önce** panel DB'sinin tam dump'ını alır. Dump alınamazsa **güncelleme hiç başlamaz** (yedeksiz migration reddedilir). Ayrıntı için aşağıdaki "Güncelleme" bölümüne bakın.
 
 ### Müşteri siteleri
 
-Müşteri siteleri + veritabanları ayrı bir işle yedeklenir: `sanalpanel-backup-all` (cron, her gün 03:00 UTC, `/var/backups/sanalpanel/<sistem_kullanıcı>/`, 14 gün saklama). Panel DB yedeği bu dizinlere **dokunmaz**.
+Müşteri siteleri + veritabanları ayrı bir işle yedeklenir: `sanalcp-backup-all` (cron, her gün 03:00 UTC, `/var/backups/sanalcp/<sistem_kullanıcı>/`, 14 gün saklama). Panel DB yedeği bu dizinlere **dokunmaz**.
 
 ## Güncelleme (SSH / CLI)
 
 Kurulu bir panelde, SSH ile root olarak tek komut:
 
 ```bash
-sanalpanel-update            # son sürümü GitHub'dan çek → binary+frontend+migration değiştir → yeniden başlat
-sanalpanel-update --dry-run  # önce ne yapacağını göster (dokunmadan)
-sanalpanel-update --force    # binary aynı olsa bile yeniden uygula
-sanalpanel-update --branch X # farklı dal
+sanalcp-update            # son sürümü GitHub'dan çek → binary+frontend+migration değiştir → yeniden başlat
+sanalcp-update --dry-run  # önce ne yapacağını göster (dokunmadan)
+sanalcp-update --force    # binary aynı olsa bile yeniden uygula
+sanalcp-update --branch X # farklı dal
 ```
 
-- **Güvenli & veri-korumalı:** `/etc/sanalpanel/env` (JWT/DB/Redis secret), MariaDB `panel` veritabanı ve `/home/c_*` müşteri siteleri **asla silinmez**. `install.sh`'in aksine yeni secret üretmez.
+- **Güvenli & veri-korumalı:** `/etc/sanalcp/env` (JWT/DB/Redis secret), MariaDB `panel` veritabanı ve `/home/c_*` müşteri siteleri **asla silinmez**. `install.sh`'in aksine yeni secret üretmez.
 - Yeni migration'lar servis yeniden başlarken **otomatik + idempotent** uygulanır.
 - Binary değişmemişse (sha eşleşir) hiçbir şey yapmaz.
-- **Migration'lardan önce panel DB'sinin tam dump'ı alınır** → `/var/backups/sanalpanel/db/`.
+- **Migration'lardan önce panel DB'sinin tam dump'ı alınır** → `/var/backups/sanalcp/db/`.
 - **Fail-closed:** dump alınamazsa güncelleme **hiç başlamaz** — binary'ye, frontend'e ve migration'lara dokunulmaz. Yedeksiz migration kabul edilmez.
 - Yeni sürüm sağlıklı başlamazsa **otomatik olarak eski binary'ye _ve_ güncelleme öncesi DB'ye geri döner** (rollback). Panel o sırada zaten durmuş olduğu için yazma kaybı olmaz.
 
-> Kendi fork'unu deploy ediyorsan: kaynağı derle (`GOAMD64=v1 go build` + `npm run build`), `assets/sanalpanel-server` + `assets/frontend-dist.tar.gz`'i güncelle, repona push et — sunucularda `sanalpanel-update` yeni sürümü çeker. **Binary'yi mutlaka `GOAMD64=v1` ile derle** (bkz. "Backend (Go)" altındaki uyarı) — aksi halde eski CPU'lu müşteri sunucularında panel açılmaz.
+> Kendi fork'unu deploy ediyorsan: kaynağı derle (`GOAMD64=v1 go build` + `npm run build`), `assets/sanalcp-server` + `assets/frontend-dist.tar.gz`'i güncelle, repona push et — sunucularda `sanalcp-update` yeni sürümü çeker. **Binary'yi mutlaka `GOAMD64=v1` ile derle** (bkz. "Backend (Go)" altındaki uyarı) — aksi halde eski CPU'lu müşteri sunucularında panel açılmaz.
 
 ## Notlar
 
-- Kurulum **idempotent** değildir; her çalıştırma yeni secret (JWT/DB parola) üretir. Yeniden çalıştırma yerine `sanalpanel-repair` / `sanalpanel-optimize` kullanın.
+- Kurulum **idempotent** değildir; her çalıştırma yeni secret (JWT/DB parola) üretir. Yeniden çalıştırma yerine `sanalcp-repair` / `sanalcp-optimize` kullanın.
 - Panel HTTP/2 + self-signed SSL ile :8443'te yayınlanır; gerçek alan adı için Let's Encrypt panel üzerinden eklenebilir.
 
 ---
@@ -175,17 +175,17 @@ Bu proje **tamamen açık kaynaktır** (MIT). İstersen hazır binary'yi kurmak 
 ### Backend (Go)
 
 > ⚠️ **Yayınlanacak binary `GOAMD64=v1` ile derlenmelidir.** AlmaLinux 10 (go1.26+) varsayılan olarak `GOAMD64=v3` üretir; v3 ile derlenen binary eski/yaygın müşteri CPU'larında
-> `"This program can only be run on AMD64 processors with v3 microarchitecture support"` verip **çalışmaz**. `assets/sanalpanel-server` daima `GOAMD64=v1` ile derlenmelidir
+> `"This program can only be run on AMD64 processors with v3 microarchitecture support"` verip **çalışmaz**. `assets/sanalcp-server` daima `GOAMD64=v1` ile derlenmelidir
 > (kolaylık için `scripts/build-assets.sh` kullan — bunu zaten sabitler).
 
 ```bash
 # tek statik binary derle (eski CPU uyumu için GOAMD64=v1 ZORUNLU)
-CGO_ENABLED=0 GOAMD64=v1 go build -o sanalpanel-server ./cmd/server
+CGO_ENABLED=0 GOAMD64=v1 go build -o sanalcp-server ./cmd/server
 
 # çalıştır (ortam değişkenleriyle)
 PANEL_JWT_SECRET="$(openssl rand -hex 32)" \
 PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
-./sanalpanel-server
+./sanalcp-server
 ```
 
 Backend API `/api/v1` altında; sağlık kontrolü `/healthz`. Admin girişi işletim sistemi root'u üzerinden PAM ile doğrulanır (üretimde); geliştirmede `scripts/seed_admin.go` ile ayrı bir admin tohumlayabilirsin:
@@ -219,7 +219,7 @@ frontend/src/     React arayüzü (pages/, components/, lib/)
 migrations/       SQL şema migration'ları (başlangıçta uygulanır)
 scripts/          Ops yardımcıları (optimize, repair, redis-setup, seed_admin, ...)
 assets/           Kurulum için hazır (prebuilt) release çıktıları — installer bunları kullanır
-install.sh        Tek satır bootstrap (repoyu indirir → sanalpanel-install.sh)
+install.sh        Tek satır bootstrap (repoyu indirir → sanalcp-install.sh)
 ```
 
 > `assets/` içindeki hazır binary + `frontend-dist.tar.gz`, `curl | bash` kurulumunun kaynağı derlemeden çalışması içindir. Kendi değişikliklerini yayınlarken bunları yukarıdaki `go build` / `npm run build` çıktısıyla güncelle.
@@ -235,28 +235,28 @@ install.sh        Tek satır bootstrap (repoyu indirir → sanalpanel-install.sh
 Paneli son sürüme güncellemek için sunucuda:
 
 ```bash
-sanalpanel-update              # son sürümü kur
-sanalpanel-update --dry-run    # sadece ne yapacağını göster
-sanalpanel-update --force      # aynı sürüm olsa bile yeniden uygula
+sanalcp-update              # son sürümü kur
+sanalcp-update --dry-run    # sadece ne yapacağını göster
+sanalcp-update --force      # aynı sürüm olsa bile yeniden uygula
 ```
 
 Panel içinden de güncelleyebilirsiniz: **Araçlar ve Ayarlar → Panel Güncellemesi → "Güncellemeleri denetle ve kur"**.
 
-Güncelleme **korur** (asla dokunmaz): `/etc/sanalpanel/env` (JWT/DB/Redis secret), MariaDB `panel` veritabanı + tüm müşteri verisi, `/home/c_*` siteleri.
+Güncelleme **korur** (asla dokunmaz): `/etc/sanalcp/env` (JWT/DB/Redis secret), MariaDB `panel` veritabanı + tüm müşteri verisi, `/home/c_*` siteleri.
 
-Güncelleme, **migration'ları uygulamadan önce** panel DB'sinin tam dump'ını `/var/backups/sanalpanel/db/` altına alır. Dump alınamazsa güncelleme **hiç başlamaz** (yedeksiz migration reddedilir). Yeni sürüm sağlıklı başlamazsa otomatik olarak **eski binary'ye + güncelleme öncesi DB'ye geri döner**.
+Güncelleme, **migration'ları uygulamadan önce** panel DB'sinin tam dump'ını `/var/backups/sanalcp/db/` altına alır. Dump alınamazsa güncelleme **hiç başlamaz** (yedeksiz migration reddedilir). Yeni sürüm sağlıklı başlamazsa otomatik olarak **eski binary'ye + güncelleme öncesi DB'ye geri döner**.
 
-### "sanalpanel-update: command not found" alıyorsanız
+### "sanalcp-update: command not found" alıyorsanız
 
 Panelinizi, güncelleme aracı dağıtıma eklenmeden **önce** kurmuşsanız bu komut sunucunuzda bulunmaz. Aracı almanın tek yolu yine kendisi olduğu için kısır döngüye girersiniz. Tek seferlik şu komutla kurun:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalpanel/sanalpanel/main/assets/ops/sanalpanel-update \
-  -o /usr/local/bin/sanalpanel-update && chmod +x /usr/local/bin/sanalpanel-update
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/assets/ops/sanalcp-update \
+  -o /usr/local/bin/sanalcp-update && chmod +x /usr/local/bin/sanalcp-update
 
-sanalpanel-update
+sanalcp-update
 ```
 
-Bunu **bir kez** yapmanız yeterlidir: `sanalpanel-update` her çalıştığında `assets/ops/` altındaki tüm araçları `/usr/local/bin`'e yeniden kurar, dolayısıyla kendini de güncel tutar. Bundan sonra panel içindeki **Panel Güncellemesi** butonunu da kullanabilirsiniz.
+Bunu **bir kez** yapmanız yeterlidir: `sanalcp-update` her çalıştığında `assets/ops/` altındaki tüm araçları `/usr/local/bin`'e yeniden kurar, dolayısıyla kendini de güncel tutar. Bundan sonra panel içindeki **Panel Güncellemesi** butonunu da kullanabilirsiniz.
 
 > Panel içi güncelleme butonu, aracı eksikse **otomatik indirir** — yani butona basmanız da yeterlidir; yukarıdaki komut yalnızca panele hiç erişemediğiniz durumlar için.

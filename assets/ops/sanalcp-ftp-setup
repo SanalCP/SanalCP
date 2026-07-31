@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sanalpanel-ftp-setup — Pure-FTPd (MySQL backend) kur/onar
+# sanalcp-ftp-setup — Pure-FTPd (MySQL backend) kur/onar
 #   Panel ftp_accounts tablosunu okuyan virtual-user FTP: chroot + passive + TLS
 #   Idempotent — tekrar çalıştırılabilir.
 set -uo pipefail
@@ -12,7 +12,7 @@ die(){ echo -e "  ${c_r}✗${c_0} $*"; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "root gerekli"
 
-ENVF=/etc/sanalpanel/env
+ENVF=/etc/sanalcp/env
 PANEL_DB_PASS=$(grep -oP '^PANEL_DB_PASS=\K.*' "$ENVF" 2>/dev/null || true)
 # DSN'den de dene
 [ -z "${PANEL_DB_PASS:-}" ] && PANEL_DB_PASS=$(grep -oP 'panel:\K[^@]*' "$ENVF" 2>/dev/null | head -1 || true)

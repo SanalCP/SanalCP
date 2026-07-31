@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"sanalpanel/internal/httpx"
-	"sanalpanel/internal/provisioner"
-	"sanalpanel/internal/redis"
+	"sanalcp/internal/httpx"
+	"sanalcp/internal/provisioner"
+	"sanalcp/internal/redis"
 )
 
 // POST /cache/purge  (form body: purge=all|fastcgi|redis, varsayılan "all")
