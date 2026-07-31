@@ -54,19 +54,19 @@ func guncelleAracIndir() error {
 	cli := &http.Client{Timeout: 30 * time.Second}
 	resp, err := cli.Get(guncelleRawURL)
 	if err != nil {
-		return fmt.Errorf("indirilemedi: %w", err)
+		return fmt.Errorf("%s: %w", t("indirilemedi", "download failed"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("indirme HTTP %d", resp.StatusCode)
+		return fmt.Errorf("%s HTTP %d", t("indirme", "download"), resp.StatusCode)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return fmt.Errorf("okunamadı: %w", err)
+		return fmt.Errorf("%s: %w", t("okunamadı", "could not read"), err)
 	}
 	// gelen şey gerçekten script mi (HTML hata sayfası vb. değil)
 	if !strings.HasPrefix(string(b), "#!") {
-		return fmt.Errorf("beklenmeyen içerik — script değil")
+		return fmt.Errorf("%s", t("beklenmeyen içerik — script değil", "unexpected content — not a script"))
 	}
 	tmp := guncelleScript + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o755); err != nil {
@@ -78,25 +78,27 @@ func guncelleAracIndir() error {
 // GuncellemeBaslat — aracı (gerekirse indirip) ayrı systemd unit'inde başlatır.
 func GuncellemeBaslat(w http.ResponseWriter, r *http.Request) {
 	if calisiyor, _ := guncelleCalisiyor(); calisiyor {
-		httpx.WriteError(w, http.StatusConflict, "güncelleme zaten çalışıyor")
+		httpx.WriteError(w, http.StatusConflict, t("güncelleme zaten çalışıyor", "update already running"))
 		return
 	}
 	aracIndirildi := false
 	if _, err := os.Stat(guncelleScript); err != nil {
 		if err := guncelleAracIndir(); err != nil {
-			httpx.WriteError(w, http.StatusBadGateway, "güncelleme aracı alınamadı: "+err.Error())
+			httpx.WriteError(w, http.StatusBadGateway, t("güncelleme aracı alınamadı: ", "could not fetch update tool: ")+err.Error())
 			return
 		}
 		aracIndirildi = true
 	}
 
 	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
-	bas := fmt.Sprintf("=== Güncelleme başlatıldı: %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+	bas := fmt.Sprintf("%s\n", t(
+		fmt.Sprintf("=== Güncelleme başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("=== Update started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
 	if aracIndirildi {
-		bas += "(güncelleme aracı eksikti — repo'dan indirildi)\n"
+		bas += t("(güncelleme aracı eksikti — repo'dan indirildi)\n", "(update tool was missing — fetched from the repo)\n")
 	}
 	if err := os.WriteFile(guncelleLogYol, []byte(bas), 0o640); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "log açılamadı: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
 		return
 	}
 
@@ -107,7 +109,7 @@ func GuncellemeBaslat(w http.ResponseWriter, r *http.Request) {
 		"--description", "SanalCP güncelleme",
 		"/bin/bash", "-lc", fmt.Sprintf("%s >>%s 2>&1", guncelleScript, guncelleLogYol))
 	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{

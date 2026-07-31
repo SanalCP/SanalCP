@@ -33,7 +33,35 @@ const (
 // optimizeWrapperIcerik — SABİT script. Kullanıcı girdisi İÇERMEZ; her başlatmada
 // diske atomik yazılır (kaynak-doğruluğu Go tarafında tek yerde). dnf/yum -y update
 // + sanalcp-optimize. Her adım kendi başına idempotent + güvenli.
-const optimizeWrapperIcerik = `#!/usr/bin/env bash
+// Panel diline göre TR/EN üretilir — script kendisi ayrı bir process olarak
+// systemd-run ile çalıştığı için DB'ye erişemez, dil seçimi burada (yazılma anında)
+// sabitlenir.
+func optimizeWrapperIcerik(dil string) string {
+	if dil == "en" {
+		return `#!/usr/bin/env bash
+set -uo pipefail
+echo "════════ Server Optimization — $(date "+%Y-%m-%d %H:%M:%S") ════════"
+echo
+echo "▶ 1/2 · System package update (AlmaLinux)"
+if command -v dnf >/dev/null 2>&1; then
+  dnf -y update
+elif command -v yum >/dev/null 2>&1; then
+  yum -y update
+else
+  echo "  (dnf/yum not found — package update skipped)"
+fi
+echo
+echo "▶ 2/2 · MariaDB / nginx / PHP performance tuning"
+if command -v sanalcp-optimize >/dev/null 2>&1; then
+  PANEL_LANG=en sanalcp-optimize
+else
+  echo "  (sanalcp-optimize not found — tuning skipped)"
+fi
+echo
+echo "════════ ✓ Optimization complete ════════"
+`
+	}
+	return `#!/usr/bin/env bash
 set -uo pipefail
 echo "════════ Sunucu Optimizasyonu — $(date "+%Y-%m-%d %H:%M:%S") ════════"
 echo
@@ -55,6 +83,7 @@ fi
 echo
 echo "════════ ✓ Optimizasyon tamamlandı ════════"
 `
+}
 
 // optimizeCalisiyor — transient unit hâlâ çalışıyor mu.
 func optimizeCalisiyor() (bool, string) {
@@ -72,9 +101,9 @@ func OptimizeDurum(w http.ResponseWriter, r *http.Request) {
 }
 
 // optimizeWrapperYaz — sabit wrapper scriptini atomik yazar (0700, panel-özel).
-func optimizeWrapperYaz() error {
+func optimizeWrapperYaz(dil string) error {
 	tmp := optimizeWrapper + ".tmp"
-	if err := os.WriteFile(tmp, []byte(optimizeWrapperIcerik), 0o700); err != nil {
+	if err := os.WriteFile(tmp, []byte(optimizeWrapperIcerik(dil)), 0o700); err != nil {
 		return err
 	}
 	return os.Rename(tmp, optimizeWrapper) // atomik
@@ -84,22 +113,25 @@ func optimizeWrapperYaz() error {
 // unit'inde başlatır.
 func OptimizeBaslat(w http.ResponseWriter, r *http.Request) {
 	if c, _ := optimizeCalisiyor(); c {
-		httpx.WriteError(w, http.StatusConflict, "optimizasyon zaten çalışıyor")
+		httpx.WriteError(w, http.StatusConflict, t("optimizasyon zaten çalışıyor", "optimization already running"))
 		return
 	}
 	// Panel güncellemesiyle çakışmasın (ikisi de paket/servis dokunur).
 	if c, _ := guncelleCalisiyor(); c {
-		httpx.WriteError(w, http.StatusConflict, "panel güncellemesi sürüyor — bitince tekrar deneyin")
+		httpx.WriteError(w, http.StatusConflict, t("panel güncellemesi sürüyor — bitince tekrar deneyin", "a panel update is in progress — try again once it's done"))
 		return
 	}
 	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
-	if err := optimizeWrapperYaz(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "hazırlanamadı: "+err.Error())
+	dil := panelDili()
+	if err := optimizeWrapperYaz(dil); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, t("hazırlanamadı: ", "could not prepare: ")+err.Error())
 		return
 	}
-	bas := fmt.Sprintf("=== Optimizasyon başlatıldı: %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+	bas := fmt.Sprintf("%s\n", t(
+		fmt.Sprintf("=== Optimizasyon başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("=== Optimization started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
 	if err := os.WriteFile(optimizeLogYol, []byte(bas), 0o640); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "log açılamadı: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
 		return
 	}
 	// systemd-run: PID 1 altında transient unit; çıktı append: ile log dosyasına
@@ -112,7 +144,7 @@ func OptimizeBaslat(w http.ResponseWriter, r *http.Request) {
 		"-p", "StandardError=append:"+optimizeLogYol,
 		optimizeWrapper)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "başlatılamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"baslatildi": true})

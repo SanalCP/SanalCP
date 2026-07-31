@@ -601,6 +601,9 @@ func main() {
 	// Sürüm kontrolü + güvenlik duyuru kanalı. PANEL_SURUM_KONTROL=0 ile kapalı;
 	// kapalıyken hiç ağ isteği atılmaz (bkz. internal/system/surumkontrol.go).
 	system.SurumBaslat(version, buildDate)
+	// Güncelleme/optimizasyon gibi uzun-süren işlerin log çıktısını panel diline
+	// göre göstermek için (bkz. internal/system/dil.go).
+	system.Init(d)
 
 	go func() {
 		log.Printf("sanalcp %s — %s üzerinde dinleniyor (env=%s)", version, cfg.ListenAddr, cfg.Env)
