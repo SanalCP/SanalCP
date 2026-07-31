@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# sanalcp-update — SanalCP'i GitHub'dan güvenli in-place günceller.
+# sanalcp-update — safely updates SanalCP in-place from GitHub.
 #
-#   sanalcp-update            # son sürümü çek → binary+frontend+migration değiştir → yeniden başlat
-#   sanalcp-update --dry-run  # sadece ne yapacağını göster, dokunma
-#   sanalcp-update --force    # binary aynı olsa bile yeniden uygula
-#   sanalcp-update --branch X # farklı dal (varsayılan: main)
+#   sanalcp-update            # pull latest → swap binary+frontend+migrations → restart
+#   sanalcp-update --dry-run  # show what would happen, touch nothing
+#   sanalcp-update --force    # re-apply even if the binary is unchanged
+#   sanalcp-update --branch X # use a different branch (default: main)
 #
-# KORUR (asla dokunmaz): /etc/sanalcp/env (JWT/DB/Redis secret),
-# MariaDB `panel` DB + tüm müşteri verisi, /home/c_* siteleri.
-# Yeni migration'lar servis yeniden başlarken otomatik + idempotent uygulanır.
+# PRESERVES (never touched): /etc/sanalcp/env (JWT/DB/Redis secrets),
+# the MariaDB `panel` DB + all customer data, /home/c_* sites.
+# New migrations are applied automatically + idempotently when the service restarts.
 #
-# DB DAYANIKLILIĞI:
-#  • Migration'lardan ÖNCE panel DB'sinin tam dump'ı alınır (/var/backups/sanalcp/db).
-#  • FAIL-CLOSED: dump alınamazsa güncelleme HİÇ BAŞLAMAZ (yedeksiz migration reddedilir).
-#  • Yeni sürüm sağlıklı başlamazsa ESKİ binary'ye + güncelleme öncesi DB'ye rollback yapar.
-#  • Günlük 03:30 yedek timer'ı (sanalcp-db-backup.timer) kurulur + enable edilir.
+# DB RESILIENCE:
+#  • A full dump of the panel DB is taken BEFORE migrations (/var/backups/sanalcp/db).
+#  • FAIL-CLOSED: if the dump fails, the update NEVER STARTS (no migration without a backup).
+#  • If the new version doesn't come up healthy, rolls back to the OLD binary + pre-update DB.
+#  • A daily 03:30 backup timer (sanalcp-db-backup.timer) is installed + enabled.
 set -euo pipefail
 
 REPO="${SANAL_REPO:-sanalcp/sanalcp}"
@@ -25,9 +25,9 @@ SEED="$PREFIX/bin/sanalcp-seed-admin"
 FDIST="$PREFIX/frontend-dist"
 MIGR="$PREFIX/src/migrations"
 SCRIPTS="$PREFIX/src/scripts"
-DBBK=/usr/local/bin/sanalcp-db-backup   # panel DB dump aracı (assets/ops'tan kurulur)
-DBDIR=/var/backups/sanalcp/db           # dump'ların yeri (kardeş dizinler = domain yedeği)
-PREDUMP=""                                    # güncelleme öncesi dump yolu (rollback'te geri yüklenir)
+DBBK=/usr/local/bin/sanalcp-db-backup   # panel DB dump tool (installed from assets/ops)
+DBDIR=/var/backups/sanalcp/db           # where dumps live (sibling dirs = domain backups)
+PREDUMP=""                                    # pre-update dump path (restored on rollback)
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -36,7 +36,7 @@ while [ $# -gt 0 ]; do
     --branch) BRANCH="$2"; shift ;;
     --branch=*) BRANCH="${1#*=}" ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "bilinmeyen arg: $1" >&2; exit 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
 done
@@ -48,80 +48,91 @@ warn() { echo -e "  ${c_y}!${c_0} $*"; }
 die()  { echo -e "${c_r}✗ $*${c_0}" >&2; exit 1; }
 step() { echo -e "${c_b}══ $* ══${c_0}"; }
 
-# çalışan panelin /healthz'inden sürüm (binary'nin --version flag'i YOK, asla çalıştırmıyoruz)
+# This runs both from SSH and from inside the panel (Settings → panel update, which
+# shows this script's stdout live) — so its messages follow the PANEL's own default
+# language (panel_ayarlari.varsayilan_dil), not a fixed one. DB may not be reachable
+# yet (auth_socket, DB down) → falls back to Turkish (project default) silently.
+DBLANG=$(mysql -N -B panel -e "SELECT varsayilan_dil FROM panel_ayarlari WHERE id=1;" 2>/dev/null || echo "")
+[ "$DBLANG" = "en" ] || DBLANG="tr"
+t() { if [ "$DBLANG" = "en" ]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
+
+# version from the running panel's /healthz (the binary has NO --version flag, we never run it)
 surum() { curl -fsS http://127.0.0.1:8080/healthz 2>/dev/null | grep -oE '"surum":"[^"]*"' | cut -d'"' -f4; }
 
-[ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalcp-update)"
-[ -x "$BIN" ] || die "SanalCP kurulu değil ($BIN yok) — önce install.sh çalıştırın"
-command -v curl >/dev/null || die "curl gerekli"
-command -v tar  >/dev/null || die "tar gerekli"
+[ "$(id -u)" = 0 ] || die "$(t "root gerekli (sudo sanalcp-update)" "root required (sudo sanalcp-update)")"
+[ -x "$BIN" ] || die "$(t "SanalCP kurulu değil ($BIN yok) — önce install.sh çalıştırın" "SanalCP is not installed ($BIN missing) — run install.sh first")"
+command -v curl >/dev/null || die "$(t "curl gerekli" "curl required")"
+command -v tar  >/dev/null || die "$(t "tar gerekli" "tar required")"
 
-step "SanalCP güncelleme (github.com/$REPO@$BRANCH)"
+step "$(t "SanalCP güncelleme (github.com/$REPO@$BRANCH)" "SanalCP update (github.com/$REPO@$BRANCH)")"
 
-# 1) indir
+# 1) download
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-echo "  indiriliyor…"
+echo "  $(t "indiriliyor…" "downloading…")"
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar xz -C "$TMP" \
-  || die "indirme başarısız — repo public mi / '$BRANCH' dalı var mı?"
+  || die "$(t "indirme başarısız — repo public mi / '$BRANCH' dalı var mı?" "download failed — is the repo public / does branch '$BRANCH' exist?")"
 SRC=$(find "$TMP" -maxdepth 1 -type d -name "*-$BRANCH" | head -1)
 A="$SRC/assets"
 NEWBIN="$A/sanalcp-server"
-[ -f "$NEWBIN" ] || die "$A/sanalcp-server yok (repo yapısı beklenenden farklı)"
-[ -f "$A/SHA256SUMS" ] || die "release bütünlük manifesti yok"
+[ -f "$NEWBIN" ] || die "$(t "$A/sanalcp-server yok (repo yapısı beklenenden farklı)" "$A/sanalcp-server missing (repo layout is not what was expected)")"
+[ -f "$A/SHA256SUMS" ] || die "$(t "release bütünlük manifesti yok" "release integrity manifest missing")"
 (cd "$SRC" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
-  die "release asset SHA-256 doğrulaması başarısız"
-ok "release asset bütünlüğü doğrulandı"
+  die "$(t "release asset SHA-256 doğrulaması başarısız" "release asset SHA-256 verification failed")"
+ok "$(t "release asset bütünlüğü doğrulandı" "release asset integrity verified")"
 
-# 2) yeni binary'yi ÇALIŞTIRMADAN doğrula (ELF header) + değişiklik tespiti.
-# ÖNEMLİ: sadece binary'yi değil TÜM release'i (binary + frontend-dist + migrations)
-# hash'le. Aksi halde frontend-only / migration-only bir güncellemede binary sha
-# aynı kaldığı için güncelleme yanlışlıkla ATLANIRDI.
-head -c4 "$NEWBIN" | grep -q $'\x7fELF' || die "indirilen binary geçerli ELF değil — iptal"
+# 2) verify the new binary WITHOUT running it (ELF header) + detect changes.
+# IMPORTANT: hash the WHOLE release (binary + frontend-dist + migrations), not just the
+# binary. Otherwise a frontend-only / migration-only update would be wrongly SKIPPED
+# because the binary sha stayed the same.
+head -c4 "$NEWBIN" | grep -q $'\x7fELF' || die "$(t "indirilen binary geçerli ELF değil — iptal" "downloaded binary is not a valid ELF — aborting")"
 CURVER=$(surum); [ -n "$CURVER" ] || CURVER="?"
-echo "  mevcut sürüm: $CURVER"
-# NOT: her sha256sum'u cut ile SADECE hash'e indir — aksi halde çıktıdaki (rastgele
-# tmp) dosya yolu RELHASH'i her çalıştırmada değiştirir ve no-op asla çalışmazdı.
+echo "  $(t "mevcut sürüm: $CURVER" "current version: $CURVER")"
+# NOTE: reduce every sha256sum to ONLY the hash with cut — otherwise the (random tmp)
+# file path in the output would change RELHASH on every run, and the no-op path would
+# never trigger.
 RELHASH=$( { sha256sum "$NEWBIN" | cut -d' ' -f1
   [ -f "$A/frontend-dist.tar.gz" ] && sha256sum "$A/frontend-dist.tar.gz" | cut -d' ' -f1
   [ -f "$A/migrations.tar.gz" ] && sha256sum "$A/migrations.tar.gz" | cut -d' ' -f1
-  # ops/ + systemd/ de hash'e DAHİL: aksi halde yalnızca script/unit değişen bir sürümde
-  # (ör. DB yedek aracı + timer'ın eklenmesi) RELHASH sabit kalır ve güncelleme "zaten
-  # en güncel" deyip sessizce ATLANIRDI — düzeltme sunucuya hiç ulaşmazdı.
-  # LC_ALL=C sort: dosya sırası deterministik olmalı, yoksa hash her çalıştırmada oynar.
+  # ops/ + systemd/ are INCLUDED in the hash too: otherwise a release that only changes
+  # a script/unit (e.g. adding the DB backup tool + timer) would leave RELHASH unchanged
+  # and the update would silently report "already up to date" — the fix would never
+  # reach the server.
+  # LC_ALL=C sort: file order must be deterministic, or the hash would drift each run.
   find "$A/ops" "$A/systemd" -type f 2>/dev/null | LC_ALL=C sort \
     | xargs -r sha256sum 2>/dev/null | cut -d' ' -f1
   true; } | sha256sum | cut -d' ' -f1)
 MARKER="$PREFIX/.release_hash"
 CURREL=$(cat "$MARKER" 2>/dev/null || echo yok)
 if [ "$RELHASH" = "$CURREL" ] && [ "$FORCE" = 0 ]; then
-  ok "zaten en güncel (release hash eşleşti) — yapılacak bir şey yok (--force ile zorla)"
+  ok "$(t "zaten en güncel (release hash eşleşti) — yapılacak bir şey yok (--force ile zorla)" "already up to date (release hash matched) — nothing to do (use --force to override)")"
   exit 0
 fi
 
 if [ "$DRY" = 1 ]; then
-  step "DRY-RUN — değişecekler (uygulanmadı)"
-  echo "  • $BIN  (binary değişmişse swap + yedek $BIN.bak)"
-  echo "  • $FDIST/  (frontend-dist yeniden yazılır)"
-  echo "  • $MIGR/  (yeni .sql eklenir, mevcutlar korunur)"
-  echo "  • /usr/local/bin ops-tool'lar + $SCRIPTS"
-  echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} (timer enable --now)"
-  echo "  • migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)"
-  echo "  • systemctl restart sanalcp  (env/DB/siteler KORUNUR)"
+  step "$(t "DRY-RUN — değişecekler (uygulanmadı)" "DRY RUN — what would change (nothing applied)")"
+  echo "  • $BIN  $(t "(binary değişmişse swap + yedek $BIN.bak)" "(swapped if changed + backed up to $BIN.bak)")"
+  echo "  • $FDIST/  $(t "(frontend-dist yeniden yazılır)" "(frontend-dist rewritten)")"
+  echo "  • $MIGR/  $(t "(yeni .sql eklenir, mevcutlar korunur)" "(new .sql files added, existing ones kept)")"
+  echo "  • $(t "/usr/local/bin ops-tool'lar" "/usr/local/bin ops tools")" "+ $SCRIPTS"
+  echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} $(t "(timer enable --now)" "(timer enable --now)")"
+  echo "  • $(t "migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)" "panel DB dump BEFORE migrations → $DBDIR  (no dump is taken in DRY RUN)")"
+  echo "  • systemctl restart sanalcp  $(t "(env/DB/siteler KORUNUR)" "(env/DB/sites PRESERVED)")"
   exit 0
 fi
 
-# 3) DB yedek aracı + günlük timer'ı kur.
-# SIRA ÖNEMLİ: dump'ı adım 4'te alacağız, aracın o an KURULU olması şart. Adım 9'daki
-# genel ops döngüsü çok geç kalıyor (migration'lar adım 6'da çoktan açılmış olurdu) ve
-# aracı hiç olmayan eski kurulumlarda dump imkânsız olurdu. Burada yalnızca db-backup'ı
-# kuruyoruz — çalışan updater'ın kendi dosyasını bu noktada ezmiyoruz (bash script'i
-# satır satır okur; kendini ortasından değiştirmek tehlikeli), o iş adım 9'da kalıyor.
+# 3) install the DB backup tool + daily timer.
+# ORDER MATTERS: we take the dump in step 4, so the tool must already be INSTALLED. The
+# general ops loop in step 9 runs too late (migrations would already be open by step 6)
+# and on old installs that never had the tool, the dump would be impossible. Only
+# db-backup is installed here — we don't overwrite the running updater's own file at
+# this point (bash reads the script line by line; rewriting yourself mid-run is
+# dangerous), that happens in step 9.
 if [ -f "$A/ops/sanalcp-db-backup" ]; then
   install -m 0755 "$A/ops/sanalcp-db-backup" "$DBBK"
-  ok "DB yedek aracı kuruldu ($DBBK)"
+  ok "$(t "DB yedek aracı kuruldu ($DBBK)" "DB backup tool installed ($DBBK)")"
 fi
-# systemd unit'leri: dosyayı kopyalamak YETMEZ — daemon-reload + enable --now olmadan
-# timer asla ateşlenmez (kurulumda unutulursa günlük yedek sessizce hiç çalışmaz).
+# systemd units: copying the file is NOT enough — without daemon-reload + enable --now
+# the timer never fires (if forgotten, the daily backup would silently never run).
 UNITS=0
 for u in sanalcp-db-backup.service sanalcp-db-backup.timer; do
   if [ -f "$A/systemd/$u" ]; then install -m 0644 "$A/systemd/$u" "/etc/systemd/system/$u"; UNITS=1; fi
@@ -130,42 +141,45 @@ if [ "$UNITS" = 1 ]; then
   systemctl daemon-reload >/dev/null 2>&1 || true
   systemctl enable --now sanalcp-db-backup.timer >/dev/null 2>&1 || true
   if systemctl is-active --quiet sanalcp-db-backup.timer; then
-    ok "günlük DB yedek timer'ı ACTIVE ($(systemctl show -p TimersCalendar --value sanalcp-db-backup.timer 2>/dev/null | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1))"
+    ok "$(t "günlük DB yedek timer'ı ACTIVE ($(systemctl show -p TimersCalendar --value sanalcp-db-backup.timer 2>/dev/null | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1))" "daily DB backup timer ACTIVE ($(systemctl show -p TimersCalendar --value sanalcp-db-backup.timer 2>/dev/null | grep -oE '[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1))")"
   else
-    warn "DB yedek timer'ı başlatılamadı — günlük yedek çalışmayabilir"
+    warn "$(t "DB yedek timer'ı başlatılamadı — günlük yedek çalışmayabilir" "DB backup timer failed to start — daily backup may not run")"
   fi
 fi
 
-# 4) GÜNCELLEME ÖNCESİ DB DUMP — FAIL-CLOSED.
-# Migration'lar geri alınamaz; yedeksiz migration kabul edilemez. Dump alınamıyorsa
-# güncellemeye HİÇ BAŞLAMA (binary'ye, frontend'e, migration'lara dokunmadan çık).
-step "Güncelleme öncesi DB yedeği"
-[ -x "$DBBK" ] || die "DB yedek aracı yok/çalıştırılamıyor ($DBBK) — yedeksiz migration REDDEDİLDİ, güncelleme başlatılmadı"
-PREDUMP=$("$DBBK") || die "güncelleme öncesi DB yedeği BAŞARISIZ — güncelleme başlatılmadı (DB'ye/binary'ye dokunulmadı)"
+# 4) PRE-UPDATE DB DUMP — FAIL-CLOSED.
+# Migrations can't be undone; a migration without a backup is unacceptable. If the dump
+# fails, do NOT start the update at all (nothing touched — binary, frontend, migrations).
+step "$(t "Güncelleme öncesi DB yedeği" "Pre-update DB backup")"
+[ -x "$DBBK" ] || die "$(t "DB yedek aracı yok/çalıştırılamıyor ($DBBK) — yedeksiz migration REDDEDİLDİ, güncelleme başlatılmadı" "DB backup tool missing/unusable ($DBBK) — migration without a backup REJECTED, update not started")"
+PREDUMP=$("$DBBK") || die "$(t "güncelleme öncesi DB yedeği BAŞARISIZ — güncelleme başlatılmadı (DB'ye/binary'ye dokunulmadı)" "pre-update DB backup FAILED — update not started (DB/binary untouched)")"
 [ -n "$PREDUMP" ] && [ -f "$PREDUMP" ] \
-  || die "güncelleme öncesi DB yedeği doğrulanamadı (dönen yol boş veya dosya yok) — güncelleme başlatılmadı"
-ok "pre-update dump: $PREDUMP ($(du -h "$PREDUMP" 2>/dev/null | cut -f1))"
+  || die "$(t "güncelleme öncesi DB yedeği doğrulanamadı (dönen yol boş veya dosya yok) — güncelleme başlatılmadı" "pre-update DB backup could not be verified (returned path empty or missing) — update not started")"
+ok "$(t "pre-update dump: $PREDUMP ($(du -h "$PREDUMP" 2>/dev/null | cut -f1))" "pre-update dump: $PREDUMP ($(du -h "$PREDUMP" 2>/dev/null | cut -f1))")"
 
-# 5) yedek (binary + seed)
+# 5) backup (binary + seed)
 cp -f "$BIN" "$BIN.bak"
 [ -x "$SEED" ] && cp -f "$SEED" "$SEED.bak" 2>/dev/null || true
-ok "mevcut binary yedeklendi ($BIN.bak)"
+ok "$(t "mevcut binary yedeklendi ($BIN.bak)" "current binary backed up ($BIN.bak)")"
 
-# 6) binary swap (install = atomik replace; çalışan process eski inode'u restart'a kadar tutar — cp -f KULLANMA)
+# 6) binary swap (install = atomic replace; the running process keeps the old inode until
+# restart — never use cp -f here)
 install -m 0755 "$NEWBIN" "$BIN"
 [ -f "$A/sanalcp-seed-admin" ] && install -m 0755 "$A/sanalcp-seed-admin" "$SEED"
-ok "binary güncellendi"
+ok "$(t "binary güncellendi" "binary updated")"
 
-# 7) frontend-dist — ATOMİK + DOĞRULANMIŞ swap.
-# Eski hata: `rm -rf "${FDIST:?}/"* && tar xzf ...` ÖNCE çalışan frontend'i siliyordu; extraction
-# kesilir ya da flush olmadan reboot olursa → 0-byte dosyalar → BEYAZ EKRAN outage (geri dönüş YOK).
-# Artık yeni sürüm ayrı bir geçici dizine açılır, bütünlüğü DOĞRULANIR, sonra atomik mv ile takas
-# edilir. Bozuk/kesik extraction çalışan frontend'e ASLA dokunmaz.
+# 7) frontend-dist — ATOMIC + VERIFIED swap.
+# Old bug: `rm -rf "${FDIST:?}/"* && tar xzf ...` deleted the running frontend FIRST; if
+# extraction was interrupted or a reboot hit before the flush → 0-byte files → WHITE
+# SCREEN outage (no way back). Now the new version is extracted into a separate temp
+# dir, VERIFIED, then swapped in atomically with mv. A broken/truncated extraction NEVER
+# touches the running frontend.
 if [ -f "$A/frontend-dist.tar.gz" ]; then
   FDNEW="${FDIST}.new.$$"
-  # Bozuk extraction'da temizlik: geçici dizini sil + binary'yi (adım 6'da swap edilmişti) yedeğe
-  # geri al ki başarısız güncelleme on-disk'te de tam no-op olsun. Servis HENÜZ restart edilmedi
-  # (restart adım 11) → çalışan panel eski binary + eski frontend ile kesintisiz ayakta kalır.
+  # Cleanup on a broken extraction: remove the temp dir + restore the binary (swapped in
+  # step 6) back to the backup, so a failed update is a full no-op on disk too. The
+  # service hasn't been restarted yet (that's step 11) → the running panel stays up
+  # without interruption on the old binary + old frontend.
   fdist_abort() {
     rm -rf "$FDNEW" 2>/dev/null || true
     install -m 0755 "$BIN.bak" "$BIN" 2>/dev/null || true
@@ -175,55 +189,60 @@ if [ -f "$A/frontend-dist.tar.gz" ]; then
   }
   rm -rf "$FDNEW"; mkdir -p "$FDNEW"
   if ! tar xzf "$A/frontend-dist.tar.gz" -C "$FDNEW"; then
-    fdist_abort "frontend-dist extraction başarısız — mevcut frontend + eski binary KORUNDU"
+    fdist_abort "$(t "frontend-dist extraction başarısız — mevcut frontend + eski binary KORUNDU" "frontend-dist extraction failed — current frontend + old binary PRESERVED")"
   fi
-  # bütünlük kapısı: index.html DOLU + en az bir JS bundle olmalı (0-byte/kesik tarball reddedilir)
+  # integrity gate: index.html must be non-empty + at least one JS bundle must exist
+  # (0-byte/truncated tarballs are rejected)
   if [ ! -s "$FDNEW/index.html" ] || ! ls "$FDNEW"/assets/index-*.js >/dev/null 2>&1; then
-    fdist_abort "frontend-dist bozuk (index.html/JS boş veya eksik) — mevcut frontend + eski binary KORUNDU"
+    fdist_abort "$(t "frontend-dist bozuk (index.html/JS boş veya eksik) — mevcut frontend + eski binary KORUNDU" "frontend-dist is broken (index.html/JS empty or missing) — current frontend + old binary PRESERVED")"
   fi
   rm -rf "${FDIST}.old"
   [ -d "$FDIST" ] && mv "$FDIST" "${FDIST}.old"
   mv "$FDNEW" "$FDIST"
-  sync   # reboot-güvenli: delayed-alloc veri kaybını önlemek için diske flush et
-  ok "frontend-dist güncellendi (atomik doğrulanmış swap)"
+  sync   # reboot-safe: flush to disk to avoid delayed-alloc data loss
+  ok "$(t "frontend-dist güncellendi (atomik doğrulanmış swap)" "frontend-dist updated (atomic, verified swap)")"
 fi
 
-# 8) migration'lar (idempotent — startup'ta uygulanır). Adım 4'te dump'ı ALDIK.
+# 8) migrations (idempotent — applied at startup). We already took the dump in step 4.
 if [ -f "$A/migrations.tar.gz" ]; then
   mkdir -p "$MIGR"; tar xzf "$A/migrations.tar.gz" -C "$MIGR"
-  ok "migration'lar senkron ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)"
+  ok "$(t "migration'lar senkron ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)" "migrations in sync ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)")"
 fi
 
-# 9) ops-tool'lar (updater kendini de günceller; db-backup adım 3'te zaten kuruldu — tekrar idempotent)
+# 9) ops tools (the updater updates itself too; db-backup was already installed in step 3
+# — reinstalling here is idempotent)
 if [ -d "$A/ops" ]; then
-  for t in "$A"/ops/*; do bn=$(basename "$t"); install -m 0755 "$t" "/usr/local/bin/${bn%.sh}" 2>/dev/null || true; done
+  for t2 in "$A"/ops/*; do bn=$(basename "$t2"); install -m 0755 "$t2" "/usr/local/bin/${bn%.sh}" 2>/dev/null || true; done
   mkdir -p "$SCRIPTS"; cp "$A"/ops/* "$SCRIPTS/" 2>/dev/null || true
-  ok "ops-tool'lar güncellendi"
+  ok "$(t "ops-tool'lar güncellendi" "ops tools updated")"
 fi
 
-# 9b) WAF (ModSecurity + OWASP CRS) heal — IDEMPOTENT (her sey hazirsa saniyeler icinde ATLAR).
-# nginx sürümü değişmişse connector'ı ABI için yeniden derler. nginx -t GATE + rollback icerir →
-# ana nginx'i asla bozmaz. Modül yüklü değilse panel WAF'ı graceful atlar (site etkilenmez).
+# 9b) WAF (ModSecurity + OWASP CRS) heal — IDEMPOTENT (skips in seconds if everything is
+# already ready). Rebuilds the connector for ABI if the nginx version changed. Includes an
+# nginx -t GATE + rollback → never breaks the main nginx. If the module isn't loaded, the
+# panel's WAF gracefully skips (sites are unaffected).
 if command -v sanalcp-waf-setup >/dev/null 2>&1; then
-  sanalcp-waf-setup >/dev/null 2>&1 && ok "WAF altyapısı senkron (ModSecurity+CRS)" || warn "waf-setup atlandı (WAF modülsüz graceful)"
+  sanalcp-waf-setup >/dev/null 2>&1 && ok "$(t "WAF altyapısı senkron (ModSecurity+CRS)" "WAF stack in sync (ModSecurity+CRS)")" || warn "$(t "waf-setup atlandı (WAF modülsüz graceful)" "waf-setup skipped (gracefully, WAF module unavailable)")"
 fi
 
-# 10) izolasyon + araç prereq (eski kurulumlarda yoksa gelsin; idempotent) + SELinux context
+# 10) isolation + tool prerequisites (added if missing on old installs; idempotent) + SELinux context
 command -v bwrap >/dev/null 2>&1 || dnf install -y bubblewrap >/dev/null 2>&1 || true
-# acl (setfacl): per-user dosya izin modeli (nginx user-ACL) için ŞART — yoksa panel fail-safe
-# grup=nginx moduna düşer. Idempotent.
+# acl (setfacl): REQUIRED for the per-user file permission model (nginx user-ACL) —
+# without it the panel falls back fail-safe to group=nginx mode. Idempotent.
 command -v setfacl >/dev/null 2>&1 || dnf install -y acl >/dev/null 2>&1 || true
-# RAR açıcı (dosya yöneticisi .rar extract): PRİMER bsdtar (libarchive, base repo, güvenilir
-# RAR/RAR5 + path-traversal reddeder). 7z (7-Zip 26.02) RAR codec içermez → kullanılmaz.
+# RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, reliably reads
+# RAR/RAR5 and itself rejects path-traversal). 7z (7-Zip 26.02) does NOT include the RAR
+# codec → unusable.
 if ! command -v bsdtar >/dev/null 2>&1 && ! command -v unar >/dev/null 2>&1 && ! command -v unrar >/dev/null 2>&1; then
   dnf install -y bsdtar >/dev/null 2>&1 || dnf install -y unar >/dev/null 2>&1 || dnf install -y unrar >/dev/null 2>&1 || true
 fi
 command -v restorecon >/dev/null && restorecon -R "$PREFIX/bin" "$FDIST" >/dev/null 2>&1 || true
 
-# 10b) Disk kotası (XFS user quota) GRUB yapılandırma — 🔴 CANLI SUNUCU: OTO-REBOOT ETME.
-# Kök fs XFS + noquota ise `rootflags=uquota`'yı /etc/default/grub'a idempotent yaz; kota ancak
-# MOUNT anında (reboot ile) açılır. Reboot'u OPERATÖR zamanlar → sentinel dosyası + net uyarı
-# bırak. Panel açılışındaki HealKotaOnStartup, fs kota aktif olduğunda limitleri kendi uygular.
+# 10b) Disk quota (XFS user quota) GRUB config — 🔴 LIVE SERVER: DO NOT AUTO-REBOOT.
+# If root fs is XFS with `noquota`, idempotently write `rootflags=uquota` to
+# /etc/default/grub; the quota can only be enabled at MOUNT time (reboot). The operator
+# schedules the reboot → leave a sentinel file + a clear warning. HealKotaOnStartup (at
+# panel boot) applies limits itself once fs quota is active.
 command -v quota >/dev/null 2>&1 || dnf install -y quota xfsprogs >/dev/null 2>&1 || true
 QROOTFS=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 QROOTOPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
@@ -240,14 +259,14 @@ if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|qu
     for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
   fi
   mkdir -p /etc/sanalcp
-  echo "rootflags=uquota GRUB'a yazildi $(date -Is 2>/dev/null) — reboot bekleniyor" > "$QSENTINEL" 2>/dev/null || true
-  warn "🔴 Disk kotası GRUB'a yazıldı — AKTİF olması için tek seferlik REBOOT gerekli (canlı sunucuda operatör zamanlar). OTO-REBOOT YAPILMADI."
+  echo "$(t "rootflags=uquota GRUB'a yazildi" "rootflags=uquota written to GRUB") $(date -Is 2>/dev/null) — $(t "reboot bekleniyor" "reboot pending")" > "$QSENTINEL" 2>/dev/null || true
+  warn "$(t "🔴 Disk kotası GRUB'a yazıldı — AKTİF olması için tek seferlik REBOOT gerekli (canlı sunucuda operatör zamanlar). OTO-REBOOT YAPILMADI." "🔴 Disk quota was written to GRUB — needs a ONE-TIME REBOOT to become active (the operator schedules this on a live server). NO AUTO-REBOOT was performed.")"
 elif [ "$QROOTFS" = "xfs" ]; then
-  [ -f "$QSENTINEL" ] && rm -f "$QSENTINEL" 2>/dev/null && ok "disk kotası aktif — reboot sentinel temizlendi" || ok "disk kotası aktif (kök XFS user quota)"
+  [ -f "$QSENTINEL" ] && rm -f "$QSENTINEL" 2>/dev/null && ok "$(t "disk kotası aktif — reboot sentinel temizlendi" "disk quota active — reboot sentinel cleared")" || ok "$(t "disk kotası aktif (kök XFS user quota)" "disk quota active (root XFS user quota)")"
 fi
 
-# 11) yeniden başlat + sağlık kontrolü (başarısızsa binary + DB rollback)
-step "Yeniden başlatılıyor"
+# 11) restart + health check (rolls back binary + DB on failure)
+step "$(t "Yeniden başlatılıyor" "Restarting")"
 systemctl restart sanalcp
 HEALTHY=0
 for i in 1 2 3 4 5 6; do
@@ -257,38 +276,39 @@ done
 
 if [ "$HEALTHY" = 1 ]; then
   systemctl reload nginx >/dev/null 2>&1 || true
-  echo "$RELHASH" > "$MARKER" 2>/dev/null || true   # bu release'i uygulandı olarak işaretle
+  echo "$RELHASH" > "$MARKER" 2>/dev/null || true   # mark this release as applied
   NEWVER=$(surum); [ -n "$NEWVER" ] || NEWVER="?"
-  ok "panel ACTIVE + /healthz OK"
-  ok "kaynak limitleri planlardan uygulanıyor + mevcut siteler per-tenant PHP-FPM izolasyonuna GÜVENLE (self-check + auto-rollback) geçiriliyor (arka planda)"
-  echo -e "${c_g}══ Güncelleme tamam ($CURVER → $NEWVER) — env/DB/siteler korundu ══${c_0}"
+  ok "$(t "panel ACTIVE + /healthz OK" "panel ACTIVE + /healthz OK")"
+  ok "$(t "kaynak limitleri planlardan uygulanıyor + mevcut siteler per-tenant PHP-FPM izolasyonuna GÜVENLE (self-check + auto-rollback) geçiriliyor (arka planda)" "resource limits are being applied from plans + existing sites are being SAFELY migrated to per-tenant PHP-FPM isolation (self-check + auto-rollback) in the background")"
+  echo -e "${c_g}══ $(t "Güncelleme tamam ($CURVER → $NEWVER) — env/DB/siteler korundu" "Update complete ($CURVER → $NEWVER) — env/DB/sites preserved") ══${c_0}"
 else
-  warn "yeni sürüm sağlıklı başlamadı — ESKİ binary'ye + güncelleme öncesi DB'ye dönülüyor"
+  warn "$(t "yeni sürüm sağlıklı başlamadı — ESKİ binary'ye + güncelleme öncesi DB'ye dönülüyor" "the new version did not come up healthy — rolling back to the OLD binary + pre-update DB")"
   install -m 0755 "$BIN.bak" "$BIN"
   [ -f "$SEED.bak" ] && install -m 0755 "$SEED.bak" "$SEED" 2>/dev/null || true
   command -v restorecon >/dev/null && restorecon "$BIN" >/dev/null 2>&1 || true
 
-  # DB'yi de geri yükle: yeni sürümün migration'ı şemayı değiştirmiş olabilir ve ESKİ
-  # binary o şemayla çalışamaz → binary-only rollback yetmez. Panel şu an DURMUŞ
-  # (restart sağlıksız kaldı) → geri yükleme sırasında yazma kaybı yok.
-  # NOT: dump `--databases panel` ile alındı → her tablo için DROP+CREATE içerir; yeni
-  # migration'ın EKLEDİĞİ tablolar dump'ta olmadığı için kalır (eski binary onları
-  # görmez, zararsız). Kolon/veri değişiklikleri geri alınır.
+  # Restore the DB too: the new version's migration may have changed the schema, and the
+  # OLD binary can't run against that schema → a binary-only rollback isn't enough. The
+  # panel is currently STOPPED (the restart came up unhealthy) → no write loss during
+  # restore.
+  # NOTE: the dump was taken with `--databases panel` → it contains DROP+CREATE for every
+  # table; tables ADDED by the new migration aren't in the dump, so they REMAIN (the old
+  # binary doesn't see them, harmless). Column/data changes are reverted.
   systemctl stop sanalcp >/dev/null 2>&1 || true
   if [ -n "$PREDUMP" ] && [ -f "$PREDUMP" ]; then
     if zcat "$PREDUMP" | mysql; then
-      ok "DB güncelleme öncesi yedeğe geri yüklendi ($PREDUMP)"
+      ok "$(t "DB güncelleme öncesi yedeğe geri yüklendi ($PREDUMP)" "DB restored to the pre-update backup ($PREDUMP)")"
     else
-      warn "DB geri yükleme BAŞARISIZ — dump duruyor, elle: zcat '$PREDUMP' | mysql"
+      warn "$(t "DB geri yükleme BAŞARISIZ — dump duruyor, elle: zcat '$PREDUMP' | mysql" "DB restore FAILED — the dump is still there, restore manually: zcat '$PREDUMP' | mysql")"
     fi
   else
-    warn "güncelleme öncesi dump bulunamadı — yalnızca binary geri alındı"
+    warn "$(t "güncelleme öncesi dump bulunamadı — yalnızca binary geri alındı" "pre-update dump not found — only the binary was rolled back")"
   fi
 
   systemctl restart sanalcp; sleep 3
   if systemctl is-active --quiet sanalcp; then
-    die "rollback yapıldı — panel ESKİ sürüm + ESKİ DB ile ayakta. Yeni sürüm hatası: journalctl -u sanalcp -n 40"
+    die "$(t "rollback yapıldı — panel ESKİ sürüm + ESKİ DB ile ayakta. Yeni sürüm hatası: journalctl -u sanalcp -n 40" "rollback complete — the panel is up on the OLD version + OLD DB. For the new version's error: journalctl -u sanalcp -n 40")"
   else
-    die "KRİTİK: rollback sonrası da panel kalkmadı — journalctl -u sanalcp -n 40 (DB yedeği: $PREDUMP)"
+    die "$(t "KRİTİK: rollback sonrası da panel kalkmadı — journalctl -u sanalcp -n 40 (DB yedeği: $PREDUMP)" "CRITICAL: the panel did not come up even after rollback — journalctl -u sanalcp -n 40 (DB backup: $PREDUMP)")"
   fi
 fi
