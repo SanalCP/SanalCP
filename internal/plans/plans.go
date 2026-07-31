@@ -369,6 +369,17 @@ func (h *Handlers) DomainlerAra(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
+// panelDili: panel_ayarlari.varsayilan_dil — seed paket isim/açıklamalarının hangi
+// dilde oluşturulacağını belirler (kurulumda seçilen dil). Okunamazsa 'tr' varsayılır.
+func panelDili(ctx context.Context, db *sql.DB) string {
+	var dil string
+	_ = db.QueryRowContext(ctx, `SELECT varsayilan_dil FROM panel_ayarlari WHERE id=1`).Scan(&dil)
+	if dil != "en" {
+		return "tr"
+	}
+	return "en"
+}
+
 // SeedIfEmpty: 3 demo plan (Başlangıç, Standart, Profesyonel) — yeni kaynak limitleriyle
 func SeedIfEmpty(ctx context.Context, db *sql.DB) error {
 	var n int
@@ -379,7 +390,7 @@ func SeedIfEmpty(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 	log.Printf("seed: 3 demo paket ekleniyor")
-	for _, p := range seedPlanlari() {
+	for _, p := range seedPlanlari(panelDili(ctx, db)) {
 		_, err := db.ExecContext(ctx,
 			`INSERT INTO service_plans(ad, aciklama, disk_kota_mb, trafik_kota_mb,
 			   max_domain, max_db, max_email, max_ftp,
@@ -403,7 +414,17 @@ type seedTier struct {
 	Default                                      int
 }
 
-func seedPlanlari() []seedTier {
+func seedPlanlari(dil string) []seedTier {
+	if dil == "en" {
+		return []seedTier{
+			{"Starter", "Single site, small project", 1024, 5120, 1, 1, 5, 2,
+				50, 256, 30, 25000, 100, 15, 4, 1},
+			{"Standard", "Multiple projects + email", 10240, 51200, 5, 10, 25, 10,
+				100, 512, 60, 100000, 100, 30, 8, 0},
+			{"Professional", "High traffic + large site", 51200, 204800, 25, 50, 100, 50,
+				200, 2048, 150, 500000, 200, 100, 32, 0},
+		}
+	}
 	return []seedTier{
 		{"Başlangıç", "Tek site, küçük proje", 1024, 5120, 1, 1, 5, 2,
 			50, 256, 30, 25000, 100, 15, 4, 1},
@@ -419,7 +440,7 @@ func seedPlanlari() []seedTier {
 // çalışır; SeedSync ise 177 gibi zaten dolu kurulumlarda yeni tier'ları güvenle ekler.
 // Operatör tarafından düzenlenmiş planların değerleri KORUNUR.
 func SeedSync(ctx context.Context, db *sql.DB) error {
-	for _, p := range seedPlanlari() {
+	for _, p := range seedPlanlari(panelDili(ctx, db)) {
 		// Varsayılan bayrağını burada set ETME (mevcut varsayılanı ezmemek için);
 		// yalnız plan hiç yoksa, adıyla ekle.
 		_, err := db.ExecContext(ctx,
