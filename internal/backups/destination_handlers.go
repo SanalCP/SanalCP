@@ -100,6 +100,9 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 	} else if req.Host == "" {
 		httpx.WriteError(w, http.StatusBadRequest, "host zorunlu")
 		return
+	} else if !gecerliHost(req.Host) {
+		httpx.WriteError(w, http.StatusBadRequest, "host: geçersiz biçim (yalnız hostname/IP)")
+		return
 	} else if req.Port == 0 {
 		if req.Tip == "sftp" {
 			req.Port = 22
@@ -187,6 +190,10 @@ func (h *Handlers) TestDestination(w http.ResponseWriter, r *http.Request) {
 	var ad destPutReq
 	if json.NewDecoder(r.Body).Decode(&ad) == nil &&
 		(ad.Host != "" || (objectStorageTip(ad.Tip) && ad.Bucket != "")) {
+		if ad.Host != "" && !objectStorageTip(ad.Tip) && !gecerliHost(ad.Host) {
+			httpx.WriteError(w, http.StatusBadRequest, "host: geçersiz biçim (yalnız hostname/IP)")
+			return
+		}
 		// Ad-hoc test (UI'dan kaydetmeden test): parola boşsa DB'den çek
 		mevcutParola := ""
 		_ = h.DB.QueryRowContext(r.Context(),

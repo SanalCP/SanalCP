@@ -38,6 +38,10 @@ ok "MySQL kullanıcısı 'pureftpd' (SELECT ftp_accounts)"
 umask 077; echo "$PFPW" > "$PFPW_FILE"; chmod 600 "$PFPW_FILE"
 
 # 3) MySQL config (Pure-FTPd)
+# MYSQLCrypt=crypt: ftp_accounts.password_md5 artık düz metin DEĞİL, panelin
+# ürettiği yescrypt ($y$) hash'i tutuyor. Pure-FTPd bu değeri glibc crypt(3)
+# ile (AlmaLinux 10 libxcrypt $y$'yi destekler) doğrular — parola panel
+# DB'sinde hiçbir noktada düz metin olarak durmaz.
 SOCK=$(mysql -N -e "SHOW VARIABLES LIKE 'socket';" 2>/dev/null | awk '{print $2}'); [ -z "$SOCK" ] && SOCK=/var/lib/mysql/mysql.sock
 cat > /etc/pure-ftpd/pureftpd-mysql.conf <<EOF
 MYSQLSocket     $SOCK
@@ -46,7 +50,7 @@ MYSQLPort       3306
 MYSQLUser       pureftpd
 MYSQLPassword   $PFPW
 MYSQLDatabase   panel
-MYSQLCrypt      cleartext
+MYSQLCrypt      crypt
 MYSQLGetPW      SELECT password_md5 FROM ftp_accounts WHERE username="\L" AND status='active'
 MYSQLGetUID     SELECT uid_n FROM ftp_accounts WHERE username="\L" AND status='active'
 MYSQLGetGID     SELECT gid_n FROM ftp_accounts WHERE username="\L" AND status='active'

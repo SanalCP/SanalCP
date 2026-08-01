@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -36,6 +38,26 @@ func gecerliTip(t string) bool {
 }
 
 func objectStorageTip(t string) bool { return t == "s3" || t == "b2" }
+
+// hostRe: FTP/SFTP hedefi için izin verilen hostname/IPv4 karakter kümesi.
+// lftp/ssh/curl komut satırlarına bu değer tırnaksız veya kısmen tırnaklı
+// gömüldüğünden (bkz. lftpURL, testConnection), ';', '!', '"', '$', '`' gibi
+// script/shell meta karakterlerini baştan reddetmek command injection'ı önler.
+var hostRe = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,252}[A-Za-z0-9])?$`)
+
+// gecerliHost: hostname veya IPv4/IPv6 adresini kabul eder; script/shell
+// meta karakteri (;, !, ", $, `, |, boşluk, vb.) içeren her şeyi reddeder.
+func gecerliHost(h string) bool {
+	if h == "" || len(h) > 253 {
+		return false
+	}
+	// IPv6, köşeli parantez olmadan da girilebilir (örn. "::1") — ':' hostRe'de
+	// yok, o yüzden ayrıca izin veriyoruz; net.ParseIP zaten sıkı doğrular.
+	if strings.Contains(h, ":") {
+		return net.ParseIP(h) != nil
+	}
+	return hostRe.MatchString(h)
+}
 
 // readDestination: bir domain'in destinasyon kaydını döner (yoksa nil, nil).
 func readDestination(ctx context.Context, db *sql.DB, domainID int64) (*Destination, error) {
@@ -90,7 +112,7 @@ func uploadToRemote(ctx context.Context, d *Destination, localPath, dosyaAdi str
 			`set net:max-retries 1; `+
 			`set net:timeout 15; `+
 			`set net:reconnect-interval-base 2; `+
-			`open -u "%s","%s" %s; `+
+			`open -u "%s","%s" "%s"; `+
 			`mkdir -p -f "%s"; `+
 			`cd "%s"; `+
 			`put -O . "%s"; `+
@@ -123,7 +145,7 @@ func downloadFromRemote(ctx context.Context, d *Destination, dosyaAdi, localPath
 		`set cmd:fail-exit yes; set sftp:auto-confirm yes; `+
 			`set ssl:verify-certificate yes; set ftp:ssl-allow no; `+
 			`set net:max-retries 1; set net:timeout 15; `+
-			`open -u "%s","%s" %s; cd "%s"; get "%s" -o "%s"; bye`,
+			`open -u "%s","%s" "%s"; cd "%s"; get "%s" -o "%s"; bye`,
 		lftpEscape(d.Kullanici), lftpEscape(d.Parola), lftpURL(d),
 		lftpEscape(d.UzakDizin), lftpEscape(dosyaAdi), lftpEscape(localPath))
 	out, err := exec.CommandContext(ctx, "lftp", "-c", script).CombinedOutput()
@@ -142,7 +164,7 @@ func deleteFromRemote(ctx context.Context, d *Destination, dosyaAdi string) erro
 		`set cmd:fail-exit yes; set sftp:auto-confirm yes; `+
 			`set ssl:verify-certificate yes; set ftp:ssl-allow no; `+
 			`set net:max-retries 1; set net:timeout 15; `+
-			`open -u "%s","%s" %s; cd "%s"; rm "%s"; bye`,
+			`open -u "%s","%s" "%s"; cd "%s"; rm "%s"; bye`,
 		lftpEscape(d.Kullanici), lftpEscape(d.Parola), lftpURL(d),
 		lftpEscape(d.UzakDizin), lftpEscape(dosyaAdi))
 	out, err := exec.CommandContext(ctx, "lftp", "-c", script).CombinedOutput()

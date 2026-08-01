@@ -17,6 +17,7 @@ import (
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/sys/unix"
 )
 
 type restoreRequest struct {
@@ -207,7 +208,10 @@ func restoreSingle(source, target, sk string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode().Perm())
+	// O_NOFOLLOW: target zaten bir symlink ise (kullanıcı home'u içine önceden
+	// yerleştirilmiş, jail-dışı bir dosyayı işaret eden) açmayı reddeder —
+	// aksi halde root olarak çalışan bu işlem symlink'i izleyip jail dışına yazabilirdi.
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|unix.O_NOFOLLOW, info.Mode().Perm())
 	if err != nil {
 		return err
 	}

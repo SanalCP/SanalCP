@@ -2,9 +2,11 @@
 package monitor
 
 import (
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"errors"
+	"net"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -124,6 +126,32 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, res)
 }
 
+// errSSRFBlocked: çözümlenen IP loopback/link-local (bulut metadata dahil)/özel
+// aralıkta — müşterinin domaini DNS'i kendi kontrolünde olduğundan (DNS rebinding)
+// bu kontrol her bağlantıda (ilk istek + her redirect) tekrar uygulanır.
+var errSSRFBlocked = errors.New("hedef adres iç/özel bir IP aralığına çözümleniyor — engellendi")
+
+func ssrfBlockedIP(ip net.IP) bool {
+	return ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() || ip.IsPrivate()
+}
+
+// ssrfSafeDialContext: bağlantı gerçek TCP handshake'iyle kurulduktan SONRA
+// uzak IP'yi kontrol eder (DNS-time değil connect-time doğrulama) — böylece
+// TOCTOU/DNS-rebinding ile kontrolü atlatmak mümkün olmaz.
+func ssrfSafeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	conn, err := (&net.Dialer{Timeout: 6 * time.Second}).DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	host, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr == nil && ssrfBlockedIP(net.ParseIP(host)) {
+		conn.Close()
+		return nil, errSSRFBlocked
+	}
+	return conn, nil
+}
+
 func probe(targetURL string) DomainHealth {
 	res := DomainHealth{URL: targetURL}
 
@@ -132,6 +160,7 @@ func probe(targetURL string) DomainHealth {
 		TLSClientConfig:       tlsCfg,
 		DisableKeepAlives:     true,
 		ResponseHeaderTimeout: 6 * time.Second,
+		DialContext:           ssrfSafeDialContext,
 	}
 	client := &http.Client{
 		Transport: tr,

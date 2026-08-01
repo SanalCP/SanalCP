@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/archivex"
 	"sanalcp/internal/cron"
 	"sanalcp/internal/domains"
 	"sanalcp/internal/hesaplar"
@@ -477,6 +478,12 @@ func restoreMailboxes(archivePath, root, sourceDomain string, locals []string, s
 	if !strings.HasPrefix(sk, "c_") || root == "" {
 		return errors.New("güvensiz hedef")
 	}
+	// Katman 2: sistem tar'ına geçmeden önce arşivi Go stdlib ile ön-tara —
+	// mutlak yol / ".." / symlink-hardlink-aygıt üyesi varsa çıkarma reddedilir.
+	// (archivex.GuvenliCikar'ın kullandığı aynı ortak taramadır.)
+	if err := archivex.Tara(archivePath, archivex.TurTarGz); err != nil {
+		return err
+	}
 	target := "/home/" + sk + "/mail"
 	f, err := os.Open(archivePath)
 	if err != nil {
@@ -697,6 +704,11 @@ func contextWithRoute(r *http.Request, rc *chi.Context) context.Context {
 func restoreWeb(archivePath, root, sk string) error {
 	if !strings.HasPrefix(sk, "c_") || root == "" {
 		return errors.New("güvensiz hedef")
+	}
+	// Katman 2: sistem tar'ına geçmeden önce arşivi Go stdlib ile ön-tara —
+	// mutlak yol / ".." / symlink-hardlink-aygıt üyesi varsa çıkarma reddedilir.
+	if err := archivex.Tara(archivePath, archivex.TurTarGz); err != nil {
+		return err
 	}
 	home := "/home/" + sk
 	target := home + "/public_html"

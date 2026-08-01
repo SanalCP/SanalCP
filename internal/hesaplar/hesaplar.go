@@ -8,7 +8,29 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"sanalcp/internal/secretcrypt"
 )
+
+// box: db_pass_plain gibi panel metadata'sındaki parolaları şifreler.
+// main.go'da Init() ile bir kez ayarlanır (bkz. middleware.Init/provisioner.Init
+// ile aynı paket-seviyesi singleton deseni).
+var box *secretcrypt.Box
+
+// Init: panelin sır şifreleme kutusunu ayarlar. main.go'da config.Load()
+// sonrası, herhangi bir hesap oluşturma isteğinden ÖNCE çağrılmalıdır.
+func Init(b *secretcrypt.Box) { box = b }
+
+// DecryptDBPassword: db_accounts.db_pass_plain sütunundaki şifreli değeri
+// gösterme/phpMyAdmin-SSO için çözer. Değer henüz göç edilmemiş eski bir
+// düz-metin kayıtsa (HealLegacyPlaintextSecrets boot'ta göçürür, ama ara bir
+// istek yetişirse) OLDUĞU GİBİ döner — görüntüleme o pencerede kırılmasın diye.
+func DecryptDBPassword(enc string) (string, error) {
+	if !secretcrypt.IsEncrypted(enc) {
+		return enc, nil
+	}
+	return box.Decrypt(enc)
+}
 
 // RandomParola: URL-safe alphanumeric parola (default 20 karakter)
 func RandomParola(n int) string {
@@ -85,22 +107,33 @@ func ParolaGecerli(pw string) bool {
 	return !strings.ContainsAny(pw, "\r\n\x00")
 }
 
-// FTPCreate: ftp_accounts tablosuna kayit ekler, parolayi cleartext olarak tutar (Pure-FTPd MYSQLCrypt cleartext)
+// FTPCreate: ftp_accounts tablosuna kayit ekler. Parola DB'ye yescrypt ($y$)
+// hash'i olarak yazılır — düz metin hiçbir zaman diske inmez (bkz. yescrypt.go).
+// Pure-FTPd `MYSQLCrypt crypt` modu ve SyncSSHPassword'un `chpasswd -e`
+// çağrısı bu hash'i doğrudan kullanır.
 func FTPCreate(db *sql.DB, domainID int64, sistemKullanici, parola string, uidN, gidN int) error {
+	hash, err := yescryptHashFTP(parola)
+	if err != nil {
+		return fmt.Errorf("ftp parola hash: %w", err)
+	}
 	home := "/home/" + sistemKullanici
-	_, err := db.Exec(
+	_, err = db.Exec(
 		`INSERT INTO ftp_accounts(domain_id, username, password_md5, home_dir, uid_n, gid_n, status)
 		 VALUES(?,?,?,?,?,?, 'active')
 		 ON DUPLICATE KEY UPDATE password_md5=VALUES(password_md5), home_dir=VALUES(home_dir), uid_n=VALUES(uid_n), gid_n=VALUES(gid_n), status='active'`,
-		domainID, sistemKullanici, parola, home, uidN, gidN)
+		domainID, sistemKullanici, hash, home, uidN, gidN)
 	return err
 }
 
-// FTPUpdatePassword: mevcut FTP hesabinin parolasini guncelle
+// FTPUpdatePassword: mevcut FTP hesabinin parolasini guncelle (yescrypt hash olarak).
 func FTPUpdatePassword(db *sql.DB, sistemKullanici, parola string) error {
-	_, err := db.Exec(
+	hash, err := yescryptHashFTP(parola)
+	if err != nil {
+		return fmt.Errorf("ftp parola hash: %w", err)
+	}
+	_, err = db.Exec(
 		`UPDATE ftp_accounts SET password_md5=? WHERE username=?`,
-		parola, sistemKullanici)
+		hash, sistemKullanici)
 	return err
 }
 
@@ -128,11 +161,17 @@ func MySQLCreateDB(db *sql.DB, domainID int64, dbName, dbUser, dbPass string) er
 		return fmt.Errorf("mysql exec: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 
-	// 2) panel DB metadata
+	// 2) panel DB metadata — db_pass_plain AES-GCM ile şifreli tutulur (bkz.
+	// internal/secretcrypt); gerçek MySQL auth mysql.user'ın kendi hash'iyle
+	// yapılır, bu sütun yalnız panelin gösterme/PMA-SSO için tuttuğu bir kopyadır.
+	encPass, encErr := box.Encrypt(dbPass)
+	if encErr != nil {
+		return fmt.Errorf("db parola şifreleme: %w", encErr)
+	}
 	_, err := db.Exec(
 		`INSERT INTO db_accounts(domain_id, db_name, db_user, db_pass_plain, db_host)
 		 VALUES(?,?,?,?, 'localhost')`,
-		domainID, dbName, dbUser, dbPass)
+		domainID, dbName, dbUser, encPass)
 	return err
 }
 
@@ -216,8 +255,10 @@ func MySQLDropAllForDomain(db *sql.DB, domainID int64) error {
 }
 
 // SyncSSHPassword: sistem (SSH) hesabının parolasını FTP parolasıyla eşitler.
-// FTP parolası ftp_accounts.password_md5 sütununda cleartext tutulur
-// (Pure-FTPd MYSQLCrypt cleartext) — böylece SSH parolası = FTP parolası olur.
+// ftp_accounts.password_md5 artık DÜZ METİN değil, yescrypt ($y$) hash'i
+// tutuyor (bkz. FTPCreate/FTPUpdatePassword) — bu hash `chpasswd -e` ile
+// ÇÖZÜLMEDEN doğrudan /etc/shadow'a yazılır, panel süreci parolayı hiçbir
+// zaman görmez.
 func SyncSSHPassword(db *sql.DB, sistemKullanici string) error {
 	if !strings.HasPrefix(sistemKullanici, "c_") {
 		return fmt.Errorf("güvenlik: c_ prefiksli olmayan kullanıcı")
@@ -234,7 +275,10 @@ func SyncSSHPassword(db *sql.DB, sistemKullanici string) error {
 	if !ParolaGecerli(pw) {
 		return fmt.Errorf("güvenlik: parola geçersiz karakter içeriyor")
 	}
-	cmd := exec.Command("chpasswd")
+	if !isYescryptHash(pw) {
+		return fmt.Errorf("güvenlik: ftp parolası henüz hash'e göç etmemiş (bkz. HealLegacyPlaintextSecrets)")
+	}
+	cmd := exec.Command("chpasswd", "-e")
 	cmd.Stdin = strings.NewReader(sistemKullanici + ":" + pw)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("chpasswd: %s: %w", strings.TrimSpace(string(out)), err)

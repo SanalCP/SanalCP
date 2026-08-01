@@ -30,10 +30,14 @@ func MySQLChangePassword(panelDB *sql.DB, dbUser, yeniPw string) error {
 	if err != nil {
 		return fmt.Errorf("mysql alter: %s: %w", strings.TrimSpace(string(out)), err)
 	}
-	// panel metadata güncelle
+	// panel metadata güncelle (şifreli — bkz. internal/secretcrypt)
+	encPw, err := box.Encrypt(yeniPw)
+	if err != nil {
+		return fmt.Errorf("parola şifreleme: %w", err)
+	}
 	if _, err := panelDB.Exec(
 		`UPDATE db_accounts SET db_pass_plain=? WHERE db_user=?`,
-		yeniPw, dbUser); err != nil {
+		encPw, dbUser); err != nil {
 		return fmt.Errorf("metadata: %w", err)
 	}
 	return nil
