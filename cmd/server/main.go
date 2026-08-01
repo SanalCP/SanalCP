@@ -36,6 +36,7 @@ import (
 	githubpkg "sanalcp/internal/github"
 	"sanalcp/internal/gocis"
 	"sanalcp/internal/guvenlikduvari"
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/istatistik"
 	"sanalcp/internal/kaynak"
@@ -56,6 +57,7 @@ import (
 	"sanalcp/internal/pma"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/redis"
+	"sanalcp/internal/secretcrypt"
 	"sanalcp/internal/sifrekoruma"
 	"sanalcp/internal/sitekopya"
 	"sanalcp/internal/sshaccess"
@@ -137,6 +139,15 @@ func main() {
 
 	provisioner.Init(d) // askıya-alma tutarlılığı için provisioner'a DB handle'ı ver
 	middleware.Init(d)  // musteri-scope askiya-alma kontrolu icin DB handle
+
+	secretBox, err := secretcrypt.New(cfg.SecretKey)
+	if err != nil {
+		log.Fatalf("secretcrypt: %v", err)
+	}
+	hesaplar.Init(secretBox) // db_pass_plain şifreleme kutusu (bkz. internal/secretcrypt)
+	// Bu göç öncesi oluşturulmuş düz-metin DB/FTP parolalarını yerinde şifreler/hash'ler.
+	// Idempotent, göçecek satır yoksa no-op — diğer Heal*/Seed* fonksiyonlarıyla aynı desen.
+	hesaplar.HealLegacyPlaintextSecrets(context.Background(), d)
 
 	ipv4 := detectIPv4()
 	log.Printf("server ipv4: %s", ipv4)

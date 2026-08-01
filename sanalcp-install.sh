@@ -164,11 +164,13 @@ systemctl is-active --quiet mariadb || die "MariaDB did not start"
 if [ -s /etc/sanalcp/env ]; then
   DBPASS=$(sed -n 's/^PANEL_DB_DSN=panel:\([^@]*\)@.*/\1/p' /etc/sanalcp/env)
   JWT=$(sed -n 's/^PANEL_JWT_SECRET=//p' /etc/sanalcp/env)
+  SECRETKEY=$(sed -n 's/^PANEL_SECRET_KEY=//p' /etc/sanalcp/env)
   RADMIN=$(sed -n 's/^PANEL_REDIS_ADMIN_PASS=//p' /etc/sanalcp/env)
 fi
-[ -n "${DBPASS:-}" ] || DBPASS=$(openssl rand -hex 16)
-[ -n "${JWT:-}" ]    || JWT=$(openssl rand -hex 32)
-[ -n "${RADMIN:-}" ] || RADMIN=$(openssl rand -hex 24)
+[ -n "${DBPASS:-}" ]    || DBPASS=$(openssl rand -hex 16)
+[ -n "${JWT:-}" ]       || JWT=$(openssl rand -hex 32)
+[ -n "${SECRETKEY:-}" ] || SECRETKEY=$(openssl rand -hex 32)
+[ -n "${RADMIN:-}" ]    || RADMIN=$(openssl rand -hex 24)
 mysql -u root <<SQL
 CREATE DATABASE IF NOT EXISTS panel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS 'panel'@'127.0.0.1' IDENTIFIED BY '$DBPASS';
@@ -189,10 +191,11 @@ PANEL_ENV=production
 PANEL_DB_DSN=panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci
 PANEL_JWT_SECRET=${JWT}
 PANEL_JWT_LIFETIME_SEC=43200
+PANEL_SECRET_KEY=${SECRETKEY}
 PANEL_REDIS_ADMIN_PASS=${RADMIN}
 ENV
 chmod 600 /etc/sanalcp/env
-ok "/etc/sanalcp/env (JWT + DB DSN + Redis admin — kept if present, generated otherwise)"
+ok "/etc/sanalcp/env (JWT + secret key + DB DSN + Redis admin — kept if present, generated otherwise)"
 
 # ============ 6) ARTIFACT DEPLOY ============
 step "6) Panel binary + frontend + migrations"

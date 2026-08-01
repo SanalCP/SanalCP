@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
 
@@ -69,6 +70,15 @@ func (h *Handlers) TokenIste(w http.ResponseWriter, r *http.Request) {
 	}
 	if demo == 1 {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin phpMyAdmin'i etkin değildir")
+		return
+	}
+	// db_pass_plain DB'de şifreli (bkz. internal/secretcrypt) — phpMyAdmin
+	// signon gerçek düz metni istediğinden burada çözülür. Çözülen değer yalnız
+	// kısa ömürlü (2dk), tek-kullanımlık pma_tokens satırına yazılır.
+	if dec, err := hesaplar.DecryptDBPassword(dbPar); err == nil {
+		dbPar = dec
+	} else {
+		httpx.WriteError(w, http.StatusInternalServerError, "parola çözme: "+err.Error())
 		return
 	}
 

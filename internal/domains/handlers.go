@@ -618,6 +618,9 @@ func (h *Handlers) ListDatabases(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&d.ID, &d.DomainID, &d.DBAdi, &d.DBKullanici, &d.DBHost, &d.DBParola, &d.Olusturulma); err != nil {
 			continue
 		}
+		if dec, err := hesaplar.DecryptDBPassword(d.DBParola); err == nil {
+			d.DBParola = dec
+		}
 		out = append(out, d)
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
@@ -754,8 +757,12 @@ func (h *Handlers) CreateDatabase(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Mevcut kullanıcının parolasını yanıtta göster (müşteri zaten sahibi).
+		var encParola string
 		_ = h.DB.QueryRowContext(r.Context(),
-			`SELECT db_pass_plain FROM db_accounts WHERE db_user=? LIMIT 1`, dbKullanici).Scan(&parola)
+			`SELECT db_pass_plain FROM db_accounts WHERE db_user=? LIMIT 1`, dbKullanici).Scan(&encParola)
+		if dec, err := hesaplar.DecryptDBPassword(encParola); err == nil {
+			parola = dec
+		}
 	} else {
 		if err := hesaplar.MySQLCreateDB(h.DB, id, dbAdi, dbKullanici, parola); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "DB oluşturma: "+err.Error())

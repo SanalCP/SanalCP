@@ -213,11 +213,13 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
 		return
 	}
-	if err == nil {
-		_ = os.Remove(filepath.Join(BackupRoot, sk, dosya))
-		deleteRemoteBestEffort(h.DB, id, dosya, uzakDurum)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM backups WHERE id=?`, bid)
+	_ = os.Remove(filepath.Join(BackupRoot, sk, dosya))
+	deleteRemoteBestEffort(h.DB, id, dosya, uzakDurum)
+	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM backups WHERE id=? AND domain_id=?`, bid, id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
