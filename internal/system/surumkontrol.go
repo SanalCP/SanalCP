@@ -98,6 +98,41 @@ func KurulumKimligi() string {
 	return kimlik
 }
 
+// surumTetikleCooldown: giriş-tetikli manuel kontrollerin GitHub'ı gereksiz
+// yormaması için minimum aralık. Arka plan döngüsü zaten ~24 saatte bir
+// çalışıyor; bu yalnızca "giriş anında hemen güncel göster" içindir — art
+// arda birden çok admin/bayi girişi (ör. birkaç dakika içinde) GitHub'a her
+// seferinde ayrı istek atmaz, en fazla cooldown süresinde bir kez.
+const surumTetikleCooldown = 5 * time.Minute
+
+// SurumKontrolTetikle — bir admin/bayi başarıyla giriş yaptığında çağrılır
+// (bkz. internal/auth Login). Arka plandaki ~24 saatlik periyodu beklemeden
+// GÜNCEL bir kontrol tetikler. Fire-and-forget (goroutine) — login yanıtını
+// GECİKTİRMEZ, hata durumunda da login akışını etkilemez (surumGetir zaten
+// ağ hatalarını sessizce yutuyor, bkz. dosya başındaki AĞ HATASI notu).
+func SurumKontrolTetikle() {
+	if !surumKontrolAcikMi() {
+		return
+	}
+	surumMu.RLock()
+	son := surumSon
+	surumMu.RUnlock()
+	if !surumTetikleGerekliMi(son, time.Now()) {
+		return
+	}
+	go surumGetir()
+}
+
+// surumTetikleGerekliMi: saf karar fonksiyonu (test edilebilir) — son kontrol
+// hiç yapılmamışsa (sıfır zaman) ya da cooldown'dan eskiyse yeni bir kontrol
+// gerekir.
+func surumTetikleGerekliMi(sonKontrol, simdi time.Time) bool {
+	if sonKontrol.IsZero() {
+		return true
+	}
+	return simdi.Sub(sonKontrol) >= surumTetikleCooldown
+}
+
 // SurumBaslat — arka plan sürüm kontrolünü başlatır. Kapalıysa hiç çalışmaz.
 func SurumBaslat(mevcutSurum, buildTarihi string) {
 	surumMu.Lock()
