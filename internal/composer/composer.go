@@ -2,6 +2,7 @@
 package composer
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 
@@ -43,7 +45,9 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 	}
 	var surum string
 	kurulu := false
-	vc := exec.Command(composerBin, "--version", "--no-ansi")
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	vc := exec.CommandContext(ctx, composerBin, "--version", "--no-ansi")
 	vc.Env = []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"HOME=/tmp",
@@ -111,7 +115,11 @@ func (h *Handlers) Calistir(w http.ResponseWriter, r *http.Request) {
 		}
 		args = append(args, pkg)
 	}
-	cmd := exec.Command("runuser", args...)
+	// composer install/update/require Packagist/VCS'e ağ çıkışı yapar — yanıt
+	// gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "runuser", args...)
 	// Guvenlik: panel sirlarini (PANEL_JWT_SECRET, PANEL_DB_DSN, ...) alt-surece VERME
 	cmd.Env = []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",

@@ -2,6 +2,7 @@
 package git
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -18,11 +19,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
 )
+
+// gitAgSuresi: clone/fetch gibi ağa çıkan git komutları için üst sınır —
+// kullanıcının verdiği repo URL'sine bağlanıp yanıt gelmezse istek işleyen
+// goroutine sonsuza dek asılı kalmasın diye (bkz. runAsUserArgs).
+const gitAgSuresi = 2 * time.Minute
 
 // badURLChars: repo URL'de yasak shell/enjeksiyon metakarakterleri
 const badURLChars = "\"'`$();|&<>\\"
@@ -169,16 +176,16 @@ func temizleDizinIcerigi(dst string) {
 }
 
 // runAsUserArgs: komutu sk kullanicisi olarak SHELL OLMADAN (argv) calistir; panel env verilmez
-func runAsUserArgs(sk, cwd string, argv ...string) (string, error) {
+func runAsUserArgs(ctx context.Context, sk, cwd string, argv ...string) (string, error) {
 	sudoArgs := append([]string{"-u", sk, "-H", "--"}, argv...)
-	cmd := exec.Command("sudo", sudoArgs...)
+	cmd := exec.CommandContext(ctx, "sudo", sudoArgs...)
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		ruArgs := append([]string{"-u", sk, "--"}, argv...)
-		cmd2 := exec.Command("runuser", ruArgs...)
+		cmd2 := exec.CommandContext(ctx, "runuser", ruArgs...)
 		if cwd != "" {
 			cmd2.Dir = cwd
 		}
@@ -192,7 +199,7 @@ func runAsUserArgs(sk, cwd string, argv ...string) (string, error) {
 }
 
 // gitClone: ilk kez klonla (target_dir varsa silinir)
-func gitClone(sk, repoURL, branch, targetDir string) (sha string, log string, err error) {
+func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha string, log string, err error) {
 	if !gecerliTargetDir(targetDir) {
 		return "", "", errors.New("geçersiz hedef dizin")
 	}
@@ -209,19 +216,19 @@ func gitClone(sk, repoURL, branch, targetDir string) (sha string, log string, er
 	_ = os.MkdirAll(dst, 0755)
 	_, _ = exec.Command("chown", sk+":"+sk, dst).CombinedOutput()
 
-	out, err := runAsUserArgs(sk, home, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
+	out, err := runAsUserArgs(ctx, sk, home, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
 	log = out
 	if err != nil {
 		return "", out, err
 	}
-	shaOut, _ := runAsUserArgs(sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
+	shaOut, _ := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
 	sha = strings.TrimSpace(shaOut)
 	_, _ = exec.Command("restorecon", "-R", dst).CombinedOutput()
 	return sha, log, nil
 }
 
 // gitPull: mevcut repo'da pull yap
-func gitPull(sk, targetDir, branch string) (sha string, log string, err error) {
+func gitPull(ctx context.Context, sk, targetDir, branch string) (sha string, log string, err error) {
 	if !gecerliTargetDir(targetDir) {
 		return "", "", errors.New("geçersiz hedef dizin")
 	}
@@ -233,16 +240,16 @@ func gitPull(sk, targetDir, branch string) (sha string, log string, err error) {
 	if _, err := os.Stat(filepath.Join(dst, ".git")); err != nil {
 		return "", "", errors.New("hedef dizin git deposu değil; önce 'klonla' kullanın")
 	}
-	out, err := runAsUserArgs(sk, dst, "git", "-C", dst, "fetch", "origin", branch)
+	out, err := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "fetch", "origin", branch)
 	if err == nil {
-		o2, e2 := runAsUserArgs(sk, dst, "git", "-C", dst, "reset", "--hard", "origin/"+branch)
+		o2, e2 := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "reset", "--hard", "origin/"+branch)
 		out, err = out+o2, e2
 	}
 	log = out
 	if err != nil {
 		return "", out, err
 	}
-	shaOut, _ := runAsUserArgs(sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
+	shaOut, _ := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
 	sha = strings.TrimSpace(shaOut)
 	_, _ = exec.Command("restorecon", "-R", dst).CombinedOutput()
 	return sha, log, nil
@@ -352,7 +359,9 @@ func (h *Handlers) Klonla(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "önce repo bağlayın")
 		return
 	}
-	sha, log, err := gitClone(sk, repoURL, branch, targetDir)
+	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
+	defer cancel()
+	sha, log, err := gitClone(ctx, sk, repoURL, branch, targetDir)
 	durum := "basarili"
 	if err != nil {
 		durum = "hata"
@@ -385,7 +394,9 @@ func (h *Handlers) Pull(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "repo yok")
 		return
 	}
-	sha, log, err := gitPull(sk, targetDir, branch)
+	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
+	defer cancel()
+	sha, log, err := gitPull(ctx, sk, targetDir, branch)
 	durum := "basarili"
 	if err != nil {
 		durum = "hata"
@@ -477,7 +488,9 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sha, log, perr := gitPull(sk, targetDir, branch)
+	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
+	defer cancel()
+	sha, log, perr := gitPull(ctx, sk, targetDir, branch)
 	durum := "basarili"
 	if perr != nil {
 		durum = "hata-webhook"

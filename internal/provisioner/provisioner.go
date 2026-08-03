@@ -3,6 +3,7 @@ package provisioner
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 )
 
 var (
@@ -1076,7 +1078,7 @@ func EnableSelfSigned(alanAdi, sk, phpSurum, backend string) (certPath, keyPath 
 //     Bu, aynı SAN setiyle tekrar-çekimi (LE 429 rate-limit) HİÇ tetiklemez.
 //  2. FAIL-SAFE: acme çekimi başarısız olursa (429 dahil) → sslFailSafe mevcut/self-
 //     signed cert ile 443'ü KORUR. Hiçbir durumda vhost HTTP-only'ye DÜŞMEZ.
-func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath string, real bool, err error) {
+func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend string) (certPath, keyPath string, real bool, err error) {
 	if verr := ValidateDomain(alanAdi); verr != nil {
 		return "", "", false, verr // path güvenliği
 	}
@@ -1120,7 +1122,11 @@ func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath
 		args = append(args, "-d", h)
 	}
 	args = append(args, "--keylength", "2048")
-	if out, e := exec.Command("/root/.acme.sh/acme.sh", args...).CombinedOutput(); e != nil {
+	// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
+	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	issueCtx, issueCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer issueCancel()
+	if out, e := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", args...).CombinedOutput(); e != nil {
 		// FAIL-SAFE (teardown YOK): mevcut/self-signed cert ile 443'ü KORU.
 		return sslFailSafe(alanAdi, sk, phpSurum, backend, "acme issue: "+strings.TrimSpace(string(out)))
 	}
@@ -1134,7 +1140,9 @@ func EnableLetsEncrypt(alanAdi, sk, phpSurum, backend string) (certPath, keyPath
 		"--fullchain-file", certPath,
 		"--reloadcmd", "systemctl reload nginx",
 	}
-	if out, e := exec.Command("/root/.acme.sh/acme.sh", insArgs...).CombinedOutput(); e != nil {
+	installCtx, installCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer installCancel()
+	if out, e := exec.CommandContext(installCtx, "/root/.acme.sh/acme.sh", insArgs...).CombinedOutput(); e != nil {
 		return sslFailSafe(alanAdi, sk, phpSurum, backend, "acme install-cert: "+strings.TrimSpace(string(out)))
 	}
 

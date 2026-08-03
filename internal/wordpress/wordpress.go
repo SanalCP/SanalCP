@@ -60,10 +60,10 @@ func (h *Handlers) domain(r *http.Request) (id int64, sk, alanAdi string, ssl, d
 // wp <args> komutunu domain kullanıcısı olarak çalıştırır (HOME set, shell yok).
 // php'yi doğrudan -d memory_limit=512M ile çağır (ham .phar shebang'i WP_CLI_PHP_ARGS'ı
 // okumaz; arşiv çıkarımı 128M default'a takılır).
-func wpKomut(sk string, args ...string) ([]byte, error) {
+func wpKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
 	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
 		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
-	cmd := exec.Command("runuser", full...)
+	cmd := exec.CommandContext(ctx, "runuser", full...)
 	return cmd.CombinedOutput()
 }
 
@@ -81,6 +81,8 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
 	root := "/home/" + sk + "/public_html"
 	out := []Kurulum{}
 	adaylar := []string{root}
@@ -99,10 +101,10 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		if k.Dizin == "/" {
 			k.Dizin = "/ (kök)"
 		}
-		if b, err := wpKomut(sk, "core", "version", "--path="+dir); err == nil {
+		if b, err := wpKomut(ctx, sk, "core", "version", "--path="+dir); err == nil {
 			k.Surum = strings.TrimSpace(string(b))
 		}
-		if b, err := wpKomut(sk, "option", "get", "siteurl", "--path="+dir); err == nil {
+		if b, err := wpKomut(ctx, sk, "option", "get", "siteurl", "--path="+dir); err == nil {
 			k.SiteURL = strings.TrimSpace(string(b))
 			k.AdminURL = k.SiteURL + "/wp-admin"
 		}
@@ -371,11 +373,15 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, asama+" başarısız: "+msg)
 	}
 
-	if out, err := wpKomut(sk, "core", "download", "--path="+hedef, "--locale=tr_TR"); err != nil {
+	// core download wordpress.org'a ağ çıkışı yapar — yanıt gelmezse istek
+	// işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	defer cancel()
+	if out, err := wpKomut(ctx, sk, "core", "download", "--path="+hedef, "--locale=tr_TR"); err != nil {
 		basarisiz("WordPress indirme", out)
 		return
 	}
-	if out, err := wpKomut(sk, "config", "create", "--dbname="+dbName, "--dbuser="+dbUser,
+	if out, err := wpKomut(ctx, sk, "config", "create", "--dbname="+dbName, "--dbuser="+dbUser,
 		"--dbpass="+dbPass, "--dbhost=localhost", "--locale=tr_TR", "--path="+hedef, "--skip-check"); err != nil {
 		basarisiz("wp-config oluşturma", out)
 		return
@@ -385,7 +391,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		url += "/" + req.AltDizin
 	}
 	adminParola := randParola()
-	if out, err := wpKomut(sk, "core", "install", "--url="+url, "--title="+req.SiteBasligi,
+	if out, err := wpKomut(ctx, sk, "core", "install", "--url="+url, "--title="+req.SiteBasligi,
 		"--admin_user="+req.AdminKullanici, "--admin_password="+adminParola,
 		"--admin_email="+req.AdminEmail, "--skip-email", "--path="+hedef); err != nil {
 		basarisiz("WordPress kurulum", out)
@@ -395,7 +401,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	surum := ""
-	if b, err := wpKomut(sk, "core", "version", "--path="+hedef); err == nil {
+	if b, err := wpKomut(ctx, sk, "core", "version", "--path="+hedef); err == nil {
 		surum = strings.TrimSpace(string(b))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -425,14 +431,18 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	out1, e1 := wpKomut(sk, "core", "update", "--path="+dir)
-	out2, _ := wpKomut(sk, "core", "update-db", "--path="+dir)
+	// core update wordpress.org'a ağ çıkışı yapar — yanıt gelmezse istek işleyen
+	// goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	out1, e1 := wpKomut(ctx, sk, "core", "update", "--path="+dir)
+	out2, _ := wpKomut(ctx, sk, "core", "update-db", "--path="+dir)
 	if e1 != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+strings.TrimSpace(string(out1)))
 		return
 	}
 	surum := ""
-	if b, err := wpKomut(sk, "core", "version", "--path="+dir); err == nil {
+	if b, err := wpKomut(ctx, sk, "core", "version", "--path="+dir); err == nil {
 		surum = strings.TrimSpace(string(b))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "surum": surum,

@@ -43,6 +43,7 @@ import (
 	"sanalcp/internal/kaynaklimit"
 	"sanalcp/internal/logs"
 	"sanalcp/internal/mail"
+	"sanalcp/internal/metrics"
 	"sanalcp/internal/middleware"
 	"sanalcp/internal/monitor"
 	"sanalcp/internal/musteri"
@@ -258,6 +259,7 @@ func main() {
 	// adresiyle üretir (bkz. assets/nginx/_panel.conf).
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(300 * time.Second))
+	r.Use(metrics.Middleware) // toplama burada; sunum (/metrics) loopback-only cliSrv'de (aşağıda)
 
 	r.Post("/api/v1/git-webhook/{secret}", gitH.Webhook)
 	r.Post("/api/v1/internal/pma-redeem", pmaH.Bozdur)
@@ -596,9 +598,15 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 
+	// /metrics — cliapi.Routes'un site-CLI token zorunluluğunun DIŞINDA, ama aynı
+	// loopback-only dinleyicide (Prometheus'un kendi tenant token'ı yok).
+	cliMux := http.NewServeMux()
+	cliMux.Handle("/metrics", metrics.Handler())
+	cliMux.Handle("/", cliapi.Routes(d))
+
 	cliSrv := &http.Server{
 		Addr:              cfg.CLIListenAddr,
-		Handler:           cliapi.Routes(d),
+		Handler:           cliMux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Minute, // buyuk db:import upload'lari icin genis ust sinir
 		WriteTimeout:      10 * time.Minute, // buyuk db:export indirmeleri icin genis ust sinir

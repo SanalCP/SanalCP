@@ -2,6 +2,7 @@
 package phpext
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/phpsurum"
@@ -234,6 +236,11 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// dnf/pecl ağa çıkar (repo sorgusu + paket indirme) — yanıt gelmezse istek
+	// işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır (bkz. paketler.go'daki aynı desen).
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	defer cancel()
+
 	// 1) DNF prebuild paket dene — Remi'de paket adı varyantlı (im7, 6, 5 suffixli)
 	prefix := "php"
 	if strings.HasPrefix(s.Service, "php") && strings.Contains(s.Service, "-php-fpm") && s.Service != "php-fpm" {
@@ -260,7 +267,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 
 	dnfPkg := ""
 	for _, ad := range adaylar {
-		if exec.Command("dnf", "info", "--quiet", ad).Run() == nil {
+		if exec.CommandContext(ctx, "dnf", "info", "--quiet", ad).Run() == nil {
 			dnfPkg = ad
 			break
 		}
@@ -268,7 +275,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 
 	if dnfPkg != "" {
 		// Prebuild paket var, dnf ile kur
-		cmd := exec.Command("dnf", "install", "-y", dnfPkg)
+		cmd := exec.CommandContext(ctx, "dnf", "install", "-y", dnfPkg)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError,
@@ -294,7 +301,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 			"prebuild dnf paketi yok ("+dnfPkg+") ve PECL kurulu degil. Manuel kurulum gerekli: dnf install "+strings.Split(s.Service, "-")[0]+"-php-pear")
 		return
 	}
-	cmd := exec.Command(s.PECLBin, "install", "-f", req.Paket)
+	cmd := exec.CommandContext(ctx, s.PECLBin, "install", "-f", req.Paket)
 	// Guvenlik: panel sirlarini alt-surece verme (allowlist env)
 	cmd.Env = []string{
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -339,7 +346,9 @@ func (h *Handlers) PECLSil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "desteklenmeyen surum")
 		return
 	}
-	out, err := exec.Command(s.PECLBin, "uninstall", req.Paket).CombinedOutput()
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, s.PECLBin, "uninstall", req.Paket).CombinedOutput()
 	if err != nil {
 		// pecl uninstall bazen ini dosyayi birakir; biz silelim
 		_ = chi.URLParam // keep import
