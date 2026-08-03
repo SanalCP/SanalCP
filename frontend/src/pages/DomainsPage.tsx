@@ -52,6 +52,7 @@ export default function DomainsPage() {
   const [olusturAcik, setOlusturAcik] = useState(false)
   const [olusturuluyor, setOlusturuluyor] = useState(false)
   const [olusturmaSonuc, setOlusturmaSonuc] = useState<OlusturmaSonuc | null>(null)
+  const [sonucKopyalandi, setSonucKopyalandi] = useState(false)
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
   const [fPlanID, setFPlanID] = useState<number | ''>('')
@@ -164,6 +165,34 @@ export default function DomainsPage() {
     } catch {}
     try { window.prompt(t('DomainsPage:result_modal.clipboard_prompt'), metin); return true } catch {}
     return false
+  }
+
+  function sonucMetni(s: OlusturmaSonuc) {
+    return [
+      `SanalCP — ${s.alan_adi}`,
+      '',
+      t('DomainsPage:result_modal.ftp'),
+      `  ${t('DomainsPage:result_modal.host')}: ${s.ftp_host || '—'}`,
+      `  ${t('DomainsPage:result_modal.user')}: ${s.ftp_user}`,
+      `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.ftp}`,
+      '',
+      t('DomainsPage:result_modal.mysql'),
+      `  ${t('DomainsPage:result_modal.host')}: ${s.db_host || 'localhost'}`,
+      `  ${t('DomainsPage:result_modal.database')}: ${s.db_adi}`,
+      `  ${t('DomainsPage:result_modal.user')}: ${s.db_user}`,
+      `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.db}`,
+      '',
+      `${t('DomainsPage:result_modal.system_user')} ${s.sistem_kullanici}`,
+    ].join('\n')
+  }
+
+  function sonucTxtIndir(s: OlusturmaSonuc) {
+    const blob = new Blob([sonucMetni(s)], { type: 'text/plain;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${s.alan_adi}-erisim-bilgileri.txt`
+    a.click()
+    URL.revokeObjectURL(a.href)
   }
 
   const filtreli = useMemo(() => {
@@ -498,7 +527,18 @@ export default function DomainsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end mt-5">
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={async () => {
+                  const ok = await panoYaz(sonucMetni(olusturmaSonuc))
+                  if (ok) { setSonucKopyalandi(true); setTimeout(() => setSonucKopyalandi(false), 1500) }
+                }}
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
+                {sonucKopyalandi ? t('DomainsPage:result_modal.copied') : t('DomainsPage:result_modal.copy_all')}
+              </button>
+              <button onClick={() => sonucTxtIndir(olusturmaSonuc)}
+                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
+                {t('DomainsPage:result_modal.save_txt')}
+              </button>
               <button onClick={() => setOlusturmaSonuc(null)}
                 className="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded">{t('common:ok')}</button>
             </div>

@@ -72,7 +72,10 @@
     "copy_hint": "Tıklayarak kopyala",
     "hide": "Gizle",
     "show": "Göster",
-    "clipboard_prompt": "Kopyalamak için Ctrl+C, sonra Enter:"
+    "clipboard_prompt": "Kopyalamak için Ctrl+C, sonra Enter:",
+    "copy_all": "📋 Kopyala",
+    "save_txt": "💾 TXT Olarak Kaydet",
+    "copied": "✓ Kopyalandı"
   },
   "delete_modal": {
     "title": "⚠ Toplu Domain Silme",
