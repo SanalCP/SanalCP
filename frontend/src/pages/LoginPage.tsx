@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -24,6 +24,15 @@ export default function LoginPage() {
   const [hata, setHata] = useState<string | null>(null)
   const navigate = useNavigate()
   const giris = useAuth((s) => s.giris)
+  const [surum, setSurum] = useState('')
+
+  // /healthz auth gerektirmez (login ekranından ÖNCE erişilebilir olmalı) ve
+  // panelin TEK sürüm kaynağından (internal/system.SurumNo) geliyor — burada
+  // sabit bir string YAZILMAMALI, aksi hâlde her release'de unutulup
+  // (nitekim öyle oldu: "0.2.0-f1" aylardır güncellenmeyen bir kalıntıydı).
+  useEffect(() => {
+    fetch('/healthz').then(r => r.json()).then(d => { if (d?.surum) setSurum(d.surum) }).catch(() => {})
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -122,9 +131,11 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-6">
-          {t('LoginPage:footer', { version: '0.2.0-f1' })}
-        </p>
+        {surum && (
+          <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-6">
+            {t('LoginPage:footer', { version: surum })}
+          </p>
+        )}
       </div>
     </div>
   )

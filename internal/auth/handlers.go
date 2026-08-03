@@ -15,6 +15,7 @@ import (
 	yescrypt "github.com/openwall/yescrypt-go"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/system"
 )
 
 type Handlers struct {
@@ -247,6 +248,10 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteAudit(h.DB, uid, kadi, ip, "auth.login", kadi, true)
 	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
+	// Bu handler'a yalnız admin/bayi ulaşabilir (müşteri rolü satır 205'te
+	// reddedilir) — arka plandaki ~24 saatlik periyodu beklemeden giriş anında
+	// güncel bir sürüm kontrolü tetikle (cooldown'lu, bkz. system.SurumKontrolTetikle).
+	system.SurumKontrolTetikle()
 
 	resp := loginResp{Token: tok, Bitis: time.Now().Add(time.Duration(h.LifetimeSec) * time.Second).Unix()}
 	resp.Kullanici.ID = uid
