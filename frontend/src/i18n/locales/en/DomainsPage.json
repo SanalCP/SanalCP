@@ -55,7 +55,12 @@
     "create_error": "Could not create domain",
     "success": "✓ \"{{name}}\" created — Linux user, nginx vhost, PHP-FPM pool, FTP account, MySQL DB and DNS zone ready.",
     "ssl_success": " ✓ Let's Encrypt SSL certificate installed.",
-    "ssl_error": " ⚠ SSL could not be installed — You can retry from Subscription → SSL page."
+    "ssl_error": " ⚠ SSL could not be installed — You can retry from Subscription → SSL page.",
+    "www_label": "Also enable {{domain}} → www.{{domain}} redirect",
+    "www_placeholder_domain": "domain",
+    "www_hint": "Visiting the bare domain ({{domain}}) will automatically 301-redirect to www.{{domain}}. You can change this later from the SSL/TLS Certificates page too.",
+    "www_success": " ✓ www redirect enabled.",
+    "www_error": " ⚠ Could not enable www redirect — you can retry from the SSL/TLS Certificates page."
   },
   "result_modal": {
     "title": "✓ Domain Created",
