@@ -433,6 +433,36 @@ server {
 {{- end -}}
 `))
 
+// wwwRedirectTmpl: WWWYonlendir aktifken vhostTmpl'e EK olarak (aynı dosyaya) yazılır.
+// Yalnız apex host için minimal bir server bloğu — acme-challenge hariç her istek
+// www alt alan adına 301'lenir. Sertifika zaten apex+www ikisini de kapsıyor
+// (bkz. wwwHostlar, EnableLetsEncrypt) — ayrı bir cert gerekmez.
+var wwwRedirectTmpl = template.Must(template.New("wr").Parse(`
+# {{.AlanAdi}} — apex, www alt alan adına yönlendiriliyor
+server {
+    listen 80;
+    listen [::]:80;
+{{if .SSL}}    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    ssl_certificate     {{.CertPath}};
+    ssl_certificate_key {{.KeyPath}};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+{{end}}    server_name {{.AlanAdi}};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/_acme;
+        auth_basic off;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 {{if .SSL}}https{{else}}http{{end}}://www.{{.AlanAdi}}$request_uri;
+    }
+}
+`))
+
 // denyBlocksNginx: backend'den bagimsiz erisim engelleri. Regex location'lar
 // tanim SIRASIYLA denenir; bu blok browser-cache/php location'larindan ONCE
 // yerlestirilir (arsiv uzantilari onceligi burada kazanir).
@@ -639,6 +669,15 @@ type VhostOpts struct {
 	// Askida true ise normal vhost yerine 503 "askıya alındı" vhost'u render edilir.
 	Askida bool
 
+	// WWWYonlendir true ise apex (AlanAdi) ana vhost'tan ÇIKARILIR ve ayrı, minimal
+	// bir 301 bloğu ile www alt alan adına yönlendirilir (bkz. wwwRedirectTmpl).
+	// renderAndReload SADECE normal (Askida/vhost_ozel/Redirect devrede değilken)
+	// render yolunda bunu DB'den okuyup set eder — diğer şablonlar apex+www'yi
+	// birlikte kapsamaya devam eder (askıdayken/redirect'teyken ayrı ele almanın
+	// anlamı yok, hatta apex için server_name eşleşmesi kaybolup nginx'in default
+	// vhost'una düşmesine yol açardı).
+	WWWYonlendir bool
+
 	// RedirectHedef doluysa (ve Askida/vhost_ozel devrede değilse) normal vhost yerine
 	// tüm istekleri RedirectHedef'e yönlendiren basit bir vhost render edilir (bkz.
 	// domain_redirects tablosu). Öncelik: Askida > vhost_ozel > Redirect > normal.
@@ -662,6 +701,9 @@ func (o VhostOpts) SSL() bool {
 // zaman var olamayacagi icin ACME dogrulamasi (ve cert kapsam kontrolu) hep
 // basarisiz olur, LE sertifikasi asla alinamaz hale gelirdi.
 func (o VhostOpts) SunucuAdlari() string {
+	if o.WWWYonlendir {
+		return "www." + o.AlanAdi // apex ayrı bloktan (wwwRedirectTmpl) yönlendirilir
+	}
 	return strings.Join(wwwHostlar(o.AlanAdi), " ")
 }
 
@@ -799,6 +841,17 @@ func renderAndReload(opts VhostOpts, sk string) error {
 		}
 	}
 
+	// WWW yönlendirme: askıda DEĞİLSE, özel-vhost YOKSA ve tüm-domain yönlendirmesi
+	// YOKSA (ikisi de zaten apex+www'yi birlikte kapsıyor/yönlendiriyor — bu ayarı
+	// ayrıca uygulamanın anlamı yok), domains.www_yonlendir açıksa apex ana vhost'tan
+	// çıkarılır (bkz. SunucuAdlari) ve aşağıda wwwRedirectTmpl ile ayrı render edilir.
+	if !opts.Askida && ozelIcerik == "" && opts.RedirectHedef == "" && pkgDB != nil &&
+		!strings.HasPrefix(strings.ToLower(opts.AlanAdi), "www.") {
+		var wwwYon int
+		_ = pkgDB.QueryRow(`SELECT COALESCE(www_yonlendir,0) FROM domains WHERE sistem_kullanici=? AND ana_domain_id IS NULL`, sk).Scan(&wwwYon)
+		opts.WWWYonlendir = wwwYon == 1
+	}
+
 	var buf bytes.Buffer
 	if ozelIcerik != "" {
 		buf.WriteString(ozelIcerik)
@@ -823,6 +876,11 @@ func renderAndReload(opts VhostOpts, sk string) error {
 		}
 		if err := tmpl.Execute(&buf, opts); err != nil {
 			return fmt.Errorf("template render: %w", err)
+		}
+		if opts.WWWYonlendir {
+			if err := wwwRedirectTmpl.Execute(&buf, opts); err != nil {
+				return fmt.Errorf("www redirect template render: %w", err)
+			}
 		}
 	}
 	cfgPath := "/etc/nginx/conf.d/dom_" + sk + ".conf"

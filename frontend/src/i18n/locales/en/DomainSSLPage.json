@@ -31,5 +31,14 @@
   "letsencrypt_pro2": "✓ Automatic renewal (cron)",
   "letsencrypt_warn": "⚠ The domain must point to this server via DNS",
   "get_letsencrypt": "Get Let's Encrypt Certificate",
-  "locale": "en-US"
+  "locale": "en-US",
+  "www_redirect_title": "www Redirect",
+  "www_redirect_desc": "When on, visiting the bare (apex) domain — e.g. {{domain}} — automatically 301-redirects to www.{{domain}}.",
+  "www_redirect_on": "On",
+  "www_redirect_off": "Off",
+  "www_redirect_enable": "Turn On www Redirect",
+  "www_redirect_disable": "Turn Off Redirect",
+  "www_redirect_enabled": "www redirect enabled — {{domain}} now redirects to www.{{domain}}.",
+  "www_redirect_disabled": "www redirect disabled.",
+  "www_redirect_failed": "Failed to save the www redirect setting"
 }

@@ -453,6 +453,8 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssl", domainsH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ssl/issue", domainsH.SSLIssue)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ssl", domainsH.SSLDisable)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/www-yonlendir", domainsH.WWWYonlendirDurum)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/www-yonlendir", domainsH.WWWYonlendirAyarla)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/cron", cronH.List)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/cron", cronH.Create)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/cron/{idx}", cronH.Delete)
