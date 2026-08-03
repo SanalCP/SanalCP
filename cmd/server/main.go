@@ -147,7 +147,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("secretcrypt: %v", err)
 	}
-	hesaplar.Init(secretBox) // db_pass_plain şifreleme kutusu (bkz. internal/secretcrypt)
+	if err := hesaplar.Init(secretBox); err != nil { // db_pass_plain şifreleme kutusu + root MySQL bağlantısı
+		log.Fatalf("hesaplar.Init (root mysql): %v", err)
+	}
 	// Bu göç öncesi oluşturulmuş düz-metin DB/FTP parolalarını yerinde şifreler/hash'ler.
 	// Idempotent, göçecek satır yoksa no-op — diğer Heal*/Seed* fonksiyonlarıyla aynı desen.
 	hesaplar.HealLegacyPlaintextSecrets(context.Background(), d)
