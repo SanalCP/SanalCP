@@ -4,7 +4,6 @@ package hesaplar
 import (
 	"database/sql"
 	"fmt"
-	"os/exec"
 	"strings"
 )
 
@@ -22,13 +21,11 @@ func MySQLChangePassword(panelDB *sql.DB, dbUser, yeniPw string) error {
 	if !GecerliDBKimlik(dbUser) {
 		return fmt.Errorf("güvenlik: geçersiz kullanıcı adı")
 	}
-	stmts := []string{
-		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s';", dbUser, sqlKac(yeniPw)),
-		"FLUSH PRIVILEGES;",
-	}
-	out, err := exec.Command("mysql", "-e", strings.Join(stmts, " ")).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("mysql alter: %s: %w", strings.TrimSpace(string(out)), err)
+	if err := rootExecAll(
+		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(yeniPw)),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return fmt.Errorf("mysql alter: %w", err)
 	}
 	// panel metadata güncelle (şifreli — bkz. internal/secretcrypt)
 	encPw, err := box.Encrypt(yeniPw)

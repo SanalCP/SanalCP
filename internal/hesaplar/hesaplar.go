@@ -2,14 +2,18 @@
 package hesaplar
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"sanalcp/internal/secretcrypt"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 // box: db_pass_plain gibi panel metadata'sındaki parolaları şifreler.
@@ -17,9 +21,55 @@ import (
 // ile aynı paket-seviyesi singleton deseni).
 var box *secretcrypt.Box
 
-// Init: panelin sır şifreleme kutusunu ayarlar. main.go'da config.Load()
-// sonrası, herhangi bir hesap oluşturma isteğinden ÖNCE çağrılmalıdır.
-func Init(b *secretcrypt.Box) { box = b }
+// rootDB: MariaDB'ye ROOT olarak — CREATE/ALTER/DROP USER, GRANT gibi panelin
+// kendi düşük-yetkili 'panel' bağlantısıyla YAPILAMAYACAK işlemler için.
+// Unix socket + boş parola: sanalcp-install.sh'nin "mysql -u root <<SQL" ile
+// birebir aynı mekanizma — taze bir MariaDB kurulumunda root@localhost parola
+// İSTEMEZ, ama YALNIZ unix socket üzerinden ('root'@'127.0.0.1' hiç yok, TCP
+// erişimi reddedilir — gerçek sunucuda doğrulandı). Önceden bu işlemler her
+// çağrıda `mysql` CLI process'i başlatılarak yapılıyordu; artık kalıcı bir
+// bağlantı havuzu üzerinden native driver ile yapılıyor.
+var rootDB *sql.DB
+
+const rootSocket = "/var/lib/mysql/mysql.sock"
+
+// Init: panelin sır şifreleme kutusunu ayarlar VE root MySQL bağlantısını açar.
+// main.go'da config.Load() sonrası, herhangi bir hesap oluşturma isteğinden
+// ÖNCE çağrılmalıdır. Panelin ana 'panel' bağlantısı bu noktaya gelmeden önce
+// zaten kurulmuş (aynı MariaDB'ye) olduğu için ayrı bir bekle-tekrar-dene
+// döngüsüne gerek yok.
+func Init(b *secretcrypt.Box) error {
+	box = b
+	cfg := mysql.NewConfig()
+	cfg.User = "root"
+	cfg.Net = "unix"
+	cfg.Addr = rootSocket
+	d, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return fmt.Errorf("root mysql open: %w", err)
+	}
+	d.SetMaxOpenConns(4)
+	d.SetMaxIdleConns(2)
+	d.SetConnMaxLifetime(30 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := d.PingContext(ctx); err != nil {
+		d.Close()
+		return fmt.Errorf("root mysql ping: %w", err)
+	}
+	rootDB = d
+	return nil
+}
+
+// rootExecAll: sırayla root olarak çalıştırır; ilk hata anında durur.
+func rootExecAll(stmts ...string) error {
+	for _, s := range stmts {
+		if _, err := rootDB.Exec(s); err != nil {
+			return fmt.Errorf("mysql: %w", err)
+		}
+	}
+	return nil
+}
 
 // DecryptDBPassword: db_accounts.db_pass_plain sütunundaki şifreli değeri
 // gösterme/phpMyAdmin-SSO için çözer. Değer henüz göç edilmemiş eski bir
@@ -148,17 +198,15 @@ func MySQLCreateDB(db *sql.DB, domainID int64, dbName, dbUser, dbPass string) er
 	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
 	}
-	// 1) MariaDB'de DB + user create (root socket auth ile)
-	stmts := []string{
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;", dbName),
-		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s';", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s';", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost';", dbName, dbUser),
-		"FLUSH PRIVILEGES;",
-	}
-	sql := strings.Join(stmts, " ")
-	if out, err := exec.Command("mysql", "-e", sql).CombinedOutput(); err != nil {
-		return fmt.Errorf("mysql exec: %s: %w", strings.TrimSpace(string(out)), err)
+	// 1) MariaDB'de DB + user create (root, native driver — bkz. Init/rootDB)
+	if err := rootExecAll(
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
+		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return err
 	}
 
 	// 2) panel DB metadata — db_pass_plain AES-GCM ile şifreli tutulur (bkz.
@@ -190,13 +238,12 @@ func MySQLCreateDBForUser(db *sql.DB, domainID int64, dbName, dbUser string) err
 		return fmt.Errorf("mevcut kullanıcı parolası bulunamadı: %w", err)
 	}
 	// DB olustur + mevcut kullaniciya GRANT (CREATE/ALTER USER YOK → parola korunur).
-	stmts := []string{
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;", dbName),
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost';", dbName, dbUser),
-		"FLUSH PRIVILEGES;",
-	}
-	if out, err := exec.Command("mysql", "-e", strings.Join(stmts, " ")).CombinedOutput(); err != nil {
-		return fmt.Errorf("mysql exec: %s: %w", strings.TrimSpace(string(out)), err)
+	if err := rootExecAll(
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return err
 	}
 	_, err := db.Exec(
 		`INSERT INTO db_accounts(domain_id, db_name, db_user, db_pass_plain, db_host)
@@ -210,13 +257,12 @@ func MySQLDropDB(db *sql.DB, dbName, dbUser string) error {
 	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
 	}
-	stmts := []string{
-		fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", dbName),
-		fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost';", dbUser),
-		"FLUSH PRIVILEGES;",
-	}
-	if out, err := exec.Command("mysql", "-e", strings.Join(stmts, " ")).CombinedOutput(); err != nil {
-		return fmt.Errorf("mysql drop: %s: %w", strings.TrimSpace(string(out)), err)
+	if err := rootExecAll(
+		fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName),
+		fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return err
 	}
 	_, err := db.Exec(`DELETE FROM db_accounts WHERE db_name=?`, dbName)
 	return err
@@ -229,9 +275,8 @@ func MySQLDropDBKeepUser(db *sql.DB, dbName string) error {
 	if !GecerliDBKimlik(dbName) {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı")
 	}
-	if out, err := exec.Command("mysql", "-e",
-		fmt.Sprintf("DROP DATABASE IF EXISTS `%s`;", dbName)).CombinedOutput(); err != nil {
-		return fmt.Errorf("mysql drop: %s: %w", strings.TrimSpace(string(out)), err)
+	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName)); err != nil {
+		return err
 	}
 	_, err := db.Exec(`DELETE FROM db_accounts WHERE db_name=?`, dbName)
 	return err
