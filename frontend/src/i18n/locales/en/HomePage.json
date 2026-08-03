@@ -23,6 +23,11 @@
     "inactive_title": "Disk quota is not active",
     "inactive_desc": "Disk quota is not active — a one-time server reboot is required to enable it."
   },
+  "surum_bildirim": {
+    "baslik": "A new panel version is available, please update!",
+    "versiyon": "(installed: {{mevcut}} → new: {{son}})",
+    "dismiss_aria": "Dismiss notification"
+  },
   "widget_name": {
     "yuk-grafik": "Load Chart",
     "wordpress": "WordPress Sites",
@@ -30,7 +35,7 @@
     "son-yedek": "Latest Server Backup",
     "performans": "Performance / Optimize",
     "cve-guvenlik": "Security Vulnerabilities (CVE)",
-    "servisler": "Services",
+    "servisler": "Installed Services",
     "domainler": "Domains",
     "sunucu-bilgi": "Server Information",
     "saglik": "System Health",
@@ -93,7 +98,7 @@
     "idle_badge": "Idle"
   },
   "servisler": {
-    "baslik": "Services",
+    "baslik": "Installed Services",
     "alt_format": "{{active}}/{{total}} services running",
     "alt_fallback": "service status",
     "all_active_badge": "All active",

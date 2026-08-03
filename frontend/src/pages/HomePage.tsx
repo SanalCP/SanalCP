@@ -36,6 +36,10 @@ type Sistem = {
 type Domain = { id: number; alan_adi: string; ssl: boolean; durum: string }
 
 /* --- ek uçlar --- */
+type SurumKontrol = {
+  acik: boolean; mevcut: string; son: string; guncelleme_var: boolean
+  duyuru?: string; kritik?: boolean
+}
 type Guncelleme = { arac_var: boolean; calisiyor: boolean; durum: string }
 type Optimize = { calisiyor: boolean; durum: string }
 type YedekSatir = { domain_id: number; alan_adi: string; sayi: number; toplam_b: number; son_yedek: string }
@@ -70,7 +74,7 @@ const VARSAYILAN_KOLON: Record<string, number> = (() => {
 const WIDGET_ADI: Record<string, string> = {
   'yuk-grafik': 'Yük Grafiği', 'wordpress': 'WordPress Siteleri',
   'panel-guncelleme': 'Panel Güncelleme', 'son-yedek': 'Son Sunucu Yedeklemesi', 'performans': 'Performans / Optimize',
-  'cve-guvenlik': 'Güvenlik Açıkları (CVE)', 'servisler': 'Servisler', 'domainler': 'Domainler', 'sunucu-bilgi': 'Sunucu Bilgileri',
+  'cve-guvenlik': 'Güvenlik Açıkları (CVE)', 'servisler': 'Kurulu Servisler', 'domainler': 'Domainler', 'sunucu-bilgi': 'Sunucu Bilgileri',
   'saglik': 'Sistem Sağlığı', 'canli-kaynak': 'Canlı Kaynaklar', 'abonelikler': 'Aboneliklerim', 'ag': 'Ağ Trafiği',
 }
 
@@ -127,6 +131,8 @@ export default function HomePage() {
   const [kotaUyariKapali, setKotaUyariKapali] = useState(
     () => localStorage.getItem(KOTA_UYARI_KAPALI_KEY) === '1'
   )
+  const [surumKontrol, setSurumKontrol] = useState<SurumKontrol | null>(null)
+  const [surumKapatildi, setSurumKapatildi] = useState(false)
 
   // --- pano düzeni durumu ---
   const [duzen, setDuzen] = useState<Duzen>(VARSAYILAN_DUZEN)
@@ -179,6 +185,20 @@ export default function HomePage() {
     if (kayitTimer.current) clearTimeout(kayitTimer.current)
     if (kayitSifirla.current) clearTimeout(kayitSifirla.current)
   }, [])
+
+  // Panel sürüm kontrolü: backend günde bir GitHub'daki yayın manifestini denetliyor
+  // (bkz. internal/system/surumkontrol.go); burada yalnız sonucu okuyup bildirime
+  // çeviriyoruz. Uç admin/bayi yetkisi ister — sıradan müşteri için hiç çağırma.
+  useEffect(() => {
+    if (kullanici?.rol !== 'admin' && kullanici?.rol !== 'reseller') return
+    api.get<SurumKontrol>('/system/surum-kontrol').then((r) => setSurumKontrol(r.data)).catch(() => {})
+  }, [kullanici?.rol])
+
+  useEffect(() => {
+    if (surumKontrol?.son) {
+      setSurumKapatildi(localStorage.getItem(`sp-surum-bildirim-kapali-${surumKontrol.son}`) === '1')
+    }
+  }, [surumKontrol?.son])
 
   useEffect(() => {
     const cekKullanim = () => {
@@ -684,6 +704,51 @@ export default function HomePage() {
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
               {t('HomePage:kota.inactive_desc')}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panel yeni sürüm bildirimi — backend günde bir GitHub'daki surum.json'ı
+          denetler; sonucu burada gösteriyoruz. Reddedilirse aynı sürüm için bir
+          daha çıkmaz (localStorage), yeni bir sürüm yayınlanınca tekrar görünür. */}
+      {surumKontrol?.guncelleme_var && !surumKapatildi && (
+        <div className={`rise mb-4 flex justify-center`}>
+          <div className={`flex w-full max-w-2xl items-center gap-3 rounded-full border px-4 py-2.5 shadow-sm ${
+            surumKontrol.kritik
+              ? 'border-rose-300 bg-rose-50 dark:border-rose-800/60 dark:bg-rose-900/20'
+              : 'border-brand-300 bg-brand-50 dark:border-brand-800/60 dark:bg-brand-900/20'}`}>
+            <svg className={`h-5 w-5 shrink-0 ${surumKontrol.kritik ? 'text-rose-500' : 'text-brand-500'}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 13.5 12 16.5 22 6.5M2 12a10 10 0 1 1 6.6 9.4" />
+            </svg>
+            <div className="min-w-0 flex-1 text-center">
+              <span className={`text-sm font-semibold ${surumKontrol.kritik ? 'text-rose-800 dark:text-rose-200' : 'text-brand-800 dark:text-brand-200'}`}>
+                {t('HomePage:surum_bildirim.baslik')}
+              </span>
+              <span className={`ml-2 text-xs ${surumKontrol.kritik ? 'text-rose-700 dark:text-rose-300' : 'text-brand-700 dark:text-brand-300'}`}>
+                {t('HomePage:surum_bildirim.versiyon', { mevcut: surumKontrol.mevcut, son: surumKontrol.son })}
+              </span>
+              {surumKontrol.duyuru && (
+                <div className={`mt-0.5 text-xs ${surumKontrol.kritik ? 'text-rose-700 dark:text-rose-300' : 'text-brand-700 dark:text-brand-300'}`}>
+                  {surumKontrol.duyuru}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (surumKontrol.son) localStorage.setItem(`sp-surum-bildirim-kapali-${surumKontrol.son}`, '1')
+                setSurumKapatildi(true)
+              }}
+              className={`shrink-0 -m-1 rounded-lg p-1 ${surumKontrol.kritik
+                ? 'text-rose-500 hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-200'
+                : 'text-brand-500 hover:bg-brand-100 hover:text-brand-700 dark:hover:bg-brand-900/30 dark:hover:text-brand-200'}`}
+              aria-label={t('HomePage:surum_bildirim.dismiss_aria')}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
