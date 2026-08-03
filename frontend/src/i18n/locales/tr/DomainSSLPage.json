@@ -31,5 +31,14 @@
   "letsencrypt_pro2": "✓ Otomatik yenileme (cron)",
   "letsencrypt_warn": "⚠ Alan adı bu sunucuya DNS ile yönelmiş olmalı",
   "get_letsencrypt": "Let's Encrypt Sertifikası Al",
-  "locale": "tr-TR"
+  "locale": "tr-TR",
+  "www_redirect_title": "www Yönlendirmesi",
+  "www_redirect_desc": "Açıkken alan adının çıplak (apex) hâli — örn. {{domain}} — ziyaret edildiğinde otomatik olarak www.{{domain}} adresine 301 ile yönlendirilir.",
+  "www_redirect_on": "Açık",
+  "www_redirect_off": "Kapalı",
+  "www_redirect_enable": "www'e Yönlendirmeyi Aç",
+  "www_redirect_disable": "Yönlendirmeyi Kapat",
+  "www_redirect_enabled": "www yönlendirmesi açıldı — {{domain}} artık www.{{domain}}'e yönlendiriliyor.",
+  "www_redirect_disabled": "www yönlendirmesi kapatıldı.",
+  "www_redirect_failed": "www yönlendirme ayarı kaydedilemedi"
 }

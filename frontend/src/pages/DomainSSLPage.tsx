@@ -14,13 +14,16 @@ type SSLDurum = {
   cert_yol?: string
   key_yol?: string
 }
+type WWWDurum = { aktif: boolean }
 
 export default function DomainSSLPage() {
   const { t } = useTranslation(['DomainSSLPage', 'common'])
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [durum, setDurum] = useState<SSLDurum | null>(null)
+  const [wwwDurum, setWwwDurum] = useState<WWWDurum | null>(null)
   const [isleniyor, setIsleniyor] = useState(false)
+  const [wwwIsleniyor, setWwwIsleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
 
@@ -28,8 +31,23 @@ export default function DomainSSLPage() {
     if (!id) return
     api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<SSLDurum>(`/domains/${id}/ssl`).then(r => setDurum(r.data)).catch(e => setHata(apiHata(e)))
+    api.get<WWWDurum>(`/domains/${id}/www-yonlendir`).then(r => setWwwDurum(r.data)).catch(() => {})
   }
   useEffect(yukle, [id])
+
+  async function wwwYonlendirDegistir() {
+    const hedef = !wwwDurum?.aktif
+    setWwwIsleniyor(true); setHata(null); setBasari(null)
+    try {
+      await api.put(`/domains/${id}/www-yonlendir`, { aktif: hedef })
+      setWwwDurum({ aktif: hedef })
+      setBasari(t(hedef ? 'DomainSSLPage:www_redirect_enabled' : 'DomainSSLPage:www_redirect_disabled', { domain: domain?.alan_adi }))
+    } catch (e) {
+      setHata(apiHata(e, t('DomainSSLPage:www_redirect_failed')))
+    } finally {
+      setWwwIsleniyor(false)
+    }
+  }
 
   async function issue(tip: 'self-signed' | 'letsencrypt') {
     if (tip === 'letsencrypt' && !confirm(t('DomainSSLPage:confirm_letsencrypt'))) return
@@ -120,6 +138,42 @@ export default function DomainSSLPage() {
           </div>
         )}
       </div>
+
+      {/* www yönlendirme kartı */}
+      {domain && (
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t('DomainSSLPage:www_redirect_title')}</h2>
+            {wwwDurum && (
+              wwwDurum.aktif ? (
+                <span className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded uppercase font-semibold tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  {t('DomainSSLPage:www_redirect_on')}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded uppercase font-semibold tracking-wider flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  {t('DomainSSLPage:www_redirect_off')}
+                </span>
+              )
+            )}
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-500 mb-4">
+            {t('DomainSSLPage:www_redirect_desc', { domain: domain.alan_adi })}
+          </p>
+          <button
+            onClick={wwwYonlendirDegistir}
+            disabled={wwwIsleniyor || !wwwDurum}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition disabled:opacity-50 ${
+              wwwDurum?.aktif
+                ? 'border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20'
+                : 'bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900'
+            }`}
+          >
+            {wwwDurum?.aktif ? t('DomainSSLPage:www_redirect_disable') : t('DomainSSLPage:www_redirect_enable')}
+          </button>
+        </div>
+      )}
 
       {/* Aksiyon kartları */}
       {durum && !durum.aktif && (

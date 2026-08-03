@@ -162,3 +162,54 @@ func (h *Handlers) SSLDisable(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
+
+// GET /domains/{id}/www-yonlendir — apex (ör. sanalcp.com) ziyaret edilince
+// www alt alan adına (www.sanalcp.com) 301 yönlendirilsin mi?
+func (h *Handlers) WWWYonlendirDurum(w http.ResponseWriter, r *http.Request) {
+	id, _, _, _, ok := h.domainInfo(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	var aktif int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT www_yonlendir FROM domains WHERE id=?`, id).Scan(&aktif); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okunamadı")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"aktif": aktif == 1})
+}
+
+// PUT /domains/{id}/www-yonlendir  {aktif: bool}
+func (h *Handlers) WWWYonlendirAyarla(w http.ResponseWriter, r *http.Request) {
+	id, sk, phpSurum, demo, ok := h.domainInfo(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	var req struct {
+		Aktif bool `json:"aktif"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz istek gövdesi")
+		return
+	}
+	deger := 0
+	if req.Aktif {
+		deger = 1
+	}
+	if _, err := h.DB.ExecContext(r.Context(),
+		`UPDATE domains SET www_yonlendir=? WHERE id=?`, deger, id); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kaydedilemedi: "+err.Error())
+		return
+	}
+	if err := h.applyVhost(r, id, sk, phpSurum); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "vhost render: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "aktif": req.Aktif})
+}
