@@ -57,9 +57,13 @@ if [ -z "$PANEL_LANG" ]; then
     printf "  > "
     LANG_CHOICE=""
     read -r LANG_CHOICE < /dev/tty || true
+    LANG_CHOICE="${LANG_CHOICE%$'\r'}"
+    # Yalnız açıkça İngilizce seçimi "en" yapar; tanınmayan/boş girdi de dahil
+    # geri kalan her şey Türkçe'ye düşer (projenin geneldeki varsayılanıyla tutarlı —
+    # bkz. TTY olmayan koldaki PANEL_LANG="tr").
     case "$LANG_CHOICE" in
-      2|tr|TR|Turkce|Türkçe) PANEL_LANG="tr" ;;
-      *) PANEL_LANG="en" ;;
+      1|en|EN|English|english) PANEL_LANG="en" ;;
+      *) PANEL_LANG="tr" ;;
     esac
   else
     PANEL_LANG="tr"

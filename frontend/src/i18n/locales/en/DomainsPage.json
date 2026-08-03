@@ -72,7 +72,10 @@
     "copy_hint": "Click to copy",
     "hide": "Hide",
     "show": "Show",
-    "clipboard_prompt": "Press Ctrl+C to copy, then Enter:"
+    "clipboard_prompt": "Press Ctrl+C to copy, then Enter:",
+    "copy_all": "📋 Copy",
+    "save_txt": "💾 Save as TXT",
+    "copied": "✓ Copied"
   },
   "delete_modal": {
     "title": "⚠ Bulk Domain Deletion",
