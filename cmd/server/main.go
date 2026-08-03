@@ -72,7 +72,9 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-const version = "0.3.0-f2"
+// version — sanalcp/internal/system.SurumNo'nun takma adı; TEK sürüm
+// kaynağı orasıdır (bkz. o dosyadaki not).
+const version = system.SurumNo
 
 // buildDate — derleme zamanında ldflags ile gömülür (bkz. scripts/build-assets.sh:
 // -X main.buildDate=...). Kaynağından `go build` ile elle derlenirse "gelistirme" kalır.

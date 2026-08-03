@@ -23,6 +23,11 @@
     "inactive_title": "Disk kotası aktif değil",
     "inactive_desc": "Disk kotası aktif değil — etkinleştirmek için tek seferlik sunucu yeniden başlatması gerekli."
   },
+  "surum_bildirim": {
+    "baslik": "Panelin yeni sürümü var, güncelleyin!",
+    "versiyon": "(kurulu: {{mevcut}} → yeni: {{son}})",
+    "dismiss_aria": "Bildirimi kapat"
+  },
   "widget_name": {
     "yuk-grafik": "Yük Grafiği",
     "wordpress": "WordPress Siteleri",
@@ -30,7 +35,7 @@
     "son-yedek": "Son Sunucu Yedeklemesi",
     "performans": "Performans / Optimize",
     "cve-guvenlik": "Güvenlik Açıkları (CVE)",
-    "servisler": "Servisler",
+    "servisler": "Kurulu Servisler",
     "domainler": "Domainler",
     "sunucu-bilgi": "Sunucu Bilgileri",
     "saglik": "Sistem Sağlığı",
@@ -93,7 +98,7 @@
     "idle_badge": "Boşta"
   },
   "servisler": {
-    "baslik": "Servisler",
+    "baslik": "Kurulu Servisler",
     "alt_format": "{{active}}/{{total}} servis çalışıyor",
     "alt_fallback": "servis durumu",
     "all_active_badge": "Hepsi aktif",

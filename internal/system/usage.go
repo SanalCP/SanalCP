@@ -19,7 +19,15 @@ import (
 	"sanalcp/internal/kaynaklimit"
 )
 
-const PanelSurum = "SanalCP 0.2.0"
+// SurumNo — panelin TEK sürüm kaynağı. cmd/server/main.go ve /system/usage
+// (panel_surum) buradan okur; surum.json'daki (repo kökü) son_surum alanı da
+// her release'de bununla EŞİT tutulmalı — aksi hâlde kurulu panellerde yanlış
+// "güncelleme var" bildirimi çıkar (bkz. internal/system/surumkontrol.go).
+// 🔴 Kullanıcıya görünür her yeni özellik/düzeltme release'inde bu sabiti
+// (VE surum.json'ı) birlikte bump'lamayı unutma.
+const SurumNo = "0.3.1"
+
+const PanelSurum = "SanalCP " + SurumNo
 
 type CPUUsage struct {
 	Yuzde    float64 `json:"yuzde"`
@@ -528,35 +536,43 @@ var servisListesi = []struct{ ad, etiket string }{
 	{"firewalld", "Firewalld"},
 }
 
+// ReadServisler — yalnız SİSTEMDE KURULU (unit dosyası bulunan) servisleri döner;
+// kurulmamış bir servis (örn. mail sunucusu hiç kurulmadıysa postfix/dovecot,
+// ya da bir PHP sürümü hiç yüklenmediyse ilgili php-fpm) "kapalı" değil, listede
+// hiç gösterilmez. Kurulu olup olmadığı `systemctl list-unit-files` ile ayrıca
+// kontrol edilir; is-active tek başına bunu ayırt edemez (kurulu değilse de
+// "inactive" döner).
 func ReadServisler() []ServiceStat {
 	out := make([]ServiceStat, 0, len(servisListesi))
 	type res struct {
-		i     int
-		aktif bool
+		i      int
+		aktif  bool
+		kurulu bool
 	}
 	ch := make(chan res, len(servisListesi))
 	for i, s := range servisListesi {
 		go func(i int, ad string) {
-			cmd := exec.Command("systemctl", "is-active", ad)
-			b, _ := cmd.Output()
-			ch <- res{i: i, aktif: strings.TrimSpace(string(b)) == "active"}
+			ub, _ := exec.Command("systemctl", "list-unit-files", ad+".service", "--no-legend").Output()
+			kurulu := len(strings.TrimSpace(string(ub))) > 0
+			var aktif bool
+			if kurulu {
+				ab, _ := exec.Command("systemctl", "is-active", ad).Output()
+				aktif = strings.TrimSpace(string(ab)) == "active"
+			}
+			ch <- res{i: i, aktif: aktif, kurulu: kurulu}
 		}(i, s.ad)
 	}
-	mat := make(map[int]bool)
+	mat := make(map[int]res)
 	for i := 0; i < len(servisListesi); i++ {
 		r := <-ch
-		mat[r.i] = r.aktif
+		mat[r.i] = r
 	}
 	for i, s := range servisListesi {
-		aktif := mat[i]
-		if !aktif && (s.ad == "pure-ftpd" || strings.HasPrefix(s.ad, "php")) {
-			cmd := exec.Command("systemctl", "list-unit-files", s.ad+".service", "--no-legend")
-			b, _ := cmd.Output()
-			if len(strings.TrimSpace(string(b))) == 0 {
-				continue
-			}
+		r := mat[i]
+		if !r.kurulu {
+			continue
 		}
-		out = append(out, ServiceStat{Ad: s.ad, Etiket: s.etiket, Aktif: aktif})
+		out = append(out, ServiceStat{Ad: s.ad, Etiket: s.etiket, Aktif: r.aktif})
 	}
 	return out
 }
