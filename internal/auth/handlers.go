@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
@@ -61,11 +62,18 @@ func rootShadowHash() string {
 //
 // yescrypt ($y$) — AlmaLinux 10 varsayılanı — NATİF Go ile hesaplanır
 // (github.com/openwall/yescrypt-go: yescrypt yazarlarının kendi uygulaması).
-// Python 3.13'te `crypt` modülü kaldırıldığı için ana yol artık ona bağımlı
-// değil; sunucu Python'u güncellediğinde panel girişi kırılmaz.
+// Eski formatlar ($6$/$5$/$1$) için `openssl passwd` çağrılır — ÖNCEDEN
+// python3'ün `crypt` modülüne shell-out ediyordu, o modül Python 3.13'te
+// kaldırıldığı için sunucu Python'u güncellediğinde panel girişi kırılırdı.
+// openssl her AlmaLinux/RHEL kurulumunda temel bağımlılık olduğu için daha
+// sağlam bir seçim; ayrıca denenen (github.com/GehirnInc/crypt) pure-Go
+// kütüphanesi rounds= içeren sha256/sha512 hash'lerinde salt'ı yanlış
+// ayrıştırdığı (bkz. legacycrypt_test.go'daki "rounds=" vakası) için elendi —
+// openssl glibc ile aynı referans uygulamayı kullanır.
 //
-// Eski formatlar ($6$/$5$/$1$) için python3 yedeği korunur. Karşılaştırma
-// subtle.ConstantTimeCompare ile sabit zamanlıdır (timing side-channel'a karşı).
+// Karşılaştırma iki yolda da sabit zamanlıdır (timing side-channel'a karşı):
+// yescrypt yolunda subtle.ConstantTimeCompare, legacyCryptDogrula içinde de
+// aynısı.
 func rootParolaDogrula(parola string) bool {
 	hash := rootShadowHash()
 	// Kilitli ("!", "!!", "*") veya parolasız hesap → asla kabul etme.
@@ -79,16 +87,50 @@ func rootParolaDogrula(parola string) bool {
 		}
 		return subtle.ConstantTimeCompare(hesap, []byte(hash)) == 1
 	}
-	return pythonCryptDogrula(parola, hash)
+	return legacyCryptDogrula(parola, hash)
 }
 
-// pythonCryptDogrula — ESKİ YOL: yalnız yescrypt-dışı formatlar (sha512/sha256/
-// md5crypt) için yedek. UYARI: python3 `crypt` modülü Python 3.13'te kaldırıldı;
-// bu yol o sürümde çalışmaz (yescrypt zaten ana yolda natif olduğu için etkilenmez).
-func pythonCryptDogrula(parola, hash string) bool {
-	cmd := exec.Command("python3", "-c",
-		"import sys, crypt; p = sys.stdin.read(); sys.stdout.write(crypt.crypt(p, sys.argv[1]))",
-		hash)
+// legacyCryptSaltAyikla — "$id$[rounds=N$]salt$digest" hash'inden openssl'in
+// -salt argümanına verilecek "[rounds=N$]salt" bölümünü çıkarır. Salt ve
+// digest crypt(3) alfabesinde ($ hariç ./0-9A-Za-z) olduğundan "$" ile
+// bölmek güvenlidir. openssl'in KENDİSİ tam hash'i -salt olarak verilince
+// (glibc crypt(3)'ün aksine) digest'in fazladan karakterlerini salt'a
+// karıştırıyor — bu yüzden burada elle en dar segment çıkarılır.
+func legacyCryptSaltAyikla(hash string) (id, saltArg string, tamam bool) {
+	parcalar := strings.Split(hash, "$")
+	// "$6$salt$digest" → ["", "6", "salt", "digest"] (4)
+	// "$6$rounds=N$salt$digest" → ["", "6", "rounds=N", "salt", "digest"] (5)
+	if len(parcalar) == 4 {
+		return parcalar[1], parcalar[2], true
+	}
+	if len(parcalar) == 5 && strings.HasPrefix(parcalar[2], "rounds=") {
+		return parcalar[1], parcalar[2] + "$" + parcalar[3], true
+	}
+	return "", "", false
+}
+
+// legacyCryptDogrula — ESKİ YOL: yalnız yescrypt-dışı formatlar (sha512/sha256/
+// md5crypt) için yedek.
+func legacyCryptDogrula(parola, hash string) bool {
+	id, saltArg, tamam := legacyCryptSaltAyikla(hash)
+	if !tamam {
+		return false
+	}
+	var bayrak string
+	switch id {
+	case "6":
+		bayrak = "-6"
+	case "5":
+		bayrak = "-5"
+	case "1":
+		bayrak = "-1"
+	default:
+		return false // DES-crypt gibi desteklenmeyen eski formatlar
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "openssl", "passwd", bayrak, "-salt", saltArg, "-stdin")
 	cmd.Stdin = strings.NewReader(parola)
 	out, err := cmd.Output()
 	if err != nil {

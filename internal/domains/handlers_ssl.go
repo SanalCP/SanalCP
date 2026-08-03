@@ -92,7 +92,7 @@ func (h *Handlers) SSLIssue(w http.ResponseWriter, r *http.Request) {
 		certYol, keyYol, err = provisioner.EnableSelfSigned(alanAdi, sk, phpSurum, backend)
 	case "letsencrypt":
 		var gercek bool
-		certYol, keyYol, gercek, err = provisioner.EnableLetsEncrypt(alanAdi, sk, phpSurum, backend)
+		certYol, keyYol, gercek, err = provisioner.EnableLetsEncrypt(r.Context(), alanAdi, sk, phpSurum, backend)
 		if !gercek {
 			gercekTip = "self-signed"
 		}

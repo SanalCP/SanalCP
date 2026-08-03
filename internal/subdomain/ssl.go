@@ -1,6 +1,7 @@
 package subdomain
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
@@ -95,13 +97,19 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 	case "letsencrypt", "le":
 		_ = os.MkdirAll("/var/www/_acme", 0o755)
 		_, _ = exec.Command("restorecon", "-R", "/var/www/_acme").CombinedOutput()
-		if out, err := exec.Command("/root/.acme.sh/acme.sh", "--issue", "--webroot", "/var/www/_acme",
+		// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
+		// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+		issueCtx, issueCancel := context.WithTimeout(r.Context(), 3*time.Minute)
+		defer issueCancel()
+		if out, err := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", "--issue", "--webroot", "/var/www/_acme",
 			"-d", tamAd, "--keylength", "ec-256").CombinedOutput(); err != nil {
 			httpx.WriteError(w, http.StatusBadRequest,
 				"Let's Encrypt alınamadı (subdomain DNS'i bu sunucuya A kaydıyla yönlendirilmeli): "+strings.TrimSpace(string(out)))
 			return
 		}
-		if out, err := exec.Command("/root/.acme.sh/acme.sh", "--install-cert", "-d", tamAd, "--ecc",
+		installCtx, installCancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer installCancel()
+		if out, err := exec.CommandContext(installCtx, "/root/.acme.sh/acme.sh", "--install-cert", "-d", tamAd, "--ecc",
 			"--key-file", key, "--fullchain-file", crt,
 			"--reloadcmd", "systemctl reload nginx").CombinedOutput(); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "cert yerleştirilemedi: "+strings.TrimSpace(string(out)))

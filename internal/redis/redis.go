@@ -4,6 +4,7 @@
 package redis
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 
@@ -93,10 +95,10 @@ func PurgeSK(sk string) (int, error) {
 
 const wpBin = "/usr/local/bin/wp"
 
-func wpKomut(sk string, args ...string) ([]byte, error) {
+func wpKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
 	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
 		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
-	return exec.Command("runuser", full...).CombinedOutput()
+	return exec.CommandContext(ctx, "runuser", full...).CombinedOutput()
 }
 
 // wpDizinler: <sk>/public_html + bir seviye alt dizinlerde wp-config.php olan WP kurulumları.
@@ -123,7 +125,7 @@ func wpDizinler(sk string) []string {
 // NOT: `wp redis enable` KULLANILMAZ — o komut Predis+FLUSHDB çağırıyor, ACL'imiz (haklı olarak)
 // flushdb'yi reddediyor. Bunun yerine drop-in ELLE kopyalanır; ACL auth için WP_REDIS_PASSWORD
 // dizi formatında [kullanıcı, parola] verilir; selective flush ile runtime flush = scan+unlink.
-func wpBagla(sk, pass string) int {
+func wpBagla(ctx context.Context, sk, pass string) int {
 	n := 0
 	for _, dir := range wpDizinler(sk) {
 		set := func(k, v string, raw bool) {
@@ -131,7 +133,7 @@ func wpBagla(sk, pass string) int {
 			if raw {
 				a = append(a, "--raw")
 			}
-			_, _ = wpKomut(sk, a...)
+			_, _ = wpKomut(ctx, sk, a...)
 		}
 		set("WP_REDIS_HOST", redisHost, false)
 		set("WP_REDIS_PORT", strconv.Itoa(redisPort), true)
@@ -142,19 +144,20 @@ func wpBagla(sk, pass string) int {
 		set("WP_REDIS_CLIENT", "phpredis", false)
 		set("WP_CACHE", "true", true)
 		// eski (yanlış) tek-string USERNAME/PASSWORD kalıntısı varsa temizle
-		_, _ = wpKomut(sk, "config", "delete", "WP_REDIS_USERNAME", "--path="+dir)
+		_, _ = wpKomut(ctx, sk, "config", "delete", "WP_REDIS_USERNAME", "--path="+dir)
 
-		if _, err := wpKomut(sk, "plugin", "install", "redis-cache", "--activate", "--path="+dir); err != nil {
+		// plugin install wordpress.org'a ağ çıkışı yapar — ctx üst sınırı burada devrede.
+		if _, err := wpKomut(ctx, sk, "plugin", "install", "redis-cache", "--activate", "--path="+dir); err != nil {
 			continue
 		}
 		// drop-in'i elle kur (wp redis enable'ın flushdb'sini atla)
 		src := filepath.Join(dir, "wp-content/plugins/redis-cache/includes/object-cache.php")
 		dst := filepath.Join(dir, "wp-content/object-cache.php")
-		if _, err := exec.Command("runuser", "-u", sk, "--", "cp", "-f", src, dst).CombinedOutput(); err != nil {
+		if _, err := exec.CommandContext(ctx, "runuser", "-u", sk, "--", "cp", "-f", src, dst).CombinedOutput(); err != nil {
 			continue
 		}
 		// bağlantı doğrula — status "Connected" içeriyorsa başarılı say
-		if out, err := wpKomut(sk, "redis", "status", "--path="+dir); err == nil && strings.Contains(string(out), "Connected") {
+		if out, err := wpKomut(ctx, sk, "redis", "status", "--path="+dir); err == nil && strings.Contains(string(out), "Connected") {
 			n++
 		}
 	}
@@ -163,13 +166,13 @@ func wpBagla(sk, pass string) int {
 
 // wpCozdur: WP kurulumlarında Redis'i kapatır — drop-in'i kaldırır + sabitleri siler.
 // `wp redis disable` KULLANILMAZ (o da flushdb deneyebilir); drop-in elle silinir.
-func wpCozdur(sk string) {
+func wpCozdur(ctx context.Context, sk string) {
 	for _, dir := range wpDizinler(sk) {
-		_, _ = exec.Command("runuser", "-u", sk, "--", "rm", "-f",
+		_, _ = exec.CommandContext(ctx, "runuser", "-u", sk, "--", "rm", "-f",
 			filepath.Join(dir, "wp-content/object-cache.php")).CombinedOutput()
 		for _, k := range []string{"WP_REDIS_HOST", "WP_REDIS_PORT", "WP_REDIS_USERNAME",
 			"WP_REDIS_PASSWORD", "WP_REDIS_PREFIX", "WP_REDIS_SELECTIVE_FLUSH", "WP_REDIS_CLIENT", "WP_CACHE"} {
-			_, _ = wpKomut(sk, "config", "delete", k, "--path="+dir)
+			_, _ = wpKomut(ctx, sk, "config", "delete", k, "--path="+dir)
 		}
 	}
 }
@@ -250,8 +253,12 @@ func (h *Handlers) Ac(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "kaydedilemedi: "+err.Error())
 		return
 	}
-	// WordPress kurulumları varsa otomatik bağla (best-effort — WP yoksa snippet elle kalır)
-	baglandi := wpBagla(sk, pass)
+	// WordPress kurulumları varsa otomatik bağla (best-effort — WP yoksa snippet elle kalır).
+	// plugin install wordpress.org'a ağ çıkışı yapar — üst sınır olmadan istek
+	// işleyen goroutine sonsuza dek asılı kalabilir.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	baglandi := wpBagla(ctx, sk, pass)
 	httpx.WriteJSON(w, http.StatusOK, durumResp{
 		Aktif: true, Host: redisHost, Port: redisPort, Kullanici: sk, Parola: pass,
 		Prefix: sk + ":", WPSnippet: wpSnippet(sk, pass), WPBaglandi: baglandi,
@@ -265,7 +272,9 @@ func (h *Handlers) Kapat(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
-	wpCozdur(sk) // önce WP'de kapat (creds hâlâ geçerliyken drop-in kaldırılır)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	wpCozdur(ctx, sk) // önce WP'de kapat (creds hâlâ geçerliyken drop-in kaldırılır)
 	disableUser(sk)
 	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM cp_domain_redis WHERE domain_id=?`, id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -274,8 +283,8 @@ func (h *Handlers) Kapat(w http.ResponseWriter, r *http.Request) {
 // KapatDomain: domain SİLİNİRKEN çağrılır (domains.Delete). WP drop-in kaldır +
 // Valkey ACL user sil + cp_domain_redis satırını temizle. cp_domain_redis'te
 // ON DELETE CASCADE FK olmadığı için domain silinince satır orphan kalıyordu.
-func KapatDomain(db *sql.DB, id int64, sk string) {
-	wpCozdur(sk)
+func KapatDomain(ctx context.Context, db *sql.DB, id int64, sk string) {
+	wpCozdur(ctx, sk)
 	disableUser(sk)
 	_, _ = db.Exec(`DELETE FROM cp_domain_redis WHERE domain_id=?`, id)
 }

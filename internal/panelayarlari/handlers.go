@@ -7,6 +7,7 @@
 package panelayarlari
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
@@ -107,7 +109,11 @@ func (h *Handlers) Kaydet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sslDurum, sslHata, sslBitis := sslKur(domain)
+	// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
+	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	sslCtx, sslCancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	defer sslCancel()
+	sslDurum, sslHata, sslBitis := sslKur(sslCtx, domain)
 	if _, err := h.DB.ExecContext(r.Context(),
 		`UPDATE panel_ayarlari SET ssl_durum=?, ssl_hata=?, ssl_bitis=? WHERE id=1`,
 		sslDurum, nullIfEmpty(sslHata), nullIfEmpty(sslBitis)); err != nil {
@@ -144,12 +150,12 @@ func (h *Handlers) Kaldir(w http.ResponseWriter, r *http.Request) {
 // panel.crt/.key'i yerinde günceller + nginx -t + reload eder. HERHANGİ bir adım
 // başarısız olursa panel.crt/.key'e ASLA dokunulmadan (veya anında geri alınarak) döner
 // — panel erişimi hiçbir koşulda kesilmez.
-func sslKur(domain string) (durum, hata, bitis string) {
+func sslKur(ctx context.Context, domain string) (durum, hata, bitis string) {
 	_ = os.MkdirAll(acmeWebroot, 0755)
 	_, _ = exec.Command("restorecon", "-R", acmeWebroot).CombinedOutput()
 
 	issueArgs := []string{"--issue", "--webroot", acmeWebroot, "-d", domain, "--keylength", "2048"}
-	out, err := exec.Command(acmeBinYolu, issueArgs...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, acmeBinYolu, issueArgs...).CombinedOutput()
 	if err != nil && strings.Contains(string(out), "invalidContact") {
 		// Kurulumda geçersiz bir contact-email ile (ör. admin@test.local — public suffix
 		// olmayan bir TLD) hesap kaydı BAŞARISIZ olmuş olabilir. acme.sh bu email'i HEM
@@ -161,8 +167,8 @@ func sslKur(domain string) (durum, hata, bitis string) {
 		// dosyadaki eski email'i temizleyip yeniden kaydet — bu kalıcı-kilitlenmeyi kırar
 		// (bkz. sanalcp-install.sh'daki aynı sınıf düzeltme).
 		acmeContactTemizle()
-		_, _ = exec.Command(acmeBinYolu, "--register-account", "--server", "letsencrypt").CombinedOutput()
-		out, err = exec.Command(acmeBinYolu, issueArgs...).CombinedOutput()
+		_, _ = exec.CommandContext(ctx, acmeBinYolu, "--register-account", "--server", "letsencrypt").CombinedOutput()
+		out, err = exec.CommandContext(ctx, acmeBinYolu, issueArgs...).CombinedOutput()
 	}
 	if err != nil {
 		// acme.sh exit code 2 = RENEW_SKIP: store'da zaten gecerli (yenileme penceresine
@@ -189,7 +195,7 @@ func sslKur(domain string) (durum, hata, bitis string) {
 		"--key-file", keyYol,
 		"--fullchain-file", certYol,
 	}
-	if out, err := exec.Command(acmeBinYolu, insArgs...).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, acmeBinYolu, insArgs...).CombinedOutput(); err != nil {
 		selfSignedaDon()
 		return "basarisiz", "install-cert: " + strings.TrimSpace(string(out)), ""
 	}

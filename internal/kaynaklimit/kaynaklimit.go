@@ -623,15 +623,22 @@ func SlowQueryWatchdog(ctx context.Context, db *sql.DB) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			governorScanOnce(db)
+			governorScanOnce(ctx, db)
 		}
 	}
 }
 
 // governorScanOnce: tek tarama. root ile processlist okur (panel DB-kullanıcısı
 // PROCESS/CONNECTION ADMIN'e sahip olmayabilir), limiti aşan tenant sorgularını öldürür.
-func governorScanOnce(db *sql.DB) {
-	out, err := exec.Command("mysql", "-uroot", "-N", "-B", "-e",
+//
+// 🔴 Her `mysql` çağrısı ctx üstünden bir üst sınırla sarılı: sarılmasaydı,
+// mysqld tıkanıp `mysql` istemcisi asılı kalınca watchdog goroutine'i de SONSUZA
+// DEK bloke olur — koruma mekanizması, tam da koruması gereken durumda kilitlenir.
+// Zaman aşımı bir taramayı atlatır, bir sonraki tick'te watchdog kaldığı yerden devam eder.
+func governorScanOnce(parent context.Context, db *sql.DB) {
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "mysql", "-uroot", "-N", "-B", "-e",
 		"SELECT ID,USER,TIME FROM information_schema.PROCESSLIST WHERE COMMAND<>'Sleep' AND TIME>0").Output()
 	if err != nil {
 		return
@@ -660,7 +667,7 @@ func governorScanOnce(db *sql.DB) {
 		if qerr != nil || limit <= 0 || secs <= limit {
 			continue // db_accounts'ta değil / limit yok / henüz aşmadı
 		}
-		if kout, kerr := exec.Command("mysql", "-uroot", "-e", fmt.Sprintf("KILL QUERY %d", id)).CombinedOutput(); kerr != nil {
+		if kout, kerr := exec.CommandContext(ctx, "mysql", "-uroot", "-e", fmt.Sprintf("KILL QUERY %d", id)).CombinedOutput(); kerr != nil {
 			log.Printf("Governor: %s KILL başarısız (id=%d): %s: %v", user, id, strings.TrimSpace(string(kout)), kerr)
 		} else {
 			log.Printf("Governor: %s sorgusu %ds > %ds → KILL (id=%d)", user, secs, limit, id)

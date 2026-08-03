@@ -379,7 +379,9 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 		_ = kaynaklimit.SystemdSliceSil(sk)
 		// Redis tenant cache: Valkey ACL user + WP drop-in + cp_domain_redis satırı.
 		// cp_domain_redis'te CASCADE FK olmadığı için domain silinince satır orphan kalıyordu.
-		redis.KapatDomain(h.DB, id, sk)
+		redisCtx, redisCancel := context.WithTimeout(r.Context(), 30*time.Second)
+		redis.KapatDomain(redisCtx, h.DB, id, sk)
+		redisCancel()
 		// Mail: mail_domains/mailboxes/mail_aliases zaten domains(id) ON DELETE CASCADE FK'li,
 		// DB satırları aşağıdaki DELETE FROM domains ile otomatik silinir. KapatDomain yine de
 		// çağrılır (redis.KapatDomain ile aynı simetri) — ileride cascade-dışı bir yan etki eklenirse.

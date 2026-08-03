@@ -190,7 +190,9 @@ func (h *Handlers) EklentiIslem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	h.paketIslem(w, sk, dir, "plugin", req.Islem, req.Ad)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	h.paketIslem(ctx, w, sk, dir, "plugin", req.Islem, req.Ad)
 }
 
 // POST /domains/{id}/wordpress/tema  {dizin, islem: guncelle|tumunu-guncelle|aktif, ad}
@@ -201,11 +203,13 @@ func (h *Handlers) TemaIslem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	h.paketIslem(w, sk, dir, "theme", req.Islem, req.Ad)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	h.paketIslem(ctx, w, sk, dir, "theme", req.Islem, req.Ad)
 }
 
 // paketIslem: plugin/theme için ortak güncelle/etkinleştir/devre-dışı yürütücü.
-func (h *Handlers) paketIslem(w http.ResponseWriter, sk, dir, tur, islem, ad string) {
+func (h *Handlers) paketIslem(ctx context.Context, w http.ResponseWriter, sk, dir, tur, islem, ad string) {
 	var args []string
 	switch islem {
 	case "tumunu-guncelle":
@@ -232,7 +236,7 @@ func (h *Handlers) paketIslem(w http.ResponseWriter, sk, dir, tur, islem, ad str
 		httpx.WriteError(w, http.StatusBadRequest, "bilinmeyen işlem")
 		return
 	}
-	out, err := wpKomut(sk, args...)
+	out, err := wpKomut(ctx, sk, args...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, kisalt(string(out)))
 		return
@@ -264,7 +268,9 @@ func (h *Handlers) KullaniciParola(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "parola 8-100 karakter olmalı")
 		return
 	}
-	out, err := wpKomut(sk, "user", "update", strconv.Itoa(req.UserID),
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	out, err := wpKomut(ctx, sk, "user", "update", strconv.Itoa(req.UserID),
 		"--user_pass="+parola, "--skip-email", "--path="+dir)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, kisalt(string(out)))
@@ -272,7 +278,7 @@ func (h *Handlers) KullaniciParola(w http.ResponseWriter, r *http.Request) {
 	}
 	// kullanıcı adını da döndür (UI'da göstermek için)
 	login := ""
-	if b, e := wpKomut(sk, "user", "get", strconv.Itoa(req.UserID), "--field=user_login", "--path="+dir); e == nil {
+	if b, e := wpKomut(ctx, sk, "user", "get", strconv.Itoa(req.UserID), "--field=user_login", "--path="+dir); e == nil {
 		login = strings.TrimSpace(string(b))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "parola": parola, "kullanici": login})
@@ -288,14 +294,18 @@ func (h *Handlers) Onar(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	onceOut, onceErr := wpKomut(sk, "core", "verify-checksums", "--path="+dir)
+	// core download wordpress.org'a ağ çıkışı yapar — yanıt gelmezse istek
+	// işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	defer cancel()
+	onceOut, onceErr := wpKomut(ctx, sk, "core", "verify-checksums", "--path="+dir)
 	once := "temiz"
 	if onceErr != nil {
 		once = "sorun-var"
 	}
 	// mevcut sürümü öğren → aynı sürümü yeniden indir (istenmeyen yükseltme olmasın)
 	surum := ""
-	if b, e := wpKomut(sk, "core", "version", "--path="+dir); e == nil {
+	if b, e := wpKomut(ctx, sk, "core", "version", "--path="+dir); e == nil {
 		surum = strings.TrimSpace(string(b))
 	}
 	dlArgs := []string{"core", "download", "--force", "--skip-content", "--path=" + dir}
@@ -303,13 +313,13 @@ func (h *Handlers) Onar(w http.ResponseWriter, r *http.Request) {
 		dlArgs = append(dlArgs, "--version="+surum)
 	}
 	// çekirdeği yeniden indir (içerik/eklenti/tema korunur), DB güncelle
-	dlOut, dlErr := wpKomut(sk, dlArgs...)
+	dlOut, dlErr := wpKomut(ctx, sk, dlArgs...)
 	if dlErr != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "çekirdek indirilemedi: "+kisalt(string(dlOut)))
 		return
 	}
-	_, _ = wpKomut(sk, "core", "update-db", "--path="+dir)
-	sonraOut, sonraErr := wpKomut(sk, "core", "verify-checksums", "--path="+dir)
+	_, _ = wpKomut(ctx, sk, "core", "update-db", "--path="+dir)
+	sonraOut, sonraErr := wpKomut(ctx, sk, "core", "verify-checksums", "--path="+dir)
 	sonra := "temiz"
 	if sonraErr != nil {
 		sonra = "sorun-var"
@@ -328,6 +338,11 @@ func (h *Handlers) AracIslem(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// tumunu-guncelle core/plugin/theme icin wordpress.org'a ağ çıkışı yapar —
+	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye
+	// üst sınır (diğer işlemler yerel/hızlı, aynı bütçeyi paylaşmaları zararsız).
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
 	var out []byte
 	var err error
 	switch req.Islem {
@@ -343,18 +358,18 @@ func (h *Handlers) AracIslem(w http.ResponseWriter, r *http.Request) {
 			out = []byte("Bakım modu kapatıldı.")
 		}
 	case "cache-temizle":
-		out, err = wpKomut(sk, "cache", "flush", "--path="+dir)
+		out, err = wpKomut(ctx, sk, "cache", "flush", "--path="+dir)
 	case "tumunu-guncelle":
 		var b strings.Builder
-		o1, e1 := wpKomut(sk, "core", "update", "--path="+dir)
+		o1, e1 := wpKomut(ctx, sk, "core", "update", "--path="+dir)
 		b.Write(o1)
-		o2, _ := wpKomut(sk, "plugin", "update", "--all", "--path="+dir)
+		o2, _ := wpKomut(ctx, sk, "plugin", "update", "--all", "--path="+dir)
 		b.WriteString("\n")
 		b.Write(o2)
-		o3, _ := wpKomut(sk, "theme", "update", "--all", "--path="+dir)
+		o3, _ := wpKomut(ctx, sk, "theme", "update", "--all", "--path="+dir)
 		b.WriteString("\n")
 		b.Write(o3)
-		_, _ = wpKomut(sk, "core", "update-db", "--path="+dir)
+		_, _ = wpKomut(ctx, sk, "core", "update-db", "--path="+dir)
 		out, err = []byte(b.String()), e1
 	default:
 		httpx.WriteError(w, http.StatusBadRequest, "bilinmeyen işlem")
