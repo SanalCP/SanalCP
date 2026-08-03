@@ -24,3 +24,19 @@ func TestSurumTetikleGerekliMi(t *testing.T) {
 		t.Error("cooldown'dan çok daha eskiyse gerekli olmalı")
 	}
 }
+
+// TestSurumOnbellekGuvenilirMi: canlıda gözlemlenen gerçek hatayı kapsar —
+// güncelleme sonrası eski (bir önceki sürüm tarafından yazılmış) önbellek
+// yüklenirse "kurulu: 0.3.7 → yeni: 0.3.5" gibi ters/anlamsız bir bildirim
+// çıkıyordu.
+func TestSurumOnbellekGuvenilirMi(t *testing.T) {
+	if !surumOnbellekGuvenilirMi("0.3.7", "0.3.7") {
+		t.Error("aynı sürüm tarafından yazılmışsa güvenilir olmalı (ör. sadece systemctl restart)")
+	}
+	if surumOnbellekGuvenilirMi("0.3.5", "0.3.7") {
+		t.Error("FARKLI (eski) sürüm tarafından yazılmışsa güvenilmez olmalı — güncelleme araya girmiş")
+	}
+	if surumOnbellekGuvenilirMi("", "0.3.7") {
+		t.Error("bu alanı hiç içermeyen eski biçimli önbellek güvenilmez sayılmalı")
+	}
+}

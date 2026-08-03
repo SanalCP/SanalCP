@@ -53,6 +53,13 @@ type SurumYayin struct {
 type surumOnbellek struct {
 	Yayin      SurumYayin `json:"yayin"`
 	SonKontrol time.Time  `json:"son_kontrol"`
+	// Mevcut — önbellek yazıldığı ANDAKİ derlenmiş sürüm. Yükleme sırasında
+	// o anki surumMevcut ile karşılaştırılır: FARKLIYSA (yani araya bir
+	// güncelleme girmiş) önbellek ATLANIR — aksi hâlde bir önceki sürümün
+	// (ör. 0.3.5) çekilmiş son_surum'u, YENİ kurulan sürümle (ör. 0.3.7)
+	// karşılaştırılıp "kurulu: 0.3.7 → yeni: 0.3.5" gibi TERS/anlamsız bir
+	// bildirim üretebilirdi — nitekim üretti (canlıda gözlemlendi).
+	Mevcut string `json:"mevcut"`
 }
 
 var (
@@ -232,7 +239,7 @@ func surumHataYaz(m string) {
 
 func surumOnbellekYaz() {
 	surumMu.RLock()
-	o := surumOnbellek{Yayin: surumYayin, SonKontrol: surumSon}
+	o := surumOnbellek{Yayin: surumYayin, SonKontrol: surumSon, Mevcut: surumMevcut}
 	surumMu.RUnlock()
 	if b, err := json.Marshal(o); err == nil {
 		_ = os.MkdirAll(filepath.Dir(surumOnbellekYol), 0o755)
@@ -241,7 +248,12 @@ func surumOnbellekYaz() {
 }
 
 // surumOnbellekYukle — restart sonrası son bilinen durumu geri yükler ki
-// panel açılır açılmaz "bilinmiyor" göstermesin.
+// panel açılır açılmaz "bilinmiyor" göstermesin. AMA önbellek FARKLI bir
+// derlenmiş sürüm tarafından yazıldıysa (araya bir güncelleme girmiş) hiç
+// yüklenmez — bkz. surumOnbellek.Mevcut. Bu durumda panel yalnızca ilk
+// arka plan taramasına (açılıştan 10-60sn sonra) veya girişte tetiklenen
+// kontrole (bkz. SurumKontrolTetikle) kadar "kontrol edilmedi" gösterir;
+// bu, eski/ters bir karşılaştırma göstermekten HER ZAMAN daha iyidir.
 func surumOnbellekYukle() {
 	b, err := os.ReadFile(surumOnbellekYol)
 	if err != nil {
@@ -252,9 +264,21 @@ func surumOnbellekYukle() {
 		return
 	}
 	surumMu.Lock()
+	defer surumMu.Unlock()
+	if !surumOnbellekGuvenilirMi(o.Mevcut, surumMevcut) {
+		return
+	}
 	surumYayin = o.Yayin
 	surumSon = o.SonKontrol
-	surumMu.Unlock()
+}
+
+// surumOnbellekGuvenilirMi: saf karar fonksiyonu (test edilebilir) — önbellek
+// FARKLI bir derlenmiş sürüm tarafından yazıldıysa (araya bir güncelleme
+// girmiş) ya da bu alanı hiç içermeyen eski biçimli bir önbellekse (boş
+// string) güvenilmez. Eski biçimli önbellekler bu düzeltmeden SONRAKİ ilk
+// güncellemede otomatik olarak yeni biçimle değişecek.
+func surumOnbellekGuvenilirMi(onbellekMevcut, suankiMevcut string) bool {
+	return onbellekMevcut == suankiMevcut
 }
 
 // SurumKontrolYenile — operatör "şimdi kontrol et" derse. Kapalıysa istek atmaz.
