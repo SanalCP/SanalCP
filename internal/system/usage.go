@@ -25,7 +25,7 @@ import (
 // "güncelleme var" bildirimi çıkar (bkz. internal/system/surumkontrol.go).
 // 🔴 Kullanıcıya görünür her yeni özellik/düzeltme release'inde bu sabiti
 // (VE surum.json'ı) birlikte bump'lamayı unutma.
-const SurumNo = "0.3.1"
+const SurumNo = "0.3.2"
 
 const PanelSurum = "SanalCP " + SurumNo
 
@@ -472,6 +472,9 @@ func ReadInfo() SystemInfo {
 	if infoCache != nil {
 		c := *infoCache
 		c.IP = birinciIP()
+		// Hostname IP gibi çalışma zamanında değişebilir (bkz. HostnameKaydet) —
+		// diğer alanların aksine (kernel, CPU, OS) önbellekte donmuş kalmamalı.
+		c.Hostname, _ = os.Hostname()
 		return c
 	}
 	info := SystemInfo{PanelSurum: PanelSurum, CPUCekirdek: runtime.NumCPU(), Mimari: runtime.GOARCH}
