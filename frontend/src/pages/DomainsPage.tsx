@@ -57,6 +57,7 @@ export default function DomainsPage() {
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
   const [fPlanID, setFPlanID] = useState<number | ''>('')
   const [fSSL, setFSSL] = useState(false)
+  const [fWWW, setFWWW] = useState(false)
 
   // Liste yalnızca /domains'e bağlıdır. /plans + /php/versions (yavaş olabilen dnf keşfi)
   // listeyi BLOKLAMAZ — modal açılınca lazy çekilir. Böylece dnf yavaş/kilitliyken bile
@@ -110,7 +111,7 @@ export default function DomainsPage() {
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
-    setFAlanAdi(''); setFPHPSurum('8.3'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false)
+    setFAlanAdi(''); setFPHPSurum('8.3'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
     setOlusturAcik(true)
     modalVeriYukle() // lazy: plan/php sürümleri henüz gelmediyse şimdi çek (listeyi bloklamaz)
   }
@@ -139,6 +140,14 @@ export default function DomainsPage() {
             : t('DomainsPage:create_modal.ssl_success')
         } catch (e) {
           mesaj += t('DomainsPage:create_modal.ssl_error')
+        }
+        if (fWWW) {
+          try {
+            await api.put(`/domains/${r.data.id}/www-yonlendir`, { aktif: true })
+            mesaj += t('DomainsPage:create_modal.www_success')
+          } catch (e) {
+            mesaj += t('DomainsPage:create_modal.www_error')
+          }
         }
       }
       setBasari(mesaj)
@@ -465,16 +474,27 @@ export default function DomainsPage() {
 
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
-                  <input type="checkbox" checked={fSSL} onChange={e => setFSSL(e.target.checked)} disabled={olusturuluyor} className="rounded" />
+                  <input type="checkbox" checked={fSSL} onChange={e => { setFSSL(e.target.checked); if (!e.target.checked) setFWWW(false) }} disabled={olusturuluyor} className="rounded" />
                   {t('DomainsPage:create_modal.ssl_label')}
                 </label>
                 {fSSL && (
-                  <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
-                    {items[0]?.ipv4
-                      ? t('DomainsPage:create_modal.ssl_warning_with_ip', { ip: items[0].ipv4 })
-                      : t('DomainsPage:create_modal.ssl_warning_no_ip')
-                    }
-                  </p>
+                  <>
+                    <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                      {items[0]?.ipv4
+                        ? t('DomainsPage:create_modal.ssl_warning_with_ip', { ip: items[0].ipv4 })
+                        : t('DomainsPage:create_modal.ssl_warning_no_ip')
+                      }
+                    </p>
+                    <label className="mt-2.5 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer pl-1">
+                      <input type="checkbox" checked={fWWW} onChange={e => setFWWW(e.target.checked)} disabled={olusturuluyor} className="rounded" />
+                      {t('DomainsPage:create_modal.www_label', { domain: fAlanAdi.trim() || t('DomainsPage:create_modal.www_placeholder_domain') })}
+                    </label>
+                    {fWWW && (
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-500 leading-relaxed pl-1">
+                        {t('DomainsPage:create_modal.www_hint', { domain: fAlanAdi.trim() || t('DomainsPage:create_modal.www_placeholder_domain') })}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

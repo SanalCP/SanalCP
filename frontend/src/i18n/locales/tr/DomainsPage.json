@@ -55,7 +55,12 @@
     "create_error": "Domain oluşturulamadı",
     "success": "✓ \"{{name}}\" oluşturuldu — Linux user, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL DB ve DNS zone hazır.",
     "ssl_success": " ✓ Let's Encrypt SSL sertifikası kuruldu.",
-    "ssl_error": " ⚠ SSL kurulamadı — Abonelik → SSL sayfasından tekrar deneyebilirsiniz."
+    "ssl_error": " ⚠ SSL kurulamadı — Abonelik → SSL sayfasından tekrar deneyebilirsiniz.",
+    "www_label": "{{domain}} → www.{{domain}} yönlendirmesini de aç",
+    "www_placeholder_domain": "alan adı",
+    "www_hint": "Çıplak alan adı ({{domain}}) ziyaret edilince otomatik olarak www.{{domain}}'e 301 ile yönlendirilir. İstersen kurulumdan sonra SSL/TLS Sertifikaları sayfasından da değiştirebilirsin.",
+    "www_success": " ✓ www yönlendirmesi açıldı.",
+    "www_error": " ⚠ www yönlendirmesi açılamadı — SSL/TLS Sertifikaları sayfasından tekrar deneyebilirsiniz."
   },
   "result_modal": {
     "title": "✓ Domain Oluşturuldu",
