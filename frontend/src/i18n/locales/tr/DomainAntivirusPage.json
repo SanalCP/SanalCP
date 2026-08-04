@@ -20,6 +20,7 @@
   "scanning": "Taranıyor…",
   "scan_now": "Şimdi Tara",
   "scan_in_progress": "Tarama sürüyor… (büyük sitelerde birkaç dakika sürebilir)",
+  "resource_warning": "Tarama sırasında CPU kullanımı geçici olarak yükselir; büyük public_html klasörlerinde sunucu bir süreliğine yavaşlayabilir.",
   "findings_title": "Bulgular",
   "findings_last_scan_note": "— son taramadan",
   "no_scan_yet": "Henüz tarama yapılmadı. “Şimdi Tara” ile başlayın.",

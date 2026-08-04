@@ -20,6 +20,7 @@
   "scanning": "Scanning…",
   "scan_now": "Scan Now",
   "scan_in_progress": "Scan in progress… (can take a few minutes on large sites)",
+  "resource_warning": "CPU usage rises temporarily during a scan; on large public_html folders the server may slow down for a while.",
   "findings_title": "Findings",
   "findings_last_scan_note": "— from last scan",
   "no_scan_yet": "No scan has been run yet. Start with “Scan Now”.",
