@@ -58,6 +58,8 @@
     "imunify_desc": "Antivirüs",
     "ssh": "SSH Erişimi",
     "ssh_on": "Açık",
-    "ssh_off": "Kapalı"
+    "ssh_off": "Kapalı",
+    "import": "İçe Aktarma",
+    "import_desc": "Site arşivi + SQL yedeği aktar"
   }
 }

@@ -1,0 +1,47 @@
+{
+  "title": "İçe Aktarma",
+  "desc": "Başka bir panelden (cPanel, Plesk, CloudPanel, DirectAdmin…) aldığınız site arşivini ve veritabanı yedeğini bu domaine aktarın.",
+  "files": {
+    "title": "1 · Site dosyaları",
+    "desc": "zip, tar, tar.gz/tgz, tar.bz2, tar.xz veya rar arşivi yükleyin. Arşiv çıkarılmadan önce içeriği analiz edilir.",
+    "file": "Arşiv dosyası",
+    "analyze": "Yükle ve analiz et",
+    "uploading": "Yükleniyor… %{{pct}}",
+    "entries": "Dosya sayısı",
+    "expanded": "Açılmış boyut",
+    "root": "Kök klasör",
+    "app": "Tespit edilen uygulama",
+    "target": "Hedef klasör (ev dizinine göre)",
+    "strip_root": "\"{{kok}}\" klasörünü atla, içeriğini doğrudan hedefe aç",
+    "strip_root_na": "Arşivde tek bir kapsayıcı klasör yok — atlanamaz",
+    "wipe_first": "Hedef klasörün mevcut içeriğini önce sil",
+    "apply": "Dosyaları aktar",
+    "extracting": "Çıkarılıyor…",
+    "confirm_wipe": "{{hedef}} klasöründeki TÜM mevcut içerik silinecek. Devam edilsin mi?",
+    "done": "Site dosyaları {{hedef}} klasörüne aktarıldı."
+  },
+  "db": {
+    "title": "2 · Veritabanı",
+    "desc": ".sql veya .sql.gz dump dosyası yükleyin. Dump, hedef veritabanının kendi kullanıcısıyla uygulanır.",
+    "target": "Hedef veritabanı",
+    "file": "SQL dump dosyası",
+    "no_db": "Bu domaine ait veritabanı yok. Önce Veritabanları sayfasından bir veritabanı oluşturun.",
+    "wipe_first": "İçe aktarmadan önce hedef veritabanındaki tüm tabloları sil",
+    "apply": "Veritabanını aktar",
+    "importing": "Aktarılıyor… %{{pct}}",
+    "confirm_wipe": "{{db}} veritabanındaki TÜM tablolar silinecek. Devam edilsin mi?",
+    "done": "{{db}} veritabanına içe aktarma tamamlandı."
+  },
+  "config": {
+    "title": "3 · Bağlantı ayarları",
+    "desc": "Aktarılan uygulamanın veritabanı bilgilerini bu sunucudaki yeni değerlerle günceller (WordPress wp-config.php, Laravel .env). Aktarım sonrası \"veritabanı bağlantı hatası\" almamak için bu adımı çalıştırın.",
+    "apply": "{{dizin}} altındaki config dosyalarını {{db}} bilgileriyle güncelle",
+    "none_found": "Hedef klasörde güncellenebilecek bir yapılandırma dosyası bulunamadı."
+  },
+  "errors": {
+    "upload": "Arşiv yüklenemedi.",
+    "extract": "Arşiv çıkarılamadı.",
+    "dump": "Veritabanı içe aktarılamadı.",
+    "config": "Yapılandırma güncellenemedi."
+  }
+}

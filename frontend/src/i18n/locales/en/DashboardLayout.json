@@ -69,7 +69,8 @@
     "connection_info": "Connection Info",
     "file_manager": "File Manager",
     "dns_settings": "DNS Settings",
-    "git_deploy": "Git Deploy"
+    "git_deploy": "Git Deploy",
+    "import": "Import"
   },
   "server_management_back": "Server Management",
   "close_menu_aria": "Close menu",

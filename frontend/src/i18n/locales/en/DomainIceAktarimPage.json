@@ -1,0 +1,47 @@
+{
+  "title": "Import",
+  "desc": "Import a site archive and database dump taken from another panel (cPanel, Plesk, CloudPanel, DirectAdmin…) into this domain.",
+  "files": {
+    "title": "1 · Site files",
+    "desc": "Upload a zip, tar, tar.gz/tgz, tar.bz2, tar.xz or rar archive. Its contents are analyzed before anything is extracted.",
+    "file": "Archive file",
+    "analyze": "Upload and analyze",
+    "uploading": "Uploading… {{pct}}%",
+    "entries": "File count",
+    "expanded": "Expanded size",
+    "root": "Root folder",
+    "app": "Detected application",
+    "target": "Target folder (relative to home)",
+    "strip_root": "Skip the \"{{kok}}\" folder and extract its contents directly",
+    "strip_root_na": "No single containing folder in the archive — cannot be skipped",
+    "wipe_first": "Delete existing contents of the target folder first",
+    "apply": "Import files",
+    "extracting": "Extracting…",
+    "confirm_wipe": "ALL existing content in {{hedef}} will be deleted. Continue?",
+    "done": "Site files imported into {{hedef}}."
+  },
+  "db": {
+    "title": "2 · Database",
+    "desc": "Upload a .sql or .sql.gz dump. The dump is applied using the target database's own user.",
+    "target": "Target database",
+    "file": "SQL dump file",
+    "no_db": "This domain has no database. Create one from the Databases page first.",
+    "wipe_first": "Drop all tables in the target database before importing",
+    "apply": "Import database",
+    "importing": "Importing… {{pct}}%",
+    "confirm_wipe": "ALL tables in {{db}} will be dropped. Continue?",
+    "done": "Import into {{db}} completed."
+  },
+  "config": {
+    "title": "3 · Connection settings",
+    "desc": "Updates the imported application's database credentials with this server's new values (WordPress wp-config.php, Laravel .env). Run this step to avoid a \"database connection error\" after import.",
+    "apply": "Update config files under {{dizin}} with {{db}} credentials",
+    "none_found": "No updatable configuration file found in the target folder."
+  },
+  "errors": {
+    "upload": "Archive upload failed.",
+    "extract": "Archive extraction failed.",
+    "dump": "Database import failed.",
+    "config": "Configuration update failed."
+  }
+}

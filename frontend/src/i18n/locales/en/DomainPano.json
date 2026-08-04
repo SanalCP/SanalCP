@@ -58,6 +58,8 @@
     "imunify_desc": "Antivirus",
     "ssh": "SSH Access",
     "ssh_on": "Enabled",
-    "ssh_off": "Disabled"
+    "ssh_off": "Disabled",
+    "import": "Import",
+    "import_desc": "Import a site archive + SQL dump"
   }
 }

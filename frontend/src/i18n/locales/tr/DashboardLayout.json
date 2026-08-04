@@ -69,7 +69,8 @@
     "connection_info": "Bağlantı Bilgisi",
     "file_manager": "Dosya Yöneticisi",
     "dns_settings": "DNS Ayarları",
-    "git_deploy": "Git Deploy"
+    "git_deploy": "Git Deploy",
+    "import": "İçe Aktarma"
   },
   "server_management_back": "Sunucu Yönetimi",
   "close_menu_aria": "Menüyü kapat",

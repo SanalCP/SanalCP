@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"database/sql"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/sqlimport"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -83,9 +85,13 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz veritabanı adı")
 		return
 	}
-	var exists int
-	if err := h.DB.QueryRow(`SELECT 1 FROM db_accounts WHERE domain_id=? AND db_name=?`, domainID, dbName).Scan(&exists); err != nil {
-		httpx.WriteError(w, http.StatusForbidden, "bu veritabanı size ait değil")
+	// 🔴 Hedefin KENDİ kimliği alınır: dump asla MySQL root'una akıtılmaz.
+	// Panel root çalıştığı için `mysql <db>` root@localhost'a bağlanırdı ve
+	// dump'a konan `USE mysql; GRANT ...` ifadeleri DB sunucusunun tamamını
+	// ele geçirirdi (bkz. internal/sqlimport paket açıklaması).
+	hedef, err := h.dbHedefi(r, domainID, dbName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	select {
@@ -161,15 +167,29 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		sqlFile = expanded
 	}
 
-	cmd := exec.Command("mysql", dbName)
-	cmd.Stdin = sqlFile
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "mysql: "+strings.TrimSpace(stderr.String()))
+	if err := sqlimport.Uygula(r.Context(), hedef, sqlFile); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// dbHedefi: veritabanının bu domaine ait olduğunu doğrular ve o veritabanının
+// KENDİ (düşük yetkili) kimlik bilgilerini döner.
+func (h *Handlers) dbHedefi(r *http.Request, domainID int64, dbName string) (sqlimport.Hedef, error) {
+	var kullanici, sifreli, host string
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT db_user, db_pass_plain, COALESCE(db_host,'localhost')
+		   FROM db_accounts WHERE domain_id=? AND db_name=?`, domainID, dbName).
+		Scan(&kullanici, &sifreli, &host)
+	if err != nil {
+		return sqlimport.Hedef{}, errors.New("bu veritabanı size ait değil")
+	}
+	parola, err := hesaplar.DecryptDBPassword(sifreli)
+	if err != nil {
+		return sqlimport.Hedef{}, errors.New("veritabanı parolası çözülemedi")
+	}
+	return sqlimport.Hedef{DBAdi: dbName, Kullanici: kullanici, Parola: parola, Host: host}, nil
 }
 
 func isGzip(b []byte) bool {
