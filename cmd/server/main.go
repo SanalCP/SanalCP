@@ -209,6 +209,10 @@ func main() {
 	// konan onarım ancak bir sonraki güncellemede devreye girer (canlıda böyle
 	// oldu). Panel açılışı, güncellemenin hemen ardından çalışan tek noktadır.
 	mail.HealRoundcubeSMTP(context.Background())
+	// Sanal kutu girişindeki PAM gecikmesi (~2sn/istek) + sistem hesaplarının
+	// IMAP'e açık olması. Kurulum script'i de yapar ama mevcut kurulumlar onu
+	// bir daha çalıştırmıyor (bkz. HealRoundcubeSMTP'deki aynı ders).
+	mail.HealDovecotAuth(context.Background())
 	mail.StartPolicyServer(d, "127.0.0.1:10040")
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
