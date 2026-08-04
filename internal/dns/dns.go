@@ -388,6 +388,13 @@ func SeedDefaults(ctx context.Context, db *sql.DB, domainID int64, alanAdi, ipv4
 		added++
 	}
 
+	// Nameserver bu zone'un İÇİNDEYSE (sağlayıcının kendi alan adı) BIND
+	// glue A kaydını zone dosyasında görmek zorundadır; şablon bunu statik
+	// olarak ifade edemez, karar domain başına verilir (bkz. GlueEsitle).
+	if _, gerr := GlueEsitle(ctx, db, domainID, alanAdi, ipv4, ns1, ns2); gerr != nil {
+		log.Printf("dns glue esitle domain=%d: %v", domainID, gerr)
+	}
+
 	// Per-domain SOA yoksa merkezi sablon SOA parametrelerinden tohumla
 	seedSOAFromMeta(ctx, db, domainID, alanAdi, meta)
 	return added, nil

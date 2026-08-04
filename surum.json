@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.4",
-  "duyuru": "Nameserver ayarı doğru yere taşındı: Araçlar & Ayarlar > Sunucu bakımı bölümünde \"Nameserver (Alan Adı Sunucuları)\" kartı. 0.4.3'te yanlışlıkla Profil sayfasına konmuştu ve bulunamıyordu. Bayiler kendi white-label nameserver'larını Profil sayfasından tanımlamaya devam eder.",
+  "son_surum": "0.4.5",
+  "duyuru": "Nameserver taşımasında sağlayıcının KENDİ alan adının zone'unu bozan hata düzeltildi. Nameserver'lar kendi zone'unun içinde yaşadığında (ns1.saglayici.com → saglayici.com) BIND adres kaydını zone dosyasının içinde görmek zorundadır; panel bu glue A kayıtlarını siliyordu ve zone yüklenemiyordu. Artık karar domain başına veriliyor: nameserver zone'un içindeyse glue A kaydı otomatik oluşturuluyor, dışındaysa (müşteri domainleri) gereksiz kayıt temizleniyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }

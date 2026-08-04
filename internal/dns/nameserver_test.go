@@ -138,3 +138,34 @@ func indexNokta(s string) int {
 	}
 	return -1
 }
+
+// Nameserver zone'un içinde mi dışında mı? Glue kararının tamamı buna dayanır.
+func TestIcZoneEtiketi(t *testing.T) {
+	// Sağlayıcının KENDİ alan adı: NS zone'un içinde → glue ZORUNLU.
+	if et, ok := icZoneEtiketi("ns1.sanalcp.com", "sanalcp.com"); !ok || et != "ns1" {
+		t.Errorf("in-zone NS 'ns1' etiketiyle bulunmalıydı: %q %v", et, ok)
+	}
+	if et, ok := icZoneEtiketi("ns1.dns.sanalcp.com", "sanalcp.com"); !ok || et != "ns1.dns" {
+		t.Errorf("derin in-zone NS: %q %v", et, ok)
+	}
+	// Sondaki nokta (zone dosyası biçimi) sorun çıkarmamalı.
+	if et, ok := icZoneEtiketi("ns1.sanalcp.com.", "sanalcp.com"); !ok || et != "ns1" {
+		t.Errorf("FQDN nokta ile: %q %v", et, ok)
+	}
+
+	// MÜŞTERİ domaini: NS zone'un dışında → glue ne gerekir ne anlamlı.
+	if _, ok := icZoneEtiketi("ns1.sanalcp.com", "ajanda.uygulamasi.tr"); ok {
+		t.Error("zone dışındaki NS in-zone sayıldı — müşteri zone'una gereksiz A kaydı yazılırdı")
+	}
+	// Sonek benzerliği yanıltmamalı: "xsanalcp.com" ⊄ "sanalcp.com"
+	if _, ok := icZoneEtiketi("ns1.xsanalcp.com", "sanalcp.com"); ok {
+		t.Error("sonek benzerliği in-zone sayıldı")
+	}
+	// NS zone'un kendisi ise apex'tir; glue apex A kaydıdır, ayrı yönetilir.
+	if et, ok := icZoneEtiketi("sanalcp.com", "sanalcp.com"); !ok || et != "@" {
+		t.Errorf("apex NS '@' dönmeliydi: %q %v", et, ok)
+	}
+	if _, ok := icZoneEtiketi("", "sanalcp.com"); ok {
+		t.Error("boş NS kabul edildi")
+	}
+}
