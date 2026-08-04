@@ -34,5 +34,7 @@
   "not_stored": "(saklanmıyor)",
   "no_permission": "(yetki yok)",
   "no_database": "veritabanı yok",
-  "password_gen_failed": "Parola üretilemedi"
+  "password_gen_failed": "Parola üretilemedi",
+  "nameservers": "Nameserver (Alan Adı Yönlendirme)",
+  "nameservers_desc": "Alan adınızı bu sunucuda kullanmak için kayıt şirketinizin panelinden nameserver’ları aşağıdaki değerlerle değiştirin. Değişiklik 1–24 saat içinde yayılır; sonrasında tüm DNS kayıtlarınızı bu panelden yönetirsiniz."
 }

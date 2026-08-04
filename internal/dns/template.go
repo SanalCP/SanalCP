@@ -1,6 +1,7 @@
 // template.go — Merkezi (sunucu geneli) düzenlenebilir DNS şablonu + DKIM anahtar üretimi.
 // Domain eklerken ve "Varsayılan Şablonu Uygula" butonunda bu şablon DİNAMİK okunur.
-// Placeholder'lar: {DOMAIN} alan adı, {IP} domain IPv4, {SELECTOR} DKIM seçici, {DKIM} DKIM public TXT.
+// Placeholder'lar: {DOMAIN} alan adı, {IP} domain IPv4, {SELECTOR} DKIM seçici,
+// {DKIM} DKIM public TXT, {NS1}/{NS2} ortak nameserver çifti (bkz. nameserver.go).
 package dns
 
 import (
@@ -55,10 +56,11 @@ func builtinDefaults() []TemplateRow {
 		{Ad: "@", Tip: "TXT", Deger: "v=spf1 a mx ip4:{IP} ~all", TTL: 3600, Oncelik: 0, Sira: 50, Aktif: true},
 		{Ad: "_dmarc", Tip: "TXT", Deger: "v=DMARC1; p=quarantine; rua=mailto:postmaster@{DOMAIN}; ruf=mailto:postmaster@{DOMAIN}; fo=1; adkim=r; aspf=r", TTL: 3600, Oncelik: 0, Sira: 60, Aktif: true},
 		{Ad: "{SELECTOR}._domainkey", Tip: "TXT", Deger: "{DKIM}", TTL: 3600, Oncelik: 0, Sira: 70, Aktif: true},
-		{Ad: "ns1", Tip: "A", Deger: "{IP}", TTL: 3600, Oncelik: 0, Sira: 80, Aktif: true},
-		{Ad: "ns2", Tip: "A", Deger: "{IP}", TTL: 3600, Oncelik: 0, Sira: 90, Aktif: true},
-		{Ad: "@", Tip: "NS", Deger: "ns1.{DOMAIN}", TTL: 86400, Oncelik: 0, Sira: 100, Aktif: true},
-		{Ad: "@", Tip: "NS", Deger: "ns2.{DOMAIN}", TTL: 86400, Oncelik: 0, Sira: 110, Aktif: true},
+		// NS kayıtları ORTAK nameserver'ları gösterir. Müşteri domaininin altına
+		// ns1/ns2 A kaydı KOYULMAZ: nameserver sağlayıcının (veya bayinin) kendi
+		// alan adında yaşar, glue yalnız orada bir kez gerekir (bkz. nameserver.go).
+		{Ad: "@", Tip: "NS", Deger: "{NS1}", TTL: 86400, Oncelik: 0, Sira: 100, Aktif: true},
+		{Ad: "@", Tip: "NS", Deger: "{NS2}", TTL: 86400, Oncelik: 0, Sira: 110, Aktif: true},
 	}
 }
 
@@ -122,11 +124,13 @@ func LoadTemplateMeta(ctx context.Context, db *sql.DB) TemplateMeta {
 }
 
 // subst: placeholder değişimi.
-func subst(s, alanAdi, ipv4, selector, dkim string) string {
+func subst(s, alanAdi, ipv4, selector, dkim, ns1, ns2 string) string {
 	s = strings.ReplaceAll(s, "{DOMAIN}", alanAdi)
 	s = strings.ReplaceAll(s, "{IP}", ipv4)
 	s = strings.ReplaceAll(s, "{SELECTOR}", selector)
 	s = strings.ReplaceAll(s, "{DKIM}", dkim)
+	s = strings.ReplaceAll(s, "{NS1}", ns1)
+	s = strings.ReplaceAll(s, "{NS2}", ns2)
 	return s
 }
 

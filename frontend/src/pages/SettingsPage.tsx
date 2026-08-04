@@ -45,6 +45,16 @@ function Uyari({ tip, mesaj }: { tip: 'ok' | 'err'; mesaj: string }) {
 export default function SettingsPage() {
   const { t } = useTranslation(['SettingsPage', 'common'])
   const guncelleAd = useAuth((s) => s.guncelleAd)
+
+  // Nameserver: admin panel genelini, bayi kendi white-label çiftini yönetir.
+  // Müşteriler bunu Bağlantı Bilgisi ekranında yalnız görüntüler.
+  const [ns, setNS] = useState<{ ns1: string; ns2: string; kaynak?: string; uyari?: string; oneri1?: string; oneri2?: string } | null>(null)
+  const [ns1, setNS1] = useState('')
+  const [ns2, setNS2] = useState('')
+  const [nsYuk, setNSYuk] = useState(false)
+  const [nsOk, setNSOk] = useState('')
+  const [nsErr, setNSErr] = useState('')
+  const [tasiYuk, setTasiYuk] = useState(false)
   const [ben, setBen] = useState<Ben | null>(null)
   const [yukHata, setYukHata] = useState('')
 
@@ -116,6 +126,40 @@ export default function SettingsPage() {
       setLang(dil as Lang)
       setTOk(t('common:saved')); setTimeout(() => setTOk(''), 3000)
     } catch { setTOk('') } finally { setTYuk(false) }
+  }
+
+  const adminMi = ben?.rol === 'admin'
+  const bayiMi = ben?.rol === 'reseller'
+  const nsUcu = adminMi ? '/nameserver' : '/bayi/nameserver'
+
+  useEffect(() => {
+    if (!adminMi && !bayiMi) return
+    api.get(nsUcu).then(r => {
+      setNS(r.data)
+      // Ayarlı değilse öneriyi ALANA yazar ama KAYDETMEZ — admin görüp
+      // onaylamadan hiçbir zone'a yazılmaz (yanlış NS = çözülemeyen domain).
+      setNS1(r.data.ns1 || r.data.oneri1 || '')
+      setNS2(r.data.ns2 || r.data.oneri2 || '')
+    }).catch(() => { /* yetkisizse kart gizli kalır */ })
+  }, [adminMi, bayiMi, nsUcu])
+
+  async function nsKaydet() {
+    setNSYuk(true); setNSOk(''); setNSErr('')
+    try {
+      const { data } = await api.put(nsUcu, { ns1: ns1.trim(), ns2: ns2.trim() })
+      setNS(data)
+      setNSOk(data.uyari || t('SettingsPage:nameserver.saved'))
+    } catch (e) { setNSErr(apiHata(e)) } finally { setNSYuk(false) }
+  }
+
+  async function nsTasi() {
+    if (!confirm(t('SettingsPage:nameserver.migrate_confirm'))) return
+    setTasiYuk(true); setNSOk(''); setNSErr('')
+    try {
+      const { data } = await api.post('/dns/nameserver-tasi', {})
+      setNSOk(t('SettingsPage:nameserver.migrated', { g: data.guncellenen, n: data.toplam }))
+      if (data.hatalar?.length) setNSErr(data.hatalar.join(' | '))
+    } catch (e) { setNSErr(apiHata(e)) } finally { setTasiYuk(false) }
   }
 
   const btn = 'px-4 py-2 text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-50 inline-flex items-center gap-2'
@@ -230,6 +274,40 @@ export default function SettingsPage() {
               )}
             </div>
           } />
+
+        {/* 3.5) Nameserver — yalnız admin ve bayi */}
+        {(adminMi || bayiMi) && (
+          <Kart baslik={t('SettingsPage:nameserver.title')} aciklama={t('SettingsPage:nameserver.desc')}
+            ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg>}
+            cocuk={
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {adminMi ? t('SettingsPage:nameserver.help_admin') : t('SettingsPage:nameserver.help_bayi')}
+                </p>
+                {ns?.uyari && <Uyari tip="err" mesaj={ns.uyari} />}
+                {ns?.kaynak === 'yok' && ns?.oneri1 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('SettingsPage:nameserver.suggested')}
+                  </p>
+                )}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <Girdi etiket="NS1" value={ns1} onChange={e => setNS1(e.target.value)} placeholder="ns1.ornek.com" />
+                  <Girdi etiket="NS2" value={ns2} onChange={e => setNS2(e.target.value)} placeholder="ns2.ornek.com" />
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button onClick={nsKaydet} disabled={nsYuk} className={btn}>{nsYuk ? t('common:saving') : t('common:save')}</button>
+                  {adminMi && (
+                    <button onClick={nsTasi} disabled={tasiYuk}
+                      className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">
+                      {tasiYuk ? t('common:loading') : t('SettingsPage:nameserver.migrate')}
+                    </button>
+                  )}
+                </div>
+                <Uyari tip="ok" mesaj={nsOk} />
+                <Uyari tip="err" mesaj={nsErr} />
+              </div>
+            } />
+        )}
 
         {/* 4) Tercihler */}
         <Kart baslik={t('SettingsPage:prefs.title')} aciklama={t('SettingsPage:prefs.desc')}

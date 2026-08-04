@@ -57,5 +57,16 @@
     "theme_dark": "Dark",
     "language": "Language",
     "save": "Save Preferences"
+  },
+  "nameserver": {
+    "title": "Nameservers",
+    "desc": "The shared nameserver pair customers delegate their domains to.",
+    "help_admin": "Customers enter these at their registrar. These hostnames MUST have A records pointing to this server's IP in your own DNS, otherwise no domain will resolve. After changing them, use \"Migrate existing domains\" to update old records.",
+    "help_bayi": "You can offer white-label nameservers. You must create A records for these hostnames pointing to the server IP at your own DNS provider. Leave empty to use the server-wide nameservers.",
+    "saved": "Nameservers saved.",
+    "migrate": "Migrate existing domains",
+    "migrate_confirm": "NS records and SOA primary NS of all domains will be updated to the current nameserver pair and zones rewritten. Continue?",
+    "migrated": "{{g}} of {{n}} domains updated.",
+    "suggested": "The values below were guessed from your panel domain and are NOT saved yet. Verify them and save."
   }
 }

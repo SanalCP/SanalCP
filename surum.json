@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.2",
-  "duyuru": "SSL düzeltmesi — ÖNEMLİ. Let's Encrypt sertifikası apex'in yanına koşulsuz 'www.' ekleniyordu; ACME siparişi hepsi-ya-hiçbiri olduğu için www DNS kaydı olmayan her domain sertifika alamıyor, panel sessizce self-signed'a düşüyor ve tarayıcı 'güvenli değil' diyordu. Artık www yalnız DNS'te çözülüyorsa ve aynı sunucuya bakıyorsa sertifikaya ekleniyor; alınamadığında panel yeşil 'kuruldu' yerine sebebi yazan bir uyarı gösteriyor. Ayrıca FTP hesabı oluşturmayı tümüyle engelleyen bir sütun taşması düzeltildi (ftp_accounts.password_md5 64→255).",
-  "kritik": true,
+  "son_surum": "0.4.3",
+  "duyuru": "Ortak nameserver desteği. Artık müşterilerinize IP verip A kaydı girdirmek yerine, gerçek hosting firmaları gibi \"domaininizi ns1./ns2.alanadiniz.com adreslerine yönlendirin\" diyebilirsiniz. Ayarlar > Nameserver'dan çifti tanımlayın, \"Mevcut domainleri taşı\" ile eski domainleri güncelleyin. Bayiler kendi markalarıyla nameserver verebilir. Bağlantı Bilgisi ekranına müşterinin kayıt şirketine gireceği nameserver kartı eklendi.",
+  "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
