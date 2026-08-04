@@ -107,7 +107,7 @@ func certGecerliMi(certPath, keyPath string, minGun int, hostlar ...string) bool
 }
 
 // enIyiCertBul: bir domain icin en iyi GECERLI cert'i (key eslesen, minGun gecerli,
-// domain+www kapsayan) acme.sh store + /etc/pki adaylari arasindan secer. Oncelik:
+// APEX'i kapsayan) acme.sh store + /etc/pki adaylari arasindan secer. Oncelik:
 // gercek CA (Let's Encrypt) > self-signed; ayni sinifta daha gec notAfter kazanir.
 // gercekCA doner = secilen cert gercek CA imzali mi (self-signed degil).
 func enIyiCertBul(domain string, minGun int) (certPath, keyPath string, gercekCA bool) {
@@ -126,7 +126,12 @@ func enIyiCertBul(domain string, minGun int) (certPath, keyPath string, gercekCA
 	var bestReal bool
 	var bestNotAfter time.Time
 	for _, a := range adaylar {
-		if !certGecerliMi(a.cert, a.key, minGun, wwwHostlar(domain)...) {
+		// 🔴 YALNIZ apex sorulur, "www." SORULMAZ. Let's Encrypt sertifikasi
+		// artik www ancak DNS'te cozuluyorsa kapsiyor (bkz. leHostlari); burada
+		// www'yi sart kosmak, apex-only olarak alinmis GECERLI bir LE cert'ini
+		// reddeder ve panel her seferinde yeniden cekmeye calisip (rate-limit)
+		// self-signed'a duserek calisan sertifikanin uzerine yazardi.
+		if !certGecerliMi(a.cert, a.key, minGun, domain) {
 			continue
 		}
 		leaf, ok := leafOku(a.cert, a.key)

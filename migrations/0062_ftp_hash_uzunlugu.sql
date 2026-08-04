@@ -1,0 +1,15 @@
+-- ftp_accounts.password_md5 sütunu VARCHAR(64) idi ve artık yetmiyordu.
+--
+-- Sütun adı tarihsel (eskiden md5, 32 karakter). Bugün hesaplar.yescryptHashFTP
+-- yescrypt ($y$j9T$...) üretiyor ve bu hash 73 KARAKTER — yani her FTP hesabı
+-- oluşturma denemesi sessizce şu hatayla düşüyordu:
+--
+--   Error 1406 (22001): Data too long for column 'password_md5' at row 1
+--
+-- Sonuç: domain oluşturma/içe aktarma sırasında FTP hesabı HİÇ yazılamıyordu,
+-- müşteriye FTP erişimi verilemiyordu. Canlıda ftp_accounts tablosu tamamen
+-- boştu ve panel logunda yalnızca bir satır hata görünüyordu.
+--
+-- 255'e genişletiliyor: bcrypt/argon2/yescrypt gibi tüm modern crypt(3)
+-- formatları rahatça sığar, ileride hash şeması değişirse tekrar taşma olmaz.
+ALTER TABLE ftp_accounts MODIFY COLUMN password_md5 VARCHAR(255) NOT NULL;

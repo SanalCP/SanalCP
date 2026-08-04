@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/user"
@@ -715,6 +716,76 @@ func wwwHostlar(domain string) []string {
 	return []string{domain, "www." + domain}
 }
 
+// dnsZamanAsimi: sertifika öncesi ad çözümlemesi için üst sınır. Yavaş/ölü bir
+// resolver SSL kurulumunu asılı bırakmasın.
+const dnsZamanAsimi = 8 * time.Second
+
+func adresleriCoz(ctx context.Context, host string) ([]net.IPAddr, error) {
+	c, iptal := context.WithTimeout(ctx, dnsZamanAsimi)
+	defer iptal()
+	return net.DefaultResolver.LookupIPAddr(c, host)
+}
+
+func ortakAdresVar(a, b []net.IPAddr) bool {
+	for _, x := range a {
+		for _, y := range b {
+			if x.IP.Equal(y.IP) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// leHostlari: Let's Encrypt siparişine girecek host listesini SEÇER.
+//
+// 🔴 NEDEN GEREKLİ: bir ACME siparişi HEPSİ-YA-HİÇBİRİ'dir. İstenen hostlardan
+// tek biri bile doğrulanamazsa sertifikanın TAMAMI alınamaz. wwwHostlar apex'in
+// yanına koşulsuz "www." eklediği için, www kaydı olmayan her domain
+// (paylaşımlı hostingde çoğunluk) Let's Encrypt'i ASLA alamıyordu:
+//
+//	www.<domain>: Invalid status. DNS problem: NXDOMAIN looking up A for www.<domain>
+//
+// Panel bunu fail-safe ile yakalayıp self-signed üretiyordu — site ayakta
+// kalıyordu ama tarayıcı "güvenli değil" diyordu ve kullanıcıya bu bir "SSL
+// kurulmuyor" hatası gibi görünüyordu.
+//
+// Kural: apex ZORUNLU; "www." yalnız (a) çözülüyorsa ve (b) apex ile EN AZ BİR
+// ortak IP'ye sahipse eklenir. Ortak IP koşulu, www'nin başka bir sunucuya/CDN'e
+// baktığı durumda http-01 doğrulamasının bu sunucuda yapılamayacağını yakalar.
+//
+// Dönüş: gönderilecek hostlar, kullanıcıya gösterilecek bilgi notu (boş olabilir)
+// ve apex hiç çözülmüyorsa hata.
+func leHostlari(ctx context.Context, alanAdi string) ([]string, string, error) {
+	adaylar := wwwHostlar(alanAdi)
+	apex := adaylar[0]
+
+	apexAdres, err := adresleriCoz(ctx, apex)
+	if err != nil || len(apexAdres) == 0 {
+		return nil, "", fmt.Errorf(
+			"%s DNS'te çözülemiyor — Let's Encrypt doğrulaması yapılamaz; A kaydını bu sunucuya yönlendirin", apex)
+	}
+
+	hostlar := []string{apex}
+	var not string
+	for _, h := range adaylar[1:] {
+		adres, herr := adresleriCoz(ctx, h)
+		if herr != nil || len(adres) == 0 {
+			not = h + " için DNS kaydı bulunmadığından sertifikaya eklenmedi. " +
+				"Eklemek isterseniz A kaydını oluşturup SSL'i yeniden kurun."
+			log.Printf("ssl: %s atlandi (DNS kaydi yok) — sertifika yalniz %s icin isteniyor", h, apex)
+			continue
+		}
+		if !ortakAdresVar(apexAdres, adres) {
+			not = h + " başka bir sunucuya işaret ettiğinden sertifikaya eklenmedi."
+			log.Printf("ssl: %s atlandi (apex ile ortak IP yok) — sertifika yalniz %s icin isteniyor", h, apex)
+			continue
+		}
+		hostlar = append(hostlar, h)
+	}
+	return hostlar, not, nil
+}
+
 type Result struct {
 	SistemKullanici string
 	WebRoot         string
@@ -1136,9 +1207,9 @@ func EnableSelfSigned(alanAdi, sk, phpSurum, backend string) (certPath, keyPath 
 //     Bu, aynı SAN setiyle tekrar-çekimi (LE 429 rate-limit) HİÇ tetiklemez.
 //  2. FAIL-SAFE: acme çekimi başarısız olursa (429 dahil) → sslFailSafe mevcut/self-
 //     signed cert ile 443'ü KORUR. Hiçbir durumda vhost HTTP-only'ye DÜŞMEZ.
-func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend string) (certPath, keyPath string, real bool, err error) {
+func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend string) (certPath, keyPath string, real bool, not string, err error) {
 	if verr := ValidateDomain(alanAdi); verr != nil {
-		return "", "", false, verr // path güvenliği
+		return "", "", false, "", verr // path güvenliği
 	}
 	phpSurum = normalizePHP(phpSurum)
 
@@ -1158,11 +1229,11 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 	if src, srcKey, gercek := enIyiCertBul(alanAdi, 30); src != "" && gercek {
 		if cp, kp, e := certiPkiyeKur(alanAdi, src, srcKey); e == nil {
 			if e := sslVhostYaz(alanAdi, sk, phpSurum, backend, cp, kp, "letsencrypt"); e != nil {
-				return "", "", false, e
+				return "", "", false, "", e
 			}
 			removeHomeCert(sk, alanAdi)
 			log.Printf("ssl reuse: %s geçerli letsencrypt cert bulundu — yeni LE çekimi ATLANDI (rate-limit korumasi)", alanAdi)
-			return cp, kp, true, nil
+			return cp, kp, true, "", nil
 		}
 	}
 
@@ -1172,11 +1243,23 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 
 	// 🔴 --force KALDIRILDI: acme kendi geçerli cert'i varsa gereksiz yere yeniden
 	// çekmez (rate-limit koruması). Yenileme penceresindeyse yine de yeniler.
+	// 🔴 Hostlar acme.sh'a verilmeden ÖNCE DNS'te doğrulanır. ACME siparişi
+	// hepsi-ya-hiçbiri olduğu için, çözülmeyen tek bir "www." sertifikanın
+	// tamamını düşürürdü (bkz. leHostlari).
+	hostlar, dnsNot, dnsErr := leHostlari(ctx, alanAdi)
+	if dnsErr != nil {
+		// ACME denemesi HİÇ yapılmaz — hem rate-limit yakılmaz hem kullanıcı
+		// belirsiz bir acme çıktısı yerine net bir sebep görür.
+		cp, kp, gercek, e := sslFailSafe(alanAdi, sk, phpSurum, backend, dnsErr.Error())
+		return cp, kp, gercek, dnsErr.Error(), e
+	}
+	not = dnsNot
+
 	args := []string{
 		"--issue",
 		"--webroot", "/var/www/_acme",
 	}
-	for _, h := range wwwHostlar(alanAdi) {
+	for _, h := range hostlar {
 		args = append(args, "-d", h)
 	}
 	args = append(args, "--keylength", "2048")
@@ -1186,7 +1269,8 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 	defer issueCancel()
 	if out, e := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", args...).CombinedOutput(); e != nil {
 		// FAIL-SAFE (teardown YOK): mevcut/self-signed cert ile 443'ü KORU.
-		return sslFailSafe(alanAdi, sk, phpSurum, backend, "acme issue: "+strings.TrimSpace(string(out)))
+		cp, kp, gercek, e := sslFailSafe(alanAdi, sk, phpSurum, backend, "acme issue: "+strings.TrimSpace(string(out)))
+		return cp, kp, gercek, not, e
 	}
 
 	// acme.sh install-cert ile target path'lere yerleştir
@@ -1201,15 +1285,16 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 	installCtx, installCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer installCancel()
 	if out, e := exec.CommandContext(installCtx, "/root/.acme.sh/acme.sh", insArgs...).CombinedOutput(); e != nil {
-		return sslFailSafe(alanAdi, sk, phpSurum, backend, "acme install-cert: "+strings.TrimSpace(string(out)))
+		cp, kp, gercek, e := sslFailSafe(alanAdi, sk, phpSurum, backend, "acme install-cert: "+strings.TrimSpace(string(out)))
+		return cp, kp, gercek, not, e
 	}
 
 	yazCertKurulumu(sslDir, certPath, keyPath) // root-owned, cert 0644 / key 0600, cert_t
 	if e := sslVhostYaz(alanAdi, sk, phpSurum, backend, certPath, keyPath, "letsencrypt"); e != nil {
-		return "", "", false, e
+		return "", "", false, "", e
 	}
 	removeHomeCert(sk, alanAdi)
-	return certPath, keyPath, true, nil
+	return certPath, keyPath, true, not, nil
 }
 
 // DisableSSL: vhost'u SSL'siz hale döndür, cert dosyalarını silme (ileride yeniden açılabilir)
