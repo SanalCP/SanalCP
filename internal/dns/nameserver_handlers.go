@@ -235,37 +235,36 @@ func nsKayitlariEsitle(ctx context.Context, db *sql.DB, domainID int64, alanAdi,
 			dogru = false
 		}
 	}
-	// Vanity artığı A kayıtları
-	var vanityA int
-	_ = db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM dns_records WHERE domain_id=? AND tip='A' AND ad IN ('ns1','ns2')`,
-		domainID).Scan(&vanityA)
 	// SOA primary
 	var soaNS string
 	_ = db.QueryRowContext(ctx,
 		`SELECT primary_ns FROM dns_soa WHERE domain_id=?`, domainID).Scan(&soaNS)
 	soaDogru := strings.EqualFold(strings.TrimSuffix(soaNS, "."), ns1)
 
-	if dogru && vanityA == 0 && soaDogru {
+	// Glue (in-zone A) kayıtları: nameserver bu zone'un içindeyse zorunlu,
+	// dışındaysa artık gereksiz. Kararı GlueEsitle domain başına verir.
+	var ipv4 string
+	_ = db.QueryRowContext(ctx, `SELECT ipv4 FROM domains WHERE id=?`, domainID).Scan(&ipv4)
+	glueDegisti, err := GlueEsitle(ctx, db, domainID, alanAdi, ipv4, ns1, ns2)
+	if err != nil {
+		return false, err
+	}
+
+	if dogru && soaDogru && !glueDegisti {
 		return false, nil
 	}
 
-	if _, err := db.ExecContext(ctx,
-		`DELETE FROM dns_records WHERE domain_id=? AND tip='NS' AND ad='@'`, domainID); err != nil {
-		return false, err
-	}
-	for _, h := range []string{ns1, ns2} {
+	if !dogru {
 		if _, err := db.ExecContext(ctx,
-			`INSERT INTO dns_records(domain_id, ad, tip, deger, ttl, oncelik, aktif)
-			 VALUES(?, '@', 'NS', ?, 86400, 0, 1)`, domainID, h); err != nil {
+			`DELETE FROM dns_records WHERE domain_id=? AND tip='NS' AND ad='@'`, domainID); err != nil {
 			return false, err
 		}
-	}
-	if vanityA > 0 {
-		if _, err := db.ExecContext(ctx,
-			`DELETE FROM dns_records WHERE domain_id=? AND tip='A' AND ad IN ('ns1','ns2')`,
-			domainID); err != nil {
-			return false, err
+		for _, h := range []string{ns1, ns2} {
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO dns_records(domain_id, ad, tip, deger, ttl, oncelik, aktif)
+				 VALUES(?, '@', 'NS', ?, 86400, 0, 1)`, domainID, h); err != nil {
+				return false, err
+			}
 		}
 	}
 	if !soaDogru {

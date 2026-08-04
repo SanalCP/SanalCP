@@ -21,6 +21,7 @@ package dns
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -114,4 +115,97 @@ func OneriliNS(ctx context.Context, db *sql.DB) (ns1, ns2 string, ok bool) {
 func NSAyarli(ctx context.Context, db *sql.DB) bool {
 	_, _, ok := panelNS(ctx, db)
 	return ok
+}
+
+// icZoneEtiketi: ns hostname'i alanAdi zone'unun İÇİNDE mi kalıyor?
+// İçindeyse zone dosyasına yazılacak GÖRELİ etiketi döner ("ns1"), değilse
+// ok=false. ns == zone ise "@" döner (apex; glue apex A kaydıdır, ayrı yönetilir).
+func icZoneEtiketi(ns, alanAdi string) (string, bool) {
+	n := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(ns), "."))
+	z := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(alanAdi), "."))
+	if n == "" || z == "" {
+		return "", false
+	}
+	if n == z {
+		return "@", true
+	}
+	if strings.HasSuffix(n, "."+z) {
+		return strings.TrimSuffix(n, "."+z), true
+	}
+	return "", false
+}
+
+// GlueEsitle: zone'un KENDİ içinde kalan nameserver'lar için A (glue) kaydını
+// oluşturur/günceller; zone dışındaki nameserver'lardan artakalan ns1/ns2 A
+// kayıtlarını siler. Değişiklik olduysa true döner.
+//
+// 🔴 NEDEN GEREKLİ: bir zone'un NS kayıtları O ZONE'UN İÇİNDEKİ bir hosta
+// işaret ediyorsa (in-bailiwick), BIND adres kaydını zone dosyasının İÇİNDE
+// görmek zorundadır — yoksa zone hiç yüklenmez:
+//
+//	zone sanalcp.com/IN: NS 'ns1.sanalcp.com' has no address records (A or AAAA)
+//	zone sanalcp.com/IN: not loaded due to errors.
+//
+// Sağlayıcının KENDİ alan adı (nameserver'ların yaşadığı zone) tam olarak bu
+// durumdadır. Müşteri domainlerinde ise NS zone DIŞINDADIR (ns1.saglayici.com),
+// orada in-zone A kaydı ne gerekir ne de anlamlıdır — bu yüzden karar
+// domain başına, hostname'in zone'a göre konumuna bakılarak verilir.
+func GlueEsitle(ctx context.Context, db *sql.DB, domainID int64, alanAdi, ipv4, ns1, ns2 string) (bool, error) {
+	gerekli := map[string]bool{}
+	for _, ns := range []string{ns1, ns2} {
+		if et, ok := icZoneEtiketi(ns, alanAdi); ok && et != "@" {
+			gerekli[et] = true
+		}
+	}
+
+	degisti := false
+	if ipv4 != "" {
+		for et := range gerekli {
+			var mevcut string
+			err := db.QueryRowContext(ctx,
+				`SELECT deger FROM dns_records WHERE domain_id=? AND ad=? AND tip='A' LIMIT 1`,
+				domainID, et).Scan(&mevcut)
+			switch {
+			case errors.Is(err, sql.ErrNoRows):
+				if _, e := db.ExecContext(ctx,
+					`INSERT INTO dns_records(domain_id, ad, tip, deger, ttl, oncelik, aktif)
+					 VALUES(?,?, 'A', ?, 3600, 0, 1)`, domainID, et, ipv4); e != nil {
+					return degisti, e
+				}
+				degisti = true
+			case err == nil && mevcut != ipv4:
+				if _, e := db.ExecContext(ctx,
+					`UPDATE dns_records SET deger=? WHERE domain_id=? AND ad=? AND tip='A'`,
+					ipv4, domainID, et); e != nil {
+					return degisti, e
+				}
+				degisti = true
+			case err != nil:
+				return degisti, err
+			}
+		}
+	}
+
+	// Artık gerekmeyen ns1/ns2 A kayıtlarını temizle (vanity model artığı).
+	rows, err := db.QueryContext(ctx,
+		`SELECT ad FROM dns_records WHERE domain_id=? AND tip='A' AND ad IN ('ns1','ns2')`, domainID)
+	if err != nil {
+		return degisti, err
+	}
+	var silinecek []string
+	for rows.Next() {
+		var ad string
+		if err := rows.Scan(&ad); err == nil && !gerekli[ad] {
+			silinecek = append(silinecek, ad)
+		}
+	}
+	rows.Close()
+	for _, ad := range silinecek {
+		if _, e := db.ExecContext(ctx,
+			`DELETE FROM dns_records WHERE domain_id=? AND tip='A' AND ad=?`, domainID, ad); e != nil {
+			return degisti, e
+		}
+		degisti = true
+	}
+	return degisti, nil
 }
