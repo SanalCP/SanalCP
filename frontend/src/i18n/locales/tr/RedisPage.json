@@ -14,6 +14,7 @@
   "inactive_card_desc": "Etkinleştirince izole bir ACL kullanıcısı + bağlantı bilgisi oluşturulur.",
   "enabling": "Etkinleştiriliyor…",
   "enable_button": "Redis Cache Etkinleştir",
+  "resource_warning": "Redis, sunucuda paylaşımlı bir önbellek süreci çalıştırır (256MB'a kadar RAM, LRU ile sınırlı). Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun.",
   "connection_info_title": "Bağlantı Bilgisi",
   "close": "Kapat",
   "row_server": "Sunucu",

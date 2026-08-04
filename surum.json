@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.3",
-  "duyuru": "E-posta hizmetini etkinleştirme sayfasına, servisin (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM/CPU tükettiğini belirten bir uyarı eklendi.",
+  "son_surum": "0.5.4",
+  "duyuru": "Redis Cache ve WAF (yüksek paranoya seviyesi) sayfalarına, sunucuda ek RAM/CPU tüketebileceğini belirten uyarılar eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }

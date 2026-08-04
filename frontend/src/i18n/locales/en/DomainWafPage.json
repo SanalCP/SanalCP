@@ -41,7 +41,8 @@
     "hint1": "Low — basic attack signatures. Almost no false positives. (recommended)",
     "hint2": "Medium — more rules. Some legitimate requests may be blocked.",
     "hint3": "High — aggressive. May require tuning (exclusions) per application.",
-    "hint4": "Strict — most aggressive. Only for cases requiring strict auditing."
+    "hint4": "Strict — most aggressive. Only for cases requiring strict auditing.",
+    "high_level_warning": "At levels 3-4, ModSecurity/OWASP CRS runs a large number of rules on every request; this can noticeably increase CPU usage and request latency. Use with caution on resource-limited servers."
   },
   "apply": "Save and Apply",
   "applying": "Applying…",

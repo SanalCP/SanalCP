@@ -41,7 +41,8 @@
     "hint1": "Düşük — temel saldırı imzaları. Neredeyse hiç yanlış-pozitif. (önerilen)",
     "hint2": "Orta — daha fazla kural. Bazı meşru istekler engellenebilir.",
     "hint3": "Yüksek — agresif. Uygulamaya göre ayarlama (exclusion) gerekebilir.",
-    "hint4": "Sıkı — en agresif. Yalnızca sıkı denetim gereken durumlar için."
+    "hint4": "Sıkı — en agresif. Yalnızca sıkı denetim gereken durumlar için.",
+    "high_level_warning": "Seviye 3-4'te ModSecurity/OWASP CRS her istekte çok sayıda kural çalıştırır; bu CPU kullanımını ve istek gecikmesini belirgin biçimde artırabilir. Kaynakları kısıtlı sunucularda dikkatli kullanın."
   },
   "apply": "Kaydet ve Uygula",
   "applying": "Uygulanıyor…",

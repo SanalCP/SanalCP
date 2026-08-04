@@ -175,6 +175,12 @@ export default function DomainWafPage() {
               </select>
               <span className="text-xs text-slate-500 dark:text-slate-400">{paranoyaAciklama(t)[ayar.paranoya]}</span>
             </div>
+            {ayar.paranoya >= 3 && (
+              <div className="flex items-start gap-2 mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <span className="text-amber-500 dark:text-amber-400 text-sm leading-none mt-0.5">⚠</span>
+                <span className="text-xs text-amber-800 dark:text-amber-300">{t('DomainWafPage:paranoia.high_level_warning')}</span>
+              </div>
+            )}
           </Kart>
 
           <div className="flex gap-3 mt-6">
