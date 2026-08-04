@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.8",
-  "duyuru": "Webmail'den e-posta GÖNDERİLEMEMESİ düzeltildi (\"SMTP sorunu (): Kimlik doğrulanamadı\"). Roundcube şablonu eski sürüm seçenek adlarını (smtp_server) kullanıyordu; Roundcube 1.7 bunları yok sayıp TLS'siz bağlanıyor, Postfix ise submission portunda AUTH'u yalnız STARTTLS sonrası sunduğu için kimlik doğrulama hiç başlamıyordu. Mevcut kurulumlar sanalcp-update ile otomatik onarılır.",
+  "son_surum": "0.4.9",
+  "duyuru": "0.4.8'deki webmail SMTP onarımı devreye girmiyordu: onarım sanalcp-update içindeydi, ancak güncelleyici kendini de değiştirdiği için çalışan kopya hep ESKİ script oluyor ve onarım bir sonraki güncellemeye kalıyordu. Onarım artık panelin açılışında çalışıyor; bu sürüme geçtiğinizde webmail'den e-posta gönderimi otomatik düzelir.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
