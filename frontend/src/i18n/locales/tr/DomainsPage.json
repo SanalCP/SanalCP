@@ -80,7 +80,9 @@
     "clipboard_prompt": "Kopyalamak için Ctrl+C, sonra Enter:",
     "copy_all": "📋 Kopyala",
     "save_txt": "💾 TXT Olarak Kaydet",
-    "copied": "✓ Kopyalandı"
+    "copied": "✓ Kopyalandı",
+    "nameservers": "NAMESERVER (ALAN ADI YÖNLENDİRME)",
+    "ns_note": "Alan adının kayıt şirketinde nameserver'ları bu değerlerle değiştirin. Yayılma 1–24 saat sürer; sonrasında tüm DNS kayıtları panelden yönetilir."
   },
   "delete_modal": {
     "title": "⚠ Toplu Domain Silme",
