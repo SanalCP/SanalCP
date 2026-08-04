@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.0",
-  "duyuru": "Webmail yavaşlığı düzeltildi ve bir güvenlik açığı kapatıldı. Dovecot'un stok yapılandırması PAM passdb'sini SQL'den önce yüklüyordu; posta kutuları sanal olduğu için her giriş önce PAM'a takılıyor ve pam_unix gecikmesi yüzünden ~1.4-2.1 saniye sürüyordu. Roundcube her istekte yeni IMAP oturumu açtığından bu gecikme her tıklamada tekrarlanıyordu. Aynı yapılandırma IMAP üzerinden root dahil SİSTEM hesaplarına parola denenmesine de izin veriyordu. PAM passdb kapatıldı, kimlik doğrulama önbelleği açıldı. Panel açılışta mevcut kurulumları otomatik onarır.",
-  "kritik": true,
+  "son_surum": "0.5.1",
+  "duyuru": "Müşteriler artık webmail'e KENDİ alan adlarından girebiliyor: https://musterim.com/webmail/ — sunucu IP'si veya panel adresi gerekmiyor. Roundcube her domainin kendi vhost'una bağlanır; ek DNS kaydı veya sertifika gerekmez, domainin mevcut sertifikası bu yolu zaten kapsar. Panel açılışta mevcut domainlerin vhost'larını otomatik günceller. E-posta sayfasındaki webmail bağlantısı da artık müşterinin kendi alan adını gösteriyor.",
+  "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
