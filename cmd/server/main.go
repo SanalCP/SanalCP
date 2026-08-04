@@ -157,6 +157,9 @@ func main() {
 	backups.Init(secretBox) // backup_destinations.parola şifreleme kutusu
 	backups.HealLegacyPlaintextDestinationPasswords(context.Background(), d)
 
+	githubpkg.Init(secretBox) // github_connections.pat şifreleme kutusu
+	githubpkg.HealLegacyPlaintextPATs(context.Background(), d)
+
 	ipv4 := detectIPv4()
 	log.Printf("server ipv4: %s", ipv4)
 

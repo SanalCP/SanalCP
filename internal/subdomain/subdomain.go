@@ -15,6 +15,7 @@ import (
 
 	"sanalcp/internal/dns"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
@@ -128,14 +129,24 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "PHP sürümü sunucuda kurulu değil: "+phpSurum)
 		return
 	}
-	docroot := docrootOf(sk, tamAd)
-	if err := os.MkdirAll(docroot, 0o755); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "docroot oluşturulamadı")
+	// 🔴 GÜVENLİK: docroot tenant'ın yazabildiği ~/subdomains altındadır; yol
+	// tabanlı os.MkdirAll/os.WriteFile bir symlink'i izleyip root olarak jail
+	// DIŞINA dizin açıp dosya yazardı. jailpath tüm bileşenleri
+	// openat2(RESOLVE_BENEATH|NO_SYMLINKS) ile symlink-siz çözer.
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
+	docrootRel := "subdomains/" + tamAd
+	if err := jailpath.DizinOlustur(home, docrootRel, sk); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "docroot güvenli değil (symlink?): "+err.Error())
+		return
+	}
+	docroot := docrootOf(sk, tamAd)
 	// başlangıç sayfası
 	if _, e := os.Stat(filepath.Join(docroot, "index.html")); e != nil {
-		_ = os.WriteFile(filepath.Join(docroot, "index.html"),
+		_ = jailpath.DosyaYaz(home, docrootRel+"/index.html", sk,
 			[]byte("<!doctype html><meta charset=utf-8><title>"+tamAd+"</title>"+
 				"<body style='font-family:sans-serif;text-align:center;padding:60px'>"+
 				"<h1>"+tamAd+"</h1><p>Subdomain hazır. Dosyalarınızı bu dizine yükleyin.</p></body>"), 0o644)

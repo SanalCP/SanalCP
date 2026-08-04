@@ -15,9 +15,9 @@ import (
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/sys/unix"
 )
 
 type restoreRequest struct {
@@ -100,7 +100,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 	result := ""
 	switch req.Scope {
 	case "full":
-		if err := restoreTree(extractedHome, filepath.Join("/home", sk), sk, true); err != nil {
+		if err := restoreTree(extractedHome, "", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -112,14 +112,14 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 		result = fmt.Sprintf("tüm hesap geri yüklendi; %d veritabanı içe aktarıldı", imported)
 	case "files":
 		if err := restoreTree(filepath.Join(extractedHome, "public_html"),
-			filepath.Join("/home", sk, "public_html"), sk, true); err != nil {
+			"public_html", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		result = "web dosyaları geri yüklendi"
 	case "email":
 		if err := restoreTree(filepath.Join(extractedHome, "mail"),
-			filepath.Join("/home", sk, "mail"), sk, true); err != nil {
+			"mail", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -130,8 +130,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if err := restoreSingle(filepath.Join(extractedHome, rel),
-			filepath.Join("/home", sk, rel), sk); err != nil {
+		if err := restoreSingle(filepath.Join(extractedHome, rel), rel, sk); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -172,27 +171,67 @@ func safeRestoreRelativePath(value string) (string, error) {
 	return clean, nil
 }
 
-func restoreTree(source, target, sk string, deleteMissing bool) error {
+// restoreTree: yedekteki bir alt ağacı tenant home'undaki hedefe geri yükler.
+// rel, /home/<sk>'ya GÖRELİ hedeftir ("" = home'un kendisi).
+//
+// 🔴 GÜVENLİK (iki katman): hedef yol root olarak çözülürse tenant onu jail
+// DIŞINA bir symlink'le değiştirip (ör. `ln -s /etc ~/public_html`) rsync'i
+// root olarak /etc'ye yazdırabilir ve `--delete` ile /etc'yi silebilirdi —
+// /etc/cron.d'ye dosya yazmak doğrudan root kod çalıştırma demektir.
+// Aynı saldırı sınıfı restoreSingle'da O_NOFOLLOW ile zaten kapatılmıştı.
+//
+//  1. jailpath.DizinOlustur/DizinDogrula: hedefin hiçbir bileşeni symlink
+//     olamaz, home dışına çıkamaz (openat2 RESOLVE_BENEATH|NO_SYMLINKS).
+//  2. rsync TENANT KİMLİĞİNDE çalışır: doğrulama ile rsync arasındaki TOCTOU
+//     penceresinde hedef yine takas edilse bile DAC jail dışına yazmayı
+//     engeller (bkz. internal/transfers'daki aynı desen).
+func restoreTree(source, rel, sk string, deleteMissing bool) error {
 	if info, err := os.Stat(source); err != nil || !info.IsDir() {
 		return fmt.Errorf("seçilen bölüm bu yedekte bulunamadı")
 	}
-	if err := os.MkdirAll(target, 0o750); err != nil {
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
 		return err
 	}
+	if err := jailpath.DizinOlustur(home, rel, sk); err != nil {
+		return fmt.Errorf("hedef dizin güvenli değil (symlink?): %w", err)
+	}
+	target := filepath.Join(home, rel)
+
 	args := []string{"-a"}
 	if deleteMissing {
 		args = append(args, "--delete")
 	}
 	args = append(args, source+"/", target+"/")
-	if out, err := exec.Command("rsync", args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("rsync: %s: %w", strings.TrimSpace(string(out)), err)
+	if out, err := tenantKomut(sk, "rsync", args...); err != nil {
+		return fmt.Errorf("rsync: %s: %w", strings.TrimSpace(out), err)
 	}
 	_, _ = exec.Command("chown", "-R", sk+":"+sk, target).CombinedOutput()
 	_, _ = exec.Command("restorecon", "-R", target).CombinedOutput()
 	return nil
 }
 
-func restoreSingle(source, target, sk string) error {
+// tenantKomut: komutu tenant kullanıcısı kimliğinde, SHELL OLMADAN (argv)
+// çalıştırır. Panel ortam değişkenleri verilmez.
+func tenantKomut(sk, ad string, args ...string) (string, error) {
+	full := append([]string{"-u", sk, "--", ad}, args...)
+	cmd := exec.Command("runuser", full...)
+	cmd.Env = []string{
+		"HOME=" + filepath.Join(jailpath.HomeKok, sk),
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// restoreSingle: tek bir dosyayı geri yükler. rel, /home/<sk>'ya göreli hedeftir.
+//
+// 🔴 GÜVENLİK: eskiden yalnız SON bileşen O_NOFOLLOW ile korunuyordu; ARA
+// dizinler symlink olabildiği için (`~/a` → /etc iken rel="a/b.conf")
+// os.MkdirAll symlink'i izleyip jail dışına dizin açıyor, dosya da oraya
+// yazılıyordu. Artık tüm bileşenler openat2(RESOLVE_BENEATH|NO_SYMLINKS) ile
+// çözülüyor — hiçbir bileşen symlink olamaz.
+func restoreSingle(source, rel, sk string) error {
 	info, err := os.Lstat(source)
 	if err != nil {
 		return fmt.Errorf("seçilen dosya yedekte bulunamadı")
@@ -200,30 +239,28 @@ func restoreSingle(source, target, sk string) error {
 	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 		return fmt.Errorf("yalnız normal bir dosya geri yüklenebilir")
 	}
-	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
 		return err
+	}
+	if dir := filepath.Dir(rel); dir != "." && dir != "/" {
+		if err := jailpath.DizinOlustur(home, dir, sk); err != nil {
+			return fmt.Errorf("hedef dizin güvenli değil (symlink?): %w", err)
+		}
 	}
 	in, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	// O_NOFOLLOW: target zaten bir symlink ise (kullanıcı home'u içine önceden
-	// yerleştirilmiş, jail-dışı bir dosyayı işaret eden) açmayı reddeder —
-	// aksi halde root olarak çalışan bu işlem symlink'i izleyip jail dışına yazabilirdi.
-	out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|unix.O_NOFOLLOW, info.Mode().Perm())
+	veri, err := io.ReadAll(in)
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.Copy(out, in)
-	closeErr := out.Close()
-	if copyErr != nil {
-		return copyErr
+	if err := jailpath.DosyaYaz(home, rel, sk, veri, uint32(info.Mode().Perm())); err != nil {
+		return fmt.Errorf("hedef dosya güvenli değil (symlink?): %w", err)
 	}
-	if closeErr != nil {
-		return closeErr
-	}
-	_, _ = exec.Command("chown", sk+":"+sk, target).CombinedOutput()
+	target := filepath.Join(home, rel)
 	_, _ = exec.Command("restorecon", target).CombinedOutput()
 	return nil
 }

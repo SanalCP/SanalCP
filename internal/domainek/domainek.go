@@ -39,6 +39,7 @@ import (
 	"sanalcp/internal/dns"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/kota"
 	"sanalcp/internal/provisioner"
 
@@ -176,13 +177,22 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 
 	docroot := hb.webRoot
 	if !req.Parked {
-		docroot = docrootOf(hb.sk, alanAdi)
-		if err := os.MkdirAll(docroot, 0o755); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "docroot oluşturulamadı")
+		// 🔴 GÜVENLİK: docroot tenant'ın yazabildiği ~/domains altındadır; yol
+		// tabanlı os.MkdirAll/os.WriteFile bir symlink'i izleyip root olarak
+		// jail DIŞINA dizin açıp dosya yazardı (bkz. internal/jailpath).
+		home, err := jailpath.TenantHome(hb.sk)
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 			return
 		}
+		docrootRel := "domains/" + alanAdi
+		if err := jailpath.DizinOlustur(home, docrootRel, hb.sk); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "docroot güvenli değil (symlink?): "+err.Error())
+			return
+		}
+		docroot = docrootOf(hb.sk, alanAdi)
 		if _, e := os.Stat(filepath.Join(docroot, "index.html")); e != nil {
-			_ = os.WriteFile(filepath.Join(docroot, "index.html"),
+			_ = jailpath.DosyaYaz(home, docrootRel+"/index.html", hb.sk,
 				[]byte("<!doctype html><meta charset=utf-8><title>"+alanAdi+"</title>"+
 					"<body style='font-family:sans-serif;text-align:center;padding:60px'>"+
 					"<h1>"+alanAdi+"</h1><p>Ek alan adı hazır. Dosyalarınızı bu dizine yükleyin.</p></body>"), 0o644)

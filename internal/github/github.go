@@ -12,11 +12,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/secretcrypt"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -171,12 +173,17 @@ func (h *Handlers) Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	encPat, err := patSifrele(req.Token)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "PAT şifreleme: "+err.Error())
+		return
+	}
 	_, err = h.DB.ExecContext(r.Context(),
 		`INSERT INTO github_connections(domain_id, pat, login, ad_soyad, avatar_url)
 		 VALUES(?,?,?,?,?)
 		 ON DUPLICATE KEY UPDATE pat=VALUES(pat), login=VALUES(login),
 		   ad_soyad=VALUES(ad_soyad), avatar_url=VALUES(avatar_url)`,
-		id, req.Token, u.Login, u.Name, u.AvatarURL)
+		id, encPat, u.Login, u.Name, u.AvatarURL)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB: "+err.Error())
 		return
@@ -226,6 +233,7 @@ func (h *Handlers) Disconnect(w http.ResponseWriter, r *http.Request) {
 	_ = h.DB.QueryRowContext(r.Context(),
 		`SELECT pat, secili_repo, webhook_id FROM github_connections WHERE domain_id=?`, id).
 		Scan(&pat, &repo, &hookID)
+	pat = patCoz(pat)
 	if pat != "" && repo != "" && hookID > 0 {
 		_, _, _ = ghCall(r.Context(), "DELETE", fmt.Sprintf("/repos/%s/hooks/%d", repo, hookID), pat, nil)
 	}
@@ -425,10 +433,94 @@ func (h *Handlers) readConnection(ctx context.Context, domainID int64) (*Connect
 	return c, nil
 }
 
+// tokenOf: domainin GitHub PAT'ini çözülmüş olarak döner ("" = yok/çözülemedi).
 func (h *Handlers) tokenOf(ctx context.Context, domainID int64) string {
 	var pat string
 	_ = h.DB.QueryRowContext(ctx, `SELECT pat FROM github_connections WHERE domain_id=?`, domainID).Scan(&pat)
-	return pat
+	return patCoz(pat)
+}
+
+// box: github_connections.pat sütununu şifreler. main.go'da Init() ile bir kez
+// ayarlanır (hesaplar/backups paketleriyle aynı paket-seviyesi singleton deseni).
+var box *secretcrypt.Box
+
+// Init: panelin sır şifreleme kutusunu ayarlar.
+func Init(b *secretcrypt.Box) { box = b }
+
+// patSifrele: PAT'i saklamaya hazır hâle getirir. GitHub PAT'i depo yazma
+// yetkisi taşıyan canlı bir kimlik bilgisidir; DB dump'ı sızarsa (yedek
+// çalınması, yanlış izinli mysqldump) düz metin olarak ifşa olmamalı —
+// db_accounts.db_pass_plain ve backup_destinations.parola ile aynı desen.
+func patSifrele(ham string) (string, error) {
+	if ham == "" || box == nil {
+		return ham, nil
+	}
+	return box.Encrypt(ham)
+}
+
+// patCoz: saklanan değeri çözer. Göç öncesi (HealLegacyPlaintextPATs
+// çalışmadan önce) satırlar düz metin olabilir — o hâlde olduğu gibi döner ki
+// bu pencerede GitHub entegrasyonu kırılmasın.
+func patCoz(saklanan string) string {
+	if saklanan == "" || !secretcrypt.IsEncrypted(saklanan) {
+		return saklanan
+	}
+	if box == nil {
+		return ""
+	}
+	ham, err := box.Decrypt(saklanan)
+	if err != nil {
+		return ""
+	}
+	return ham
+}
+
+// HealLegacyPlaintextPATs: bu göç öncesi kaydedilmiş düz-metin PAT satırlarını
+// yerinde şifreler. Idempotent — zaten şifreli (v1: önekli) satırları atlar;
+// panel her açılışta çağırır, göçecek satır yoksa no-op'tur.
+func HealLegacyPlaintextPATs(ctx context.Context, db *sql.DB) {
+	if box == nil {
+		log.Printf("github PAT göçü: şifreleme kutusu ayarlanmamış (github.Init çağrılmadı), atlanıyor")
+		return
+	}
+	rows, err := db.QueryContext(ctx, `SELECT id, pat FROM github_connections`)
+	if err != nil {
+		log.Printf("github PAT göçü okunamadı: %v", err)
+		return
+	}
+	type kayit struct {
+		id  int64
+		ham string
+	}
+	var eski []kayit
+	for rows.Next() {
+		var k kayit
+		if err := rows.Scan(&k.id, &k.ham); err != nil {
+			continue
+		}
+		if k.ham != "" && !secretcrypt.IsEncrypted(k.ham) {
+			eski = append(eski, k)
+		}
+	}
+	rows.Close()
+	if len(eski) == 0 {
+		return
+	}
+	gocen := 0
+	for _, k := range eski {
+		enc, err := box.Encrypt(k.ham)
+		if err != nil {
+			log.Printf("github PAT göçü (id=%d) şifreleme hatası: %v", k.id, err)
+			continue
+		}
+		if _, err := db.ExecContext(ctx,
+			`UPDATE github_connections SET pat=? WHERE id=?`, enc, k.id); err != nil {
+			log.Printf("github PAT göçü (id=%d) yazılamadı: %v", k.id, err)
+			continue
+		}
+		gocen++
+	}
+	log.Printf("github PAT göçü: %d/%d PAT şifrelendi", gocen, len(eski))
 }
 
 func randomHex(n int) string {

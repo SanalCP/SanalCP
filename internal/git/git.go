@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -164,15 +165,22 @@ func gecerliRepoURL(u string) bool {
 	return strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "git@") || strings.HasPrefix(u, "ssh://")
 }
 
-// temizleDizinIcerigi: dizin icerigini SHELL OLMADAN sil (dotfile dahil)
-func temizleDizinIcerigi(dst string) {
-	entries, err := os.ReadDir(dst)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		_ = os.RemoveAll(filepath.Join(dst, e.Name()))
-	}
+// temizleDizinIcerigi: hedef dizinin icerigini SHELL OLMADAN sil (dotfile dahil).
+//
+// 🔴 GÜVENLİK: eskiden os.ReadDir + os.RemoveAll ile YOL üzerinden çalışıyordu.
+// target_dir tamamen tenant kontrolündedir (POST /domains/{id}/git) ve tenant
+// kendi home'unda o adı jail DIŞINA bir symlink'e çevirebilir
+// (`ln -s /etc ~/pwn` + target_dir="pwn"). Panel root çalıştığı için ReadDir
+// symlink'i izleyip /etc'yi listeliyor, RemoveAll da içindeki her girdiyi
+// symlink üzerinden ROOT OLARAK SİLİYORDU — tek istekle sunucunun /etc'si
+// yok edilebiliyordu.
+//
+// Artık jailpath.IceriginiSil kullanılıyor: tüm çözümleme
+// openat2(RESOLVE_BENEATH|RESOLVE_NO_SYMLINKS) + fd-göreli unlinkat ile
+// yapılır; hiçbir bileşen symlink olamaz, home dışına çıkılamaz ve exec
+// olmadığı için TOCTOU penceresi de yoktur.
+func temizleDizinIcerigi(home, rel string) error {
+	return jailpath.IceriginiSil(home, rel)
 }
 
 // runAsUserArgs: komutu sk kullanicisi olarak SHELL OLMADAN (argv) calistir; panel env verilmez
@@ -209,11 +217,20 @@ func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha s
 	if !gecerliRepoURL(repoURL) {
 		return "", "", errors.New("geçersiz repo URL")
 	}
-	home := "/home/" + sk
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		return "", "", err
+	}
+	// Hedefi symlink-güvenli oluştur: bileşenlerden biri symlink ise (tenant
+	// jail dışına kaçmaya çalışıyorsa) burada reddedilir.
+	if err := jailpath.DizinOlustur(home, targetDir, sk); err != nil {
+		return "", "", fmt.Errorf("hedef dizin güvenli değil (symlink?): %w", err)
+	}
 	dst := filepath.Join(home, targetDir)
 	// hedef temizle (ama public_html varsa içerik kaybolur — uyarı UI'da)
-	temizleDizinIcerigi(dst)
-	_ = os.MkdirAll(dst, 0755)
+	if err := temizleDizinIcerigi(home, targetDir); err != nil {
+		return "", "", fmt.Errorf("hedef dizin temizlenemedi: %w", err)
+	}
 	_, _ = exec.Command("chown", sk+":"+sk, dst).CombinedOutput()
 
 	out, err := runAsUserArgs(ctx, sk, home, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
@@ -235,7 +252,16 @@ func gitPull(ctx context.Context, sk, targetDir, branch string) (sha string, log
 	if !gecerliBranch(branch) {
 		return "", "", errors.New("geçersiz branch adı")
 	}
-	home := "/home/" + sk
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		return "", "", err
+	}
+	// Git komutları zaten tenant kimliğinde çalışıyor (runAsUserArgs → DAC),
+	// ama hedefin symlink'le jail dışına taşınmadığını burada da doğrula:
+	// kullanıcı net bir hata görsün, sessizce beklenmedik bir dizinde çalışmasın.
+	if err := jailpath.DizinDogrula(home, targetDir); err != nil {
+		return "", "", fmt.Errorf("hedef dizin güvenli değil (symlink?): %w", err)
+	}
 	dst := filepath.Join(home, targetDir)
 	if _, err := os.Stat(filepath.Join(dst, ".git")); err != nil {
 		return "", "", errors.New("hedef dizin git deposu değil; önce 'klonla' kullanın")

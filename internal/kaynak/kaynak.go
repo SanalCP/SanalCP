@@ -53,18 +53,7 @@ type Handlers struct {
 }
 
 // duMB: home dizinin disk kullanimi MB cinsinden
-func duMB(home string) int64 {
-	out, err := exec.Command("du", "-sm", home).CombinedOutput()
-	if err != nil {
-		return 0
-	}
-	parts := strings.Fields(string(out))
-	if len(parts) == 0 {
-		return 0
-	}
-	n, _ := strconv.ParseInt(parts[0], 10, 64)
-	return n
-}
+// duMB: bkz. dusize.go — önbellekli + zaman aşımlı ölçüm.
 
 // dbTotalMB: panel kullanicisinin db'lerinin toplam boyutu MB
 func dbTotalMB(ctx context.Context, db *sql.DB, dbUsers []string) int64 {

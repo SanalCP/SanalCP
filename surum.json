@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.3.9",
-  "duyuru": "Yedek hedefleri (FTP/SFTP/S3) güvenlik sıkılaştırması: SSRF koruması, parola şifreleme, SFTP host key doğrulaması, komut satırından parola sızıntısının giderilmesi.",
+  "son_surum": "0.4.0",
+  "duyuru": "KRİTİK güvenlik güncellemesi — hemen kurun. Yedek geri yükleme ve Git deploy yollarında, hosting müşterisinin ev dizinine symlink koyarak panelin root yetkisiyle jail dışına dosya yazmasına/silmesine yol açabilen iki açık kapatıldı. Ayrıca GitHub PAT'leri artık şifreli saklanıyor ve disk ölçümü (du) zaman aşımlı + önbellekli hale getirildi.",
   "kritik": true,
   "yayin_tarihi": "2026-08-04"
 }

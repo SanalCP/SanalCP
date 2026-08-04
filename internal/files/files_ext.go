@@ -5,6 +5,7 @@ package files
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
@@ -501,7 +503,11 @@ func (h *Handlers) BoyutHesapla(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	out, err := exec.Command("du", "-sb", abs).CombinedOutput()
+	// du tüm alt ağacı gezer; çok dosyalı bir dizinde istek işleyen goroutine'i
+	// süresiz bloklamasın diye ÜST SINIRLI çalıştırılır.
+	duCtx, duCancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer duCancel()
+	out, err := exec.CommandContext(duCtx, "du", "-sb", abs).CombinedOutput()
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "du: "+strings.TrimSpace(string(out)))
 		return

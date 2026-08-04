@@ -1,12 +1,14 @@
 package domains
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 
@@ -38,7 +40,10 @@ func (h *Handlers) DiskHesapla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := "/home/" + sk
-	out, err := exec.Command("du", "-sb", path).CombinedOutput()
+	// du tüm ev dizinini gezer; ÜST SINIRLI çalıştırılır (bkz. internal/kaynak/dusize.go).
+	duCtx, duCancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer duCancel()
+	out, err := exec.CommandContext(duCtx, "du", "-sb", path).CombinedOutput()
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "du: "+strings.TrimSpace(string(out)))
 		return
