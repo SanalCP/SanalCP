@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.1",
-  "duyuru": "Genel içe aktarma: artık hangi panelden gelirse gelsin bir site arşivini (zip/tar.gz/rar) ve SQL yedeğini doğrudan bir domaine aktarabilirsiniz. Arşivin kapsayıcı kök klasörü otomatik tespit edilip atlanır, WordPress/Laravel yapılandırması yeni veritabanı bilgileriyle güncellenir. GÜVENLİK: SQL dump'ları artık MySQL root'una değil hedef veritabanının kendi düşük yetkili kullanıcısına uygulanıyor — dump içine gizlenmiş USE mysql / GRANT ifadeleri artık etkisiz.",
+  "son_surum": "0.4.2",
+  "duyuru": "SSL düzeltmesi — ÖNEMLİ. Let's Encrypt sertifikası apex'in yanına koşulsuz 'www.' ekleniyordu; ACME siparişi hepsi-ya-hiçbiri olduğu için www DNS kaydı olmayan her domain sertifika alamıyor, panel sessizce self-signed'a düşüyor ve tarayıcı 'güvenli değil' diyordu. Artık www yalnız DNS'te çözülüyorsa ve aynı sunucuya bakıyorsa sertifikaya ekleniyor; alınamadığında panel yeşil 'kuruldu' yerine sebebi yazan bir uyarı gösteriyor. Ayrıca FTP hesabı oluşturmayı tümüyle engelleyen bir sütun taşması düzeltildi (ftp_accounts.password_md5 64→255).",
   "kritik": true,
   "yayin_tarihi": "2026-08-04"
 }

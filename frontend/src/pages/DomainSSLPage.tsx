@@ -26,6 +26,10 @@ export default function DomainSSLPage() {
   const [wwwIsleniyor, setWwwIsleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
+  // uyari: islem teknik olarak tamamlandi ama SONUC istenen degil (or. Let's
+  // Encrypt alinamadi, self-signed'a dusuldu). Yesil "kuruldu" gostermek
+  // kullaniciyi yaniltiyordu — tarayici uyari verirken panel basarili diyordu.
+  const [uyari, setUyari] = useState<string | null>(null)
 
   function yukle() {
     if (!id) return
@@ -37,7 +41,7 @@ export default function DomainSSLPage() {
 
   async function wwwYonlendirDegistir() {
     const hedef = !wwwDurum?.aktif
-    setWwwIsleniyor(true); setHata(null); setBasari(null)
+    setWwwIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
       await api.put(`/domains/${id}/www-yonlendir`, { aktif: hedef })
       setWwwDurum({ aktif: hedef })
@@ -51,10 +55,17 @@ export default function DomainSSLPage() {
 
   async function issue(tip: 'self-signed' | 'letsencrypt') {
     if (tip === 'letsencrypt' && !confirm(t('DomainSSLPage:confirm_letsencrypt'))) return
-    setIsleniyor(true); setHata(null); setBasari(null)
+    setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
       const { data } = await api.post(`/domains/${id}/ssl/issue`, { tip }, { timeout: 120_000 })
-      setBasari(t('DomainSSLPage:issued', { tip, bitis: data.bitis }))
+      // Backend istenen tip ile FIILEN kurulan tipi ayri raporlar; uyari varsa
+      // basari degil uyari gosterilir.
+      if (data.uyari) {
+        setUyari(data.uyari)
+      } else {
+        setBasari(t('DomainSSLPage:issued', { tip: data.tip || tip, bitis: data.bitis })
+          + (data.bilgi ? ' ' + data.bilgi : ''))
+      }
       yukle()
     } catch (e) {
       setHata(apiHata(e, t('DomainSSLPage:issue_failed')))
@@ -65,7 +76,7 @@ export default function DomainSSLPage() {
 
   async function disable() {
     if (!confirm(t('DomainSSLPage:confirm_disable'))) return
-    setIsleniyor(true); setHata(null); setBasari(null)
+    setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
       await api.delete(`/domains/${id}/ssl`)
       setBasari(t('DomainSSLPage:disabled'))
@@ -97,6 +108,7 @@ export default function DomainSSLPage() {
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+      {uyari && <div className="mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-300">{uyari}</div>}
 
       {/* Durum kartı */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 mb-5">

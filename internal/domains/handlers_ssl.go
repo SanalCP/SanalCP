@@ -87,12 +87,15 @@ func (h *Handlers) SSLIssue(w http.ResponseWriter, r *http.Request) {
 	// "self-signed" kalir — panel kendi DB'sine ASLA yalan soylemez (canlida
 	// gozlemlenen "kuruldu gosteriyor ama kurmuyor" hatasinin kok nedeni buydu).
 	gercekTip := req.Tip
+	// sslNot: LE akışının kullanıcıya iletilecek açıklaması (ör. "www DNS'te yok,
+	// sertifikaya eklenmedi" veya apex hiç çözülmüyorsa sebebi).
+	var sslNot string
 	switch req.Tip {
 	case "self-signed":
 		certYol, keyYol, err = provisioner.EnableSelfSigned(alanAdi, sk, phpSurum, backend)
 	case "letsencrypt":
 		var gercek bool
-		certYol, keyYol, gercek, err = provisioner.EnableLetsEncrypt(r.Context(), alanAdi, sk, phpSurum, backend)
+		certYol, keyYol, gercek, sslNot, err = provisioner.EnableLetsEncrypt(r.Context(), alanAdi, sk, phpSurum, backend)
 		if !gercek {
 			gercekTip = "self-signed"
 		}
@@ -129,8 +132,21 @@ func (h *Handlers) SSLIssue(w http.ResponseWriter, r *http.Request) {
 		"key":   keyYol,
 		"bitis": bitis.Format("2006-01-02"),
 	}
+	// Kullanıcıya NE OLDUĞUNU söyle. Eskiden yalnız genel bir "DNS işaret
+	// etmiyor olabilir" metni vardı; gerçek sebep (hangi host, neden) panelde
+	// hiç görünmediği için kullanıcı "SSL kuruldu ama tarayıcı uyarı veriyor"
+	// durumunda kalıyordu.
 	if req.Tip == "letsencrypt" && gercekTip != "letsencrypt" {
-		resp["uyari"] = "Let's Encrypt sertifikası alınamadı (domain DNS'i sunucuya işaret etmiyor olabilir); site geçici olarak self-signed sertifika ile korunuyor, DNS düzelince tekrar deneyin."
+		uyari := "Let's Encrypt sertifikası alınamadı; site geçici olarak self-signed sertifika ile korunuyor (tarayıcı uyarı gösterir). "
+		if sslNot != "" {
+			uyari += sslNot
+		} else {
+			uyari += "Domain DNS'i bu sunucuya işaret etmiyor olabilir; DNS düzelince tekrar deneyin."
+		}
+		resp["uyari"] = uyari
+	} else if sslNot != "" {
+		// LE BAŞARILI ama sertifikaya bir host eklenemedi (ör. www kaydı yok).
+		resp["bilgi"] = sslNot
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
