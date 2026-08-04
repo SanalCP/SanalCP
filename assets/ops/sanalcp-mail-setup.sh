@@ -105,6 +105,12 @@ sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tm
 chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
 chmod 640 /etc/dovecot/dovecot-sql.conf.ext
 cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+# Stok PAM passdb'sini kapat: kutular sanaldır (SQL passdb). Açık kalırsa her
+# girişte önce PAM denenir, kullanıcı sistemde olmadığı için pam_unix gecikme
+# uygular (ölçüldü: ~1.4-2.1 sn/giriş) ve IMAP'ten sistem hesaplarına parola
+# denenebilir hâle gelir. Idempotent: yalnız aktif satırı yorumlar.
+sed -i 's|^!include auth-system\.conf\.ext[[:space:]]*$|#!include auth-system.conf.ext  # SanalCP: kutular sanal (SQL passdb)|' \
+  /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true
 log "dovecot-sql.conf.ext + conf.d/10-sanalcp-mail.conf"
 
 echo "════ OpenDKIM ════"

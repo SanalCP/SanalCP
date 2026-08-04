@@ -6,6 +6,13 @@ protocols = imap lmtp
 
 mail_location = maildir:~/
 
+# 🔴 Stok 10-auth.conf'taki `!include auth-system.conf.ext` KAPATILMALIDIR
+# (kurulum script'i ve panel açılışındaki HealDovecotAuth bunu yapar).
+# Dovecot conf.d'yi alfabetik yükler; stok dosya bundan ÖNCE gelip
+# `passdb { driver = pam }` kaydeder. passdb'ler sırayla denendiği için her
+# sanal kutu girişi önce PAM'a sorulur, kullanıcı sistemde olmadığından
+# pam_unix gecikme uygular → giriş ~2 saniye sürer. Ayrıca PAM açıkken IMAP
+# üzerinden `root` dahil sistem hesaplarına parola denenebilir.
 passdb {
   driver = sql
   args = /etc/dovecot/dovecot-sql.conf.ext
@@ -14,6 +21,12 @@ userdb {
   driver = sql
   args = /etc/dovecot/dovecot-sql.conf.ext
 }
+
+# Kimlik doğrulama önbelleği: Roundcube her HTTP isteğinde YENİ IMAP oturumu
+# açar; önbellek olmadan her istek yeniden passdb sorgusu demektir.
+auth_cache_size = 10M
+auth_cache_ttl = 1 hours
+auth_cache_negative_ttl = 1 mins
 
 service auth {
   unix_listener /var/spool/postfix/private/auth {
