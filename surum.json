@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.7",
-  "duyuru": "E-posta sayfasına Webmail (Roundcube) erişim kartı eklendi — adres panelin kendi origin'inde /webmail/ altındadır, mail.<domain> DEĞİLDİR (o kayıt MX hedefidir, web arayüzü sunmaz). Ayrıca DNS Ayarları sayfasına \"DNS Doğrulama\" paneli geldi: nameserver delegasyonu, A, mail A, MX, SPF, DKIM ve DMARC kayıtları PUBLIC DNS'e sorularak denetlenir. DKIM'de yalnız kaydın varlığına değil, yayındaki anahtarın panelinkiyle aynı olup olmadığına bakılır; birden fazla SPF kaydı gibi sessiz teslim sorunları da yakalanır.",
+  "son_surum": "0.4.8",
+  "duyuru": "Webmail'den e-posta GÖNDERİLEMEMESİ düzeltildi (\"SMTP sorunu (): Kimlik doğrulanamadı\"). Roundcube şablonu eski sürüm seçenek adlarını (smtp_server) kullanıyordu; Roundcube 1.7 bunları yok sayıp TLS'siz bağlanıyor, Postfix ise submission portunda AUTH'u yalnız STARTTLS sonrası sunduğu için kimlik doğrulama hiç başlamıyordu. Mevcut kurulumlar sanalcp-update ile otomatik onarılır.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
