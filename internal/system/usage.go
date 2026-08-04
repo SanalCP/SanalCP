@@ -25,7 +25,7 @@ import (
 // "güncelleme var" bildirimi çıkar (bkz. internal/system/surumkontrol.go).
 // 🔴 Kullanıcıya görünür her yeni özellik/düzeltme release'inde bu sabiti
 // (VE surum.json'ı) birlikte bump'lamayı unutma.
-const SurumNo = "0.4.5"
+const SurumNo = "0.4.6"
 
 const PanelSurum = "SanalCP " + SurumNo
 

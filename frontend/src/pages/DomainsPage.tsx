@@ -25,6 +25,9 @@ type OlusturmaSonuc = {
   alan_adi: string; sistem_kullanici: string; ftp_user: string; ftp_host: string
   db_host: string; db_user: string; db_adi: string
   olusturulan_parolalar: { ftp: string; db: string }
+  // Sunucuda ortak nameserver tanımlı değilse backend bu alanı hiç göndermez
+  // (vanity değerler müşteriye verilemez) → bölüm gösterilmez.
+  nameserver?: { ns1: string; ns2: string }
 }
 
 function fmtKB(kb: number) {
@@ -191,6 +194,13 @@ export default function DomainsPage() {
       `  ${t('DomainsPage:result_modal.user')}: ${s.db_user}`,
       `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.db}`,
       '',
+      ...(s.nameserver ? [
+        t('DomainsPage:result_modal.nameservers'),
+        `  NS1: ${s.nameserver.ns1}`,
+        `  NS2: ${s.nameserver.ns2}`,
+        `  ${t('DomainsPage:result_modal.ns_note')}`,
+        '',
+      ] : []),
       `${t('DomainsPage:result_modal.system_user')} ${s.sistem_kullanici}`,
     ].join('\n')
   }
@@ -541,6 +551,15 @@ export default function DomainsPage() {
                 <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.db_user} kopyala={panoYaz} />
                 <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.db} kopyala={panoYaz} parola />
               </div>
+
+              {olusturmaSonuc.nameserver && (
+                <div className="border border-emerald-200 dark:border-emerald-800 rounded-md p-3 bg-emerald-50 dark:bg-emerald-900/20">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold mb-2">{t('DomainsPage:result_modal.nameservers')}</div>
+                  <KopyaSatir e="NS1" v={olusturmaSonuc.nameserver.ns1} kopyala={panoYaz} />
+                  <KopyaSatir e="NS2" v={olusturmaSonuc.nameserver.ns2} kopyala={panoYaz} />
+                  <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-2">{t('DomainsPage:result_modal.ns_note')}</p>
+                </div>
+              )}
 
               <div className="text-[11px] text-slate-500 dark:text-slate-500 italic">
                 {t('DomainsPage:result_modal.system_user')} <span className="font-mono">{olusturmaSonuc.sistem_kullanici}</span>

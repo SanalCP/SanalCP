@@ -80,7 +80,9 @@
     "clipboard_prompt": "Press Ctrl+C to copy, then Enter:",
     "copy_all": "📋 Copy",
     "save_txt": "💾 Save as TXT",
-    "copied": "✓ Copied"
+    "copied": "✓ Copied",
+    "nameservers": "NAMESERVERS (DOMAIN DELEGATION)",
+    "ns_note": "Change the nameservers at the domain's registrar to these values. Propagation takes 1–24 hours; afterwards all DNS records are managed from the panel."
   },
   "delete_modal": {
     "title": "⚠ Bulk Domain Deletion",

@@ -148,6 +148,17 @@ type createResp struct {
 		FTP string `json:"ftp"`
 		DB  string `json:"db"`
 	} `json:"olusturulan_parolalar"`
+	// Nameserver: müşterinin kayıt şirketine gireceği çift. Oluşturma
+	// yanıtında dönmesinin sebebi, bu bilginin tam da parolalarla birlikte
+	// "bir kez göster, kaydettir" anında lazım olması — ayrıca çift, domaini
+	// oluşturan BAYİYE göre değişebildiği için sonradan tahmin edilemez.
+	// Nameserver tanımlı değilse alan boş kalır ve panel göstermez.
+	Nameserver *nsCifti `json:"nameserver,omitempty"`
+}
+
+type nsCifti struct {
+	NS1 string `json:"ns1"`
+	NS2 string `json:"ns2"`
 }
 
 func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +323,13 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	resp := createResp{Domain: d}
 	resp.OluşturulanParolalar.FTP = ftpPass
 	resp.OluşturulanParolalar.DB = dbPass
+	// Yalnız GERÇEK bir nameserver çifti tanımlıysa gösterilir; tanımlı
+	// değilken dönen vanity değerler (ns1.<domain>) müşteriye VERİLEMEZ,
+	// çünkü her domain için ayrı glue record gerektirir.
+	if dns.NSAyarli(r.Context(), h.DB) {
+		ns1, ns2 := dns.NameserverCifti(r.Context(), h.DB, d.ID, d.AlanAdi)
+		resp.Nameserver = &nsCifti{NS1: ns1, NS2: ns2}
+	}
 	httpx.WriteJSON(w, http.StatusCreated, resp)
 }
 
