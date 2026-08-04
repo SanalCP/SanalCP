@@ -31,7 +31,7 @@ func ensureLocalBackup(ctx context.Context, db *sql.DB, domainID int64, sk, file
 	}
 	downloadCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
-	if err := downloadFromRemote(downloadCtx, d, fileName, localPath); err != nil {
+	if err := downloadFromRemote(downloadCtx, db, d, fileName, localPath); err != nil {
 		return "", err
 	}
 	return localPath, nil
@@ -47,5 +47,5 @@ func deleteRemoteBestEffort(db *sql.DB, domainID int64, fileName, remoteState st
 	if err != nil || d == nil {
 		return
 	}
-	_ = deleteFromRemote(ctx, d, fileName)
+	_ = deleteFromRemote(ctx, db, d, fileName)
 }

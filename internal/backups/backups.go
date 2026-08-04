@@ -15,11 +15,21 @@ import (
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
+	"sanalcp/internal/secretcrypt"
 
 	"github.com/go-chi/chi/v5"
 )
 
 const BackupRoot = "/var/backups/sanalcp"
+
+// box: backup_destinations.parola sütununu şifreler. main.go'da Init() ile
+// bir kez ayarlanır (bkz. hesaplar/provisioner/middleware paketleriyle aynı
+// paket-seviyesi singleton deseni).
+var box *secretcrypt.Box
+
+// Init: panelin sır şifreleme kutusunu ayarlar. main.go'da herhangi bir
+// backup-destination isteğinden ÖNCE çağrılmalıdır.
+func Init(b *secretcrypt.Box) { box = b }
 
 // RemoveDomainBackups: bir domainin per-domain backup dizinini kaldırır.
 // ÖNEMLİ: Domain silme akışından ÇAĞRILMAZ — müşteri yanlışlıkla silmiş olabilir,

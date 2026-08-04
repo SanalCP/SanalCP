@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -21,6 +23,29 @@ var s3HTTPClient = &http.Client{
 	Timeout: 30 * time.Minute,
 	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 		return http.ErrUseLastResponse
+	},
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout: 15 * time.Second,
+			// SSRF koruması: Control, DNS çözümü SONRASI, TCP bağlantısı kurulmadan
+			// hemen önce çağrılır — bu yüzden "önce hostname'i kontrol et" deseninin
+			// aksine DNS rebinding'e karşı da korur (kontrol ve bağlantı aynı IP
+			// üzerinde, aralarında ayrı bir çözüm adımı yok).
+			Control: func(_, address string, c syscall.RawConn) error {
+				host, _, err := net.SplitHostPort(address)
+				if err != nil {
+					return err
+				}
+				ip := net.ParseIP(host)
+				if ip == nil {
+					return fmt.Errorf("SSRF koruması: adres çözümlenemedi: %s", host)
+				}
+				if ipYasakli(ip) {
+					return fmt.Errorf("SSRF koruması: yerel/özel ağ adresine bağlantı engellendi: %s", ip)
+				}
+				return nil
+			},
+		}).DialContext,
 	},
 }
 

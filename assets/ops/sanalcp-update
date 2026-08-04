@@ -230,6 +230,11 @@ command -v bwrap >/dev/null 2>&1 || dnf install -y bubblewrap >/dev/null 2>&1 ||
 # acl (setfacl): REQUIRED for the per-user file permission model (nginx user-ACL) —
 # without it the panel falls back fail-safe to group=nginx mode. Idempotent.
 command -v setfacl >/dev/null 2>&1 || dnf install -y acl >/dev/null 2>&1 || true
+# lftp + sshpass: off-site yedek hedefleri (FTP/SFTP) için gerekli — eski
+# kurulumlarda eksikti (install script'te yoktu), backup destination özelliği
+# sessizce başarısız oluyordu. Idempotent.
+command -v lftp >/dev/null 2>&1 || dnf install -y lftp >/dev/null 2>&1 || true
+command -v sshpass >/dev/null 2>&1 || dnf install -y sshpass >/dev/null 2>&1 || true
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, reliably reads
 # RAR/RAR5 and itself rejects path-traversal). 7z (7-Zip 26.02) does NOT include the RAR
 # codec → unusable.
