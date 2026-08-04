@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.1",
-  "duyuru": "Müşteriler artık webmail'e KENDİ alan adlarından girebiliyor: https://musterim.com/webmail/ — sunucu IP'si veya panel adresi gerekmiyor. Roundcube her domainin kendi vhost'una bağlanır; ek DNS kaydı veya sertifika gerekmez, domainin mevcut sertifikası bu yolu zaten kapsar. Panel açılışta mevcut domainlerin vhost'larını otomatik günceller. E-posta sayfasındaki webmail bağlantısı da artık müşterinin kendi alan adını gösteriyor.",
+  "son_surum": "0.5.2",
+  "duyuru": "Araçlar & Ayarlar sayfasının en üstüne, SSH varsayılan portta (22) çalışıyorsa kalıcı bir güvenlik uyarısı eklendi. Uyarı, portu nasıl güvenle değiştireceğinizi (SELinux ve güvenlik duvarı adımları dahil) adım adım anlatır ve sshd artık 22'yi dinlemediği anda kendiliğinden kaybolur. Ayrıca SSH erişim ekranı artık müşteriye sabit 22 yerine sunucunun GERÇEK SSH portunu gösteriyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }

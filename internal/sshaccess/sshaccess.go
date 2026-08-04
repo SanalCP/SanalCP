@@ -7,6 +7,7 @@
 package sshaccess
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -19,6 +20,7 @@ import (
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/system"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -26,7 +28,6 @@ import (
 const (
 	shellAcik   = "/bin/bash"
 	shellKapali = "/usr/sbin/nologin"
-	sshPort     = 22
 )
 
 type Handlers struct {
@@ -92,12 +93,14 @@ func (h *Handlers) Goster(w http.ResponseWriter, r *http.Request) {
 	}
 	shell := currentShell(sk)
 	httpx.WriteJSON(w, http.StatusOK, durum{
-		AlanAdi:    alanAdi,
-		Kullanici:  sk,
-		Aktif:      shell == shellAcik,
-		Shell:      shell,
-		SSHHost:    h.IPv4,
-		SSHPort:    sshPort,
+		AlanAdi:   alanAdi,
+		Kullanici: sk,
+		Aktif:     shell == shellAcik,
+		Shell:     shell,
+		SSHHost:   h.IPv4,
+		// Sabit 22 DEĞİL: yönetici SSH portunu değiştirdiyse müşteriye yanlış
+		// port söylenirdi (bkz. system.SSHPortlari — kaynak `sshd -T`).
+		SSHPort:    ilkSSHPort(r.Context()),
 		AnahtarVar: anahtarVar(sk),
 		IsDemo:     demo,
 	})
@@ -214,6 +217,14 @@ func (h *Handlers) AnahtarKaydet(w http.ResponseWriter, r *http.Request) {
 	_ = exec.Command("chown", "-R", sk+":"+sk, dir).Run()
 	_ = exec.Command("restorecon", "-R", dir).Run()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "anahtar_var": anahtar != ""})
+}
+
+// ilkSSHPort: sshd'nin dinlediği ilk port; tespit edilemezse 22.
+func ilkSSHPort(ctx context.Context) int {
+	if p := system.SSHPortlari(ctx); len(p) > 0 {
+		return p[0]
+	}
+	return system.VarsayilanSSHPort
 }
 
 func b2i(b bool) int {

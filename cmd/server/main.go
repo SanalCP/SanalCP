@@ -340,6 +340,7 @@ func main() {
 			r.With(middleware.BayiVeUstu).Get("/system/surum-kontrol", system.SurumKontrolDurum)
 			r.With(middleware.AdminOnly).Post("/system/surum-kontrol/yenile", system.SurumKontrolYenile)
 			r.With(middleware.AdminOnly).Get("/system/cve", system.CveDurum)
+			r.With(middleware.AdminOnly).Get("/system/ssh-guvenlik", system.SSHGuvenlik)
 			r.With(middleware.AdminOnly).Post("/system/cve/guncelle", system.CveGuncelle)
 			r.With(middleware.AdminOnly).Get("/system/cve/log", system.CveLog)
 			r.With(middleware.AdminOnly).Get("/system/kernelcare", system.KernelcareDurumHandler)
