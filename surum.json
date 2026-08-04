@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.3",
-  "duyuru": "Ortak nameserver desteği. Artık müşterilerinize IP verip A kaydı girdirmek yerine, gerçek hosting firmaları gibi \"domaininizi ns1./ns2.alanadiniz.com adreslerine yönlendirin\" diyebilirsiniz. Ayarlar > Nameserver'dan çifti tanımlayın, \"Mevcut domainleri taşı\" ile eski domainleri güncelleyin. Bayiler kendi markalarıyla nameserver verebilir. Bağlantı Bilgisi ekranına müşterinin kayıt şirketine gireceği nameserver kartı eklendi.",
+  "son_surum": "0.4.4",
+  "duyuru": "Nameserver ayarı doğru yere taşındı: Araçlar & Ayarlar > Sunucu bakımı bölümünde \"Nameserver (Alan Adı Sunucuları)\" kartı. 0.4.3'te yanlışlıkla Profil sayfasına konmuştu ve bulunamıyordu. Bayiler kendi white-label nameserver'larını Profil sayfasından tanımlamaya devam eder.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
