@@ -243,6 +243,40 @@ if ! command -v bsdtar >/dev/null 2>&1 && ! command -v unar >/dev/null 2>&1 && !
 fi
 command -v restorecon >/dev/null && restorecon -R "$PREFIX/bin" "$FDIST" >/dev/null 2>&1 || true
 
+# Roundcube SMTP config heal — 🔴 LIVE BUG: webmail could receive but not SEND
+# ("SMTP sorunu (): Kimlik doğrulanamadı"). The old template used the Roundcube
+# <=1.4 option names (`smtp_server`/`smtp_port`), which 1.7 IGNORES → Roundcube
+# fell back to the default plaintext localhost:587. Postfix serves submission
+# with `smtpd_tls_security_level=encrypt`, so AUTH is only advertised AFTER
+# STARTTLS → the client never saw AUTH and reported an auth failure.
+#
+# Existing installs never re-run sanalcp-mail-setup.sh, so patch in place.
+# Idempotent: only appends when `smtp_host` is absent.
+RCCFG=/opt/roundcube/config/config.inc.php
+if [ -f "$RCCFG" ] && ! grep -q "smtp_host" "$RCCFG"; then
+  cat >> "$RCCFG" <<'RCEOF'
+
+// --- SanalCP onarımı: Roundcube 1.5+ seçenek adları + submission STARTTLS ---
+// Eski şablon `smtp_server`/`smtp_port` yazıyordu; 1.7 bunları yok sayar.
+// `tls://` olmadan Postfix AUTH'u duyurmaz (submission encrypt zorunlu).
+$config['imap_host'] = 'localhost:143';
+$config['smtp_host'] = 'tls://localhost:587';
+$config['smtp_user'] = '%u';
+$config['smtp_pass'] = '%p';
+// Loopback'te sertifika ADI uyuşmaz (cert sunucu adına, bağlantı localhost'a);
+// trafik makineden çıkmadığı için ad doğrulaması gevşetilir, şifreleme kalır.
+$config['smtp_conn_options'] = [
+    'ssl' => [
+        'verify_peer'       => false,
+        'verify_peer_name'  => false,
+        'allow_self_signed' => true,
+    ],
+];
+RCEOF
+  systemctl reload php-fpm >/dev/null 2>&1 || systemctl restart php-fpm >/dev/null 2>&1 || true
+  ok "$(t "webmail SMTP ayarı onarıldı (giden e-posta kimlik doğrulaması)" "webmail SMTP settings repaired (outgoing mail authentication)")"
+fi
+
 # 10b) Disk quota (XFS user quota) GRUB config — 🔴 LIVE SERVER: DO NOT AUTO-REBOOT.
 # If root fs is XFS with `noquota`, idempotently write `rootflags=uquota` to
 # /etc/default/grub; the quota can only be enabled at MOUNT time (reboot). The operator

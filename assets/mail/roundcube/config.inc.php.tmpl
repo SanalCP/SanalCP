@@ -7,14 +7,37 @@ $config = [];
 // (Roundcube kimlik doğrulamasını doğrudan Dovecot IMAP'e karşı yapar, aşağıya bakın).
 $config['db_dsnw'] = 'mysql://roundcube:DB_PASS_BURAYA@localhost/roundcube';
 
-// IMAP/SMTP — aynı sunucuda, loopback üzerinden (dışarıdan erişilemez, şifreleme gerekmez).
-// SMTP: submission (587) — Postfix panelin ürettiği mailbox parolasıyla SASL doğrular.
-$config['default_host'] = 'localhost';
-$config['default_port'] = 143;
-$config['smtp_server']  = 'localhost';
-$config['smtp_port']    = 587;
-$config['smtp_user']    = '%u';
-$config['smtp_pass']    = '%p';
+// ── IMAP / SMTP ──────────────────────────────────────────────────────────────
+//
+// 🔴 SEÇENEK ADLARI: Roundcube 1.5'te `default_host`/`smtp_server` yerine
+// `imap_host`/`smtp_host` geldi ve port artık host dizesinin bir parçası.
+// Eski adlar 1.7'de YOK SAYILIR — bu, ayarın uygulanmaması ve sessizce
+// varsayılana düşülmesi demektir (hata vermez, sadece çalışmaz).
+$config['imap_host'] = 'localhost:143';
+
+// SMTP submission (587). Postfix bu portu `smtpd_tls_security_level=encrypt`
+// ile sunar: AUTH yeteneği yalnız STARTTLS'TEN SONRA duyurulur.
+//
+// `tls://` öneki OLMADAN Roundcube düz bağlanır, EHLO yanıtında AUTH göremez
+// ve kullanıcıya "SMTP sorunu (): Kimlik doğrulanamadı" der. Canlıda görülen
+// hata tam olarak buydu: eski şablon `smtp_server` yazdığı için ayar hiç
+// uygulanmıyor, Roundcube varsayılan (TLS'siz) localhost:587'ye bağlanıyordu.
+$config['smtp_host'] = 'tls://localhost:587';
+$config['smtp_user'] = '%u';
+$config['smtp_pass'] = '%p';
+
+// Loopback bağlantısında sertifika ADI doğrulaması: Postfix'in sunduğu
+// sertifika sunucunun alan adına aittir, bağlantı ise 'localhost'a yapılır →
+// ad uyuşmaz ve TLS el sıkışması başarısız olur. Trafik makineden hiç
+// çıkmadığı için (127.0.0.1) doğrulama burada gevşetilir; şifreleme yine
+// yapılır, çünkü Postfix AUTH'u yalnız şifreli oturumda sunuyor.
+$config['smtp_conn_options'] = [
+    'ssl' => [
+        'verify_peer'       => false,
+        'verify_peer_name'  => false,
+        'allow_self_signed' => true,
+    ],
+];
 
 $config['support_url']  = '';
 $config['product_name'] = 'SanalCP Webmail';
