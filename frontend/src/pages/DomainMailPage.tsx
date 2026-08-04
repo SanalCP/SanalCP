@@ -253,6 +253,9 @@ export default function DomainMailPage() {
     } catch (e2) { setHata(apiHata(e2, t('DomainMailPage:limits.save_failed'))) } finally { setLimitIsleniyor(false) }
   }
 
+  // Webmail panelin KENDİ origin'inde servis edilir; ayrı bir alan adı yoktur.
+  const webmailURL = `${window.location.origin}/webmail/`
+
   return (
     <div className="px-6 py-5">
       <div>
@@ -295,6 +298,28 @@ export default function DomainMailPage() {
           </div>
         ) : (
           <>
+            {/* Webmail — Roundcube panel vhost'unda /webmail/ altında servis edilir
+                (bkz. assets/nginx/_panel.conf). mail.<domain> ADRESİ DEĞİLDİR:
+                o kayıt MX hedefidir, web arayüzü sunmaz. */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5 shadow-sm flex items-center gap-4 flex-wrap">
+              <div className="w-11 h-11 rounded-xl bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 flex items-center justify-center text-xl shrink-0">✉️</div>
+              <div className="flex-1 min-w-[200px]">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:webmail.title')}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('DomainMailPage:webmail.desc')}</div>
+                <code className="text-[11px] text-slate-500 dark:text-slate-500 font-mono break-all">{webmailURL}</code>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={webmailURL} target="_blank" rel="noopener noreferrer"
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg">
+                  {t('DomainMailPage:webmail.open')}
+                </a>
+                <button onClick={() => { navigator.clipboard?.writeText(webmailURL); setOk(t('DomainMailPage:webmail.copied')) }}
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm rounded-lg">
+                  {t('common:copy')}
+                </button>
+              </div>
+            </div>
+
             <form onSubmit={ekle} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainMailPage:mailbox.add_title')}</h3>
               <div className="flex items-center gap-2">

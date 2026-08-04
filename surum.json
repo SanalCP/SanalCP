@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.4.6",
-  "duyuru": "Domain oluşturma sonucu penceresine nameserver bölümü eklendi. FTP ve veritabanı bilgilerinin yanında, müşterinin kayıt şirketine gireceği ns1/ns2 adresleri de gösteriliyor ve \"Kopyala\" / \"TXT Olarak Kaydet\" çıktılarına dahil ediliyor. Çift, domaini oluşturan bayiye göre çözülür; sunucuda nameserver tanımlı değilse bölüm hiç gösterilmez.",
+  "son_surum": "0.4.7",
+  "duyuru": "E-posta sayfasına Webmail (Roundcube) erişim kartı eklendi — adres panelin kendi origin'inde /webmail/ altındadır, mail.<domain> DEĞİLDİR (o kayıt MX hedefidir, web arayüzü sunmaz). Ayrıca DNS Ayarları sayfasına \"DNS Doğrulama\" paneli geldi: nameserver delegasyonu, A, mail A, MX, SPF, DKIM ve DMARC kayıtları PUBLIC DNS'e sorularak denetlenir. DKIM'de yalnız kaydın varlığına değil, yayındaki anahtarın panelinkiyle aynı olup olmadığına bakılır; birden fazla SPF kaydı gibi sessiz teslim sorunları da yakalanır.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }

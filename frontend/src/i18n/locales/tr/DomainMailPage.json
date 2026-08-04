@@ -112,5 +112,11 @@
     "save_failed": "Limitler kaydedilemedi",
     "suspended_notice": "Bu hesap {{date}} tarihinde limit aşımı nedeniyle otomatik askıya alındı. Kutular listesinden yeniden etkinleştirebilirsiniz."
   },
-  "back_to_subscription": "← Aboneliğe dön"
+  "back_to_subscription": "← Aboneliğe dön",
+  "webmail": {
+    "title": "Webmail",
+    "open": "Webmail'i Aç",
+    "copied": "Webmail adresi kopyalandı.",
+    "desc": "E-posta hesaplarınıza tarayıcıdan erişin. Giriş: tam e-posta adresi ve hesabın parolası."
+  }
 }
