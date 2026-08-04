@@ -204,6 +204,11 @@ func main() {
 	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalcp-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
 	mail.HealMailOnStartup(context.Background(), d)
+	// Webmail giden e-posta onarımı. sanalcp-update'e konamaz: güncelleyici
+	// kendini de değiştirir ama ÇALIŞAN kopya eski script'tir, dolayısıyla oraya
+	// konan onarım ancak bir sonraki güncellemede devreye girer (canlıda böyle
+	// oldu). Panel açılışı, güncellemenin hemen ardından çalışan tek noktadır.
+	mail.HealRoundcubeSMTP(context.Background())
 	mail.StartPolicyServer(d, "127.0.0.1:10040")
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak
