@@ -1,0 +1,13 @@
+{
+  "title": "SSH is running on the default port (22)",
+  "badge": "Security risk",
+  "desc": "Port 22 is the first target of automated scanners and brute-force attacks on the internet. Moving to a different port removes almost all of that traffic.",
+  "desc_mixed": "Port 22 is still open (also listening on: {{diger}}). If the migration is complete, close 22 — the attack surface remains while it is open.",
+  "how": "How to change it",
+  "step1": "Create a new port file:",
+  "step2": "Tell SELinux about the new port (sshd will not start if you skip this):",
+  "step3": "Open the new port in the firewall:",
+  "step4": "Validate the config and restart sshd:",
+  "step5": "WITHOUT CLOSING YOUR CURRENT SSH SESSION, open a second session on the new port and verify it works; only then close port 22.",
+  "note": "This warning disappears on its own once sshd no longer listens on 22."
+}

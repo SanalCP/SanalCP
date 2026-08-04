@@ -1,0 +1,13 @@
+{
+  "title": "SSH varsayılan portta (22) çalışıyor",
+  "badge": "Güvenlik riski",
+  "desc": "Port 22, internetteki otomatik tarayıcıların ve kaba-kuvvet saldırılarının ilk hedefidir. Farklı bir porta taşımak bu trafiğin neredeyse tamamını keser.",
+  "desc_mixed": "Port 22 hâlâ açık (ayrıca dinlenen: {{diger}}). Geçiş tamamlandıysa 22'yi kapatın — açık kaldığı sürece saldırı yüzeyi devam eder.",
+  "how": "Nasıl değiştirilir?",
+  "step1": "Yeni port dosyası oluşturun:",
+  "step2": "SELinux'a yeni portu tanıtın (bu adım atlanırsa sshd başlamaz):",
+  "step3": "Güvenlik duvarında yeni portu açın:",
+  "step4": "Yapılandırmayı doğrulayıp sshd'yi yeniden başlatın:",
+  "step5": "MEVCUT SSH OTURUMUNU KAPATMADAN yeni porttan ikinci bir oturum açıp bağlantıyı doğrulayın; ancak ondan sonra 22'yi kapatın.",
+  "note": "Bu uyarı, sshd artık 22'yi dinlemediği anda kendiliğinden kaybolur."
+}

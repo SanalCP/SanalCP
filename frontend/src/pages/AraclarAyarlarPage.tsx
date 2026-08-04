@@ -11,6 +11,7 @@ import PanelDomain from '@/components/PanelDomain'
 import SunucuYenidenBaslat from '@/components/SunucuYenidenBaslat'
 import HostnameAyari from '@/components/HostnameAyari'
 import NameserverAyari from '@/components/NameserverAyari'
+import SSHPortUyarisi from '@/components/SSHPortUyarisi'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -175,6 +176,10 @@ export default function AraclarAyarlarPage() {
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
       <Breadcrumb items={[{ etiket: t('AraclarAyarlarPage:breadcrumb_home'), href: '/' }, { etiket: t('AraclarAyarlarPage:breadcrumb_current') }]} />
+
+      {/* SSH varsayılan portu açıkken KALICI uyarı — port değişince kendiliğinden kaybolur.
+          Sayfanın en üstünde, arama/gruplardan da önce. */}
+      <SSHPortUyarisi />
 
       {/* Başlık + arama */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
