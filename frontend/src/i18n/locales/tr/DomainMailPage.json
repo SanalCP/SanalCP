@@ -11,7 +11,8 @@
     "not_enabled": "Bu domain için e-posta henüz etkin değil.",
     "hint": "Etkinleştirince MX/SPF/DKIM/DMARC kayıtları otomatik olarak DNS'e eklenir.",
     "button": "E-postayı Etkinleştir",
-    "enabling": "Etkinleştiriliyor…"
+    "enabling": "Etkinleştiriliyor…",
+    "resource_warning": "E-posta hizmeti (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM ve CPU tüketir. Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun."
   },
   "newPassword": {
     "title": "✓ {{email}} parolası",

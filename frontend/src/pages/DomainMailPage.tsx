@@ -296,6 +296,12 @@ export default function DomainMailPage() {
             <div className="text-3xl mb-2">📧</div>
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{t('DomainMailPage:enable.not_enabled')}</p>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">{t('DomainMailPage:enable.hint')}</p>
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-start gap-2 text-left px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <span className="text-amber-500 dark:text-amber-400 text-sm leading-none mt-0.5">⚠</span>
+                <span className="text-xs text-amber-800 dark:text-amber-300">{t('DomainMailPage:enable.resource_warning')}</span>
+              </div>
+            </div>
             <button onClick={etkinlestir} disabled={isleniyor}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
               {isleniyor ? t('DomainMailPage:enable.enabling') : t('DomainMailPage:enable.button')}
