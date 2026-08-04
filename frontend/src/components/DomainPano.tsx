@@ -31,6 +31,7 @@ const ICONS = {
   waf:       'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   erisim:    'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
   posta:     'M3 8l9 6 9-6m-9 6V4m0 0v16',
+  iceaktarim:'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4',
 }
 
 function Grup({ baslik, children }: { baslik: string; children: React.ReactNode }) {
@@ -69,6 +70,7 @@ export default function DomainPano({ domain }: { domain: Domain }) {
         <ToolCard etiket={t('DomainPano:items.ftp')}                   aciklama={t('DomainPano:items.ftp_desc')}     ikon={ICONS.ftp}      renk="sky"     faz="F4"  onClick={git('ftp')} />
         <ToolCard etiket={t('DomainPano:items.backup_restore')} aciklama={t('DomainPano:items.backup_restore_desc')}    ikon={ICONS.yedek}    renk="rose"    faz="F12" onClick={git('yedekler')} />
         <ToolCard etiket={t('DomainPano:items.clone_site')}  aciklama={t('DomainPano:items.clone_site_desc')}          ikon={ICONS.kopya}    renk="sky"     onClick={git('kopyala')} />
+        <ToolCard etiket={t('DomainPano:items.import')}      aciklama={t('DomainPano:items.import_desc')}              ikon={ICONS.iceaktarim} renk="violet" onClick={git('ice-aktarim')} />
       </Grup>
 
       <Grup baslik={t('DomainPano:groups.dev_tools')}>

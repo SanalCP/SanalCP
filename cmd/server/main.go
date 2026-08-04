@@ -38,6 +38,7 @@ import (
 	"sanalcp/internal/guvenlikduvari"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/iceaktarim"
 	"sanalcp/internal/istatistik"
 	"sanalcp/internal/kaynak"
 	"sanalcp/internal/kaynaklimit"
@@ -215,6 +216,7 @@ func main() {
 	usersH := &users.Handlers{DB: d}
 	domainsH := &domains.Handlers{DB: d, IPv4: ipv4}
 	filesH := &files.Handlers{DB: d}
+	iceAktarimH := &iceaktarim.Handlers{DB: d}
 	cronH := &cron.Handlers{DB: d}
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
@@ -458,6 +460,11 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/files/yeni-dosya", filesH.YeniDosya)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/files/boyut", filesH.BoyutHesapla)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/files/ara", filesH.Ara)
+				// Genel içe aktarma (panel-bağımsız): site arşivi + SQL dump + config.
+				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/arsiv", iceAktarimH.ArsivYukle)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/arsiv-uygula", iceAktarimH.ArsivUygula)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/sql", iceAktarimH.SQLYukle)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/config", iceAktarimH.ConfigGuncelle)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssl", domainsH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ssl/issue", domainsH.SSLIssue)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ssl", domainsH.SSLDisable)

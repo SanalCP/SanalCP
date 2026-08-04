@@ -211,6 +211,46 @@ func IceriginiSil(home, rel string) error {
 	return nil
 }
 
+// Adlari: home/rel dizinindeki girdi adlarını symlink-güvenli listeler.
+// Dizinin kendisine giden yolun hiçbir bileşeni symlink olamaz; girdiler ham
+// ad olarak döner (alt dizin/symlink ayrımı yapılmaz).
+func Adlari(home, rel string) ([]string, error) {
+	f, err := AcDizin(home, rel)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	adlar, err := adlariOku(int(f.Fd()))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(adlar))
+	for _, ad := range adlar {
+		if ad == "." || ad == ".." {
+			continue
+		}
+		out = append(out, ad)
+	}
+	return out, nil
+}
+
+// Sil: home/rel girdisini (dosya veya dizin) symlink-güvenli, özyinelemeli
+// siler. IceriginiSil'den farkı: girdinin KENDİSİ de silinir.
+func Sil(home, rel string) error {
+	p := temizRel(rel)
+	if p == "." {
+		return fmt.Errorf("jailpath: ev dizininin kendisi silinemez")
+	}
+	ust := filepath.Dir(p)
+	ad := filepath.Base(p)
+	f, err := AcDizin(home, ust)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return silAt(int(f.Fd()), ad)
+}
+
 // silAt: dirfd'ye göre name'i özyinelemeli siler (symlink'in KENDİSİ silinir,
 // hedefi değil — unlinkat sembolik bağı takip etmez).
 func silAt(dirfd int, ad string) error {

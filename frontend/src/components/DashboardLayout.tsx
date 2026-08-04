@@ -53,6 +53,7 @@ const ICONS = {
   subdomain:   'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064',
   ekdomain:    'M9 12h6m-6 4h3m-3-8h6M5 6h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z',
   kopya:       'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
+  iceaktarim:  'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4',
   git:         'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1',
   cron:        'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
   ssh:         'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
@@ -165,6 +166,7 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
       { to: y('/mail'),          etiket: t('DashboardLayout:items.mail'),         ikon: ICONS.posta },
       { to: y('/yedekler'),      etiket: t('DashboardLayout:items.backups'),      ikon: ICONS.yedek },
       { to: y('/kopyala'),       etiket: t('DashboardLayout:items.clone_site'),   ikon: ICONS.kopya },
+      { to: y('/ice-aktarim'),   etiket: t('DashboardLayout:items.import'),       ikon: ICONS.iceaktarim },
     ]},
     { baslik: t('DashboardLayout:groups.developer'), baslikKey: 'developer', items: [
       { to: y('/git'),           etiket: t('DashboardLayout:items.git'),          ikon: ICONS.git },
