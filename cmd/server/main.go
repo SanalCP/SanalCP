@@ -213,6 +213,10 @@ func main() {
 	// IMAP'e açık olması. Kurulum script'i de yapar ama mevcut kurulumlar onu
 	// bir daha çalıştırmıyor (bkz. HealRoundcubeSMTP'deki aynı ders).
 	mail.HealDovecotAuth(context.Background())
+	// Müşterinin KENDİ alan adından webmail (https://musterim.com/webmail/).
+	// Blok her vhost render'ında üretilir ama mevcut vhost dosyaları
+	// kendiliğinden yenilenmez; yalnız eksik olanlar yeniden render edilir.
+	go provisioner.HealWebmailVhosts(context.Background(), d)
 	mail.StartPolicyServer(d, "127.0.0.1:10040")
 
 	// Çok kullanıcılı hesap modeline veri göçü (Faz 5C). Idempotent: taşınacak

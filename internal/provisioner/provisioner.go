@@ -287,7 +287,7 @@ server {
     # ---- Güvenlik header'ları (panel'den yönetilir; server seviyesi) ----
 {{.SecHeaders}}
 {{.ModSec}}{{.DenyBlocks}}
-{{.IPKurallari}}{{.HotlinkLocation}}
+{{.IPKurallari}}{{.HotlinkLocation}}{{.WebmailBlok}}
 {{if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
     location / {
         proxy_pass http://127.0.0.1:10080;
@@ -371,7 +371,7 @@ server {
     }
 
 {{.DenyBlocks}}
-{{.IPKurallari}}{{.HotlinkLocation}}
+{{.IPKurallari}}{{.HotlinkLocation}}{{.WebmailBlok}}
 {{if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
     location / {
         proxy_pass http://127.0.0.1:10080;
@@ -653,6 +653,10 @@ type VhostOpts struct {
 	HSTSMaxAge      int
 	HSTSSubdomains  bool
 	HSTSPreload     bool
+
+	// WebmailBlok: Roundcube kuruluysa domainin kendi vhost'una eklenen
+	// `location ^~ /webmail/` bloğu (her render'da hesaplanır, DB'de tutulmaz).
+	WebmailBlok string
 
 	// Performans onbellegi
 	FastCgiCache       bool
@@ -938,6 +942,7 @@ func renderAndReload(opts VhostOpts, sk string) error {
 			opts.ModSec = buildModSec(sk)
 			opts.IPKurallari = buildIPRules(sk)
 			opts.HotlinkLocation = buildHotlink(sk, opts.AlanAdi)
+			opts.WebmailBlok = webmailBloku()
 		}
 		tmpl := vhostTmpl
 		if opts.Askida {

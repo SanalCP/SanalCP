@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
-type Domain = { id: number; alan_adi: string }
+type Domain = { id: number; alan_adi: string; ssl?: boolean }
 type Mailbox = { id: number; local_part: string; email: string; status: string; created_at: string }
 type Durum = { etkin: boolean; dkim_selector?: string }
 type Alias = { id: number; source: string; destination: string; catch_all: boolean; status: string; created_at: string }
@@ -253,8 +253,13 @@ export default function DomainMailPage() {
     } catch (e2) { setHata(apiHata(e2, t('DomainMailPage:limits.save_failed'))) } finally { setLimitIsleniyor(false) }
   }
 
-  // Webmail panelin KENDİ origin'inde servis edilir; ayrı bir alan adı yoktur.
-  const webmailURL = `${window.location.origin}/webmail/`
+  // Webmail müşterinin KENDİ alan adından servis edilir (vhost'a eklenen
+  // /webmail/ bloğu). Panelin origin'ini kullanmak, panele IP ile girilmişse
+  // müşteriye çıplak sunucu IP'si göstermek demekti.
+  // Domain henüz yüklenmediyse panel origin'i geçici olarak kullanılır.
+  const webmailURL = domain
+    ? `${domain.ssl === false ? 'http' : 'https'}://${domain.alan_adi}/webmail/`
+    : `${window.location.origin}/webmail/`
 
   return (
     <div className="px-6 py-5">
