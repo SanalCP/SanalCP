@@ -112,5 +112,11 @@
     "save_failed": "Could not save limits",
     "suspended_notice": "This account was automatically suspended on {{date}} for exceeding limits. You can reactivate it from the mailbox list."
   },
-  "back_to_subscription": "← Back to subscription"
+  "back_to_subscription": "← Back to subscription",
+  "webmail": {
+    "title": "Webmail",
+    "open": "Open Webmail",
+    "copied": "Webmail address copied.",
+    "desc": "Access your mailboxes from the browser. Sign in with the full e-mail address and the account password."
+  }
 }

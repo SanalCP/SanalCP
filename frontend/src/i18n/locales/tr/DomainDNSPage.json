@@ -116,5 +116,11 @@
     "template_applied": "{{count}} varsayılan kayıt eklendi"
   },
   "status_active": "aktif",
-  "status_inactive": "pasif"
+  "status_inactive": "pasif",
+  "verify": {
+    "title": "DNS Doğrulama",
+    "hint": "kayıtlar gerçekten yayında mı",
+    "button": "Kontrol Et",
+    "expected": "Beklenen:"
+  }
 }

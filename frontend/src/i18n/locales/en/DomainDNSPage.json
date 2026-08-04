@@ -116,5 +116,11 @@
     "template_applied": "{{count}} default records added"
   },
   "status_active": "active",
-  "status_inactive": "inactive"
+  "status_inactive": "inactive",
+  "verify": {
+    "title": "DNS Verification",
+    "hint": "are the records actually live",
+    "button": "Check",
+    "expected": "Expected:"
+  }
 }

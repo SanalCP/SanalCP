@@ -494,6 +494,7 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/toplu-sil", dnsH.TopluSil)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/toplu-durum", dnsH.TopluDurum)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/nameserver", dnsH.GetDomainNameserver)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/dogrula", dnsH.Dogrula)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/soa", dnsH.GetSOA)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/dns/soa", dnsH.PutSOA)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/dnssec", dnsH.GetDNSSEC)

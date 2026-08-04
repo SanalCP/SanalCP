@@ -27,6 +27,9 @@ type DNSSEC = { aktif: boolean; imzali: boolean; ds: string[]; durum: string }
 
 const TIPLER = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA', 'PTR', 'DS', 'TLSA', 'SSHFP', 'NAPTR']
 
+type Kontrol = { anahtar: string; baslik: string; durum: 'ok' | 'uyari' | 'hata'; beklenen?: string; bulunan?: string; mesaj?: string }
+type Dogrulama = { alan_adi: string; kontroller: Kontrol[]; ok_sayisi: number; uyari_sayisi: number; hata_sayisi: number }
+
 export default function DomainDNSPage() {
   const { t } = useTranslation(['DomainDNSPage', 'common'])
   const { id } = useParams()
@@ -145,6 +148,24 @@ export default function DomainDNSPage() {
     }
   }
 
+  // Nameserver çifti + DNS doğrulama: ikisi de gerçek dünyadaki durumu gösterir.
+  const [ns, setNS] = useState<{ ns1: string; ns2: string; kaynak?: string } | null>(null)
+  const [dogrulama, setDogrulama] = useState<Dogrulama | null>(null)
+  const [dogrulamaYuk, setDogrulamaYuk] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    api.get(`/domains/${id}/nameserver`).then(r => setNS(r.data)).catch(() => { /* yoksa eski metin */ })
+  }, [id])
+
+  async function dogrula() {
+    setDogrulamaYuk(true)
+    try {
+      const { data } = await api.get<Dogrulama>(`/domains/${id}/dns/dogrula`)
+      setDogrulama(data)
+    } catch { /* sessiz */ } finally { setDogrulamaYuk(false) }
+  }
+
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
@@ -163,7 +184,51 @@ export default function DomainDNSPage() {
       )}
 
       <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-md px-3 py-2 text-xs text-sky-800 dark:text-sky-200 mb-4">
-        <strong>{t('DomainDNSPage:info.label')}</strong> {t('DomainDNSPage:info.text1')}<strong>{t('DomainDNSPage:info.authoritative_dns')}</strong>{t('DomainDNSPage:info.text2')}<span className="font-mono">ns1.{domain?.alan_adi || t('DomainDNSPage:info.your_domain')}</span> / <span className="font-mono">ns2.{domain?.alan_adi || t('DomainDNSPage:info.your_domain')}</span>{t('DomainDNSPage:info.after')}
+        <strong>{t('DomainDNSPage:info.label')}</strong> {t('DomainDNSPage:info.text1')}<strong>{t('DomainDNSPage:info.authoritative_dns')}</strong>{t('DomainDNSPage:info.text2')}<span className="font-mono">{ns?.ns1 || `ns1.${domain?.alan_adi || t('DomainDNSPage:info.your_domain')}`}</span> / <span className="font-mono">{ns?.ns2 || `ns2.${domain?.alan_adi || t('DomainDNSPage:info.your_domain')}`}</span>{t('DomainDNSPage:info.after')}
+      </div>
+
+      {/* DNS doğrulama — kayıtlar GERÇEKTEN yayında mı (public DNS'e sorulur). */}
+      <div className="border border-slate-200 dark:border-slate-800 rounded-xl mb-4 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {t('DomainDNSPage:verify.title')}
+            <span className="ml-2 text-xs text-slate-400 font-normal">{t('DomainDNSPage:verify.hint')}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            {dogrulama && (
+              <span className="text-xs text-slate-500">
+                <span className="text-emerald-600 dark:text-emerald-400">{dogrulama.ok_sayisi} ✓</span>
+                {dogrulama.uyari_sayisi > 0 && <span className="text-amber-600 dark:text-amber-400"> · {dogrulama.uyari_sayisi} !</span>}
+                {dogrulama.hata_sayisi > 0 && <span className="text-red-600 dark:text-red-400"> · {dogrulama.hata_sayisi} ✗</span>}
+              </span>
+            )}
+            <button onClick={dogrula} disabled={dogrulamaYuk}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50">
+              {dogrulamaYuk ? t('common:loading') : t('DomainDNSPage:verify.button')}
+            </button>
+          </div>
+        </div>
+        {dogrulama && (
+          <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+            {dogrulama.kontroller.map(k => (
+              <div key={k.anahtar} className="px-4 py-2.5 flex items-start gap-3">
+                <span className={`mt-0.5 text-sm shrink-0 ${k.durum === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : k.durum === 'uyari' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {k.durum === 'ok' ? '✓' : k.durum === 'uyari' ? '!' : '✗'}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-slate-700 dark:text-slate-200">{k.baslik}</div>
+                  {k.bulunan && <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 break-all mt-0.5">{k.bulunan}</div>}
+                  {k.durum !== 'ok' && k.beklenen && (
+                    <div className="text-[11px] text-slate-400 break-all">{t('DomainDNSPage:verify.expected')} <span className="font-mono">{k.beklenen}</span></div>
+                  )}
+                  {k.mesaj && (
+                    <div className={`text-[11px] mt-0.5 ${k.durum === 'hata' ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{k.mesaj}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {soa && (
