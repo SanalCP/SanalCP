@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.4",
-  "duyuru": "Redis Cache ve WAF (yüksek paranoya seviyesi) sayfalarına, sunucuda ek RAM/CPU tüketebileceğini belirten uyarılar eklendi.",
+  "son_surum": "0.5.5",
+  "duyuru": "Antivirüs Tarama sayfasına, taramanın CPU kullanımını geçici olarak yükseltebileceğini belirten bir uyarı eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-04"
 }
