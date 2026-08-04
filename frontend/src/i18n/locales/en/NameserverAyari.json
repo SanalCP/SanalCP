@@ -1,0 +1,15 @@
+{
+  "title": "Nameservers",
+  "badge_unset": "Not configured",
+  "desc": "The shared nameserver pair your customers delegate their domains to. Once set, customers are shown these instead of an IP/A record.",
+  "suggested": "The values below were guessed from your panel domain and are NOT saved yet. Verify them and save.",
+  "save_button": "Save",
+  "saving": "Saving…",
+  "saved": "Nameservers saved.",
+  "migrate_button": "Migrate existing domains",
+  "migrating": "Migrating…",
+  "migrate_needs_ns": "Save the nameserver pair first.",
+  "migrate_confirm": "NS records and SOA primary NS of all domains will be updated to the current nameserver pair and zones rewritten. Continue?",
+  "migrated": "{{g}} of {{n}} domains updated.",
+  "hint_a_record": "These hostnames must have A records pointing to this server's IP in your own DNS, otherwise no customer domain will resolve."
+}

@@ -10,6 +10,7 @@ import SunucuOptimize from '@/components/SunucuOptimize'
 import PanelDomain from '@/components/PanelDomain'
 import SunucuYenidenBaslat from '@/components/SunucuYenidenBaslat'
 import HostnameAyari from '@/components/HostnameAyari'
+import NameserverAyari from '@/components/NameserverAyari'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -214,6 +215,7 @@ export default function AraclarAyarlarPage() {
           <PanelGuncelleme />
           <HostnameAyari />
           <PanelDomain />
+          <NameserverAyari />
           <SunucuOptimize />
         </div>
       </section>

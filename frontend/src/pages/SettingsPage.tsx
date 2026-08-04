@@ -54,7 +54,6 @@ export default function SettingsPage() {
   const [nsYuk, setNSYuk] = useState(false)
   const [nsOk, setNSOk] = useState('')
   const [nsErr, setNSErr] = useState('')
-  const [tasiYuk, setTasiYuk] = useState(false)
   const [ben, setBen] = useState<Ben | null>(null)
   const [yukHata, setYukHata] = useState('')
 
@@ -128,12 +127,11 @@ export default function SettingsPage() {
     } catch { setTOk('') } finally { setTYuk(false) }
   }
 
-  const adminMi = ben?.rol === 'admin'
   const bayiMi = ben?.rol === 'reseller'
-  const nsUcu = adminMi ? '/nameserver' : '/bayi/nameserver'
+  const nsUcu = '/bayi/nameserver'
 
   useEffect(() => {
-    if (!adminMi && !bayiMi) return
+    if (!bayiMi) return
     api.get(nsUcu).then(r => {
       setNS(r.data)
       // Ayarlı değilse öneriyi ALANA yazar ama KAYDETMEZ — admin görüp
@@ -141,7 +139,7 @@ export default function SettingsPage() {
       setNS1(r.data.ns1 || r.data.oneri1 || '')
       setNS2(r.data.ns2 || r.data.oneri2 || '')
     }).catch(() => { /* yetkisizse kart gizli kalır */ })
-  }, [adminMi, bayiMi, nsUcu])
+  }, [bayiMi, nsUcu])
 
   async function nsKaydet() {
     setNSYuk(true); setNSOk(''); setNSErr('')
@@ -152,15 +150,6 @@ export default function SettingsPage() {
     } catch (e) { setNSErr(apiHata(e)) } finally { setNSYuk(false) }
   }
 
-  async function nsTasi() {
-    if (!confirm(t('SettingsPage:nameserver.migrate_confirm'))) return
-    setTasiYuk(true); setNSOk(''); setNSErr('')
-    try {
-      const { data } = await api.post('/dns/nameserver-tasi', {})
-      setNSOk(t('SettingsPage:nameserver.migrated', { g: data.guncellenen, n: data.toplam }))
-      if (data.hatalar?.length) setNSErr(data.hatalar.join(' | '))
-    } catch (e) { setNSErr(apiHata(e)) } finally { setTasiYuk(false) }
-  }
 
   const btn = 'px-4 py-2 text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-50 inline-flex items-center gap-2'
   const secretGruplu = f2Kur ? (f2Kur.secret.match(/.{1,4}/g) || []).join(' ') : ''
@@ -275,14 +264,15 @@ export default function SettingsPage() {
             </div>
           } />
 
-        {/* 3.5) Nameserver — yalnız admin ve bayi */}
-        {(adminMi || bayiMi) && (
+        {/* 3.5) Nameserver — YALNIZ bayi. Admin'inki sunucu geneli bir ayar
+            olduğu için Araçlar & Ayarlar sayfasındadır (NameserverAyari). */}
+        {bayiMi && (
           <Kart baslik={t('SettingsPage:nameserver.title')} aciklama={t('SettingsPage:nameserver.desc')}
             ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="7" rx="2"/><rect x="2" y="13" width="20" height="7" rx="2"/><path d="M6 7.5h.01M6 16.5h.01"/></svg>}
             cocuk={
               <div className="space-y-4">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {adminMi ? t('SettingsPage:nameserver.help_admin') : t('SettingsPage:nameserver.help_bayi')}
+                  {t('SettingsPage:nameserver.help_bayi')}
                 </p>
                 {ns?.uyari && <Uyari tip="err" mesaj={ns.uyari} />}
                 {ns?.kaynak === 'yok' && ns?.oneri1 && (
@@ -296,12 +286,6 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <button onClick={nsKaydet} disabled={nsYuk} className={btn}>{nsYuk ? t('common:saving') : t('common:save')}</button>
-                  {adminMi && (
-                    <button onClick={nsTasi} disabled={tasiYuk}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50">
-                      {tasiYuk ? t('common:loading') : t('SettingsPage:nameserver.migrate')}
-                    </button>
-                  )}
                 </div>
                 <Uyari tip="ok" mesaj={nsOk} />
                 <Uyari tip="err" mesaj={nsErr} />

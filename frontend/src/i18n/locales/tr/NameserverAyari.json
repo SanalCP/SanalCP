@@ -1,0 +1,15 @@
+{
+  "title": "Nameserver (Alan Adı Sunucuları)",
+  "badge_unset": "Tanımlı değil",
+  "desc": "Müşterilerinizin domainlerini yönlendireceği ortak nameserver çifti. Tanımlandığında müşterilere IP/A kaydı yerine bu adresler gösterilir.",
+  "suggested": "Aşağıdaki değerler panel alan adınızdan tahmin edildi ve henüz KAYDEDİLMEDİ. Doğruluğunu kontrol edip kaydedin.",
+  "save_button": "Kaydet",
+  "saving": "Kaydediliyor…",
+  "saved": "Nameserver kaydedildi.",
+  "migrate_button": "Mevcut domainleri taşı",
+  "migrating": "Taşınıyor…",
+  "migrate_needs_ns": "Önce nameserver çiftini kaydedin.",
+  "migrate_confirm": "Tüm domainlerin NS kayıtları ve SOA primary NS'i güncel nameserver çiftine güncellenecek, zone'lar yeniden yazılacak. Devam edilsin mi?",
+  "migrated": "{{n}} domainden {{g}} tanesi güncellendi.",
+  "hint_a_record": "Bu adreslerin kendi DNS'inizde sunucu IP'sine bakan A kayıtları olmalıdır; aksi halde hiçbir müşteri domaini çözülmez."
+}
