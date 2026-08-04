@@ -34,5 +34,7 @@
   "not_stored": "(not stored)",
   "no_permission": "(no permission)",
   "no_database": "no database",
-  "password_gen_failed": "Could not generate password"
+  "password_gen_failed": "Could not generate password",
+  "nameservers": "Nameservers (Domain Delegation)",
+  "nameservers_desc": "To use your domain on this server, change the nameservers at your registrar to the values below. Propagation takes 1–24 hours; afterwards you manage all DNS records from this panel."
 }

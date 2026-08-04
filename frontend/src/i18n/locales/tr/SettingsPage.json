@@ -57,5 +57,16 @@
     "theme_dark": "Koyu",
     "language": "Dil",
     "save": "Tercihleri Kaydet"
+  },
+  "nameserver": {
+    "title": "Nameserver (Alan Adı Sunucuları)",
+    "desc": "Müşterilerin domainlerini yönlendireceği ortak nameserver çifti.",
+    "help_admin": "Müşteriler kayıt şirketlerinde bu adresleri girer. Bu adreslerin kendi DNS'inizde sunucu IP'sine bakan A kayıtları OLMALIDIR; aksi halde hiçbir domain çözülmez. Değeri değiştirdikten sonra \"Mevcut domainleri taşı\" ile eski kayıtları güncelleyin.",
+    "help_bayi": "Kendi markanızla nameserver verebilirsiniz. Bu adreslerin A kayıtlarını kendi DNS sağlayıcınızda sunucu IP'sine yönlendirmelisiniz. Boş bırakırsanız sunucu geneli nameserver'lar kullanılır.",
+    "saved": "Nameserver kaydedildi.",
+    "migrate": "Mevcut domainleri taşı",
+    "migrate_confirm": "Tüm domainlerin NS kayıtları ve SOA primary NS'i güncel nameserver çiftine güncellenecek, zone'lar yeniden yazılacak. Devam edilsin mi?",
+    "migrated": "{{n}} domainden {{g}} tanesi güncellendi.",
+    "suggested": "Aşağıdaki değerler panel alan adınızdan tahmin edildi ve henüz KAYDEDİLMEDİ. Doğruluğunu kontrol edip kaydedin."
   }
 }

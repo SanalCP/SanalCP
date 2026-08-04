@@ -47,6 +47,10 @@ type Domain = {
   sistem_kullanici: string; web_root: string
 }
 
+// NS: domainin yönlendirileceği ortak nameserver çifti. Müşteri kayıt
+// şirketinde bunları girer; A kaydını elle girmesi gerekmez.
+type NS = { ns1: string; ns2: string; kaynak?: string; uyari?: string }
+
 export default function DomainConnectionPage() {
   const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const { id } = useParams()
@@ -54,10 +58,13 @@ export default function DomainConnectionPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [kopya, setKopya] = useState<string | null>(null)
   const [parolaModal, setParolaModal] = useState<{ tip: 'ftp' | 'db'; cikti?: string } | null>(null)
+  const [ns, setNS] = useState<NS | null>(null)
 
   useEffect(() => {
     if (!id) return
     api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(e => setHata(apiHata(e)))
+    // Nameserver bilgisi ayrı uçtan: panel geneli / bayi override'ı burada çözülür.
+    api.get<NS>(`/domains/${id}/nameserver`).then(r => setNS(r.data)).catch(() => { /* kart gizlenir */ })
   }, [id])
 
   function kopyala(deg: string) {
@@ -111,6 +118,21 @@ export default function DomainConnectionPage() {
             <Sat e={t('DomainConnectionPage:http_url')} d={`http://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
             <Sat e={t('DomainConnectionPage:https_url')} d={`https://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
           </Kart>
+
+          {ns && (
+            <Kart baslik={t('DomainConnectionPage:nameservers')} renk="emerald" ikon="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" cift>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                {t('DomainConnectionPage:nameservers_desc')}
+              </p>
+              <Sat e="NS1" d={ns.ns1} onKopya={kopyala} kopya={kopya} mono />
+              <Sat e="NS2" d={ns.ns2} onKopya={kopyala} kopya={kopya} mono />
+              {ns.uyari && (
+                <p className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-300">
+                  {ns.uyari}
+                </p>
+              )}
+            </Kart>
+          )}
         </div>
       )}
 
@@ -133,6 +155,7 @@ function Kart({ baslik, renk, ikon, children, cift }: { baslik: string; renk: st
     sky: 'bg-sky-100 text-sky-700',
     violet: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
     amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
+    emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
   }
   return (
     <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 ${cift ? 'lg:col-span-2' : ''}`}>

@@ -493,6 +493,7 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/sablon", dnsH.ApplyTemplate)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/toplu-sil", dnsH.TopluSil)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/toplu-durum", dnsH.TopluDurum)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/nameserver", dnsH.GetDomainNameserver)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/soa", dnsH.GetSOA)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/dns/soa", dnsH.PutSOA)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/dnssec", dnsH.GetDNSSEC)
@@ -500,6 +501,12 @@ func main() {
 				// Merkezi DNS şablonu (admin) — domain eklerken + "Şablonu Uygula" bunu okur
 				r.With(middleware.BayiVeUstu).Get("/dns-template", dnsH.GetTemplate)
 				r.With(middleware.AdminOnly).Put("/dns-template", dnsH.PutTemplate)
+				// Ortak nameserver çifti (müşteri domainlerinin NS kayıtları).
+				r.With(middleware.AdminOnly).Get("/nameserver", dnsH.GetNameserver)
+				r.With(middleware.AdminOnly).Put("/nameserver", dnsH.PutNameserver)
+				r.With(middleware.AdminOnly).Post("/dns/nameserver-tasi", dnsH.NSTasi)
+				r.With(middleware.BayiVeUstu).Get("/bayi/nameserver", dnsH.GetBayiNameserver)
+				r.With(middleware.BayiVeUstu).Put("/bayi/nameserver", dnsH.PutBayiNameserver)
 				// Sunucu geneli özet listeler (salt-okunur) — panelin sol menüsündeki
 				// DNS / SSL / E-posta / Veritabanları sayfaları bunları okur.
 				r.With(middleware.BayiVeUstu).Get("/genel/dns", genelH.DNS)

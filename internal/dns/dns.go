@@ -345,6 +345,7 @@ func SeedDefaults(ctx context.Context, db *sql.DB, domainID int64, alanAdi, ipv4
 	}
 	meta := LoadTemplateMeta(ctx, db)
 	selector := meta.DKIMSelector
+	ns1, ns2 := NameserverCifti(ctx, db, domainID, alanAdi)
 
 	// DKIM gerekiyorsa anahtari hazirla (bir kez)
 	dkimTxt := ""
@@ -366,8 +367,8 @@ func SeedDefaults(ctx context.Context, db *sql.DB, domainID int64, alanAdi, ipv4
 		if strings.Contains(t.Deger, "{DKIM}") && (!meta.DKIMAktif || dkimTxt == "") {
 			continue
 		}
-		ad := subst(t.Ad, alanAdi, ipv4, selector, dkimTxt)
-		deger := subst(t.Deger, alanAdi, ipv4, selector, dkimTxt)
+		ad := subst(t.Ad, alanAdi, ipv4, selector, dkimTxt, ns1, ns2)
+		deger := subst(t.Deger, alanAdi, ipv4, selector, dkimTxt, ns1, ns2)
 		tip := strings.ToUpper(strings.TrimSpace(t.Tip))
 		// Ayni ad+tip+deger varsa atla (idempotent)
 		var n int
@@ -399,7 +400,8 @@ func seedSOAFromMeta(ctx context.Context, db *sql.DB, domainID int64, alanAdi st
 	if mevcut > 0 {
 		return
 	}
-	d := defaultSOA(alanAdi)
+	ns1, _ := NameserverCifti(ctx, db, domainID, alanAdi)
+	d := defaultSOA(alanAdi, ns1)
 	_, _ = db.ExecContext(ctx,
 		`INSERT INTO dns_soa(domain_id, primary_ns, hostmaster, refresh, retry, expire, minimum, ttl)
 		 VALUES(?,?,?,?,?,?,?,?)

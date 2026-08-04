@@ -25,9 +25,17 @@ type SOA struct {
 	TTL        int    `json:"ttl"`
 }
 
-func defaultSOA(alanAdi string) SOA {
+// defaultSOA: SOA'nın PRIMARY NS'i, zone'un NS kayıtlarıyla TUTARLI olmalıdır —
+// yani ortak nameserver çiftinin ilki (bkz. nameserver.go). Eskiden burada
+// "ns1.<domain>" sabitti; ortak nameserver modelinde bu, zone'un NS kayıtlarında
+// hiç geçmeyen bir hostu SOA'ya yazmak demekti ("lame SOA": named-checkzone
+// kabul eder ama DNS denetleyicileri uyarı verir, bazı registry kontrolleri de).
+func defaultSOA(alanAdi, ns1 string) SOA {
+	if !GecerliNSHost(ns1) {
+		ns1 = "ns1." + alanAdi
+	}
 	return SOA{
-		PrimaryNS:  "ns1." + alanAdi,
+		PrimaryNS:  ns1,
 		Hostmaster: "admin@" + alanAdi,
 		Refresh:    3600,
 		Retry:      900,
@@ -39,7 +47,8 @@ func defaultSOA(alanAdi string) SOA {
 
 // LoadSOA: DB'den oku; satır yoksa domain adına göre default üret.
 func LoadSOA(ctx context.Context, db *sql.DB, domainID int64, alanAdi string) SOA {
-	s := defaultSOA(alanAdi)
+	ns1, _ := NameserverCifti(ctx, db, domainID, alanAdi)
+	s := defaultSOA(alanAdi, ns1)
 	var ns, hm string
 	var ref, ret, exp, mini, ttl int
 	if err := db.QueryRowContext(ctx,
@@ -100,7 +109,8 @@ func (h *Handlers) PutSOA(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	d := defaultSOA(alanAdi)
+	ns1, _ := NameserverCifti(r.Context(), h.DB, id, alanAdi)
+	d := defaultSOA(alanAdi, ns1)
 	if s.PrimaryNS = strings.TrimSpace(s.PrimaryNS); s.PrimaryNS == "" {
 		s.PrimaryNS = d.PrimaryNS
 	}
