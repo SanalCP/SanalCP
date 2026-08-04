@@ -14,6 +14,7 @@
   "inactive_card_desc": "When you enable it, an isolated ACL user and connection info are created.",
   "enabling": "Enabling…",
   "enable_button": "Enable Redis Cache",
+  "resource_warning": "Redis runs a shared caching process on the server (up to 256MB RAM, LRU-capped). On small or resource-limited servers, consider your current load before enabling it.",
   "connection_info_title": "Connection Info",
   "close": "Close",
   "row_server": "Server",

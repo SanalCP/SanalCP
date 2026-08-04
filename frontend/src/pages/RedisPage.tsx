@@ -90,6 +90,12 @@ export default function RedisPage() {
           <div className="text-3xl mb-2">⚡</div>
           <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">{t('RedisPage:inactive_card_title')}</p>
           <p className="text-xs text-slate-400 mb-4">{t('RedisPage:inactive_card_desc')}</p>
+          <div className="flex justify-center mb-4">
+            <div className="inline-flex items-start gap-2 text-left px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <span className="text-amber-500 dark:text-amber-400 text-sm leading-none mt-0.5">⚠</span>
+              <span className="text-xs text-amber-800 dark:text-amber-300">{t('RedisPage:resource_warning')}</span>
+            </div>
+          </div>
           <button onClick={ac} disabled={mesgul}
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
             {mesgul ? t('RedisPage:enabling') : t('RedisPage:enable_button')}
