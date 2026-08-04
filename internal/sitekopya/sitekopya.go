@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -87,7 +88,11 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
-	home := "/home/" + sk
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
+		return
+	}
 	kaynak := home + "/public_html"
 	if _, err := os.Stat(kaynak); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "public_html bulunamadı")
@@ -97,24 +102,26 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusRequestEntityTooLarge, "site 3 GB'den büyük — lütfen Yedekler aracını kullanın")
 		return
 	}
-	kopyaDir := home + "/kopyalar"
-	if err := os.MkdirAll(kopyaDir, 0o711); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "kopya dizini oluşturulamadı")
+	// 🔴 GÜVENLİK: hedef bileşenleri (kopyalar/<ad>/public_html) tenant'ın
+	// yazabildiği bir dizinde oluşuyor; yol tabanlı os.MkdirAll bir symlink'i
+	// izleyip root olarak jail DIŞINA dizin açar ve rsync oraya yazardı.
+	// jailpath tüm bileşenleri symlink-siz çözer; rsync ayrıca tenant
+	// kimliğinde çalışır (TOCTOU'ya karşı DAC katmanı).
+	ad := "kopya_" + time.Now().Format("20060102_150405")
+	kopyaRel := "kopyalar/" + ad
+	if err := jailpath.DizinOlustur(home, kopyaRel+"/public_html", sk); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "hedef güvenli değil (symlink?): "+err.Error())
 		return
 	}
+	kopyaDir := home + "/kopyalar"
 	_ = exec.Command("chown", sk+":"+sk, kopyaDir).Run() // kopyalar dizini de müşteriye ait olsun
-	ad := "kopya_" + time.Now().Format("20060102_150405")
-	hedef := kopyaDir + "/" + ad + "/public_html"
+	hedef := home + "/" + kopyaRel + "/public_html"
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
-	if err := os.MkdirAll(hedef, 0o755); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "hedef oluşturulamadı")
-		return
-	}
 	// rsync (trailing slash: içeriği kopyala). --delete YOK (yıkıcı değil).
-	if out, err := exec.CommandContext(ctx, "rsync", "-a", "--no-owner", "--no-group", kaynak+"/", hedef+"/").CombinedOutput(); err != nil {
-		_ = os.RemoveAll(kopyaDir + "/" + ad)
-		httpx.WriteError(w, http.StatusInternalServerError, "kopyalama başarısız: "+strings.TrimSpace(string(out)))
+	if out, err := tenantKomut(ctx, sk, "rsync", "-a", "--no-owner", "--no-group", kaynak+"/", hedef+"/"); err != nil {
+		_ = jailpath.IceriginiSil(home, kopyaRel)
+		httpx.WriteError(w, http.StatusInternalServerError, "kopyalama başarısız: "+strings.TrimSpace(out))
 		return
 	}
 	// Sahiplik domain kullanıcısına
@@ -139,28 +146,49 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kopya adı")
 		return
 	}
-	kopyaDir := "/home/" + sk + "/kopyalar"
-	hedef := filepath.Join(kopyaDir, ad)
-	// Çok katmanlı guard: prefix + Clean sonrası hâlâ kopyalar/ altında + dizin mi
-	clean := filepath.Clean(hedef)
-	if !strings.HasPrefix(clean, kopyaDir+"/") {
-		httpx.WriteError(w, http.StatusBadRequest, "yol dışında")
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
-	fi, err := os.Stat(clean)
-	if err != nil || !fi.IsDir() {
+	// Silme tamamen fd-göreli yapılır: "kopyalar" veya kopya adı bir symlink'e
+	// çevrilmiş olsa bile root olarak jail dışında silme imkânsızdır
+	// (openat2 RESOLVE_BENEATH|NO_SYMLINKS + unlinkat).
+	rel := "kopyalar/" + ad
+	if err := jailpath.DizinDogrula(home, rel); err != nil {
 		httpx.WriteError(w, http.StatusNotFound, "kopya bulunamadı")
 		return
 	}
-	if err := os.RemoveAll(clean); err != nil { // normal dizin, bind-mount değil; fuser YOK
+	if err := jailpath.IceriginiSil(home, rel); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "silinemedi")
+		return
+	}
+	if err := os.Remove(filepath.Join(home, rel)); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "silinemedi")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// tenantKomut: komutu tenant kimliğinde, SHELL OLMADAN (argv) çalıştırır —
+// yol doğrulaması ile komut arasındaki TOCTOU penceresinde hedef takas edilse
+// bile DAC jail dışına yazmayı engeller.
+func tenantKomut(ctx context.Context, sk, ad string, args ...string) (string, error) {
+	full := append([]string{"-u", sk, "--", ad}, args...)
+	cmd := exec.CommandContext(ctx, "runuser", full...)
+	cmd.Env = []string{
+		"HOME=" + filepath.Join(jailpath.HomeKok, sk),
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
 func dirBoyutBayt(p string) int64 {
-	out, err := exec.Command("du", "-sb", p).Output()
+	// ÜST SINIRLI: çok dosyalı bir site ölçümü isteği süresiz bloklamasın.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "du", "-sb", p).Output()
 	if err != nil {
 		return 0
 	}
