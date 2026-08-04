@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/secretcrypt"
 )
 
 // GET /domains/{id}/backup-destination
@@ -92,7 +93,12 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 			Tip: req.Tip, Bucket: req.Bucket, Region: req.Region,
 			Endpoint: req.Endpoint, PathStyle: req.PathStyle,
 		}
-		if _, err := s3Endpoint(probe); err != nil {
+		u, err := s3Endpoint(probe)
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := hostGuvenliMi(r.Context(), u.Hostname()); err != nil {
 			httpx.WriteError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -102,6 +108,9 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !gecerliHost(req.Host) {
 		httpx.WriteError(w, http.StatusBadRequest, "host: geçersiz biçim (yalnız hostname/IP)")
+		return
+	} else if err := hostGuvenliMi(r.Context(), req.Host); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	} else if req.Port == 0 {
 		if req.Tip == "sftp" {
@@ -113,16 +122,34 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 	if req.UzakDizin == "" {
 		req.UzakDizin = "/"
 	}
-	// Parola boş gönderildi mi? Mevcut kaydı koru.
-	var mevcutParola string
-	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COALESCE(parola,'') FROM backup_destinations WHERE domain_id=?`, id).Scan(&mevcutParola)
-	if req.Parola == "" {
-		req.Parola = mevcutParola
-	}
-	if req.Parola == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "parola zorunlu (yeni kayıt)")
-		return
+	// Parola boş gönderildi mi? Mevcut kaydı koru (zaten şifreliyse ciphertext'i
+	// olduğu gibi taşı; eski düz-metin bir kayıtsa fırsattan istifade şifrele).
+	var parolaToStore string
+	if req.Parola != "" {
+		enc, err := box.Encrypt(req.Parola)
+		if err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "parola şifreleme: "+err.Error())
+			return
+		}
+		parolaToStore = enc
+	} else {
+		var mevcutParola string
+		_ = h.DB.QueryRowContext(r.Context(),
+			`SELECT COALESCE(parola,'') FROM backup_destinations WHERE domain_id=?`, id).Scan(&mevcutParola)
+		if mevcutParola == "" {
+			httpx.WriteError(w, http.StatusBadRequest, "parola zorunlu (yeni kayıt)")
+			return
+		}
+		if secretcrypt.IsEncrypted(mevcutParola) {
+			parolaToStore = mevcutParola
+		} else {
+			enc, err := box.Encrypt(mevcutParola)
+			if err != nil {
+				httpx.WriteError(w, http.StatusInternalServerError, "parola şifreleme: "+err.Error())
+				return
+			}
+			parolaToStore = enc
+		}
 	}
 	aktif := 0
 	if req.Aktif {
@@ -140,7 +167,7 @@ func (h *Handlers) PutDestination(w http.ResponseWriter, r *http.Request) {
 		   region=VALUES(region), endpoint=VALUES(endpoint),
 		   path_style=VALUES(path_style), aktif=VALUES(aktif),
 		   son_durum='', son_hata=''`,
-		id, req.Tip, req.Host, req.Port, req.Kullanici, req.Parola, req.UzakDizin,
+		id, req.Tip, req.Host, req.Port, req.Kullanici, parolaToStore, req.UzakDizin,
 		req.Bucket, req.Region, req.Endpoint, req.PathStyle, aktif)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB kayıt: "+err.Error())
@@ -199,7 +226,16 @@ func (h *Handlers) TestDestination(w http.ResponseWriter, r *http.Request) {
 		_ = h.DB.QueryRowContext(r.Context(),
 			`SELECT COALESCE(parola,'') FROM backup_destinations WHERE domain_id=?`, id).Scan(&mevcutParola)
 		if ad.Parola == "" {
-			ad.Parola = mevcutParola
+			if secretcrypt.IsEncrypted(mevcutParola) {
+				pt, err := box.Decrypt(mevcutParola)
+				if err != nil {
+					httpx.WriteError(w, http.StatusInternalServerError, "parola çözülemedi: "+err.Error())
+					return
+				}
+				ad.Parola = pt
+			} else {
+				ad.Parola = mevcutParola
+			}
 		}
 		port := ad.Port
 		if port == 0 {
@@ -229,7 +265,7 @@ func (h *Handlers) TestDestination(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	if err := testConnection(ctx, d); err != nil {
+	if err := testConnection(ctx, h.DB, d); err != nil {
 		short := err.Error()
 		if len(short) > 400 {
 			short = short[:400]

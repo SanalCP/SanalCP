@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.3.8",
-  "duyuru": "",
-  "kritik": false,
-  "yayin_tarihi": "2026-08-03"
+  "son_surum": "0.3.9",
+  "duyuru": "Yedek hedefleri (FTP/SFTP/S3) güvenlik sıkılaştırması: SSRF koruması, parola şifreleme, SFTP host key doğrulaması, komut satırından parola sızıntısının giderilmesi.",
+  "kritik": true,
+  "yayin_tarihi": "2026-08-04"
 }

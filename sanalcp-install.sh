@@ -86,8 +86,8 @@ step "2) Base packages"
 dnf install -y nginx httpd mariadb-server valkey certbot python3-certbot-nginx \
   clamav clamav-update httpd-tools mod_proxy_html tar openssl policycoreutils-python-utils \
   setools-console jq bind bind-utils nftables unzip zip cronie xfsprogs sudo \
-  bubblewrap rsync git curl acl >/dev/null 2>&1 \
-  && ok "nginx, httpd, mariadb, valkey, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, tools" || die "base package install"
+  bubblewrap rsync git curl acl lftp sshpass >/dev/null 2>&1 \
+  && ok "nginx, httpd, mariadb, valkey, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" || die "base package install"
 
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, in the
 # base repo, reliably reads RAR/RAR5 and itself rejects path-traversal). 🔴 NOTE:

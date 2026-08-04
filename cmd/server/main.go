@@ -154,6 +154,9 @@ func main() {
 	// Idempotent, göçecek satır yoksa no-op — diğer Heal*/Seed* fonksiyonlarıyla aynı desen.
 	hesaplar.HealLegacyPlaintextSecrets(context.Background(), d)
 
+	backups.Init(secretBox) // backup_destinations.parola şifreleme kutusu
+	backups.HealLegacyPlaintextDestinationPasswords(context.Background(), d)
+
 	ipv4 := detectIPv4()
 	log.Printf("server ipv4: %s", ipv4)
 
