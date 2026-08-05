@@ -14,52 +14,22 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
+
+	"golang.org/x/sys/unix"
 )
 
-// jailJoinStrict: symlink-aware. Parent dizini EvalSymlinks ile resolve eder,
-// sonra leaf'i join eder. Symlink ile dis-cikis engellenir.
-func jailJoinStrict(home, rel string) (string, error) {
-	rel = filepath.Clean("/" + rel)
-	wanted := filepath.Clean(filepath.Join(home, rel))
-
-	// homeResolved
-	homeResolved, err := filepath.EvalSymlinks(home)
-	if err != nil {
-		homeResolved = home
-	}
-
-	// wanted'in resolve edilebilir kismini bul
-	test := wanted
-	for {
-		if r, err := filepath.EvalSymlinks(test); err == nil {
-			// test bulundu, kalan path'i ekle ve kontrol et
-			rest := strings.TrimPrefix(wanted, test)
-			full := filepath.Clean(filepath.Join(r, rest))
-			if full == homeResolved || strings.HasPrefix(full, homeResolved+string(filepath.Separator)) {
-				return full, nil
-			}
-			return "", errEscape
-		}
-		// yoksa parent'a cik
-		parent := filepath.Dir(test)
-		if parent == test {
-			// kök, devam edemez
-			break
-		}
-		test = parent
-	}
-	// hicbir ata resolve olmadi (cok nadir); plain check
-	if wanted == homeResolved || strings.HasPrefix(wanted, homeResolved+string(filepath.Separator)) {
-		return wanted, nil
-	}
-	return "", errEscape
-}
+// NOT: jailJoinStrict KALDIRILDI. Yol'u EvalSymlinks ile ÇÖZÜP resolved bir string
+// döndürüyordu; işlem sonradan o string üzerinde yapıldığı için kontrol ile işlem
+// arasında ara-bileşen symlink'e takas edilebiliyordu (TOCTOU). Mutasyon yolları
+// zaten openat2'ye taşınmıştı, okuma/exec yolları da taşındı — geriye kullanan
+// kalmadı. Yeni bir yol işlemi için safeio.go'daki *Beneath yardımcılarını veya
+// dış araçlar için dogrulanmisYol+tenantKomut ikilisini kullanın; bu fonksiyonu
+// geri getirmeyin.
 
 // ----- Yaz (editor save) -----
 
@@ -220,13 +190,14 @@ func (h *Handlers) Extract(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	abs, err := jailJoinStrict(home, req.Yol)
+	// Arşivin kendisi: symlink-güvenli doğrula (openat2) — eski os.Stat(jailJoinStrict(...))
+	// resolved-string üzerindeydi.
+	abs, err := dogrulanmisYol(home, req.Yol)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, statusFromFsErr(err), "dosya bulunamadı")
 		return
 	}
-	info, err := os.Stat(abs)
-	if err != nil || info.IsDir() {
+	if info, serr := statBeneath(home, req.Yol); serr != nil || info.IsDir() {
 		httpx.WriteError(w, http.StatusBadRequest, "dosya bulunamadı veya klasör")
 		return
 	}
@@ -235,38 +206,48 @@ func (h *Handlers) Extract(w http.ResponseWriter, r *http.Request) {
 	if hedef == "" {
 		hedef = filepath.Dir(req.Yol)
 	}
-	hedefAbs, err := jailJoinStrict(home, hedef)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "hedef: "+err.Error())
-		return
-	}
-	if err := os.MkdirAll(hedefAbs, 0755); err != nil {
+	hedefRel := relClean(hedef)
+	// Hedef dizini symlink-güvenli oluştur (her bileşen Mkdirat+O_NOFOLLOW) — eski
+	// os.MkdirAll(hedefAbs) bir ara-bileşen symlink'ini izleyip jail DIŞINDA dizin açardı.
+	if err := mkdirAllBeneath(home, hedefRel, sk); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "mkdir hedef: "+err.Error())
 		return
 	}
+	hedefAbs, err := dogrulanmisYol(home, hedefRel)
+	if err != nil {
+		httpx.WriteError(w, statusFromFsErr(err), "hedef güvenli değil (symlink?)")
+		return
+	}
 	// GÜVENLİK: hedef dizini çıkarmadan ÖNCE tenant kullanıcısına devret ki
-	// çıkarma root DEĞİL, tenant olarak (DAC altında) çalışabilsin.
-	_, _ = exec.Command("chown", sk+":"+sk, hedefAbs).CombinedOutput()
+	// çıkarma root DEĞİL, tenant olarak (DAC altında) çalışabilsin. chownTreeBeneath
+	// fd-özyinelemelidir (symlink takip etmez); eski `chown -R` yol üzerinde çalışıyordu.
+	_ = chownTreeBeneath(home, hedefRel, sk)
 
 	low := strings.ToLower(abs)
 	if strings.HasSuffix(low, ".gz") && archivex.TuruBelirle(low) == archivex.TurBilinmeyen {
 		// Tek dosyalık .gz: üye yolu yoktur; tek risk çıktı dosyasının symlink
-		// üzerinden dışarı yazması. jailJoinStrict + O_NOFOLLOW ile kapat.
-		rel := filepath.Join(hedef, strings.TrimSuffix(filepath.Base(abs), ".gz"))
-		gzHedef, jerr := jailJoinStrict(home, rel)
-		if jerr != nil {
-			httpx.WriteError(w, http.StatusBadRequest, "gz hedef: "+jerr.Error())
-			return
-		}
-		// O_NOFOLLOW: gzHedef bir symlink ise ELi'ni takip etmeden hata ver.
-		gzOut, gzErr := os.OpenFile(gzHedef, os.O_CREATE|os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0644)
+		// üzerinden dışarı yazması.
+		rel := filepath.Join(hedefRel, strings.TrimSuffix(filepath.Base(abs), ".gz"))
+		// openat2: yalnız leaf değil, YOLUN TÜM bileşenleri symlink'e karşı korunur.
+		// Eski os.OpenFile(...O_NOFOLLOW) yalnız son bileşeni koruyordu — ara bir
+		// dizin symlink'e takas edilirse çıktı jail dışına yazılabilirdi.
+		gzOut, gzErr := openAt2Beneath(home, rel, unix.O_CREAT|unix.O_WRONLY|unix.O_TRUNC, 0644)
 		if gzErr != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "gz hedef: "+gzErr.Error())
+			httpx.WriteError(w, statusFromFsErr(gzErr), "gz hedef güvenli değil")
 			return
 		}
 		defer gzOut.Close()
+		fchownRestoreFd(home, gzOut, sk)
 		var eb bytes.Buffer
-		gzc := exec.Command("gunzip", "-k", "-c", abs)
+		// gunzip de tenant kimliğinde koşar: doğrulama-exec arasındaki yarışta bile
+		// jail dışı bir kaynak dosya açılamaz (arşivin kendisi root'a okutulmaz).
+		gzCtx, gzCancel := context.WithTimeout(r.Context(), 30*time.Minute)
+		defer gzCancel()
+		gzc, cerr := tenantKomut(gzCtx, sk, "gunzip", "-k", "-c", "--", abs)
+		if cerr != nil {
+			httpx.WriteError(w, http.StatusBadRequest, cerr.Error())
+			return
+		}
 		gzc.Stdout = gzOut
 		gzc.Stderr = &eb
 		if runErr := gzc.Run(); runErr != nil {
@@ -292,14 +273,20 @@ func (h *Handlers) Extract(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// İzole ortam: çıkartılan tüm dosyaları domain user'ına chown (+ SELinux context).
-	_, _ = exec.Command("chown", "-R", sk+":"+sk, hedefAbs).CombinedOutput()
+	// chown artık fd-özyinelemeli ve symlink-güvenli (bkz. safeio.go) — eski
+	// `chown -R <yol>`, hedef bir symlink'e takas edilirse jail dışında çalışabilirdi.
+	_ = chownTreeBeneath(home, hedefRel, sk)
+	// restorecon/setfacl'ın fd karşılığı yok, yol üzerinden çalışmak zorundalar.
+	// restorecon ağacı lstat ile gezer (bağı takip etmez); setfacl ise varsayılanda
+	// takip edebildiği için -P (physical) AÇIKÇA verilir — aksi hâlde ağaçtaki bir
+	// bağ üzerinden jail dışı bir dosyaya ACL yazılabilirdi.
 	_, _ = exec.Command("restorecon", "-R", hedefAbs).CombinedOutput()
 	// Per-user izin modeli (FIX 1): çıkarılan içeriğe nginx okuma-ACL'ini teyit et. docroot'un
 	// default-ACL'i genelde bunu zaten miras verir; hedef docroot-dışıysa/ACL yoksa garanti.
 	// setfacl yoksa (acl paketi eksik) sessiz atlanır — dosyalar tenant'ta, site diğer yolla servis edilir.
 	if _, err := exec.LookPath("setfacl"); err == nil {
-		_, _ = exec.Command("setfacl", "-R", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
-		_, _ = exec.Command("setfacl", "-R", "-d", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
+		_, _ = exec.Command("setfacl", "-P", "-R", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
+		_, _ = exec.Command("setfacl", "-P", "-R", "-d", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -405,52 +392,70 @@ func (h *Handlers) Archive(w http.ResponseWriter, r *http.Request) {
 	if req.Format == "" {
 		req.Format = "zip"
 	}
-	ciktiAbs, err := jailJoinStrict(home, req.CiktiYol)
+	// 🔴 GÜVENLİK (iki ayrı kusur, birlikte düzeltildi):
+	//
+	//  1) `zip` VARSAYILAN OLARAK sembolik bağı TAKİP EDER ve hedefin İÇERİĞİNİ
+	//     arşive koyar (`-y` bayrağı tam olarak bunu kapatmak için vardır). Arşivleme
+	//     root olarak koştuğu için tenant, home'una `ln -s /etc/shadow link` koyup o
+	//     dizini arşivleyerek indirdiğinde /etc/shadow'u okuyabiliyordu — YARIŞ BİLE
+	//     GEREKMEDEN, güvenilir biçimde. (tar bağı bağ olarak saklar, o yol temizdi.)
+	//  2) Araçlar root koşuyordu; internal/archivex çıkarma tarafında kurduğu
+	//     "tenant kimliğinde çalıştır" (DAC) katmanı burada uygulanmamıştı.
+	//
+	// Düzeltme: `-y` + `--` (seçenek/dosya ayracı) + runuser ile tenant kimliği +
+	// üst-sınırlı süre. Artık bir bağ hedefi arşive giremez; girse bile tenant'ın
+	// zaten okuyabildiği bir şey olurdu.
+	ciktiAbs, err := ciktiHazirla(home, req.CiktiYol, sk)
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "cikti: "+err.Error())
 		return
 	}
-	_ = os.MkdirAll(filepath.Dir(ciktiAbs), 0755)
 
-	// Tum kaynaklarin home-altinda abs yolunu hazirla, relative isimlerle arşivle
-	// Stratejisi: ortak parent'i bul, oradan çalış
-	var args []string
-	if req.Format == "zip" {
-		args = []string{"-r", "-q", ciktiAbs}
-		for _, k := range req.Kaynaklar {
-			kAbs, err := jailJoinStrict(home, k)
-			if err != nil {
-				continue
-			}
-			// chdir + relative isim
-			args = append(args, kAbs)
-		}
-		out, err := exec.Command("zip", args...).CombinedOutput()
+	kaynakAbs := make([]string, 0, len(req.Kaynaklar))
+	for _, k := range req.Kaynaklar {
+		kAbs, err := dogrulanmisYol(home, k)
 		if err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "zip: "+strings.TrimSpace(string(out)))
-			return
+			continue // jail dışı / symlink bileşenli kaynak sessizce atlanır
 		}
-	} else { // tar.gz
-		args = []string{"-czf", ciktiAbs}
-		for _, k := range req.Kaynaklar {
-			kAbs, err := jailJoinStrict(home, k)
-			if err != nil {
-				continue
-			}
-			args = append(args, kAbs)
-		}
-		out, err := exec.Command("tar", args...).CombinedOutput()
-		if err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "tar: "+strings.TrimSpace(string(out)))
-			return
-		}
+		kaynakAbs = append(kaynakAbs, kAbs)
 	}
-	_, _ = exec.Command("chown", sk+":"+sk, ciktiAbs).CombinedOutput()
+	if len(kaynakAbs) == 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "geçerli kaynak yok")
+		return
+	}
+
+	// Arşivleme büyük ağaçlarda uzun sürer; istek işleyen goroutine'i ve alt süreci
+	// süresiz açık bırakmamak için üst sınır.
+	arCtx, arCancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer arCancel()
+
+	// Yolların hepsi ciktiHazirla/dogrulanmisYol'dan gelir, yani daima "/home/c_..."
+	// ile başlar — hiçbiri "-" ile başlayamayacağı için argüman-olarak-seçenek
+	// (option injection) mümkün değil. Info-ZIP zip'in "--" ayracını desteklediği
+	// kesin olmadığından orada kullanılmaz; GNU tar'da destekli, bırakıldı.
+	var argv []string
+	if req.Format == "zip" {
+		// -y: sembolik bağı BAĞ olarak sakla (hedefi dereference ETME) — bu bayrak
+		// olmadan zip, bağın gösterdiği dosyanın İÇERİĞİNİ arşive koyar.
+		argv = append([]string{"zip", "-r", "-q", "-y", ciktiAbs}, kaynakAbs...)
+	} else { // tar.gz
+		argv = append([]string{"tar", "-czf", ciktiAbs, "--"}, kaynakAbs...)
+	}
+	cmd, err := tenantKomut(arCtx, sk, argv...)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError,
+			req.Format+": "+strings.TrimSpace(string(out)))
+		return
+	}
+	// Arşiv zaten tenant kimliğinde üretildi; yalnız SELinux etiketini düzelt.
 	_, _ = exec.Command("restorecon", ciktiAbs).CombinedOutput()
 
-	info, _ := os.Stat(ciktiAbs)
 	var boyut int64
-	if info != nil {
+	if info, serr := statBeneath(home, req.CiktiYol); serr == nil {
 		boyut = info.Size()
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -492,29 +497,40 @@ func (h *Handlers) YeniDosya(w http.ResponseWriter, r *http.Request) {
 // ----- Boyut hesapla (du -sb) -----
 
 func (h *Handlers) BoyutHesapla(w http.ResponseWriter, r *http.Request) {
-	home, _, err := h.home(r)
+	home, sk, err := h.home(r)
 	if err != nil {
 		httpx.WriteError(w, statusFromErr(err), err.Error())
 		return
 	}
 	rel := r.URL.Query().Get("yol")
-	abs, err := jailJoinStrict(home, rel)
+	abs, err := dogrulanmisYol(home, rel)
+	if err != nil {
+		httpx.WriteError(w, statusFromFsErr(err), "geçersiz yol")
+		return
+	}
+	// du tüm alt ağacı gezer; çok dosyalı bir dizinde istek işleyen goroutine'i
+	// süresiz bloklamasın diye ÜST SINIRLI çalıştırılır. Ayrıca tenant kimliğinde
+	// koşar: doğrulama ile exec arasındaki yarışta bile jail dışı bir ağaç
+	// ölçülemez (bkz. safeio.go'daki çift-savunma notu).
+	duCtx, duCancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer duCancel()
+	cmd, err := tenantKomut(duCtx, sk, "du", "-sb", "--", abs)
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// du tüm alt ağacı gezer; çok dosyalı bir dizinde istek işleyen goroutine'i
-	// süresiz bloklamasın diye ÜST SINIRLI çalıştırılır.
-	duCtx, duCancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer duCancel()
-	out, err := exec.CommandContext(duCtx, "du", "-sb", abs).CombinedOutput()
-	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "du: "+strings.TrimSpace(string(out)))
-		return
-	}
+	// du, tenant kimliğinde koştuğu için okunamayan bir alt dizinde sıfır-olmayan
+	// kod döndürür ama TOPLAMI yine de basar. Çıkış kodunu değil, ayrıştırılabilir
+	// bir toplam olup olmadığını ölçüt al — aksi hâlde tek bir izin pürüzü bütün
+	// "boyut hesapla" işlemini 500'e düşürürdü.
+	out, err := cmd.Output()
 	parts := strings.Fields(string(out))
 	if len(parts) < 1 {
-		httpx.WriteError(w, http.StatusInternalServerError, "du çıktı parse edilemedi")
+		mesaj := "du çıktı parse edilemedi"
+		if err != nil {
+			mesaj = "du: " + err.Error()
+		}
+		httpx.WriteError(w, http.StatusInternalServerError, mesaj)
 		return
 	}
 	var b int64
@@ -533,7 +549,7 @@ func (h *Handlers) BoyutHesapla(w http.ResponseWriter, r *http.Request) {
 // ----- Arama (recursive find by name pattern) -----
 
 func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
-	home, _, err := h.home(r)
+	home, sk, err := h.home(r)
 	if err != nil {
 		httpx.WriteError(w, statusFromErr(err), err.Error())
 		return
@@ -547,9 +563,9 @@ func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "/"
 	}
-	baseAbs, err := jailJoinStrict(home, rel)
+	baseAbs, err := dogrulanmisYol(home, rel)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, statusFromFsErr(err), "geçersiz yol")
 		return
 	}
 
@@ -558,7 +574,20 @@ func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
 	q = strings.ReplaceAll(q, "?", "")
 	pattern := "*" + q + "*"
 
-	out, _ := exec.Command("find", baseAbs, "-iname", pattern, "-printf", "%p\t%s\t%y\t%T@\n").Output()
+	// 🔴 find ÜST SINIRSIZ çalışıyordu: milyonlarca dosyalı bir ağaçta istek işleyen
+	// goroutine'i ve alt süreci süresiz meşgul ederdi — kimliği doğrulanmış bir
+	// tenant, ucu tekrar tekrar çağırarak sunucuyu CPU/proses tükenmesine
+	// sürükleyebilirdi. Artık süre sınırlı ve tenant kimliğinde koşar.
+	// (-maxdepth yok: arama derinliği kullanıcı beklentisi; sınır süre + 500 sonuç.)
+	araCtx, araCancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer araCancel()
+	cmd, err := tenantKomut(araCtx, sk, "find", baseAbs, "-iname", pattern,
+		"-printf", "%p\t%s\t%y\t%T@\n")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	out, _ := cmd.Output() // zaman aşımı/kısmi çıktı: elde olan sonuçlar döndürülür
 	results := []Entry{}
 	for _, ln := range strings.Split(string(out), "\n") {
 		if ln == "" {
@@ -587,7 +616,9 @@ func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
 		if yolRel == "" {
 			yolRel = "/"
 		}
-		info, _ := os.Stat(absp)
+		// find'in bastigi mutlak yol yerine home'a-goreli yolu kullan: statBeneath
+		// openat2 ile acar, yani jail disina isaret eden bir girdi stat'lanamaz.
+		info, _ := statBeneath(home, yolRel)
 		mod := "0644"
 		var degisme string
 		if info != nil {

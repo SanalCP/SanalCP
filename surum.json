@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.5",
-  "duyuru": "Antivirüs Tarama sayfasına, taramanın CPU kullanımını geçici olarak yükseltebileceğini belirten bir uyarı eklendi.",
-  "kritik": false,
-  "yayin_tarihi": "2026-08-04"
+  "son_surum": "0.5.6",
+  "duyuru": "Güvenlik: dosya yöneticisinin okuma ve arşivleme yolları symlink saldırılarına karşı sertleştirildi; giriş ekranına hesap bazlı kaba-kuvvet koruması eklendi.",
+  "kritik": true,
+  "yayin_tarihi": "2026-08-05"
 }

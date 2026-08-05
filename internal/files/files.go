@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/sys/unix"
 )
 
 // MaxUploadBytes: tek yükleme için üst sınır. Onceden 10 GiB idi ve ParseMultipartForm'a
@@ -126,44 +126,33 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "/"
 	}
-	abs, err := jailJoinStrict(home, rel)
+	// TOCTOU symlink-güvenli listeleme: dizin openat2(RESOLVE_BENEATH|NO_SYMLINKS)
+	// ile pinlenir, girdiler AT_SYMLINK_NOFOLLOW ile fstatat edilir (bkz. safeio.go).
+	// Eski os.ReadDir(jailJoinStrict(...)) resolved-string üzerinde çalışıyordu →
+	// ara-bileşen symlink takasıyla jail DIŞI bir dizin listelenebilirdi.
+	dir, err := readDirBeneath(home, rel)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	dir, err := os.ReadDir(abs)
-	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "okuma: "+err.Error())
+		httpx.WriteError(w, statusFromFsErr(err), "okuma: "+err.Error())
 		return
 	}
 	out := make([]Entry, 0, len(dir))
 	for _, e := range dir {
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
 		tip := "dosya"
-		if info.IsDir() {
+		if e.Mode.IsDir() {
 			tip = "klasor"
-		} else if info.Mode()&os.ModeSymlink != 0 {
+		} else if e.Mode&os.ModeSymlink != 0 {
 			tip = "sembolik"
 		}
-		// Sahip / grup (Linux): FileInfo.Sys() → *syscall.Stat_t. Çözülemezse "-".
-		sahip, grup := "-", "-"
-		if st, ok := info.Sys().(*syscall.Stat_t); ok {
-			sahip = uidAdi(st.Uid)
-			grup = gidAdi(st.Gid)
-		}
 		out = append(out, Entry{
-			Adi:      e.Name(),
-			Yol:      filepath.ToSlash(filepath.Join(rel, e.Name())),
+			Adi:      e.Ad,
+			Yol:      filepath.ToSlash(filepath.Join(rel, e.Ad)),
 			Tip:      tip,
-			BoyutB:   info.Size(),
-			Mod:      "0" + strconv.FormatInt(int64(info.Mode().Perm()), 8),
-			Yetkiler: yetkiRWX(info.Mode()),
-			Sahip:    sahip,
-			Grup:     grup,
-			Degisme:  info.ModTime().UTC().Format("2006-01-02T15:04:05Z"),
+			BoyutB:   e.Boyut,
+			Mod:      "0" + strconv.FormatInt(int64(e.Mode.Perm()), 8),
+			Yetkiler: yetkiRWX(e.Mode),
+			Sahip:    uidAdi(e.UID),
+			Grup:     gidAdi(e.GID),
+			Degisme:  e.MTime.UTC().Format("2006-01-02T15:04:05Z"),
 		})
 	}
 	// klasörler önce, sonra alfabetik
@@ -189,30 +178,47 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := r.URL.Query().Get("yol")
-	abs, err := jailJoinStrict(home, rel)
+	// TOCTOU symlink-güvenli: dosyayı openat2 ile AÇ, sonra AÇIK fd üzerinden
+	// stat'la ve akıt. Eski os.Stat+os.Open(jailJoinStrict(...)) resolved-string
+	// üzerinde çalışıyordu → yarışla /etc/shadow indirilebilirdi (bkz. safeio.go).
+	f, err := openReadBeneath(home, rel)
 	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteError(w, statusFromFsErr(err), "bulunamadı")
 		return
 	}
-	info, err := os.Stat(abs)
+	defer f.Close()
+	info, err := f.Stat()
 	if err != nil {
-		httpx.WriteError(w, http.StatusNotFound, "bulunamadı")
+		httpx.WriteError(w, http.StatusInternalServerError, "okunamadı")
 		return
 	}
 	if info.IsDir() {
 		httpx.WriteError(w, http.StatusBadRequest, "klasör indirilemez")
 		return
 	}
-	f, err := os.Open(abs)
-	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "açılamadı: "+err.Error())
-		return
-	}
-	defer f.Close()
+	// İndirilen ad kullanıcı-verdiği yoldan gelir; başlık enjeksiyonunu (CRLF) ve
+	// tırnak kaçışını engellemek için ad temizlenir.
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Name()+"\"")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+dosyaAdiTemizle(filepath.Base(relClean(rel)))+"\"")
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 	_, _ = io.Copy(w, f)
+}
+
+// dosyaAdiTemizle: Content-Disposition'daki tırnaklı ad alanını bozabilecek
+// karakterleri (çift tırnak, ters bölü, kontrol karakterleri) atar. Go'nun
+// başlık yazıcısı CR/LF'i zaten temizler, yani bu başlık enjeksiyonuna karşı
+// ikinci katman; asıl işi tenant'ın seçtiği adın alanı kapatmasını önlemek.
+func dosyaAdiTemizle(ad string) string {
+	temiz := strings.Map(func(c rune) rune {
+		if c == '\r' || c == '\n' || c == '"' || c == '\\' || c < 0x20 {
+			return -1
+		}
+		return c
+	}, ad)
+	if temiz == "" {
+		return "dosya"
+	}
+	return temiz
 }
 
 // Metin dosyasini okuma (editor icin)
@@ -223,30 +229,38 @@ func (h *Handlers) Read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := r.URL.Query().Get("yol")
-	abs, err := jailJoinStrict(home, rel)
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	info, err := os.Stat(abs)
-	if err != nil {
-		httpx.WriteError(w, http.StatusNotFound, "bulunamadı")
-		return
-	}
-	if info.Size() > 2*1024*1024 {
+	// TOCTOU symlink-güvenli okuma (bkz. safeio.go): boyut kontrolü de AÇIK fd
+	// üzerinden yapılır, yani "küçük dosyayı stat'la, büyük/başka dosyayı oku"
+	// yarışı mümkün değildir.
+	const editorSinir = 2 * 1024 * 1024
+	data, boyut, err := readFileBeneath(home, rel, editorSinir)
+	if errors.Is(err, errTooBig) {
 		httpx.WriteError(w, http.StatusBadRequest, "dosya 2 MB'tan büyük; düzenleme için uygun değil")
 		return
 	}
-	data, err := os.ReadFile(abs)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		httpx.WriteError(w, statusFromFsErr(err), "okunamadı")
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"yol":    rel,
 		"icerik": string(data),
-		"boyut":  info.Size(),
+		"boyut":  boyut,
 	})
+}
+
+// statusFromFsErr: symlink-güvenli dosya işlemlerinin errno'sunu HTTP durumuna
+// çevirir. ELOOP/EXDEV = jail ihlali girişimi (403), ENOENT = 404, gerisi 500.
+func statusFromFsErr(err error) int {
+	switch {
+	case errors.Is(err, unix.ELOOP), errors.Is(err, unix.EXDEV):
+		return http.StatusForbidden
+	case errors.Is(err, os.ErrNotExist), errors.Is(err, unix.ENOENT):
+		return http.StatusNotFound
+	case errors.Is(err, unix.ENOTDIR), errors.Is(err, unix.EISDIR), errors.Is(err, errTooBig):
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
 
 type mkdirReq struct {
