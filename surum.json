@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.6",
-  "duyuru": "Güvenlik: dosya yöneticisinin okuma ve arşivleme yolları symlink saldırılarına karşı sertleştirildi; giriş ekranına hesap bazlı kaba-kuvvet koruması eklendi.",
+  "son_surum": "0.5.7",
+  "duyuru": "Güvenlik: giriş hız-sınırının IP sahteciliğiyle atlatılabilmesi kapatıldı; mailbox parolası artık API yanıtında düz metin dönmüyor; slow-DoS zaman aşımı yüzeyi daraltıldı.",
   "kritik": true,
   "yayin_tarihi": "2026-08-05"
 }
