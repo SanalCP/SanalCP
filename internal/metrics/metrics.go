@@ -38,6 +38,13 @@ func (d *durumYazici) WriteHeader(kod int) {
 	d.ResponseWriter.WriteHeader(kod)
 }
 
+// Unwrap alttaki gerçek ResponseWriter'ı döner — http.ResponseController'ın
+// (ör. büyük yükleme/indirme uçlarında per-istek soket deadline uzatması,
+// bkz. httpx.ExtendDeadline) bu sarmalayıcının arkasına geçebilmesi için gerekli.
+func (d *durumYazici) Unwrap() http.ResponseWriter {
+	return d.ResponseWriter
+}
+
 // Middleware — chi router'ına global r.Use(...) ile takılır; her isteğin
 // sayısını ve süresini "yol" etiketiyle (ham path DEĞİL, chi route şablonu —
 // örn. /domains/{id}, /domains/123 değil) kaydeder; aksi hâlde her domain/id

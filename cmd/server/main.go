@@ -118,6 +118,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	httpx.SetTrustedProxies(cfg.TrustedProxyCIDRs)
 	d, err := db.Open(cfg.DBDsn)
 	if err != nil {
 		// Reboot/MariaDB gecikmesinde anında log.Fatalf ile ölmek yerine bekle+tekrar dene.
@@ -276,10 +277,12 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	// NOT: chimw.RealIP KULLANILMIYOR — spoof edilebilir X-Forwarded-For/X-Real-IP
-	// başlıklarını güvenilir-vekil kontrolü olmadan r.RemoteAddr'a yazıp giriş
-	// hız-sınırını atlatılabilir kılardı. Gerçek istemci IP'si httpx.ClientIP ile
-	// alınır; nginx zaten bu başlıkları yalnız kendi gördüğü gerçek bağlantı
-	// adresiyle üretir (bkz. assets/nginx/_panel.conf).
+	// başlıklarını kontrolsüz r.RemoteAddr'a yazıp giriş hız-sınırını atlatılabilir
+	// kılardı. Gerçek istemci IP'si httpx.ClientIP ile alınır; bu başlıklar SADECE
+	// doğrudan bağlanan taraf TRUSTED_PROXY_CIDRS ile tanımlı güvenilir bir vekil
+	// listesindeyse dikkate alınır (bkz. httpx.SetTrustedProxies). Env boşsa
+	// (varsayılan) başlıklar tamamen yok sayılır — nginx reload hatası veya yanlış
+	// dağıtımda uygulama katmanı kendi başına ayakta kalır.
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(300 * time.Second))
 	r.Use(metrics.Middleware) // toplama burada; sunum (/metrics) loopback-only cliSrv'de (aşağıda)
@@ -384,6 +387,7 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail", mailH.Ekle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/{mid}", mailH.Sil)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/mail/{mid}/parola", mailH.ParolaSifirla)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/{mid}/parola-reveal/{token}", mailH.ParolaGoster)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/{mid}/durum", mailH.DurumDegistir)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/aliases", mailH.AliasListe)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/aliases", mailH.AliasEkle)
@@ -632,9 +636,18 @@ func main() {
 		Addr:              cfg.ListenAddr,
 		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Minute, // buyuk upload icin genis ust sinir (slowloris ust siniri kalir)
-		WriteTimeout:      30 * time.Minute, // buyuk upload/download: yanit yazma deadline-i erken gecmesin
-		IdleTimeout:       120 * time.Second,
+		// 🔴 GÜVENLİK: Bu değerler eskiden 30dk idi — TÜM uçlara (login dahil)
+		// uygulandığından, kimliği doğrulanmış bir istemci 1 byte/sn ile gövde
+		// göndererek bağlantıyı 30 dakika açık tutabilir, dosya tanıtıcılarını
+		// tüketebilirdi (slow-DoS). 6dk, chi.Timeout(300s) üst sınırının hemen
+		// üzerinde bir güvenlik payı bırakır (normal exec-bağımlı admin işlemleri
+		// zaten o sınıra göre tasarlandı). Gerçekten uzun sürmesi beklenen büyük
+		// dosya/arşiv/DB yükleme-indirme uçları httpx.ExtendDeadline ile kendi
+		// isteklerinde bu süreyi ayrıca uzatır (bkz. internal/files/files.go,
+		// internal/backups/backups.go, internal/iceaktarim/*.go).
+		ReadTimeout:  6 * time.Minute,
+		WriteTimeout: 6 * time.Minute,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// /metrics — cliapi.Routes'un site-CLI token zorunluluğunun DIŞINDA, ama aynı
@@ -647,9 +660,13 @@ func main() {
 		Addr:              cfg.CLIListenAddr,
 		Handler:           cliMux,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Minute, // buyuk db:import upload'lari icin genis ust sinir
-		WriteTimeout:      10 * time.Minute, // buyuk db:export indirmeleri icin genis ust sinir
-		IdleTimeout:       60 * time.Second,
+		// Bu sunucu loopback-only olsa da hız sınırı düşük tutulur: db/export ve
+		// db/import kendi isteklerinde httpx.ExtendDeadline ile 10dk'ya uzatır
+		// (bkz. internal/cliapi/db_handlers.go); cache/purge gibi diğer uçlar
+		// saniyeler içinde tamamlanır, uzun varsayılana ihtiyaçları yok.
+		ReadTimeout:  1 * time.Minute,
+		WriteTimeout: 1 * time.Minute,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	monitor.StartYukSampler(d, 60*time.Second)         // dashboard yük geçmişi örnekleyici

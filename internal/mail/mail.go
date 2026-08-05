@@ -218,8 +218,10 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	}
 	mid, _ := res.LastInsertId()
 	h.audit(r, "mail.create", email, true)
+	// Parola artık düz metin dönmüyor — UI, dönen token'la ParolaGoster'ı bir
+	// kez çağırıp gösterir (bkz. reveal.go).
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"id": mid, "email": email, "parola": req.Parola,
+		"id": mid, "email": email, "parola_reveal_token": revealSakla(mid, req.Parola),
 	})
 }
 
@@ -293,7 +295,35 @@ func (h *Handlers) ParolaSifirla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "mail.parola", strconv.FormatInt(mid, 10), true)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "parola": req.Parola})
+	// Parola artık düz metin dönmüyor — UI, dönen token'la ParolaGoster'ı bir
+	// kez çağırıp gösterir (bkz. reveal.go).
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "parola_reveal_token": revealSakla(mid, req.Parola)})
+}
+
+// GET /domains/{id}/mail/{mid}/parola-reveal/{token} — yeni üretilen/sıfırlanan
+// parolayı BİR KEZ gösterir; token bulunur bulunmaz tüketilir (bkz. revealAl).
+// create/reset yanıtı parolayı artık taşımıyor; UI bu uca hemen ardından tek
+// seferlik bir çağrı yapıp gösteriyor.
+func (h *Handlers) ParolaGoster(w http.ResponseWriter, r *http.Request) {
+	id, _, _, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	mid, _ := strconv.ParseInt(chi.URLParam(r, "mid"), 10, 64)
+	var exists int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT 1 FROM mailboxes WHERE id=? AND domain_id=?`, mid, id).Scan(&exists); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "kutu bulunamadı")
+		return
+	}
+	parola, ok := revealAl(chi.URLParam(r, "token"), mid)
+	if !ok {
+		httpx.WriteError(w, http.StatusGone, "gösterim süresi doldu veya parola zaten görüntülendi")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store, private")
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"parola": parola})
 }
 
 // POST /domains/{id}/mail/{mid}/durum  {status: "active"|"suspended"}

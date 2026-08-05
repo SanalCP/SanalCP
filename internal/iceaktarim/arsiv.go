@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
@@ -50,6 +51,9 @@ func (h *Handlers) ArsivYukle(w http.ResponseWriter, r *http.Request) {
 	}
 	stageTemizle(home)
 
+	// Büyük arşiv yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
+	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxArsivBayt+(1<<20))
 	mr, err := r.MultipartReader()
 	if err != nil {

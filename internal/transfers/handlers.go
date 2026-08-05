@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/cron"
@@ -44,6 +45,9 @@ type Handlers struct {
 // Analyze accepts a cPanel full backup and returns an inventory. It never
 // extracts or persists archive contents.
 func (h *Handlers) Analyze(w http.ResponseWriter, r *http.Request) {
+	// Büyük cPanel arşiv yüklemeleri sunucunun kısa varsayılan zaman aşımını
+	// (bkz. cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
 	// Envanter arşivi baştan sona sıralı okur, dolayısıyla yüklemeyi diske almaya
 	// gerek yok: ParseMultipartForm 20 GiB'e kadar dosyayı geçici dizine kopyalardı.
@@ -127,6 +131,9 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "domain sağlayıcısı hazır değil")
 		return
 	}
+	// Büyük cPanel arşiv yüklemeleri sunucunun kısa varsayılan zaman aşımını
+	// (bkz. cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "arşiv yüklenemedi veya boyut sınırı aşıldı")

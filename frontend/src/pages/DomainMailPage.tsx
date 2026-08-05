@@ -94,7 +94,7 @@ export default function DomainMailPage() {
     setHata(null); setOk(null); setYeniPw(null); setIsleniyor(true)
     try {
       const { data } = await api.post(`/domains/${id}/mail`, { local_part: localPart, parola })
-      setYeniPw({ email: data.email, parola: data.parola })
+      await parolaGoster(data.id, data.email, data.parola_reveal_token)
       setLocalPart(''); setParola('')
       yukle()
     } catch (e2) {
@@ -102,6 +102,14 @@ export default function DomainMailPage() {
     } finally {
       setIsleniyor(false)
     }
+  }
+
+  // Sunucu artık parolayı create/reset yanıtında düz metin döndürmüyor — tek
+  // kullanımlık gösterim token'ı ile ayrı bir istekte bir kez gösterilir
+  // (bkz. internal/mail/reveal.go).
+  async function parolaGoster(mailboxId: number, email: string, token: string) {
+    const { data } = await api.get(`/domains/${id}/mail/${mailboxId}/parola-reveal/${token}`)
+    setYeniPw({ email, parola: data.parola })
   }
 
   async function sil(k: Mailbox) {
@@ -119,7 +127,7 @@ export default function DomainMailPage() {
     setHata(null); setOk(null); setYeniPw(null)
     try {
       const { data } = await api.put(`/domains/${id}/mail/${k.id}/parola`, {})
-      setYeniPw({ email: k.email, parola: data.parola })
+      await parolaGoster(k.id, k.email, data.parola_reveal_token)
     } catch (e) {
       setHata(apiHata(e, t('DomainMailPage:mailbox.reset_failed')))
     }

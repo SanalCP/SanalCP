@@ -17,10 +17,10 @@ package middleware
 //   - Kademeli gecikme: her başarısız denemeden sonra istek yavaşlatılır (üst sınırlı).
 //   - Kayıtlar periyodik budanır (bellek şişmesi/DoS önlenir).
 //
-// NOT: IP anahtarı httpx.ClientIP'ten gelir; nginx bu değeri sadece kendi gördüğü
-// gerçek bağlantı adresinden ($remote_addr) üretir ve client'ın gönderdiği
-// X-Forwarded-For/X-Real-IP değerlerinin üzerine yazar (bkz. assets/nginx/_panel.conf) —
-// aksi halde sahte bir başlıkla bu sınır IP-rotasyonuyla atlatılabilirdi.
+// NOT: IP anahtarı httpx.ClientIP'ten gelir; bu, TRUSTED_PROXY_CIDRS ile
+// tanımlanmış güvenilir bir vekilden gelmediği sürece X-Forwarded-For/X-Real-IP
+// başlıklarını hiç okumaz, doğrudan r.RemoteAddr kullanır — aksi halde sahte
+// bir başlıkla bu sınır IP-rotasyonuyla atlatılabilirdi.
 
 import (
 	"bytes"
