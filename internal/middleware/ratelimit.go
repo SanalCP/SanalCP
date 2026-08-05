@@ -23,9 +23,13 @@ package middleware
 // aksi halde sahte bir başlıkla bu sınır IP-rotasyonuyla atlatılabilirdi.
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,6 +70,19 @@ func girisTemizleyici() {
 			}
 		}
 		girisMu.Unlock()
+
+		// Hesap haritası da budanır: aksi hâlde saldırgan her istekte FARKLI bir
+		// kullanıcı adı göndererek haritayı sınırsız büyütüp belleği tüketebilirdi
+		// (kimlik doğrulama ÖNCESİ erişilebilen bir yüzey).
+		hesapEsik := simdi.Add(-(hesapPencere + hesapKilit))
+		hesapMu.Lock()
+		for ad, k := range hesapMap {
+			bosVeEski := len(k.hatalar) == 0 || k.hatalar[len(k.hatalar)-1].Before(hesapEsik)
+			if k.kilitBitis.Before(simdi) && bosVeEski {
+				delete(hesapMap, ad)
+			}
+		}
+		hesapMu.Unlock()
 	}
 }
 
@@ -128,7 +145,106 @@ func (d *girisDurumYazici) WriteHeader(k int) {
 	d.ResponseWriter.WriteHeader(k)
 }
 
+// ---- Hesap bazlı sınır (dağıtık kaba-kuvvete karşı) ----
+//
+// 🔴 NEDEN GEREKLİ: yukarıdaki sınır yalnız IP başınadır. Bir botnet ya da bol
+// IPv6 önekine sahip bir saldırgan her denemeyi başka bir adresten yaparsa IP
+// sayacı hiç dolmaz ve TEK bir hesaba (pratikte root'a) yapılan çevrimiçi
+// kaba-kuvvet SINIRSIZ olur. Bu yüzden hedef HESABA göre de sayılır.
+//
+// KİLİTLEME-DoS DENGESİ: hesap kilidi, saldırganın yöneticiyi dışarıda bırakmak
+// için kasten yanlış parola göndermesine de yarayabilir. Bu yüzden eşik IP
+// sınırından belirgin biçimde YÜKSEK (kazara tetiklenmez) ve süre KISA tutuldu:
+// dağıtık saldırıyı sınırsızdan ~80 deneme/saat'e indirir, ama yöneticiyi en
+// fazla 15 dakika bekletir.
+const (
+	hesapPencere = 15 * time.Minute
+	hesapMaxHata = 20
+	hesapKilit   = 15 * time.Minute
+)
+
+var (
+	hesapMu  sync.Mutex
+	hesapMap = map[string]*girisKayit{}
+)
+
+// hesapDurum / hesapHataEkle — girisDurum/girisHataEkle ile aynı kayan-pencere
+// mantığı, ayrı eşik ve ayrı harita üzerinde.
+func hesapDurum(ad string) time.Duration {
+	simdi := time.Now()
+	hesapMu.Lock()
+	defer hesapMu.Unlock()
+	k := hesapMap[ad]
+	if k == nil {
+		return 0
+	}
+	if simdi.Before(k.kilitBitis) {
+		return k.kilitBitis.Sub(simdi)
+	}
+	kes := simdi.Add(-hesapPencere)
+	yeni := k.hatalar[:0]
+	for _, t := range k.hatalar {
+		if t.After(kes) {
+			yeni = append(yeni, t)
+		}
+	}
+	k.hatalar = yeni
+	return 0
+}
+
+func hesapHataEkle(ad string) {
+	simdi := time.Now()
+	hesapMu.Lock()
+	defer hesapMu.Unlock()
+	k := hesapMap[ad]
+	if k == nil {
+		k = &girisKayit{}
+		hesapMap[ad] = k
+	}
+	k.hatalar = append(k.hatalar, simdi)
+	if len(k.hatalar) >= hesapMaxHata {
+		k.kilitBitis = simdi.Add(hesapKilit)
+		k.hatalar = nil
+	}
+}
+
+// girisMaxGovde — bir giriş isteği gövdesinin üst sınırı. Gerçek gövde birkaç
+// yüz bayttır (kullanıcı/parola/kod); sınır, sayaç anahtarını çıkarmak için
+// istek başına keyfi bellek ayırmayı engeller (kimlik doğrulama ÖNCESİ bir DoS
+// yüzeyi).
+const girisMaxGovde = 8 << 10
+
+// hesapAdiOku — istek gövdesinden hedef kullanıcı adını okur ve gövdeyi
+// handler'ın tekrar okuyabilmesi için GERİ KOYAR.
+//
+// asiri=true ise gövde sınırı aşmıştır; çağıran isteği reddeder. Gövdeyi kırpıp
+// devam etmek YANLIŞ olurdu: kırpılmış JSON handler'da 400'e düşerdi ve istek
+// hiçbir sayaca girmeden geçip giderdi.
+func hesapAdiOku(r *http.Request) (ad string, asiri bool) {
+	if r.Body == nil {
+		return "", false
+	}
+	govde, err := io.ReadAll(io.LimitReader(r.Body, girisMaxGovde+1))
+	_ = r.Body.Close()
+	if len(govde) > girisMaxGovde {
+		return "", true
+	}
+	r.Body = io.NopCloser(bytes.NewReader(govde))
+	if err != nil {
+		return "", false
+	}
+	var g struct {
+		Kullanici string `json:"kullanici"`
+	}
+	if json.Unmarshal(govde, &g) != nil {
+		return "", false // ad çözülemedi → yalnız IP sınırı işler
+	}
+	return strings.ToLower(strings.TrimSpace(g.Kullanici)), false
+}
+
 // GirisLimiti — kimlik doğrulama uçlarına kaba-kuvvet koruması (401 sayar).
+// İki bağımsız sayaç uygular: kaynak IP (yoğun tek-kaynak saldırısı) ve hedef
+// hesap (IP rotasyonlu dağıtık saldırı).
 func GirisLimiti(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := httpx.ClientIP(r)
@@ -139,6 +255,20 @@ func GirisLimiti(next http.Handler) http.Handler {
 			httpx.WriteError(w, http.StatusTooManyRequests,
 				fmt.Sprintf("çok fazla başarısız giriş denemesi — %s sonra tekrar deneyin", sureMetni(sn)))
 			return
+		}
+		hesap, asiri := hesapAdiOku(r)
+		if asiri {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "giriş isteği çok büyük")
+			return
+		}
+		if hesap != "" {
+			if hk := hesapDurum(hesap); hk > 0 {
+				sn := int(hk.Seconds()) + 1
+				w.Header().Set("Retry-After", strconv.Itoa(sn))
+				httpx.WriteError(w, http.StatusTooManyRequests,
+					fmt.Sprintf("bu hesaba çok fazla başarısız giriş denendi — %s sonra tekrar deneyin", sureMetni(sn)))
+				return
+			}
 		}
 		if adet > 0 { // kademeli yavaşlatma
 			g := time.Duration(adet) * 250 * time.Millisecond
@@ -151,6 +281,14 @@ func GirisLimiti(next http.Handler) http.Handler {
 		next.ServeHTTP(dw, r)
 		if dw.kod == http.StatusUnauthorized {
 			girisHataEkle(ip)
+			if hesap != "" {
+				hesapHataEkle(hesap)
+			}
 		}
+		// Sayaç BAŞARIDA da sıfırlanmaz — IP tarafındaki gerekçenin aynısı, hesap
+		// ölçeğinde: 2FA akışında parola doğru olunca 200 + iki_fa_gerekli dönüyor.
+		// Sıfırlasaydık, parolayı ele geçirmiş bir saldırgan her denemeden önce
+		// "parola-only" istek atıp sayacı düşürerek TOTP kodunu IP rotasyonuyla
+		// sınırsız deneyebilirdi. Pencere dolunca sayaç kendiliğinden düşer.
 	})
 }

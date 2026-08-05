@@ -14,15 +14,21 @@ package files
 // AlmaLinux 10 / kernel 6.12 openat2'yi destekler.
 
 import (
+	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
+
+// errTooBig: readFileBeneath'in boyut sınırı aşıldığında döndürdüğü sentinel.
+var errTooBig = errors.New("dosya boyut sınırını aşıyor")
 
 const dirOpenFlags = unix.O_DIRECTORY | unix.O_NOFOLLOW | unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NONBLOCK
 
@@ -143,6 +149,185 @@ func fchownRestoreFd(home string, f *os.File, sk string) {
 }
 
 // ---- Yüksek seviye, symlink-güvenli mutasyonlar ----
+
+// ---- Symlink-güvenli OKUMA ----
+//
+// 🔴 Bu bölüm eksikti: mutasyon yolları (yaz/sil/taşı/chmod) openat2'ye taşınmışken
+// OKUMA yolları (List/Read/Download) jailJoinStrict'in döndürdüğü RESOLVED STRING
+// üzerinde os.ReadDir/os.Stat/os.Open ile çalışmayı sürdürüyordu. jailJoinStrict
+// kontrol ANINDA symlink'i çözer; işlem SONRADAN yola göre yapılır. Tenant, kontrol
+// ile açma arasında ara bileşeni symlink'e takas ederek (renameat2 RENAME_EXCHANGE
+// döngüsü — kazanması kolay bir yarış) root'a jail DIŞINDAKİ bir dosyayı okutabilirdi:
+// /etc/shadow, panelin JWT gizli anahtarı, SSL özel anahtarları. Yazma tarafındaki
+// aynı sınıf düzeltilmişken okuma tarafının açık kalması, bilgi-sızması yönünde tam
+// eşdeğer bir yetki yükseltmesiydi.
+
+// openReadBeneath: home altındaki dosyayı okumak için symlink-güvenli açar.
+// Ara bileşen veya leaf symlink ise ELOOP, jail dışına çıkıyorsa EXDEV döner.
+func openReadBeneath(home, rel string) (*os.File, error) {
+	return openAt2Beneath(home, rel, unix.O_RDONLY|unix.O_NONBLOCK, 0)
+}
+
+// readFileBeneath: symlink-güvenli dosya okuma. limit'ten büyük dosyalarda
+// (ör. editör 2 MB sınırı) okumaya hiç girmeden boyutu da döndürür.
+func readFileBeneath(home, rel string, limit int64) (data []byte, boyut int64, err error) {
+	f, err := openReadBeneath(home, rel)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+	if st.IsDir() {
+		return nil, 0, unix.EISDIR
+	}
+	if limit > 0 && st.Size() > limit {
+		return nil, st.Size(), errTooBig
+	}
+	b, err := io.ReadAll(io.LimitReader(f, st.Size()))
+	return b, st.Size(), err
+}
+
+// statBeneath: symlink-güvenli stat. Yol openat2 ile açılıp fd üzerinden
+// stat'lanır — dolayısıyla "stat'lanan" ile "açılan" aynı inode'dur.
+func statBeneath(home, rel string) (os.FileInfo, error) {
+	f, err := openAt2Beneath(home, rel, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_PATH, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Stat()
+}
+
+// dirEntryStat: readDirBeneath'in tek girdi için döndürdüğü ham metadata.
+type dirEntryStat struct {
+	Ad    string
+	Boyut int64
+	Mode  os.FileMode
+	UID   uint32
+	GID   uint32
+	MTime time.Time
+}
+
+// readDirBeneath: symlink-güvenli dizin listeleme. Dizin openat2 ile pinlenir;
+// her girdi AT_SYMLINK_NOFOLLOW ile fstatat edilir — bir girdi jail dışına işaret
+// eden symlink olsa bile HEDEFİ değil, bağın KENDİSİ raporlanır (hedefin boyutu/
+// izinleri sızmaz).
+func readDirBeneath(home, rel string) ([]dirEntryStat, error) {
+	f, err := openAt2Beneath(home, rel, unix.O_DIRECTORY|unix.O_RDONLY|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	adlar, err := readdirnamesFd(int(f.Fd()))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dirEntryStat, 0, len(adlar))
+	for _, ad := range adlar {
+		if ad == "." || ad == ".." {
+			continue
+		}
+		var st unix.Stat_t
+		if err := unix.Fstatat(int(f.Fd()), ad, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+			continue // yarışta silinmiş olabilir; atla
+		}
+		out = append(out, dirEntryStat{
+			Ad:    ad,
+			Boyut: st.Size,
+			Mode:  modeFromStat(st.Mode),
+			UID:   st.Uid,
+			GID:   st.Gid,
+			MTime: time.Unix(st.Mtim.Sec, st.Mtim.Nsec),
+		})
+	}
+	return out, nil
+}
+
+// modeFromStat: ham st_mode'u os.FileMode'a çevirir (yalnız List'in ayırt ettiği
+// tipler: dizin / sembolik bağ / normal dosya).
+func modeFromStat(m uint32) os.FileMode {
+	fm := os.FileMode(m & 0o777)
+	switch m & unix.S_IFMT {
+	case unix.S_IFDIR:
+		fm |= os.ModeDir
+	case unix.S_IFLNK:
+		fm |= os.ModeSymlink
+	}
+	return fm
+}
+
+// ---- Dış araçları (zip/tar/find/du/gunzip) tenant kimliğinde çalıştırma ----
+//
+// 🔴 Bu araçlar bir fd'ye değil bir YOLA çalışır, yani openat2 koruması onlara
+// doğrudan uygulanamaz. internal/archivex'in ÇIKARMA tarafında kurduğu çift-savunma
+// deseninin arşivLEME/arama/ölçme tarafındaki karşılığı burasıdır:
+//
+//	Katman 1 (DAC): araç root DEĞİL, tenant (c_<sk>) olarak koşar → yol doğrulaması
+//	  bir yarışla aşılsa bile tenant'ın zaten okuyamadığı/yazamadığı bir şeye
+//	  erişilemez.
+//	Katman 2 (yol doğrulama): kaynak/hedef yolları openat2 ile önceden doğrulanır.
+
+// tenantKomut: argv'yi tenant kullanıcısı olarak, panel sırları OLMADAN, temiz
+// env ile çalıştıracak komutu hazırlar (archivex.runuserKomut ile aynı desen).
+func tenantKomut(ctx context.Context, sk string, argv ...string) (*exec.Cmd, error) {
+	if !strings.HasPrefix(sk, "c_") {
+		return nil, errors.New("güvenlik: geçersiz tenant kullanıcısı")
+	}
+	full := append([]string{"-u", sk, "--"}, argv...)
+	cmd := exec.CommandContext(ctx, "runuser", full...)
+	cmd.Env = []string{
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"HOME=/home/" + sk,
+	}
+	return cmd, nil
+}
+
+// dogrulanmisYol: home/rel'i openat2 ile doğrular (symlink bileşeni veya jail
+// kaçışı varsa hata) ve dış araca verilebilecek mutlak yolu döner. Doğrulama ile
+// exec arasındaki artık TOCTOU payını tenantKomut'un DAC katmanı kapatır.
+func dogrulanmisYol(home, rel string) (string, error) {
+	f, err := openAt2Beneath(home, rel, unix.O_PATH, 0)
+	if err != nil {
+		return "", err
+	}
+	f.Close()
+	return filepath.Join(home, relClean(rel)), nil
+}
+
+// ciktiHazirla: bir dış aracın YAZACAĞI hedefi güvenli hâle getirir — üst dizinleri
+// symlink-güvenli oluşturur, hedefin kendisi bir SYMLINK ise reddeder (jail dışına
+// yazma vektörü), duran normal dosyayı temizler ve mutlak yolu döner.
+func ciktiHazirla(home, rel, sk string) (string, error) {
+	p := relClean(rel)
+	if p == "" || p == "." {
+		return "", errors.New("geçersiz çıktı yolu")
+	}
+	if err := mkdirAllBeneath(home, filepath.Dir(p), sk); err != nil {
+		return "", err
+	}
+	pfd, leaf, err := safeParentFd(home, p)
+	if err != nil {
+		return "", err
+	}
+	defer unix.Close(pfd)
+	var st unix.Stat_t
+	switch err := unix.Fstatat(pfd, leaf, &st, unix.AT_SYMLINK_NOFOLLOW); {
+	case err == unix.ENOENT: // yok — araç oluşturacak
+	case err != nil:
+		return "", err
+	case st.Mode&unix.S_IFMT == unix.S_IFLNK:
+		return "", errors.New("güvenlik: çıktı yolu sembolik bağ — reddedildi")
+	default:
+		// Duran dosyayı kaldır: araçlar (zip) mevcut dosyayı "bozuk arşiv" sanabilir.
+		if err := unix.Unlinkat(pfd, leaf, 0); err != nil && err != unix.ENOENT {
+			return "", err
+		}
+	}
+	return filepath.Join(home, p), nil
+}
 
 // chmodBeneath: symlink-güvenli chmod. Leaf'i openat2 ile (symlink ise REDDEDİLİR) açıp
 // Fchmod uygular; ara-bileşen takası kernel tarafından engellenir.
