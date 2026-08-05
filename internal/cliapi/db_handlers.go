@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -29,6 +30,9 @@ var dbImportGate = make(chan struct{}, 1)
 // "file" sadece uzantıya bakılıp gzip'lenip lenmeyeceğine karar vermek için kullanılır,
 // bir dosya yolu olarak SUNUCU TARAFINDA hiç kullanılmaz — path traversal yüzeyi yok.
 func (h *Handlers) Export(w http.ResponseWriter, r *http.Request) {
+	// Büyük DB dump indirmeleri sunucunun kısa varsayılan zaman aşımını (bkz.
+	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 10*time.Minute)
 	domainID, _, ok := DomainFrom(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "geçersiz token")
@@ -75,6 +79,9 @@ func (h *Handlers) Export(w http.ResponseWriter, r *http.Request) {
 // POST /db/import?databaseName=... — govde ham SQL veya gzip'li SQL baytlari
 // (ilk 2 byte 0x1f 0x8b ise otomatik gzip olarak algilanir, dosya uzantisina bakilmaz).
 func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
+	// Büyük DB dump yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
+	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 10*time.Minute)
 	domainID, _, ok := DomainFrom(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "geçersiz token")

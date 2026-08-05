@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"sanalcp/internal/httpx"
 
@@ -177,6 +178,9 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, statusFromErr(err), err.Error())
 		return
 	}
+	// Büyük dosya indirmeleri sunucunun kısa varsayılan yazma zaman aşımını
+	// (bkz. cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	rel := r.URL.Query().Get("yol")
 	// TOCTOU symlink-güvenli: dosyayı openat2 ile AÇ, sonra AÇIK fd üzerinden
 	// stat'la ve akıt. Eski os.Stat+os.Open(jailJoinStrict(...)) resolved-string
@@ -319,6 +323,9 @@ func (h *Handlers) Upload(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "/"
 	}
+	// Büyük dosya yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
+	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	// DoS savunması: istek gövdesini üst sınırla kes. MaxBytesReader hem RAM'i hem
 	// diski korur; sınır aşılınca okuma *http.MaxBytesError döner.
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)

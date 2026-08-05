@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -43,6 +44,9 @@ func (h *Handlers) SQLYukle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, durumKodu(err), err.Error())
 		return
 	}
+	// Büyük SQL dump yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
+	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxDumpBayt+(1<<20))
 	mr, err := r.MultipartReader()
 	if err != nil {

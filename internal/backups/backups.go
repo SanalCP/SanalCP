@@ -234,6 +234,9 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
+	// Büyük yedek indirmeleri sunucunun kısa varsayılan yazma zaman aşımını
+	// (bkz. cmd/server/main.go) aşabilir — bu uç için istisna açılır.
+	httpx.ExtendDeadline(w, 30*time.Minute)
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
 	var sk, dosya, uzakDurum string

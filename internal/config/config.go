@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/sha256"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,24 @@ type Config struct {
 	// PANEL_SECRET_KEY'in SHA-256'sı — ham env değeri herhangi bir uzunlukta
 	// olabilir, burada her zaman tam 32 bayta indirgenir.
 	SecretKey [32]byte
+	// TrustedProxyCIDRs: X-Forwarded-For/X-Real-IP başlıklarına yalnızca bu
+	// CIDR'lardan doğrudan bağlanan taraflar için güvenilir (bkz. httpx.ClientIP).
+	// Varsayılan yalnızca loopback (nginx her zaman 127.0.0.1/::1 üzerinden panele
+	// bağlanır, bkz. assets/nginx/_panel.conf) — panel yanlışlıkla dışarıya açılırsa
+	// (ör. PANEL_LISTEN=0.0.0.0) dışarıdan gelen bağlantının RemoteAddr'ı loopback
+	// olamayacağı için XFF/X-Real-IP otomatik olarak yok sayılır (fail-closed).
+	TrustedProxyCIDRs []*net.IPNet
+}
+
+func defaultTrustedProxyCIDRs() []*net.IPNet {
+	var out []*net.IPNet
+	for _, s := range []string{"127.0.0.1/32", "::1/128"} {
+		_, cidr, err := net.ParseCIDR(s)
+		if err == nil {
+			out = append(out, cidr)
+		}
+	}
+	return out
 }
 
 func Load() (*Config, error) {
@@ -45,6 +64,23 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("PANEL_SECRET_KEY en az 32 karakter olmalı (mevcut: %d)", len(secretKey))
 	}
 	c.SecretKey = sha256.Sum256([]byte(secretKey))
+
+	if raw := strings.TrimSpace(os.Getenv("TRUSTED_PROXY_CIDRS")); raw != "" {
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			_, cidr, err := net.ParseCIDR(part)
+			if err != nil {
+				return nil, fmt.Errorf("TRUSTED_PROXY_CIDRS geçersiz CIDR içeriyor (%q): %w", part, err)
+			}
+			c.TrustedProxyCIDRs = append(c.TrustedProxyCIDRs, cidr)
+		}
+	} else {
+		c.TrustedProxyCIDRs = defaultTrustedProxyCIDRs()
+	}
+
 	return c, nil
 }
 
