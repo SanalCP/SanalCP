@@ -16,7 +16,7 @@ type Domain = {
   boyut_kb: number; trafik_kb: number; durum: string
   php_surum?: string; is_demo?: boolean
   olusturulma?: string; plan_id?: number; plan_ad?: string
-  ssl?: boolean; ssl_bitis?: string
+  ssl?: boolean; ssl_bitis?: string; ssl_kaynak?: string
   bayi_adi?: string; bayi_paket_adi?: string
   ipv4?: string
 }
@@ -463,17 +463,31 @@ export default function DomainsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
-                          <span title={d.ssl ? t('DomainsPage:table.ssl_active') + (d.ssl_bitis ? t('DomainsPage:table.ssl_expires', { date: d.ssl_bitis }) : '') : t('DomainsPage:table.ssl_none')}>
-                            {d.ssl ? (
-                              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM9 11V7a3 3 0 016 0" />
-                              </svg>
-                            )}
-                          </span>
+                          {/* SSL rozeti ÜÇ durumlu. Eskiden yalnız var/yok vardı ve
+                              self-signed sertifika da yeşil görünüyordu — oysa ziyaretçi
+                              tam sayfa tarayıcı uyarısı alır, yani site fiilen açılmaz.
+                              ssl_kaynak BOŞ ise (sütun eklenmeden önceki kayıtlar) kaynak
+                              bilinmiyor demektir; kırmızı göstermek yanlış alarm olurdu,
+                              o yüzden yeşilde bırakılır. */}
+                          {(() => {
+                            const kilitli = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                            const acik = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM9 11V7a3 3 0 016 0'
+                            const selfSigned = d.ssl && d.ssl_kaynak === 'self-signed'
+                            const baslik = !d.ssl
+                              ? t('DomainsPage:table.ssl_none')
+                              : selfSigned
+                                ? t('DomainsPage:table.ssl_self_signed')
+                                : t('DomainsPage:table.ssl_active') + (d.ssl_bitis ? t('DomainsPage:table.ssl_expires', { date: d.ssl_bitis }) : '')
+                            const renk = !d.ssl ? 'text-slate-300 dark:text-slate-600'
+                              : selfSigned ? 'text-red-500' : 'text-emerald-500'
+                            return (
+                              <span title={baslik}>
+                                <svg className={`w-3.5 h-3.5 ${renk}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={d.ssl ? kilitli : acik} />
+                                </svg>
+                              </span>
+                            )
+                          })()}
                         </span>
                         {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">{t('DomainsPage:table.demo')}</span>}
                       </td>

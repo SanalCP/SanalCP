@@ -29,11 +29,16 @@ import (
 )
 
 type Domain struct {
-	ID              int64  `json:"id"`
-	AlanAdi         string `json:"alan_adi"`
-	PHPSurum        string `json:"php_surum"`
-	SSL             bool   `json:"ssl"`
-	SSLBitis        string `json:"ssl_bitis,omitempty"`
+	ID       int64  `json:"id"`
+	AlanAdi  string `json:"alan_adi"`
+	PHPSurum string `json:"php_surum"`
+	SSL      bool   `json:"ssl"`
+	SSLBitis string `json:"ssl_bitis,omitempty"`
+	// SSLKaynak: "letsencrypt" | "self-signed" | "" (bilinmiyor — sütun
+	// eklenmeden önce kurulmuş eski kayıtlar). Arayüz self-signed'ı ayrı
+	// gösterir: ziyaretçi tarayıcıda tam sayfa sertifika uyarısı görür,
+	// yani site fiilen erişilemez durumdadır.
+	SSLKaynak       string `json:"ssl_kaynak,omitempty"`
 	Durum           string `json:"durum"`
 	SistemKullanici string `json:"sistem_kullanici"`
 	BoyutKB         int64  `json:"boyut_kb"`
@@ -69,7 +74,8 @@ const selectAll = `SELECT d.id, d.alan_adi, d.sistem_kullanici, d.php_surum, d.s
   d.db_host, d.db_user, d.db_adi, d.web_root, d.boyut_kb, d.trafik_kb, d.is_demo,
   COALESCE(d.notlar,''), DATE_FORMAT(d.olusturulma,'%Y-%m-%d'),
   d.plan_id, COALESCE(p.ad,''), d.ssh_erisim, COALESCE(d.askida,0),
-  COALESCE(bu.username,''), COALESCE(brp.ad,''), COALESCE(d.site_tipi,'php')
+  COALESCE(bu.username,''), COALESCE(brp.ad,''), COALESCE(d.site_tipi,'php'),
+  COALESCE(d.ssl_kaynak,'')
   FROM domains d
   LEFT JOIN service_plans p ON p.id=d.plan_id
   LEFT JOIN customers cu ON cu.id = d.customer_id
@@ -86,7 +92,7 @@ func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 		&d.DBHost, &d.DBUser, &d.DBAdi, &d.WebRoot, &d.BoyutKB, &d.TrafikKB, &demo,
 		&d.Notlar, &d.Olusturulma,
 		&planID, &d.PlanAd, &sshE, &askida,
-		&d.BayiAdi, &d.BayiPaketAdi, &d.SiteTipi)
+		&d.BayiAdi, &d.BayiPaketAdi, &d.SiteTipi, &d.SSLKaynak)
 	d.SSL = ssl == 1
 	d.IsDemo = demo == 1
 	d.SshErisim = sshE == 1

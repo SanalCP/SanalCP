@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.16",
-  "duyuru": "Domainler sayfasına 'Yenile' butonu eklendi. İki hata düzeltildi: (1) 'Let's Encrypt SSL kur' işaretliyken yeni domain listeye hemen düşmüyor, sertifika alınana kadar görünmüyordu. (2) Let's Encrypt alınamayıp self-signed sertifikaya düşüldüğünde uyarı yeşil 'başarılı' kutusunda gösteriliyordu; artık ayrı bir uyarı kutusunda net biçimde belirtiliyor.",
+  "son_surum": "0.5.17",
+  "duyuru": "Domainler listesindeki SSL rozeti artık sertifika tipini ayırt ediyor: Let's Encrypt yeşil, self-signed KIRMIZI, sertifikasız gri. Self-signed sertifikada ziyaretçiler tarayıcıda güvenlik uyarısı gördüğü için bu durum artık listede hemen fark ediliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }
