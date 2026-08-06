@@ -182,3 +182,46 @@ func TestTenantKomut_GecersizKullaniciReddedilir(t *testing.T) {
 		t.Fatalf("geçerli tenant reddedildi: %v", err)
 	}
 }
+
+// 🔴 REGRESYON: statBeneath'in GERÇEKTEN çalıştığını doğrular.
+//
+// Bu test olmadan, aşağıdaki symlink testi statBeneath tamamen bozukken bile
+// yeşil kalıyordu: yalnızca "hata döndü mü" diye bakıyor, fonksiyon ise
+// openat2'ye geçersiz bayrak (O_PATH|O_NONBLOCK) verdiği için HER çağrıda
+// EINVAL döndürüyordu. Sonuç: arşiv açma "dosya bulunamadı" hatası veriyor,
+// arşiv boyutu 0 raporlanıyor, arama sonuçlarında izin/tarih boş kalıyordu —
+// hiçbiri teste yakalanmadan.
+//
+// Yani buradaki asıl iddia "meşru bir dosya BAŞARIYLA stat'lanabilmeli".
+func TestStatBeneath_MesruDosyaBasarili(t *testing.T) {
+	home := t.TempDir()
+	// Nokta içeren dizin adı bilerek: canlıda hata subdomain docroot'unda
+	// (~/subdomains/test.ornek.com) görüldü.
+	dizin := filepath.Join(home, "subdomains", "test.ornek.com")
+	if err := os.MkdirAll(dizin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dizin, "arsiv.zip"), []byte("PK\x03\x04"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := statBeneath(home, "subdomains/test.ornek.com/arsiv.zip")
+	if err != nil {
+		t.Fatalf("meşru dosya stat'lanamadı: %v", err)
+	}
+	if info.IsDir() {
+		t.Error("dosya için IsDir true döndü")
+	}
+	if info.Size() != 4 {
+		t.Errorf("boyut = %d, beklenen 4", info.Size())
+	}
+
+	// Dizin de stat'lanabilmeli (Extract 'klasör mü' kontrolü buna dayanır).
+	dInfo, err := statBeneath(home, "subdomains/test.ornek.com")
+	if err != nil {
+		t.Fatalf("dizin stat'lanamadı: %v", err)
+	}
+	if !dInfo.IsDir() {
+		t.Error("dizin için IsDir false döndü")
+	}
+}

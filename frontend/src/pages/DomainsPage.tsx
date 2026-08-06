@@ -1,7 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 // sp-mobil-v1
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
@@ -17,6 +17,7 @@ type Domain = {
   php_surum?: string; is_demo?: boolean
   olusturulma?: string; plan_id?: number; plan_ad?: string
   ssl?: boolean; ssl_bitis?: string; ssl_kaynak?: string
+  alt_alanlar?: { id: number; tam_ad: string; php_surum: string }[]
   bayi_adi?: string; bayi_paket_adi?: string
   ipv4?: string
 }
@@ -270,8 +271,12 @@ export default function DomainsPage() {
   const filtreli = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (!s) return items
+    // Alt alan adları da aranır: kullanıcı "blog.site.com" yazdığında listede
+    // ana domain (ve altındaki eşleşen alt alan) çıkmalı — aksi hâlde alt alan
+    // adı listede GÖRÜNÜR ama ARANAMAZ olurdu.
     return items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
-      || (d.bayi_adi || '').toLowerCase().includes(s))
+      || (d.bayi_adi || '').toLowerCase().includes(s)
+      || (d.alt_alanlar || []).some(a => a.tam_ad.toLowerCase().includes(s)))
   }, [items, q])
 
   function togga(id: number) {
@@ -459,7 +464,8 @@ export default function DomainsPage() {
               <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800`}>
                 {filtreli.map(d => {
                   return (
-                    <tr key={d.id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800 transition ${secili.has(d.id) ? 'lg:bg-brand-50 dark:lg:bg-brand-900/20' : ''}`}>
+                    <Fragment key={d.id}>
+                    <tr className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800 transition ${secili.has(d.id) ? 'lg:bg-brand-50 dark:lg:bg-brand-900/20' : ''}`}>
                       <td className={T.hucreSecim}>
                         <input type="checkbox" checked={secili.has(d.id)}
                           onChange={() => togga(d.id)} className="cursor-pointer" />
@@ -544,6 +550,40 @@ export default function DomainsPage() {
                         <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('DomainsPage:table.manage')}</Link>
                       </td>
                     </tr>
+
+                    {/* Alt alan adları — ana domainin ALTINDA girintili satırlar.
+                        colSpan tek hücre: mobil kart düzeni data-etiket'e dayandığı
+                        için normal hücrelere bölmek orada anlamsız satırlar üretirdi.
+                        Seçim kutusu YOK: toplu işlemler domain üzerinde çalışır,
+                        alt alan adı ayrı bir domain değildir. */}
+                    {(d.alt_alanlar || []).map(alt => (
+                      <tr key={`s-${alt.id}`} className="lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/50 transition">
+                        <td colSpan={10} className="py-1.5 lg:pl-12 pl-4 pr-4">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-slate-300 dark:text-slate-600 select-none font-mono text-xs">↳</span>
+                            <Link to={`/abonelikler/${d.id}/subdomainler`}
+                              className="text-sm text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
+                              {alt.tam_ad}
+                            </Link>
+                            <a href={`https://${alt.tam_ad}`} target="_blank" rel="noopener noreferrer"
+                              title={t('DomainsPage:table.open_site')}
+                              onClick={e => e.stopPropagation()}
+                              className="text-slate-300 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 transition">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              {t('DomainsPage:table.subdomain_badge')}
+                            </span>
+                            {alt.php_surum && (
+                              <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">PHP {alt.php_surum}</span>
+                            )}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    </Fragment>
                   )
                 })}
               </tbody>

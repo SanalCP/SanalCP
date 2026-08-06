@@ -192,8 +192,16 @@ func readFileBeneath(home, rel string, limit int64) (data []byte, boyut int64, e
 
 // statBeneath: symlink-güvenli stat. Yol openat2 ile açılıp fd üzerinden
 // stat'lanır — dolayısıyla "stat'lanan" ile "açılan" aynı inode'dur.
+// 🔴 O_NONBLOCK KULLANMA: openat2, openat'ten farklı olarak geçersiz bayrak
+// birleşimlerini sessizce yok saymaz — EINVAL ile REDDEDER. O_PATH yalnızca
+// O_CLOEXEC / O_DIRECTORY / O_NOFOLLOW ile birleşebilir. Buraya eklenmiş olan
+// O_NONBLOCK yüzünden statBeneath HER ÇAĞRIDA "invalid argument" dönüyordu:
+// arşiv açma "dosya bulunamadı veya klasör" hatası veriyor, arşiv oluşturma
+// boyutu 0 raporluyor, arama sonuçlarında izin/tarih boş kalıyordu. Hatanın
+// sessiz kalmasının sebebi, symlink testlerinin yalnızca "hata döndü mü" diye
+// bakması ve fonksiyon her durumda hata verdiği için geçmesiydi.
 func statBeneath(home, rel string) (os.FileInfo, error) {
-	f, err := openAt2Beneath(home, rel, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_PATH, 0)
+	f, err := openAt2Beneath(home, rel, unix.O_PATH, 0)
 	if err != nil {
 		return nil, err
 	}
