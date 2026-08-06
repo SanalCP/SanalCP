@@ -44,6 +44,12 @@ func (h *Handlers) Yaz(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, statusFromErr(err), err.Error())
 		return
 	}
+	// Editör 5 MiB'e kadar içerik kaydedebiliyor (aşağıdaki kontrol); JSON
+	// kaçışlaması (\n, \", çok baytlı karakterler) bunu gövdede birkaç katına
+	// çıkarabildiği için global 2 MiB varsayılanı (bkz. httpx.LimitBody) burada
+	// 16 MiB'e açılır. ASIL sınır aşağıdaki len(req.Icerik) kontrolüdür —
+	// buradaki yalnızca ayrıştırıcının belleğini koruyan tavandır.
+	httpx.ExtendBodyLimit(w, r, 16<<20)
 	var req yazReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")

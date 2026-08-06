@@ -285,6 +285,12 @@ func main() {
 	// dağıtımda uygulama katmanı kendi başına ayakta kalır.
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(300 * time.Second))
+	// 🔴 GÜVENLİK: Panelin ~95 JSON ucu gövdeyi sınırsız okuyordu (json.NewDecoder
+	// tüm gövdeyi belleğe alır) — kimliği doğrulanmış bir bayi/müşteri tek bir dev
+	// alanla süreci OOM'a sürükleyebilirdi. Artık varsayılan 2 MiB; gerçekten büyük
+	// gövde bekleyen dosya/arşiv/DB yükleme uçları httpx.ExtendBodyLimit ile kendi
+	// (çok daha yüksek) sınırlarını açar. İstisna listesi kasten dar tutulur.
+	r.Use(httpx.LimitBody(httpx.VarsayilanGovdeSiniri))
 	r.Use(metrics.Middleware) // toplama burada; sunum (/metrics) loopback-only cliSrv'de (aşağıda)
 
 	r.Post("/api/v1/git-webhook/{secret}", gitH.Webhook)
@@ -657,8 +663,11 @@ func main() {
 	cliMux.Handle("/", cliapi.Routes(d))
 
 	cliSrv := &http.Server{
-		Addr:              cfg.CLIListenAddr,
-		Handler:           cliMux,
+		Addr: cfg.CLIListenAddr,
+		// Gövde sınırı burada da geçerli: CLI API loopback-only olsa da site-CLI
+		// token'ı tenant'ın elindedir, yani gövdeyi tenant kontrol eder. db/import
+		// kendi isteğinde httpx.ExtendBodyLimit ile sınırı yükseltir.
+		Handler:           httpx.LimitBody(httpx.VarsayilanGovdeSiniri)(cliMux),
 		ReadHeaderTimeout: 5 * time.Second,
 		// Bu sunucu loopback-only olsa da hız sınırı düşük tutulur: db/export ve
 		// db/import kendi isteklerinde httpx.ExtendDeadline ile 10dk'ya uzatır

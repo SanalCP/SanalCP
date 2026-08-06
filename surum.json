@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.7",
-  "duyuru": "Güvenlik: giriş hız-sınırının IP sahteciliğiyle atlatılabilmesi kapatıldı; mailbox parolası artık API yanıtında düz metin dönmüyor; slow-DoS zaman aşımı yüzeyi daraltıldı.",
+  "son_surum": "0.5.9",
+  "duyuru": "Güvenlik: (1) Panel API'sinin istek gövdeleri artık varsayılan 2 MiB ile sınırlı — önceden sınırsızdı ve tek istekle sunucunun belleği tüketilebiliyordu; yükleme uçlarına tenant başına eşzamanlılık kotası eklendi. (2) Panel arayüzünün CSP'sinden 'unsafe-inline' ve 'unsafe-eval' kaldırıldı (script-src artık yalnız 'self'); bu gevşetme sadece onu gerçekten gerektiren phpMyAdmin ve webmail adreslerinde geçerli. (3) nginx tarafında gövde boyutu ve zaman aşımı varsayılanları daraltıldı.",
   "kritik": true,
-  "yayin_tarihi": "2026-08-05"
+  "yayin_tarihi": "2026-08-06"
 }
