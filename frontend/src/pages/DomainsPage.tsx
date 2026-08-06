@@ -44,9 +44,15 @@ export default function DomainsPage() {
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
+  // uyari: işlem teknik olarak tamamlandı ama SONUÇ istenen değil (ör. Let's
+  // Encrypt alınamadı, self-signed'a düşüldü). Bunu yeşil "başarılı" kutusunda
+  // göstermek kullanıcıyı yanıltıyordu — tarayıcı sertifika uyarısı verirken
+  // panel başarı diyordu. DomainSSLPage ile aynı desen.
+  const [uyari, setUyari] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [secili, setSecili] = useState<Set<number>>(new Set())
   const [isleniyor, setIsleniyor] = useState(false)
+  const [yenileniyor, setYenileniyor] = useState(false)
   // Sahip değiştirme (domain transferi). Uç AdminOnly olduğu için buton yalnız
   // admin'e gösterilir — bayiye göstermek tıklayınca 403 almasına yol açardı.
   const benimRolum = useAuth((s) => s.kullanici?.rol)
@@ -76,14 +82,17 @@ export default function DomainsPage() {
   // Liste yalnızca /domains'e bağlıdır. /plans + /php/versions (yavaş olabilen dnf keşfi)
   // listeyi BLOKLAMAZ — modal açılınca lazy çekilir. Böylece dnf yavaş/kilitliyken bile
   // "Domainler" gelir gelmez render olur.
-  function yukle() {
-    setYuk(true)
-    api.get<Domain[]>('/domains')
+  // sessiz=true: tabloyu "Yükleniyor" ile DEĞİŞTİRMEDEN tazeler. Arka plan
+  // yenilemeleri (ör. SSL kurulduktan sonra rozeti güncellemek) için — aksi
+  // hâlde dolu bir liste bir anlığına boşalıp geri gelir, göz tırmalar.
+  function yukle(sessiz = false) {
+    if (!sessiz) setYuk(true)
+    return api.get<Domain[]>('/domains')
       .then(r => setItems(r.data))
       .catch(e => setHata(apiHata(e)))
-      .finally(() => setYuk(false))
+      .finally(() => { if (!sessiz) setYuk(false) })
   }
-  useEffect(yukle, [])
+  useEffect(() => { yukle() }, [])
 
   // Mobil alt gezinme çubuğundaki "Yeni" eylemi buraya ?yeni=1 ile gelir.
   // Kipi açıp parametreyi TEMİZLİYORUZ: aksi halde geri/yenilemede kip
@@ -121,7 +130,7 @@ export default function DomainsPage() {
   }
 
   function olusturAc() {
-    setHata(null); setBasari(null); setOlusturmaSonuc(null)
+    setHata(null); setBasari(null); setUyari(null); setOlusturmaSonuc(null)
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
@@ -132,7 +141,7 @@ export default function DomainsPage() {
 
   async function olusturGonder(e: React.FormEvent) {
     e.preventDefault()
-    setHata(null)
+    setHata(null); setUyari(null)
     const alanAdi = fAlanAdi.trim().toLowerCase()
     if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(alanAdi)) {
       setHata(t('DomainsPage:create_modal.validation_error'))
@@ -145,15 +154,21 @@ export default function DomainsPage() {
       const r = await api.post<OlusturmaSonuc>('/domains', body)
       setOlusturAcik(false)
       setOlusturmaSonuc(r.data)
+      // 🔴 Listeyi HEMEN tazele. Bu çağrı eskiden SSL bloğunun ALTINDAydı:
+      // "Let's Encrypt kur" işaretliyse domain çoktan oluşmuş olmasına rağmen
+      // liste, sertifika alınana kadar (120sn timeout, tipik ~10sn) eski hâlde
+      // kalıyordu — kullanıcı domaini "eklenmedi" sanıyordu.
+      yukle()
       let mesaj = t('DomainsPage:create_modal.success', { name: alanAdi })
       if (fSSL) {
         try {
           const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' }, { timeout: 120_000 })
-          mesaj += sslR.data.uyari
-            ? ` ⚠ ${sslR.data.uyari}`
-            : t('DomainsPage:create_modal.ssl_success')
+          // Sunucu self-signed'a düştüyse bunu AYRI bir uyarı kutusunda göster;
+          // başarı mesajına iliştirmek yeşil kutuda kaybolmasına yol açıyordu.
+          if (sslR.data.uyari) setUyari(sslR.data.uyari)
+          else mesaj += t('DomainsPage:create_modal.ssl_success')
         } catch (e) {
-          mesaj += t('DomainsPage:create_modal.ssl_error')
+          setUyari(t('DomainsPage:create_modal.ssl_error_detail'))
         }
         if (fWWW) {
           try {
@@ -166,7 +181,9 @@ export default function DomainsPage() {
       }
       setBasari(mesaj)
       setTimeout(() => setBasari(null), 8000)
-      yukle()
+      // SSL/www adımları listeyi değiştirmiş olabilir (SSL rozeti) — sessiz
+      // tazele, tablo boşalmasın.
+      if (fSSL) yukle(true)
       // WordPress tipinde kurulumu BURADA çalıştırmıyoruz: WP kurulumu site
       // başlığı + admin kullanıcı/e-posta ister ve admin parolası üretilip
       // kullanıcıya gösterilmek zorundadır. Bunları uydurmak yerine kullanıcıyı
@@ -308,6 +325,13 @@ export default function DomainsPage() {
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+      {uyari && (
+        <div className="mb-3 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
+          <span className="leading-none mt-0.5">⚠</span>
+          <span className="flex-1">{uyari}</span>
+          <button onClick={() => setUyari(null)} className="text-xs hover:underline shrink-0">{t('common:close')}</button>
+        </div>
+      )}
 
       {/* WordPress tipi seçildiyse kurulum tek tıkla erişilebilir olmalı —
           domain açıldı ama site henüz boş. */}
@@ -335,6 +359,20 @@ export default function DomainsPage() {
             className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none" />
         </div>
         <span className="text-xs text-slate-500 dark:text-slate-500">{filtreli.length} / {items.length}</span>
+        {/* Yenile — sağlama arka planda süren işler içerir (DNS, SSL, FPM
+            geçişi); liste kendiliğinden tazelenmediğinde elle tetiklenebilsin.
+            Sessiz tazeleme: tablo boşalmaz, yalnız simge döner. */}
+        <button onClick={() => { setYenileniyor(true); yukle(true).finally(() => setYenileniyor(false)) }}
+          disabled={yenileniyor}
+          title={t('DomainsPage:refresh')}
+          aria-label={t('DomainsPage:refresh')}
+          className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md disabled:opacity-50">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+            className={`h-4 w-4 ${yenileniyor ? 'animate-spin' : ''}`}>
+            <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
+          </svg>
+          <span className="hidden sm:inline">{t('DomainsPage:refresh')}</span>
+        </button>
         <button onClick={olusturAc}
           className="ml-auto inline-flex items-center gap-1.5 text-sm px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md font-medium shadow-sm">
           <span className="text-base leading-none">+</span> {t('DomainsPage:new_domain')}

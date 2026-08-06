@@ -68,7 +68,8 @@
     "type_wordpress": "WordPress",
     "type_wordpress_desc": "Database + installer",
     "type_statik": "Static HTML",
-    "type_statik_desc": "No database"
+    "type_statik_desc": "No database",
+    "ssl_error_detail": "The Let's Encrypt certificate could not be obtained; the site is protected with a self-signed certificate (browsers will warn). Once the domain's DNS points to this server, try again from the SSL page."
   },
   "result_modal": {
     "title": "✓ Domain Created",
@@ -115,5 +116,6 @@
   "wp_redirect": {
     "text": "{{domain}} has been created. To finish the WordPress installation you need to enter the site title and administrator details.",
     "button": "Go to WordPress setup"
-  }
+  },
+  "refresh": "Refresh"
 }
