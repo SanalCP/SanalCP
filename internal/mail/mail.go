@@ -39,6 +39,9 @@ type Mailbox struct {
 type Durum struct {
 	Etkin        bool   `json:"etkin"`
 	DKIMSelector string `json:"dkim_selector,omitempty"`
+	// AltyapiEksik: sunucuda çalışmayan e-posta servisleri (boşsa altyapı hazır).
+	// Dolu olduğunda arayüz "Etkinleştir" butonunu kapatıp nedenini gösterir.
+	AltyapiEksik []string `json:"altyapi_eksik,omitempty"`
 }
 
 var reLocalPart = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
@@ -72,7 +75,13 @@ func (h *Handlers) MailDurum(w http.ResponseWriter, r *http.Request) {
 	var durum, selector string
 	err := h.DB.QueryRowContext(r.Context(),
 		`SELECT durum, dkim_selector FROM mail_domains WHERE domain_id=?`, id).Scan(&durum, &selector)
-	httpx.WriteJSON(w, http.StatusOK, Durum{Etkin: err == nil && durum == "active", DKIMSelector: selector})
+	// altyapi_eksik: arayüz "Etkinleştir" butonunu baştan devre dışı bırakıp
+	// nedenini gösterebilsin diye — kullanıcı tıklayıp hata almasın.
+	httpx.WriteJSON(w, http.StatusOK, Durum{
+		Etkin:        err == nil && durum == "active",
+		DKIMSelector: selector,
+		AltyapiEksik: MailAltyapisiVar(r.Context()),
+	})
 }
 
 // POST /domains/{id}/mail/etkinlestir — domain için maili açar (MailUygula: OS + DNS/DKIM tohumlama).
@@ -84,6 +93,15 @@ func (h *Handlers) Etkinlestir(w http.ResponseWriter, r *http.Request) {
 	}
 	if demo {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	// ÖN KONTROL: yığın kapalıysa burada dur. Aksi hâlde DNS'e MX/SPF/DKIM
+	// yazılır, panel "etkinleştirildi" der ve posta hiç çalışmaz (sessiz arıza).
+	if eksik := MailAltyapisiVar(r.Context()); len(eksik) > 0 {
+		httpx.WriteError(w, http.StatusServiceUnavailable,
+			"sunucuda e-posta altyapısı çalışmıyor ("+strings.Join(eksik, ", ")+"). "+
+				"Sunucu yöneticisi e-posta hizmetini kapatmış olabilir; "+
+				"açmak için sunucuda `sanalcp-mail-setup` çalıştırılmalı.")
 		return
 	}
 	if err := MailUygula(r.Context(), h.DB, id); err != nil {

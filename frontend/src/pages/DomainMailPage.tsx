@@ -6,7 +6,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 
 type Domain = { id: number; alan_adi: string; ssl?: boolean }
 type Mailbox = { id: number; local_part: string; email: string; status: string; created_at: string }
-type Durum = { etkin: boolean; dkim_selector?: string }
+type Durum = { etkin: boolean; dkim_selector?: string; altyapi_eksik?: string[] }
 type Alias = { id: number; source: string; destination: string; catch_all: boolean; status: string; created_at: string }
 type SpamSettings = { enabled: boolean; greylist_score: number; add_header_score: number; reject_score: number }
 type SpamResponse = { settings: SpamSettings; rspamd: boolean }
@@ -48,6 +48,8 @@ export default function DomainMailPage() {
   const [filtreIsleniyor, setFiltreIsleniyor] = useState(false)
   const [limit, setLimit] = useState<SendLimits>({ mailbox_id: 0, email: '', hour_limit: 100, day_limit: 500, sent_hour: 0, sent_day: 0 })
   const [limitIsleniyor, setLimitIsleniyor] = useState(false)
+
+  const altyapiEksik = durum?.altyapi_eksik || []
 
   function yukle() {
     if (!id) return
@@ -355,8 +357,15 @@ export default function DomainMailPage() {
                 <span className="text-xs text-amber-800 dark:text-amber-300">{t('DomainMailPage:enable.resource_warning')}</span>
               </div>
             </div>
-            <button onClick={etkinlestir} disabled={isleniyor}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
+            {/* Sunucu yöneticisi mail yığınını kapatmış olabilir. Butonu baştan
+                kapatıp nedenini söylüyoruz — tıklayıp 503 almaktan iyi. */}
+            {altyapiEksik.length > 0 && (
+              <div className="mx-auto mb-4 max-w-xl px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300">
+                {t('DomainMailPage:enable.stack_down', { servisler: altyapiEksik.join(', ') })}
+              </div>
+            )}
+            <button onClick={etkinlestir} disabled={isleniyor || altyapiEksik.length > 0}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
               {isleniyor ? t('DomainMailPage:enable.enabling') : t('DomainMailPage:enable.button')}
             </button>
           </div>

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -133,5 +134,67 @@ func TestTumunuKaldirDBHatasindaDiskeDokunmaz(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("rollback beklentisi karşılanmadı: %v", err)
+	}
+}
+
+// 🔴 Sessiz arıza koruması: sunucu yöneticisi mail yığınını kapattığında
+// "E-postayı Etkinleştir" DNS'e MX/SPF/DKIM yazıp "başarılı" DEMEMELİ —
+// posta hiç çalışmayacağı hâlde kullanıcı çalıştığını sanardı.
+func TestEtkinlestirYiginKapaliykenReddeder(t *testing.T) {
+	eski := servisAktif
+	defer func() { servisAktif = eski }()
+	servisAktif = func(context.Context, string) bool { return false } // yığın kapalı
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT sistem_kullanici, COALESCE(is_demo,0) FROM domains WHERE id=?`)).
+		WithArgs(int64(5)).
+		WillReturnRows(sqlmock.NewRows([]string{"sistem_kullanici", "is_demo"}).AddRow("c_ornek", 0))
+
+	h := &Handlers{DB: db}
+	r := chi.NewRouter()
+	r.Post("/domains/{id}/mail/etkinlestir", h.Etkinlestir)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/domains/5/mail/etkinlestir", nil))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("durum = %d, beklenen 503 — yığın kapalıyken etkinleştirme geçmemeli", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "postfix") {
+		t.Errorf("hata mesajı eksik servisi söylemeli, gelen: %s", rec.Body.String())
+	}
+}
+
+// Yığın ayaktayken ön kontrol yolu AÇIK olmalı — aksi hâlde kontrol, özelliği
+// tamamen kullanılamaz hâle getirirdi. Burada MailUygula'ya kadar ilerlemesi
+// (ve orada linux kullanıcısı yok diye patlaması) kapının geçildiğini gösterir.
+func TestEtkinlestirYiginAyaktaykenGecer(t *testing.T) {
+	eski := servisAktif
+	defer func() { servisAktif = eski }()
+	servisAktif = func(context.Context, string) bool { return true }
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT sistem_kullanici, COALESCE(is_demo,0) FROM domains WHERE id=?`)).
+		WithArgs(int64(5)).
+		WillReturnRows(sqlmock.NewRows([]string{"sistem_kullanici", "is_demo"}).AddRow("c_ornek", 0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT alan_adi, sistem_kullanici, COALESCE(ipv4,'') FROM domains WHERE id=?`)).
+		WithArgs(int64(5)).
+		WillReturnRows(sqlmock.NewRows([]string{"alan_adi", "sistem_kullanici", "ipv4"}).AddRow("ornek.com", "c_ornek", "1.2.3.4"))
+
+	h := &Handlers{DB: db}
+	r := chi.NewRouter()
+	r.Post("/domains/{id}/mail/etkinlestir", h.Etkinlestir)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/domains/5/mail/etkinlestir", nil))
+
+	if rec.Code == http.StatusServiceUnavailable {
+		t.Fatal("yığın ayaktayken 503 dönmemeli — ön kontrol özelliği tümden kapatmış olur")
 	}
 }

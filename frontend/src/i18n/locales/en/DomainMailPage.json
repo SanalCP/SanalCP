@@ -12,7 +12,8 @@
     "hint": "Once enabled, MX/SPF/DKIM/DMARC records are added to DNS automatically.",
     "button": "Enable Email",
     "enabling": "Enabling…",
-    "resource_warning": "The email service (Postfix, Dovecot, Rspamd, Webmail) adds extra RAM and CPU usage on the server. On small or resource-limited servers, consider your current load before enabling it."
+    "resource_warning": "The email service (Postfix, Dovecot, Rspamd, Webmail) adds extra RAM and CPU usage on the server. On small or resource-limited servers, consider your current load before enabling it.",
+    "stack_down": "The email stack is not running on this server ({{servisler}}). The server administrator may have disabled it — run `sanalcp-mail-setup` on the server to bring it back."
   },
   "disable": {
     "title": "Temporarily Disable Service",
