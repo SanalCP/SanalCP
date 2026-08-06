@@ -241,20 +241,32 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := res.LastInsertId()
 
-	// Bayinin açtığı müşteri hesabı, sahiplik zincirinin tamamlanması için
-	// kendi customers kaydını da alır: domain -> customer -> bayi. Zincir
-	// kurulmazsa hesap açılır ama bayi ona domain bağlayamaz (Create,
-	// BayiMusterisiMi ile kendi müşterisini arar) ve kota sayacı da şaşar.
-	// Faz 5C göçünün ürettiği yapıyla aynı biçim.
-	if c.Role == middleware.RolBayi && b.Rol == middleware.RolMusteri {
+	// Müşteri hesabı, sahiplik zincirinin tamamlanması için kendi customers
+	// kaydını da alır: domain -> customer -> sahip. Zincir kurulmazsa hesap
+	// açılır ama ona domain bağlanamaz (Create, BayiMusterisiMi ile müşteriyi
+	// arar) ve kota sayacı da şaşar. Faz 5C göçünün ürettiği yapıyla aynı biçim.
+	//
+	// 🔴 Bu blok eskiden YALNIZ bayi yolunda çalışıyordu. Admin "Müşteri"
+	// rolüyle hesap açtığında customers kaydı hiç oluşmuyor, hesap giriş
+	// yapabiliyor ama hiçbir domain göremiyordu — admin de ona domain
+	// bağlayamıyordu, çünkü ortada bağlanacak müşteri kaydı yoktu.
+	if b.Rol == middleware.RolMusteri {
 		ad := strings.TrimSpace(b.AdSoyad)
 		if ad == "" {
 			ad = b.KullaniciAdi
 		}
+		// owner_user_id: bayi açtıysa kendisi, admin açtıysa NULL
+		// (NULL = doğrudan admin'e ait, bkz. migrations/0048).
+		var sahip any
+		notlar := "yönetici tarafından oluşturuldu"
+		if c.Role == middleware.RolBayi {
+			sahip = c.UserID
+			notlar = "bayi tarafından oluşturuldu"
+		}
 		if _, err := h.DB.ExecContext(r.Context(),
 			`INSERT INTO customers(ad, eposta, durum, notlar, user_id, owner_user_id)
-			 VALUES(?,?, 'aktif', 'bayi tarafından oluşturuldu', ?, ?)`,
-			ad, strings.TrimSpace(b.Eposta), id, c.UserID); err != nil {
+			 VALUES(?,?, 'aktif', ?, ?, ?)`,
+			ad, strings.TrimSpace(b.Eposta), notlar, id, sahip); err != nil {
 			// Hesap açıldı ama zincir kurulamadı — sessiz bırakmak sonradan
 			// "domain bağlayamıyorum" olarak ortaya çıkardı.
 			httpx.WriteError(w, http.StatusInternalServerError,

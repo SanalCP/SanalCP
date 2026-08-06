@@ -23,6 +23,7 @@ import (
 	"sanalcp/internal/middleware"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/redis"
+	"sanalcp/internal/tenanthesap"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -274,6 +275,28 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		_, _ = h.DB.ExecContext(r.Context(),
 			`UPDATE domains SET customer_id=?, plan_id=? WHERE id=?`,
 			req.CustomerID, req.PlanID, id)
+	}
+
+	// Panel hesabı + müşteri kaydını HEMEN üret. Eskiden bunu yalnız açılışta
+	// çalışan gocis.MusteriHesapGocu yapıyordu: domain eklendikten sonra hesap
+	// Kullanıcılar ekranında görünmüyor, ancak panel yeniden başlatılınca
+	// beliriyordu. Çağıran açıkça bir müşteri belirttiyse ona dokunulmaz
+	// (Hazirla yalnız customer_id IS NULL olan domainleri bağlar).
+	//
+	// 🔴 Sahiplik: domaini bayi oluşturduysa müşteri O BAYİYE bağlanmalı.
+	// owner_user_id NULL kalsaydı müşteri doğrudan admin'e ait olur ve bayi
+	// kendi eklediği domaini göremezdi (middleware.BayiDomainiMi).
+	if req.CustomerID == nil {
+		var sahipBayi *int64
+		if c := middleware.ClaimsFrom(r); c != nil && c.Role == middleware.RolBayi {
+			uid := c.UserID
+			sahipBayi = &uid
+		}
+		if _, err := tenanthesap.Hazirla(r.Context(), h.DB, pr.SistemKullanici, req.AlanAdi, sahipBayi); err != nil {
+			// Domain sağlandı ve kaydedildi; hesap zinciri kurulamadıysa istek
+			// başarısız SAYILMAZ — açılıştaki doldurma bunu yine yakalar.
+			log.Printf("tenant hesabı hazırlanamadı (domain=%d, tenant=%s): %v", id, pr.SistemKullanici, err)
+		}
 	}
 	// Plan seçildiyse nginx web-sunucusu varsayılanlarını domain'e tohumla + vhost yenile
 	if req.PlanID != nil {
@@ -837,7 +860,7 @@ func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "silinen": dbName})
 }
 
-// TopluSahip: birden Ã§ok domain'in customer_id'sini gÃ¼ncelle
+// TopluSahip: birden çok domain'in customer_id'sini güncelle
 type topluSahipReq struct {
 	IDs        []int64 `json:"ids"`
 	CustomerID *int64  `json:"customer_id"`
@@ -846,11 +869,11 @@ type topluSahipReq struct {
 func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 	var req topluSahipReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "geÃ§ersiz gÃ¶vde")
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
 	if len(req.IDs) == 0 {
-		httpx.WriteError(w, http.StatusBadRequest, "boÅŸ ids")
+		httpx.WriteError(w, http.StatusBadRequest, "boş ids")
 		return
 	}
 	// customer_id NULL veya pozitif olabilir
@@ -859,7 +882,7 @@ func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 		_ = h.DB.QueryRowContext(r.Context(),
 			`SELECT COUNT(*) FROM customers WHERE id=?`, *req.CustomerID).Scan(&exists)
 		if exists == 0 {
-			httpx.WriteError(w, http.StatusBadRequest, "mÃ¼ÅŸteri bulunamadÄ±")
+			httpx.WriteError(w, http.StatusBadRequest, "müşteri bulunamadı")
 			return
 		}
 	}
@@ -878,7 +901,7 @@ func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 	sql := `UPDATE domains SET customer_id=? WHERE id IN (` + strings.Join(placeholders, ",") + `)`
 	res, err := h.DB.ExecContext(r.Context(), sql, args...)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "gÃ¼ncelleme: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+err.Error())
 		return
 	}
 	n, _ := res.RowsAffected()
@@ -894,15 +917,15 @@ type topluDurumReq struct {
 func (h *Handlers) TopluDurum(w http.ResponseWriter, r *http.Request) {
 	var req topluDurumReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "geÃ§ersiz gÃ¶vde")
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
 	if len(req.IDs) == 0 {
-		httpx.WriteError(w, http.StatusBadRequest, "boÅŸ ids")
+		httpx.WriteError(w, http.StatusBadRequest, "boş ids")
 		return
 	}
 	if req.Durum != "aktif" && req.Durum != "pasif" {
-		httpx.WriteError(w, http.StatusBadRequest, "geÃ§ersiz durum")
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz durum")
 		return
 	}
 	placeholders := make([]string, len(req.IDs))
@@ -914,7 +937,7 @@ func (h *Handlers) TopluDurum(w http.ResponseWriter, r *http.Request) {
 	sql := `UPDATE domains SET durum=? WHERE id IN (` + strings.Join(placeholders, ",") + `)`
 	res, err := h.DB.ExecContext(r.Context(), sql, args...)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "gÃ¼ncelleme: "+err.Error())
+		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+err.Error())
 		return
 	}
 	n, _ := res.RowsAffected()

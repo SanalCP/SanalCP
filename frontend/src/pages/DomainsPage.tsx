@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
+import { useAuth } from '@/store/auth'
+import Modal from '@/components/Modal'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
 import { T } from '@/lib/tablo'
@@ -45,6 +47,13 @@ export default function DomainsPage() {
   const [q, setQ] = useState('')
   const [secili, setSecili] = useState<Set<number>>(new Set())
   const [isleniyor, setIsleniyor] = useState(false)
+  // Sahip değiştirme (domain transferi). Uç AdminOnly olduğu için buton yalnız
+  // admin'e gösterilir — bayiye göstermek tıklayınca 403 almasına yol açardı.
+  const benimRolum = useAuth((s) => s.kullanici?.rol)
+  const adminMiyim = benimRolum === 'admin'
+  const [sahipAcik, setSahipAcik] = useState(false)
+  const [musteriler, setMusteriler] = useState<{ id: number; ad: string; eposta: string }[]>([])
+  const [sahipHedef, setSahipHedef] = useState<string>('')
   const [silOnay, setSilOnay] = useState(false)
   const [silOnayMetin, setSilOnayMetin] = useState('')
 
@@ -257,6 +266,29 @@ export default function DomainsPage() {
     finally { setIsleniyor(false) }
   }
 
+  async function sahipAc() {
+    setSahipHedef(''); setSahipAcik(true)
+    try {
+      const { data } = await api.get<{ id: number; ad: string; eposta: string }[]>('/customers')
+      setMusteriler(data || [])
+    } catch (e) { setHata(apiHata(e, t('DomainsPage:owner_modal.load_error'))) }
+  }
+
+  async function sahipUygula() {
+    const ids = Array.from(secili)
+    // Boş seçim = sahipliği KALDIR (customer_id NULL). Backend bunu destekliyor;
+    // domain sahipsiz kalır ve doğrudan admin'e döner.
+    const customer_id = sahipHedef === '' ? null : Number(sahipHedef)
+    setIsleniyor(true); setHata(null)
+    try {
+      await api.post('/domains/toplu/sahip', { ids, customer_id })
+      setBasari(t('DomainsPage:owner_modal.success', { count: ids.length }))
+      setTimeout(() => setBasari(null), 4000)
+      setSahipAcik(false); setSecili(new Set()); yukle()
+    } catch (e) { setHata(apiHata(e, t('DomainsPage:owner_modal.error'))) }
+    finally { setIsleniyor(false) }
+  }
+
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-5">
       <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('DomainsPage:title') }]} />
@@ -294,6 +326,12 @@ export default function DomainsPage() {
             className="text-xs px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded">
             {t('DomainsPage:bulk.deactivate')}
           </button>
+          {adminMiyim && (
+            <button onClick={sahipAc} disabled={isleniyor}
+              className="text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded">
+              {t('DomainsPage:bulk.change_owner')}
+            </button>
+          )}
           <button onClick={() => { setSilOnayMetin(''); setSilOnay(true) }} disabled={isleniyor}
             className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium">
             {t('DomainsPage:bulk.delete', { count: secili.size })}
@@ -631,6 +669,38 @@ export default function DomainsPage() {
         </div>
         )
       })()}
+
+      {/* Sahip değiştir — domain transferinin tek yolu. Sahiplik zinciri
+          domains.customer_id -> customers.owner_user_id üzerinden yürüdüğü
+          için, domaini başka bir bayiye geçirmek demek onu O BAYİYE AİT bir
+          müşteri kaydına bağlamak demektir. */}
+      <Modal acik={sahipAcik} baslik={t('DomainsPage:owner_modal.title')} onKapat={() => setSahipAcik(false)}>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {t('DomainsPage:owner_modal.desc', { count: secili.size })}
+          </p>
+          <select value={sahipHedef} onChange={e => setSahipHedef(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+            <option value="">{t('DomainsPage:owner_modal.none')}</option>
+            {musteriler.map(m => (
+              <option key={m.id} value={m.id}>{m.ad}{m.eposta ? ` — ${m.eposta}` : ''}</option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('DomainsPage:owner_modal.hint')}
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setSahipAcik(false)}
+              className="text-sm px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">
+              {t('common:giveUp')}
+            </button>
+            <button onClick={sahipUygula} disabled={isleniyor}
+              className="text-sm px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50">
+              {isleniyor ? t('DomainsPage:owner_modal.applying') : t('DomainsPage:owner_modal.apply')}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

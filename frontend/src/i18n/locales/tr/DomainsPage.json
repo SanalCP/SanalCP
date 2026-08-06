@@ -10,7 +10,8 @@
     "delete": "🗑 Sil ({{count}})",
     "clear_selection": "Seçimi temizle",
     "status_changed": "✓ {{count}} domain \"{{status}}\" durumuna geçirildi",
-    "status_error": "Durum değiştirme başarısız"
+    "status_error": "Durum değiştirme başarısız",
+    "change_owner": "Sahip değiştir"
   },
   "empty": {
     "title": "Henüz domain yok",
@@ -92,5 +93,16 @@
     "confirm_word": "SİL",
     "confirm_yes": "Evet, Sil",
     "success": "✓ {{success}}/{{total}} domain silindi"
+  },
+  "owner_modal": {
+    "title": "Domain sahibini değiştir",
+    "desc": "Seçili {{count}} domain aşağıda seçtiğiniz müşteriye bağlanacak.",
+    "none": "— Sahipsiz (doğrudan yöneticiye ait) —",
+    "hint": "Domaini başka bir bayiye devretmek için, o bayiye ait bir müşteri seçin. Bayinin müşteri kaydı yoksa önce bayi kendi panelinden müşteri hesabı açmalıdır — yönetici olarak açtığınız müşteri kayıtları size bağlı kalır.",
+    "apply": "Uygula",
+    "applying": "Uygulanıyor…",
+    "success": "{{count}} domainin sahibi güncellendi.",
+    "error": "Sahip değiştirilemedi",
+    "load_error": "Müşteri listesi alınamadı"
   }
 }

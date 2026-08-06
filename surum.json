@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.13",
-  "duyuru": "Sunucuda e-posta altyapısı (Postfix/Dovecot) kapalıysa panel artık bunu fark ediyor: domain için 'E-postayı Etkinleştir' butonu devre dışı kalıyor ve nedeni gösteriliyor. Önceden buton çalışıyor görünüp DNS kayıtlarını yazıyor, ama posta hiç çalışmıyordu.",
+  "son_surum": "0.5.14",
+  "duyuru": "Sahiplik zinciri düzeltmeleri: Domain eklendiğinde müşteri panel hesabı artık ANINDA oluşuyor (önceden yalnız panel yeniden başlatılınca beliriyordu). Domainler sayfasına 'Sahip değiştir' eklendi — domain devri artık arayüzden yapılabiliyor. Yöneticinin açtığı müşteri hesapları da müşteri kaydı alıyor (önceden yalnız bayilerinki alıyordu).",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }
