@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.17",
-  "duyuru": "Domainler listesindeki SSL rozeti artık sertifika tipini ayırt ediyor: Let's Encrypt yeşil, self-signed KIRMIZI, sertifikasız gri. Self-signed sertifikada ziyaretçiler tarayıcıda güvenlik uyarısı gördüğü için bu durum artık listede hemen fark ediliyor.",
+  "son_surum": "0.5.18",
+  "duyuru": "Domain oluşturma ekranı: Yönetici artık domaini doğrudan bir bayiye atayabiliyor (varsayılan 'Yönetici (bana ait)'). Ayrıca pencere işlem bitene kadar açık kalıp hangi adımda olunduğunu gösteren bir ilerleme çubuğu sunuyor; SSL kurulumu da dahil her şey tamamlanınca sonuç ekranına geçiliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }
