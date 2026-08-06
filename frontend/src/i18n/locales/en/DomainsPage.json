@@ -35,7 +35,8 @@
     "ssl_none": "No SSL",
     "open_site": "Open site in new tab",
     "add_subdomain": "+ Subdomain",
-    "manage": "Manage →"
+    "manage": "Manage →",
+    "ssl_self_signed": "Self-signed certificate — visitors will see a browser security warning. Try Let's Encrypt from the SSL page."
   },
   "create_modal": {
     "title": "Create New Domain",
