@@ -30,6 +30,20 @@ export default function DomainSSLPage() {
   // Encrypt alinamadi, self-signed'a dusuldu). Yesil "kuruldu" gostermek
   // kullaniciyi yaniltiyordu — tarayici uyari verirken panel basarili diyordu.
   const [uyari, setUyari] = useState<string | null>(null)
+  // Kurulum sırasında geçen saniye. Backend ilerleme AKIŞI vermiyor (issue tek
+  // bloklayan POST, 120sn timeout) — bu yüzden sahte bir yüzde göstermek yerine
+  // belirsiz (indeterminate) çubuk + gerçek süre sayacı gösteriyoruz. Let's
+  // Encrypt'te DNS doğrulaması uzun sürebildiği için kullanıcının "dondu mu?"
+  // diye düşünmemesi bu geri bildirime bağlı.
+  const [gecenSn, setGecenSn] = useState(0)
+  const [kurulanTip, setKurulanTip] = useState<'self-signed' | 'letsencrypt' | null>(null)
+
+  useEffect(() => {
+    if (!isleniyor) { setGecenSn(0); return }
+    const t0 = Date.now()
+    const id2 = window.setInterval(() => setGecenSn(Math.floor((Date.now() - t0) / 1000)), 1000)
+    return () => window.clearInterval(id2)
+  }, [isleniyor])
 
   function yukle() {
     if (!id) return
@@ -55,6 +69,7 @@ export default function DomainSSLPage() {
 
   async function issue(tip: 'self-signed' | 'letsencrypt') {
     if (tip === 'letsencrypt' && !confirm(t('DomainSSLPage:confirm_letsencrypt'))) return
+    setKurulanTip(tip)
     setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
       const { data } = await api.post(`/domains/${id}/ssl/issue`, { tip }, { timeout: 120_000 })
@@ -71,6 +86,7 @@ export default function DomainSSLPage() {
       setHata(apiHata(e, t('DomainSSLPage:issue_failed')))
     } finally {
       setIsleniyor(false)
+      setKurulanTip(null)
     }
   }
 
@@ -109,6 +125,32 @@ export default function DomainSSLPage() {
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
       {uyari && <div className="mb-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-md text-sm text-amber-800 dark:text-amber-300">{uyari}</div>}
+
+      {/* Kurulum ilerleme göstergesi. Yüzde YOK: backend ilerleme bildirmiyor,
+          uydurma bir yüzde göstermek yanıltıcı olurdu. Bunun yerine belirsiz
+          (kayan) çubuk + gerçek geçen süre + o tipe özgü aşama ipucu. */}
+      {isleniyor && kurulanTip && (
+        <div className="mb-3 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <span className="w-4 h-4 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                {kurulanTip === 'letsencrypt' ? t('DomainSSLPage:progress.title_le') : t('DomainSSLPage:progress.title_self')}
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {kurulanTip === 'letsencrypt' ? t('DomainSSLPage:progress.hint_le') : t('DomainSSLPage:progress.hint_self')}
+              </div>
+            </div>
+            <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400 shrink-0">
+              {t('DomainSSLPage:progress.elapsed', { n: gecenSn })}
+            </span>
+          </div>
+          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+            <div className="h-full w-1/3 rounded-full bg-brand-500 animate-ssl-indeterminate" />
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{t('DomainSSLPage:progress.dont_close')}</p>
+        </div>
+      )}
 
       {/* Durum kartı */}
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 mb-5">

@@ -89,6 +89,24 @@ export default function DomainMailPage() {
     }
   }
 
+  // Hizmeti kapat. Backend (mailH.Devredisi -> MailKaldir) posta kutularını
+  // SİLMEZ, yalnızca mail_domains.durum='suspended' yapar — yeniden
+  // etkinleştirmek kutuları ve yönlendiricileri olduğu gibi geri getirir.
+  // Onay metni bunu açıkça söylemeli: "sil" demek kullanıcıyı yanıltırdı.
+  async function devredisiBirak() {
+    if (!confirm(t('DomainMailPage:disable.confirm', { domain: domain?.alan_adi }))) return
+    setIsleniyor(true); setHata(null); setOk(null)
+    try {
+      await api.delete(`/domains/${id}/mail/etkinlestir`)
+      setOk(t('DomainMailPage:disable.success'))
+      yukle()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainMailPage:disable.failed')))
+    } finally {
+      setIsleniyor(false)
+    }
+  }
+
   async function ekle(e: React.FormEvent) {
     e.preventDefault()
     setHata(null); setOk(null); setYeniPw(null); setIsleniyor(true)
@@ -339,7 +357,10 @@ export default function DomainMailPage() {
               </div>
             </div>
 
-            <form onSubmit={ekle} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5 shadow-sm">
+            {/* Ayar kartları 2 sütunlu grid'te (dashboard deseni). items-start:
+                kartlar komşusunun boyuna uzamasın, kendi içerikleri kadar dursun. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+            <form onSubmit={ekle} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainMailPage:mailbox.add_title')}</h3>
               <div className="flex items-center gap-2">
                 <input value={localPart} onChange={e => setLocalPart(e.target.value)} required placeholder={t('DomainMailPage:mailbox.local_part_placeholder')}
@@ -380,7 +401,7 @@ export default function DomainMailPage() {
               )}
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm mt-5">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainMailPage:forwarders.title')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                 {t('DomainMailPage:forwarders.desc')}
@@ -441,7 +462,7 @@ export default function DomainMailPage() {
               )}
             </div>
 
-            <form onSubmit={spamKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm mt-5">
+            <form onSubmit={spamKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:spam.title')}</h3>
@@ -484,7 +505,7 @@ export default function DomainMailPage() {
             </form>
 
             {liste.length > 0 && (
-              <form onSubmit={autoKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm mt-5">
+              <form onSubmit={autoKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:autoresponder.title')}</h3>
                 <p className="text-xs text-slate-500 mt-1">{t('DomainMailPage:autoresponder.desc')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
@@ -518,7 +539,7 @@ export default function DomainMailPage() {
             )}
 
             {liste.length > 0 && (
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm mt-5">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:filters.title')}</h3>
                 <p className="text-xs text-slate-500 mt-1">{t('DomainMailPage:filters.desc')}</p>
                 <form onSubmit={filtreEkle} className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
@@ -557,7 +578,7 @@ export default function DomainMailPage() {
             )}
 
             {liste.length > 0 && (
-              <form onSubmit={limitKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm mt-5">
+              <form onSubmit={limitKaydet} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:limits.title')}</h3>
                 <p className="text-xs text-slate-500 mt-1">{t('DomainMailPage:limits.desc')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
@@ -592,6 +613,18 @@ export default function DomainMailPage() {
                 </div>
               </form>
             )}
+            </div>
+
+            {/* Hizmeti kapat — yıkıcı görünümlü ama GERİ ALINABİLİR bir işlem
+                olduğu için ayrı, tam genişlikte ve en altta. */}
+            <div className="mt-5 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900/50 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:disable.title')}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">{t('DomainMailPage:disable.desc')}</p>
+              <button onClick={devredisiBirak} disabled={isleniyor}
+                className="mt-3 px-4 py-2 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50 text-sm font-medium rounded-lg transition">
+                {isleniyor ? t('DomainMailPage:disable.working') : t('DomainMailPage:disable.button')}
+              </button>
+            </div>
           </>
         )}
 

@@ -14,6 +14,15 @@
     "enabling": "Enabling…",
     "resource_warning": "The email service (Postfix, Dovecot, Rspamd, Webmail) adds extra RAM and CPU usage on the server. On small or resource-limited servers, consider your current load before enabling it."
   },
+  "disable": {
+    "title": "Disable email service",
+    "desc": "Stops email exchange for this domain. Mailboxes, forwarders and settings are NOT deleted — they are kept and come back exactly as they were when you re-enable the service. While disabled, incoming email is not delivered.",
+    "button": "Disable service",
+    "working": "Disabling…",
+    "confirm": "Disable the email service for {{domain}}?\n\nMailboxes and forwarders will NOT be deleted; they come back when you re-enable it. However, while disabled, email sent to this domain will NOT be delivered.",
+    "success": "Email service disabled. Mailboxes were preserved and will return when you re-enable it.",
+    "failed": "Could not disable the service"
+  },
   "newPassword": {
     "title": "✓ Password for {{email}}",
     "hint": "Save this somewhere safe, it won't be shown again:"

@@ -22,6 +22,18 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'Consolas', 'monospace'],
       },
+      // Belirsiz (indeterminate) ilerleme çubuğu: süresi bilinmeyen işlemlerde
+      // (ör. SSL kurulumu — backend ilerleme bildirmiyor) uydurma bir yüzde
+      // göstermek yerine sürekli kayan bir şerit. Bkz. DomainSSLPage.
+      keyframes: {
+        'ssl-indeterminate': {
+          '0%':   { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
+      },
+      animation: {
+        'ssl-indeterminate': 'ssl-indeterminate 1.4s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

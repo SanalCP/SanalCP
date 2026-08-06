@@ -40,5 +40,13 @@
   "www_redirect_disable": "Turn Off Redirect",
   "www_redirect_enabled": "www redirect enabled — {{domain}} now redirects to www.{{domain}}.",
   "www_redirect_disabled": "www redirect disabled.",
-  "www_redirect_failed": "Failed to save the www redirect setting"
+  "www_redirect_failed": "Failed to save the www redirect setting",
+  "progress": {
+    "title_le": "Obtaining a Let's Encrypt certificate…",
+    "title_self": "Creating a self-signed certificate…",
+    "hint_le": "Validating the domain and signing the certificate. Depending on DNS, this step can take up to a minute.",
+    "hint_self": "Generating the key and reloading the web server.",
+    "elapsed": "{{n}}s",
+    "dont_close": "Please keep this page open until the process finishes."
+  }
 }
