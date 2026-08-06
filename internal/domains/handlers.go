@@ -151,6 +151,13 @@ type createReq struct {
 	// SiteTipi: php | wordpress | statik (bkz. migrations/0064). Boş gelirse
 	// "php" varsayılır — eski istemciler ve API çağrıları bozulmaz.
 	SiteTipi string `json:"site_tipi,omitempty"`
+	// BayiUserID: domainin bağlanacağı bayi (users.id, rol=reseller).
+	// SADECE ADMİN geçebilir; nil = doğrudan admin'e ait.
+	//
+	// 🔴 Bayi rolündeki çağıranlarda BU ALAN YOK SAYILIR — aksi hâlde bir bayi
+	// kendi domainini başka bir bayiye yazabilir ya da (daha kötüsü) başka bir
+	// bayinin kotasını harcayabilirdi. Bayi için sahip daima kendisidir.
+	BayiUserID *int64 `json:"bayi_user_id,omitempty"`
 }
 
 // gecerliSiteTipi: bilinmeyen bir değer sessizce "php"ye düşer. Tip yalnızca
@@ -165,6 +172,49 @@ func gecerliSiteTipi(v string) string {
 	default:
 		return "php"
 	}
+}
+
+// sahipBayiCoz: yeni domainin bağlanacağı sahip bayiyi belirler.
+// Dönen hata metni boş değilse çağıran 400 yazıp durmalıdır.
+//
+// 🔴 YETKİ KURALI: istekteki bayi_user_id'ye SADECE ADMİN güvenilir. Bayi
+// rolündeki çağıranda alan tamamen YOK SAYILIR ve sahip daima çağıranın
+// kendisi olur — aksi hâlde bir bayi domaini başka bir bayiye yazabilir ya da
+// onun kotasını harcayabilirdi.
+//
+// Admin'in verdiği id de doğrulanır: hedef gerçekten rol=reseller ve aktif
+// olmalı. Rastgele bir users.id kabul edilseydi domain, bayi OLMAYAN bir
+// hesaba bağlanır ve kapsam sorguları (middleware.BayiDomainiMi) onu bir daha
+// bulamazdı — domain kimsenin göremediği bir yere düşerdi.
+//
+// nil sahip = doğrudan admin'e ait (customers.owner_user_id NULL).
+func (h *Handlers) sahipBayiCoz(r *http.Request, istenen *int64) (*int64, string) {
+	c := middleware.ClaimsFrom(r)
+	if c == nil {
+		return nil, ""
+	}
+	switch c.Role {
+	case middleware.RolBayi:
+		uid := c.UserID
+		return &uid, ""
+	case middleware.RolAdmin:
+		if istenen == nil || *istenen <= 0 {
+			return nil, "" // "Yönetici (bana ait)"
+		}
+		var rol, durum string
+		if e := h.DB.QueryRowContext(r.Context(),
+			`SELECT role, status FROM users WHERE id=?`, *istenen).Scan(&rol, &durum); e != nil {
+			return nil, "seçilen bayi bulunamadı"
+		}
+		if rol != middleware.RolBayi {
+			return nil, "seçilen hesap bayi değil"
+		}
+		if durum != "active" {
+			return nil, "seçilen bayi hesabı askıya alınmış"
+		}
+		return istenen, ""
+	}
+	return nil, ""
 }
 
 type createResp struct {
@@ -273,6 +323,15 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	siteTipi := gecerliSiteTipi(req.SiteTipi)
 
+	// Sahip bayiyi SAĞLAMADAN ÖNCE çöz ve doğrula: aşağıdaki Provision Linux
+	// kullanıcısı, nginx vhost'u ve FPM havuzu oluşturur. Doğrulamayı sonraya
+	// bırakmak, geçersiz bir bayi id'sinde yarım sağlanmış bir domain bırakırdı.
+	sahipBayi, sahipHata := h.sahipBayiCoz(r, req.BayiUserID)
+	if sahipHata != "" {
+		httpx.WriteError(w, http.StatusBadRequest, sahipHata)
+		return
+	}
+
 	pr, err := provisioner.Provision(req.AlanAdi, req.PHPSurum)
 	if err != nil {
 		log.Printf("provision %q başarısız: %v", req.AlanAdi, err)
@@ -319,11 +378,6 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	// owner_user_id NULL kalsaydı müşteri doğrudan admin'e ait olur ve bayi
 	// kendi eklediği domaini göremezdi (middleware.BayiDomainiMi).
 	if req.CustomerID == nil {
-		var sahipBayi *int64
-		if c := middleware.ClaimsFrom(r); c != nil && c.Role == middleware.RolBayi {
-			uid := c.UserID
-			sahipBayi = &uid
-		}
 		if _, err := tenanthesap.Hazirla(r.Context(), h.DB, pr.SistemKullanici, req.AlanAdi, sahipBayi); err != nil {
 			// Domain sağlandı ve kaydedildi; hesap zinciri kurulamadıysa istek
 			// başarısız SAYILMAZ — açılıştaki doldurma bunu yine yakalar.

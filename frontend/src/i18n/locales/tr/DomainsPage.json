@@ -70,7 +70,13 @@
     "type_wordpress_desc": "Veritabanı + kurulum",
     "type_statik": "Statik HTML",
     "type_statik_desc": "Veritabanı yok",
-    "ssl_error_detail": "Let's Encrypt sertifikası alınamadı; site self-signed sertifika ile korunuyor (tarayıcı uyarı gösterir). Domainin DNS'i bu sunucuya işaret ettikten sonra SSL sayfasından tekrar deneyin."
+    "ssl_error_detail": "Let's Encrypt sertifikası alınamadı; site self-signed sertifika ile korunuyor (tarayıcı uyarı gösterir). Domainin DNS'i bu sunucuya işaret ettikten sonra SSL sayfasından tekrar deneyin.",
+    "owner_label": "Sahip",
+    "owner_admin": "Yönetici (bana ait)",
+    "step_provision": "Domain oluşturuluyor (Linux kullanıcı, nginx, PHP-FPM, DNS)…",
+    "step_ssl": "Let's Encrypt sertifikası alınıyor…",
+    "step_www": "www yönlendirmesi ayarlanıyor…",
+    "step_dont_close": "İşlem bitene kadar bu pencereyi kapatmayın."
   },
   "result_modal": {
     "title": "✓ Domain Oluşturuldu",

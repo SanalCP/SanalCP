@@ -75,6 +75,12 @@ export default function DomainsPage() {
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
   const [fSiteTipi, setFSiteTipi] = useState<'php'|'wordpress'|'statik'>('php')
+  // Bayi seçimi yalnız admin'e gösterilir; '' = doğrudan admin'e ait (varsayılan).
+  const [bayiler, setBayiler] = useState<{ id: number; kullanici_adi: string; ad_soyad?: string }[]>([])
+  const [fBayi, setFBayi] = useState<number | ''>('')
+  // Oluşturma ilerlemesi: adım metni modal'ın altındaki çubukta gösterilir.
+  // SSL seçiliyken işlem 10sn+ sürebiliyor; kullanıcı ne beklediğini bilmeli.
+  const [adim, setAdim] = useState<string | null>(null)
   const [fPlanID, setFPlanID] = useState<number | ''>('')
   const [fSSL, setFSSL] = useState(false)
   const [fWWW, setFWWW] = useState(false)
@@ -115,7 +121,12 @@ export default function DomainsPage() {
     Promise.all([
       api.get<Plan[]>('/plans').catch(() => ({ data: [] })),
       api.get<PHPVer[]>('/php/versions').catch(() => ({ data: [] })),
-    ]).then(([pr, phpr]) => {
+      // Bayi listesi yalnız admin için anlamlı; bayi kendi adına oluşturur.
+      adminMiyim
+        ? api.get<{ id: number; kullanici_adi: string; ad_soyad?: string; rol: string; durum: string }[]>('/users').catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
+    ]).then(([pr, phpr, ur]) => {
+      setBayiler((ur.data as any[]).filter(u => u.rol === 'reseller' && u.durum === 'active'))
       const pl = pr.data as Plan[]
       setPlanlar(pl)
       setPhpSurumler(phpr.data as PHPVer[])
@@ -134,7 +145,7 @@ export default function DomainsPage() {
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
-    setFAlanAdi(''); setFPHPSurum('8.3'); setFSiteTipi('php'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
+    setFAlanAdi(''); setFPHPSurum('8.3'); setFSiteTipi('php'); setFBayi(''); setAdim(null); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
     setOlusturAcik(true)
     modalVeriYukle() // lazy: plan/php sürümleri henüz gelmediyse şimdi çek (listeyi bloklamaz)
   }
@@ -151,9 +162,9 @@ export default function DomainsPage() {
     try {
       const body: any = { alan_adi: alanAdi, php_surum: fPHPSurum, site_tipi: fSiteTipi }
       if (fPlanID !== '') body.plan_id = fPlanID
+      if (fBayi !== '') body.bayi_user_id = fBayi
+      setAdim(t('DomainsPage:create_modal.step_provision'))
       const r = await api.post<OlusturmaSonuc>('/domains', body)
-      setOlusturAcik(false)
-      setOlusturmaSonuc(r.data)
       // 🔴 Listeyi HEMEN tazele. Bu çağrı eskiden SSL bloğunun ALTINDAydı:
       // "Let's Encrypt kur" işaretliyse domain çoktan oluşmuş olmasına rağmen
       // liste, sertifika alınana kadar (120sn timeout, tipik ~10sn) eski hâlde
@@ -161,6 +172,7 @@ export default function DomainsPage() {
       yukle()
       let mesaj = t('DomainsPage:create_modal.success', { name: alanAdi })
       if (fSSL) {
+        setAdim(t('DomainsPage:create_modal.step_ssl'))
         try {
           const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' }, { timeout: 120_000 })
           // Sunucu self-signed'a düştüyse bunu AYRI bir uyarı kutusunda göster;
@@ -171,6 +183,7 @@ export default function DomainsPage() {
           setUyari(t('DomainsPage:create_modal.ssl_error_detail'))
         }
         if (fWWW) {
+          setAdim(t('DomainsPage:create_modal.step_www'))
           try {
             await api.put(`/domains/${r.data.id}/www-yonlendir`, { aktif: true })
             mesaj += t('DomainsPage:create_modal.www_success')
@@ -179,6 +192,11 @@ export default function DomainsPage() {
           }
         }
       }
+      // Modal TÜM adımlar bittikten sonra kapanır ve sonuç ekranı açılır.
+      // Eskiden POST döner dönmez kapanıyordu; SSL arkada devam ederken
+      // kullanıcı işlemin bittiğini sanıyordu.
+      setOlusturAcik(false)
+      setOlusturmaSonuc(r.data)
       setBasari(mesaj)
       setTimeout(() => setBasari(null), 8000)
       // SSL/www adımları listeyi değiştirmiş olabilir (SSL rozeti) — sessiz
@@ -194,7 +212,7 @@ export default function DomainsPage() {
     } catch (e: any) {
       setHata(apiHata(e, t('DomainsPage:create_modal.create_error')))
     } finally {
-      setOlusturuluyor(false)
+      setOlusturuluyor(false); setAdim(null)
     }
   }
 
@@ -625,6 +643,29 @@ export default function DomainsPage() {
                 </select>
               </div>
 
+              {/* Bayi seçimi — yalnız admin. Boş = doğrudan admin'e ait.
+                  Seçilen bayi, otomatik açılan müşteri kaydının sahibi olur
+                  (customers.owner_user_id); domain böylece o bayinin
+                  kapsamına girer ve bayi panelinde görünür. */}
+              {adminMiyim && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                    {t('DomainsPage:create_modal.owner_label')}
+                  </label>
+                  <select
+                    value={fBayi}
+                    onChange={e => setFBayi(e.target.value === '' ? '' : Number(e.target.value))}
+                    disabled={olusturuluyor}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none bg-white dark:bg-slate-800"
+                  >
+                    <option value="">{t('DomainsPage:create_modal.owner_admin')}</option>
+                    {bayiler.map(b => (
+                      <option key={b.id} value={b.id}>{b.ad_soyad ? `${b.kullanici_adi} — ${b.ad_soyad}` : b.kullanici_adi}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                   <input type="checkbox" checked={fSSL} onChange={e => { setFSSL(e.target.checked); if (!e.target.checked) setFWWW(false) }} disabled={olusturuluyor} className="rounded" />
@@ -651,6 +692,22 @@ export default function DomainsPage() {
                 )}
               </div>
             </div>
+
+            {/* İlerleme — SSL seçiliyken işlem 10sn+ sürebiliyor. Yüzde YOK:
+                sunucu ilerleme bildirmiyor, uydurma bir yüzde yanıltıcı olurdu.
+                Bunun yerine hangi adımda olunduğu yazılıyor. */}
+            {olusturuluyor && (
+              <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />
+                  <span className="flex-1">{adim || t('DomainsPage:create_modal.step_provision')}</span>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div className="h-full w-1/3 rounded-full bg-brand-500 animate-ssl-indeterminate" />
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{t('DomainsPage:create_modal.step_dont_close')}</p>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setOlusturAcik(false)} disabled={olusturuluyor}

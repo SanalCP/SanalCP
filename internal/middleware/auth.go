@@ -324,6 +324,17 @@ func ClaimsContext(ctx context.Context, c *auth.Claims) context.Context {
 	return context.WithValue(ctx, claimsKey, c)
 }
 
+// ClaimsIle: isteğe kimlik bilgisi iliştirilmiş bir kopyasını döner.
+//
+// Yalnızca TESTLER için — üretimde claims'i RequireAuth, doğrulanmış JWT'den
+// yazar. Bu fonksiyon bir yetki KAPISI DEĞİLDİR ve hiçbir denetimi atlatmaz:
+// aynı süreçte çalışan kod zaten kendi context'ini kurabilir. Var olma sebebi,
+// handler'ların (ör. domains.sahipBayiCoz) rol davranışının kendi paketinden
+// test edilebilmesi — claimsKey dışa kapalı olduğu için aksi mümkün değil.
+func ClaimsIle(r *http.Request, c *auth.Claims) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), claimsKey, c))
+}
+
 func ClaimsFrom(r *http.Request) *auth.Claims {
 	v := r.Context().Value(claimsKey)
 	if v == nil {

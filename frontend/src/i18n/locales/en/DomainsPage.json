@@ -70,7 +70,13 @@
     "type_wordpress_desc": "Database + installer",
     "type_statik": "Static HTML",
     "type_statik_desc": "No database",
-    "ssl_error_detail": "The Let's Encrypt certificate could not be obtained; the site is protected with a self-signed certificate (browsers will warn). Once the domain's DNS points to this server, try again from the SSL page."
+    "ssl_error_detail": "The Let's Encrypt certificate could not be obtained; the site is protected with a self-signed certificate (browsers will warn). Once the domain's DNS points to this server, try again from the SSL page.",
+    "owner_label": "Owner",
+    "owner_admin": "Administrator (mine)",
+    "step_provision": "Creating the site (Linux user, nginx, PHP-FPM, DNS)…",
+    "step_ssl": "Obtaining the Let's Encrypt certificate…",
+    "step_www": "Setting up the www redirect…",
+    "step_dont_close": "Please keep this window open until the process finishes."
   },
   "result_modal": {
     "title": "✓ Domain Created",
