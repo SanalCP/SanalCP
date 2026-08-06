@@ -20,6 +20,15 @@ go vet ./...
 echo "== Frontend temiz kurulum + build =="
 (cd frontend && npm ci && npm run build)
 
+echo "== Panel nginx vhost'u (kanonik kaynak -> asset) =="
+# _panel.conf'un TEK kaynagi internal/nginxconf/_panel.conf'tur: binary'ye
+# //go:embed ile gomulur ve panel kurulu vhost'u ondan gunceller (bkz.
+# provisioner.HealPanelVhostOnStartup). assets/ altindaki kopya yalnizca
+# installer icindir (scripts/sanalcp-install.sh) ve buradan URETILIR.
+cp internal/nginxconf/_panel.conf assets/nginx/_panel.conf
+cmp -s internal/nginxconf/_panel.conf assets/nginx/_panel.conf ||
+  { echo "panel conf kopyalanamadi" >&2; exit 1; }
+
 echo "== Linux amd64/v1 binary =="
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 \
   go build -trimpath -buildvcs=false \

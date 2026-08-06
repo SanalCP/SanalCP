@@ -18,6 +18,8 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"sanalcp/internal/nginxconf"
 )
 
 var (
@@ -43,10 +45,13 @@ func Init(d *sql.DB) {
 	// paketten gelmese bile İLK update'te per-user ACL izolasyonu + RAR extract hazır olur.
 	ensureArchiveTools()
 	HealCacheZoneOnStartup()
-	// Batch2 sertlestirme: panel vhost guvenlik header'lari + mevcut tenant
+	// Batch2 sertlestirme: panel vhost'unu kanonik surume esitle + mevcut tenant
 	// vhost/pool'larinin (retroaktif) guvenli yeniden-render'i. Her ikisi de
-	// sentinel/rollback korumali → tekrar-guvenli ve kirilmaz.
-	HealPanelVhostHeadersOnStartup()
+	// hash/sentinel + nginx -t rollback korumali → tekrar-guvenli ve kirilmaz.
+	HealPanelVhostOnStartup()
+	// SIRA ONEMLI: ustteki butunsel yenileme basarili olduysa kanonik conf zaten
+	// NOCACHE v1'i icerir ve asagidaki no-op'tur. Vhost elle duzenlenmis olup
+	// yenileme atlandiysa bu hedefli yama yine de devreye girer.
 	HealPanelIndexNoCacheOnStartup() // Cloud-fix: panel SPA (index.html) no-cache → bayat UI önlenir
 	ensurePMAStartup()               // Cloud-fix: phpMyAdmin GCP/socket (pma-signon.php + token + pool socket + config host=localhost)
 	HealVhostsOnStartup()
@@ -1916,82 +1921,60 @@ func HealVhostsOnStartup() {
 }
 
 // panelVhostPath: kurulu panel nginx vhost'u (installer tarafindan yazilir).
-const panelVhostPath = "/etc/nginx/conf.d/_panel.conf"
+const panelVhostPath = nginxconf.PanelConfYol
 
-// panelSecSentinel: panel vhost'una guvenlik header'lari enjekte edildiginde eklenen
-// isaret satiri. Idempotency icin (iki kez eklemeyi onler).
-const panelSecSentinel = "# SANAL-PANEL-SEC v2"
-
-// HealPanelVhostHeadersOnStartup: kurulu panel vhost'una (yoksa sessiz gecer)
-// guvenlik header'larini SERVER seviyesinde ekler. Panel React SPA (location /) ve
-// phpMyAdmin PHP location'lari kendi add_header'i olmadigi icin bu server-seviyesi
-// header'lari MIRAS ALIR. Enjeksiyon SADECE add_header satirlaridir (istek yonlendirmesini
-// degistirmez) ve nginx -t + rollback ile korunur → admin kilitlenmesi riski minimum.
-func HealPanelVhostHeadersOnStartup() {
-	orig, err := os.ReadFile(panelVhostPath)
+// HealPanelVhostOnStartup: kurulu panel vhost'unu binary'ye gomulu KANONIK
+// surumle esitler (yoksa sessiz gecer).
+//
+// NEDEN BUTUNSEL DEGISTIRME (eski davranis: hedefli add_header enjeksiyonu):
+// _panel.conf'a giren guvenlik degisiklikleri mevcut kurulumlara hic inmiyordu —
+// sanalcp-update nginx conf'larina dokunmuyor, installer ise yalnizca ilk kurulumda
+// yaziyor. Eski heal fonksiyonu bunu "# SANAL-PANEL-SEC vN" sentinel'i + string
+// degistirme ile telafi etmeye calisiyordu, ama her yeni conf degisikligi ayri bir
+// kirilgan metin ameliyati gerektiriyordu. Ornegin CSP'yi sunucu seviyesinde sikmak
+// TEK BASINA phpMyAdmin ve webmail'i kirardi: o location'larin kendi add_header'i
+// yok, server seviyesini MIRAS ALIYORLAR — dolayisiyla sikma ile birlikte onlara
+// gevsek CSP blogunu da enjekte etmek gerekirdi. Butunsel degistirme bunu insaat
+// geregi dogru yapar.
+//
+// GUVENLIK AGLARI:
+//   1. Hash kapisi — dosya yalnizca BILINEN bir yayin surumuyle birebir aynıysa
+//      degistirilir. Admin elle duzenlemisse dokunulmaz, yalnizca log dusulur:
+//      yonetici emegini sessizce silmek, guncel olmayan bir CSP'den daha kotudur.
+//   2. nginx -t kapisi — yeni conf parse edilmezse ESKISI geri yazilir.
+//   3. reload kapisi — reload basarisiz olursa yine eskisi geri yazilir.
+// Bu ucu birlikte "panel guncellemesi admini disari kilitledi" senaryosunu kapatir.
+func HealPanelVhostOnStartup() {
+	mevcut, err := os.ReadFile(panelVhostPath)
 	if err != nil {
 		return // panel vhost yok (bu host'ta panel kurulu degil) — sessiz gec
 	}
-	s := string(orig)
-	if strings.Contains(s, panelSecSentinel) {
-		// Eski v2 kurulumlarinda domain onizleme iframe'i icin frame-src yoktu.
-		// Sentinel mevcut olsa bile CSP'yi geriye donuk olarak guncelle.
-		const eski = "connect-src 'self'; frame-ancestors 'self'"
-		const yeni = "connect-src 'self'; frame-src https: http:; frame-ancestors 'self'"
-		newS := strings.ReplaceAll(s, eski, yeni)
-		if newS == s {
-			return // zaten guncel
-		}
-		if e := os.WriteFile(panelVhostPath, []byte(newS), 0644); e != nil {
-			log.Printf("panel sec heal: CSP guncellenemedi: %v", e)
-			return
-		}
-		if out, e := exec.Command("nginx", "-t").CombinedOutput(); e != nil {
-			_ = os.WriteFile(panelVhostPath, orig, 0644)
-			log.Printf("panel sec heal: CSP nginx -t basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
-			return
-		}
-		if out, e := exec.Command("systemctl", "reload", "nginx").CombinedOutput(); e != nil {
-			_ = os.WriteFile(panelVhostPath, orig, 0644)
-			log.Printf("panel sec heal: CSP nginx reload basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
-			return
-		}
-		log.Printf("panel sec heal: CSP domain onizlemesi icin guncellendi + nginx reload OK")
+	if nginxconf.Hash(mevcut) == nginxconf.KanonikHash() {
+		return // zaten guncel
+	}
+	if !nginxconf.ElDegmemis(mevcut) {
+		log.Printf("panel vhost heal: %s elle duzenlenmis (bilinen hicbir yayin surumuyle eslesmiyor) "+
+			"— UZERINE YAZILMADI. Guvenlik guncellemelerini (CSP sertlestirmesi, govde sinirlari) "+
+			"almak icin dosyayi yeni surumle elle birlestirin.", panelVhostPath)
 		return
 	}
-	anchor := "server_name _;"
-	idx := strings.Index(s, anchor)
-	if idx < 0 {
-		log.Printf("panel sec heal: '%s' capasi bulunamadi, atlandi", anchor)
-		return
-	}
-	// Panel CSP: SIKI ama kendini-barindiran SPA + phpMyAdmin icin uyumlu
-	// (script/style 'unsafe-inline'/'unsafe-eval' — pma satir-ici script kullanir).
-	hdrs := "\n    " + panelSecSentinel + "\n" +
-		"    add_header X-Content-Type-Options \"nosniff\" always;\n" +
-		"    add_header X-Frame-Options \"SAMEORIGIN\" always;\n" +
-		"    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" +
-		"    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n" +
-		"    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
-		"    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\n"
 
-	insertAt := idx + len(anchor)
-	newS := s[:insertAt] + hdrs + s[insertAt:]
-
-	if e := os.WriteFile(panelVhostPath, []byte(newS), 0644); e != nil {
-		log.Printf("panel sec heal: yazilamadi: %v", e)
+	if e := os.WriteFile(panelVhostPath, []byte(nginxconf.PanelConf), 0644); e != nil {
+		log.Printf("panel vhost heal: yazilamadi: %v", e)
 		return
 	}
 	if out, e := exec.Command("nginx", "-t").CombinedOutput(); e != nil {
-		_ = os.WriteFile(panelVhostPath, orig, 0644) // GERI YUKLE
-		log.Printf("panel sec heal: nginx -t basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
+		_ = os.WriteFile(panelVhostPath, mevcut, 0644) // GERI YUKLE
+		log.Printf("panel vhost heal: nginx -t basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
 		return
 	}
 	if out, e := exec.Command("systemctl", "reload", "nginx").CombinedOutput(); e != nil {
-		log.Printf("panel sec heal: nginx reload: %s", strings.TrimSpace(string(out)))
+		_ = os.WriteFile(panelVhostPath, mevcut, 0644) // GERI YUKLE
+		_, _ = exec.Command("systemctl", "reload", "nginx").CombinedOutput()
+		log.Printf("panel vhost heal: nginx reload basarisiz, geri alindi: %s", strings.TrimSpace(string(out)))
 		return
 	}
-	log.Printf("panel sec heal: guvenlik header'lari eklendi + nginx reload OK")
+	log.Printf("panel vhost heal: %s kanonik surume guncellendi + nginx reload OK", panelVhostPath)
 }
 
 // panelIndexNoCacheSentinel: panel `location /` (SPA/index.html) bloguna no-cache

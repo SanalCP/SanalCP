@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.9",
-  "duyuru": "Güvenlik: (1) Panel API'sinin istek gövdeleri artık varsayılan 2 MiB ile sınırlı — önceden sınırsızdı ve tek istekle sunucunun belleği tüketilebiliyordu; yükleme uçlarına tenant başına eşzamanlılık kotası eklendi. (2) Panel arayüzünün CSP'sinden 'unsafe-inline' ve 'unsafe-eval' kaldırıldı (script-src artık yalnız 'self'); bu gevşetme sadece onu gerçekten gerektiren phpMyAdmin ve webmail adreslerinde geçerli. (3) nginx tarafında gövde boyutu ve zaman aşımı varsayılanları daraltıldı.",
+  "son_surum": "0.5.10",
+  "duyuru": "Önemli: 0.5.9'daki nginx güvenlik ayarları (CSP sertleştirmesi ve istek gövdesi sınırları) mevcut kurulumlara inmiyordu — panel nginx yapılandırması yalnızca ilk kurulumda yazılıyordu. Panel artık bu dosyayı kendisi güncelliyor; elle düzenlenmişse dokunmuyor ve uyarı düşüyor. 0.5.9 kuranların bu sürüme geçmesi gerekiyor, aksi hâlde 0.5.9'un güvenlik düzeltmeleri etkin değil.",
   "kritik": true,
   "yayin_tarihi": "2026-08-06"
 }

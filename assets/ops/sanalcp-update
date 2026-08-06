@@ -217,6 +217,34 @@ if [ -d "$A/ops" ]; then
   ok "$(t "ops-tool'lar güncellendi" "ops tools updated")"
 fi
 
+# 9a) nginx conf'lari — _default80/_default443/php-fpm. Bunlar eskiden SADECE kurulumda
+# yaziliyordu, dolayisiyla conf'a giren hicbir duzeltme mevcut kurulumlara inmiyordu.
+# _panel.conf BURADA YOK: onu panel kendisi binary'ye gomulu kanonik surumden gunceller
+# (bkz. internal/nginxconf + provisioner.HealPanelVhostOnStartup) — orada hash kapisi
+# admin'in elle duzenledigi dosyayi korur, burada boyle bir koruma olmazdi.
+# nginx -t GATE + rollback: bozuk conf asla kalici olmaz.
+if [ -d "$A/nginx" ]; then
+  NGBK=$(mktemp -d); NGCHANGED=0
+  for f in _default80.conf _default443.conf php-fpm.conf; do
+    [ -f "$A/nginx/$f" ] || continue
+    if ! cmp -s "$A/nginx/$f" "/etc/nginx/conf.d/$f"; then
+      [ -f "/etc/nginx/conf.d/$f" ] && cp "/etc/nginx/conf.d/$f" "$NGBK/$f"
+      cp "$A/nginx/$f" "/etc/nginx/conf.d/$f"; NGCHANGED=1
+    fi
+  done
+  if [ "$NGCHANGED" = 1 ]; then
+    if nginx -t >/dev/null 2>&1; then
+      systemctl reload nginx >/dev/null 2>&1 || true
+      ok "$(t "nginx conf'lari güncellendi" "nginx confs updated")"
+    else
+      for f in "$NGBK"/*; do [ -e "$f" ] && cp "$f" "/etc/nginx/conf.d/$(basename "$f")"; done
+      nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
+      warn "$(t "nginx conf güncellemesi nginx -t'den geçmedi, geri alındı" "nginx conf update failed nginx -t, rolled back")"
+    fi
+  fi
+  rm -rf "$NGBK"
+fi
+
 # 9b) WAF (ModSecurity + OWASP CRS) heal — IDEMPOTENT (skips in seconds if everything is
 # already ready). Rebuilds the connector for ABI if the nginx version changed. Includes an
 # nginx -t GATE + rollback → never breaks the main nginx. If the module isn't loaded, the
