@@ -4,7 +4,7 @@
   "subtitle": "Create subdomains under this domain (e.g. blog.example.com) — each gets its own web directory.",
   "created": "{{ad}} created. DNS A record added.",
   "create_failed": "Could not create",
-  "confirm_delete": "Delete subdomain {{ad}}?\nvhost + files (docroot) + DNS record will be removed. This cannot be undone.",
+  "confirm_delete": "Permanently delete the subdomain {{ad}}?\n\nThis removes:\n• All files and folders (docroot)\n• The SSL certificate\n• The nginx configuration\n• The DNS A record\n\nTHIS CANNOT BE UNDONE. Without a backup the files cannot be recovered.",
   "delete_failed": "Could not delete",
   "ssl_installed_lets": "SSL installed for {{ad}} (Let's Encrypt). It is now reachable over https://.",
   "ssl_installed_self": "SSL installed for {{ad}} (self-signed). It is now reachable over https://.",
@@ -22,5 +22,12 @@
   "selfsigned_button": "self-signed",
   "delete": "Delete",
   "info_note": "ℹ️ The subdomain is registered in the web server immediately. For access, your domain's DNS (A record) must point to this server.",
-  "back_to_subscription": "← Back to subscription"
+  "back_to_subscription": "← Back to subscription",
+  "php_changed": "{{ad}} now uses PHP {{surum}}.",
+  "php_change_failed": "Could not change the PHP version",
+  "php_select_title": "PHP version for this subdomain",
+  "php_locked_title": "This account uses its own PHP-FPM service; the version follows the main domain",
+  "php_locked_note": "This account runs its own PHP-FPM service, so subdomains share the main domain's PHP version. If you need a different version, change the main domain's PHP version — subdomains will follow it.",
+  "delete_note": "Deleting removes ALL of the subdomain's files, its SSL certificate, its nginx configuration and its DNS record. This cannot be undone.",
+  "php_ayri_domain_note": "If a subdomain needs a DIFFERENT PHP version, add it as a SEPARATE DOMAIN instead. A separate domain gets its own system user and its own PHP-FPM service, so it can run a PHP version independent of the main domain. Subdomains share the main domain's PHP service."
 }

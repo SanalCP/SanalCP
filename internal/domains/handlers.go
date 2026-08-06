@@ -2,12 +2,16 @@ package domains
 
 import (
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +79,59 @@ type AltAlan struct {
 	ID       int64  `json:"id"`
 	TamAd    string `json:"tam_ad"`
 	PHPSurum string `json:"php_surum"`
+	// SSL / SSLKaynak: ana domaindekiyle AYNI üç durumlu rozet için.
+	//
+	// Ana domainden farkı, kaynağın DB'de tutulmaması: subdomain SSL'i
+	// yalnızca dosya sisteminde yaşıyor (internal/subdomain/ssl.go) ve
+	// SSLKur kurduğu tipi hiçbir yere yazmıyor. Bu yüzden kaynak
+	// SERTİFİKANIN KENDİSİNDEN okunuyor — issuer == subject ise self-signed.
+	// Sütun eklemeye göre avantajı: geriye dönük çalışır (mevcut sertifikalar
+	// için de doğru sonuç verir) ve DB ile gerçeğin ayrışma ihtimali yoktur.
+	SSL       bool   `json:"ssl"`
+	SSLKaynak string `json:"ssl_kaynak,omitempty"`
+}
+
+// altAlanSSL: subdomain sertifikasının durumunu ve kaynağını dosya sisteminden
+// okur. Yol deseni internal/subdomain/ssl.go ile aynı: ~/ssl/<tam_ad>.crt|.key
+//
+// Sertifika okunamaz/çözümlenemezse kaynak BOŞ döner (bilinmiyor) — arayüz
+// bilinmeyeni yeşil gösterir, çünkü kırmızı yanlış alarm olurdu.
+func altAlanSSL(sk, tamAd string) (aktif bool, kaynak string) {
+	crt := filepath.Join("/home", sk, "ssl", tamAd+".crt")
+	key := filepath.Join("/home", sk, "ssl", tamAd+".key")
+	if _, err := os.Stat(crt); err != nil {
+		return false, ""
+	}
+	if _, err := os.Stat(key); err != nil {
+		return false, ""
+	}
+	return true, sertifikaKaynagi(crt)
+}
+
+// sertifikaKaynagi: PEM sertifikanın kendi kendini imzalayıp imzalamadığına
+// bakarak kaynağı belirler. Okunamaz/çözümlenemez sertifikada BOŞ döner
+// (bilinmiyor) — arayüz bilinmeyeni yeşil gösterir, kırmızı yanlış alarm olurdu.
+//
+// altAlanSSL'den ayrı tutulmasının sebebi /home altına sabitlenmiş olmaması:
+// asıl karar mantığı budur ve gerçek sertifikalarla test edilebilmelidir.
+func sertifikaKaynagi(crtYol string) string {
+	ham, err := os.ReadFile(crtYol)
+	if err != nil {
+		return ""
+	}
+	blok, _ := pem.Decode(ham)
+	if blok == nil {
+		return ""
+	}
+	c, err := x509.ParseCertificate(blok.Bytes)
+	if err != nil {
+		return ""
+	}
+	// Kendi kendini imzalayan sertifikada veren ile konu aynıdır.
+	if c.Issuer.String() == c.Subject.String() {
+		return "self-signed"
+	}
+	return "letsencrypt"
 }
 
 type Handlers struct {
@@ -178,6 +235,7 @@ func (h *Handlers) altAlanlariEkle(r *http.Request, liste []Domain) {
 			continue
 		}
 		if i, ok := idx[dID]; ok {
+			a.SSL, a.SSLKaynak = altAlanSSL(liste[i].SistemKullanici, a.TamAd)
 			liste[i].AltAlanlar = append(liste[i].AltAlanlar, a)
 		}
 	}
@@ -327,6 +385,22 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.QueryRowContext(r.Context(), `SELECT id FROM domains WHERE alan_adi=?`, req.AlanAdi).Scan(&existing)
 	if err == nil {
 		httpx.WriteError(w, http.StatusConflict, "bu alan adı zaten kayıtlı")
+		return
+	}
+	// Aynı ad bir ALT ALAN olarak duruyorsa engelle. Kontrol yalnız ters yönde
+	// vardı (subdomain oluştururken domains'e bakılıyordu); bu yön açıkta
+	// kaldığı için aynı server_name'e sahip İKİ nginx server bloğu üretilebilir
+	// ve hangisinin kazanacağı nginx'in yükleme sırasına kalırdı.
+	//
+	// Alt alan adını tam domaine yükseltmek MEŞRU bir istek (kendi Linux
+	// kullanıcısı → kendi PHP-FPM servisi → farklı PHP sürümü), bu yüzden mesaj
+	// ne yapılacağını söylüyor: önce alt alan adını sil.
+	var altVar int64
+	if e := h.DB.QueryRowContext(r.Context(),
+		`SELECT domain_id FROM subdomanlar WHERE tam_ad=?`, req.AlanAdi).Scan(&altVar); e == nil {
+		httpx.WriteError(w, http.StatusConflict,
+			"bu ad şu anda bir alt alan adı olarak kullanılıyor. Ayrı bir domain olarak eklemek "+
+				"için önce ilgili domainin Alt Alan Adları sayfasından silin.")
 		return
 	}
 

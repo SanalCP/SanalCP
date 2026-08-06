@@ -5,6 +5,7 @@ package subdomain
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -29,11 +30,14 @@ type Handlers struct {
 var reAlt = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 type Sub struct {
-	ID        int64  `json:"id"`
-	AltAd     string `json:"alt_ad"`
-	TamAd     string `json:"tam_ad"`
-	PHPSurum  string `json:"php_surum"`
-	DocRoot   string `json:"docroot"`
+	ID       int64  `json:"id"`
+	AltAd    string `json:"alt_ad"`
+	TamAd    string `json:"tam_ad"`
+	PHPSurum string `json:"php_surum"`
+	DocRoot  string `json:"docroot"`
+	// PHPSabit: true ise PHP sürümü bu alt alan adı için değiştirilemez
+	// (tenant per-tenant FPM kullanıyor, sürüm ana domaine bağlı).
+	PHPSabit  bool   `json:"php_sabit"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -65,11 +69,16 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
+	// phpSabit: per-tenant FPM'de alt alan adının sürümü ana domaine bağlıdır
+	// ve değiştirilemez. Arayüz seçiciyi buna göre kapatır — kullanıcının
+	// deneyip 409 alması yerine nedenini baştan görmesi daha iyi.
+	phpSabit := provisioner.TenantFPMActive(sk)
 	out := []Sub{}
 	for rows.Next() {
 		var s Sub
 		if err := rows.Scan(&s.ID, &s.AltAd, &s.TamAd, &s.PHPSurum, &s.CreatedAt); err == nil {
 			s.DocRoot = docrootOf(sk, s.TamAd)
+			s.PHPSabit = phpSabit
 			out = append(out, s)
 		}
 	}
@@ -123,6 +132,14 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	if n > 0 {
 		httpx.WriteError(w, http.StatusConflict, "bu alan adı zaten kullanımda")
 		return
+	}
+	// 🔴 Per-tenant FPM'de tenant TEK bir php-fpm master çalıştırır ve tüm
+	// alan adları aynı sokete gider — istenen sürüm fiilen uygulanamaz.
+	// İstenen değeri DB'ye yazmak paneli yalancı yapardı ("PHP 7.4" gösterip
+	// 8.1 sunmak); onun yerine GERÇEKTE sunulan sürüm (ana domainin sürümü)
+	// kaydedilir. Farklı sürüm isteniyorsa ana domainin sürümü değiştirilmeli.
+	if provisioner.TenantFPMActive(sk) && phpSurum != parentPHP {
+		phpSurum = parentPHP
 	}
 	socket, err := provisioner.PHPSocketFor(sk, phpSurum)
 	if err != nil {
@@ -185,6 +202,105 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "tam_ad": tamAd, "docroot": docroot})
 }
 
+// PUT /domains/{id}/subdomain/{sid}  {php_surum}
+//
+// Subdomain'in PHP sürümünü değiştirir. Eskiden sürüm YALNIZ oluşturma anında
+// belirlenebiliyordu; eski bir uygulama (ör. PHP 7.4 isteyen bir script) alt
+// alan adına konduğunda tek çare subdomain'i silip yeniden oluşturmaktı —
+// dosyalar ve sertifika da gidiyordu.
+//
+// SSL DURUMU KORUNUR: sertifika duruyorsa vhost SSL'li varyantla yeniden
+// yazılır. Bunu atlamak, PHP sürümü değiştiren kullanıcının sitesini sessizce
+// HTTP'ye düşürürdü.
+func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
+	id, sk, _, _, demo, ok := h.parent(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	altAd, tamAd, mevcutPHP, ok := h.subInfo(r, id)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "subdomain bulunamadı")
+		return
+	}
+	var req struct {
+		PHPSurum string `json:"php_surum"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
+	yeni := strings.TrimSpace(req.PHPSurum)
+	if yeni == "" || yeni == mevcutPHP {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "php_surum": mevcutPHP})
+		return
+	}
+	// 🔴 PER-TENANT FPM'DE SÜRÜM DEĞİŞTİRİLEMEZ — ve bunu SESSİZCE geçmek
+	// yasaktır. Tenant per-tenant FPM'e (Seçenek A) geçmişse tek bir php-fpm
+	// master çalışır ve TEK bir soket sunar; PHPSocketFor bu durumda istenen
+	// sürümü YOK SAYIP tenant soketini döner. Yani vhost'u yeniden yazsak da
+	// istekler eski sürüme gitmeye devam ederdi: panel "PHP 7.4" gösterir,
+	// sunucu 8.1 çalıştırırdı. Kullanıcı bunu ancak script'i patlayınca anlardı.
+	//
+	// Doğru kaldıraç ana domainin PHP sürümüdür: değiştirildiğinde
+	// EnableTenantFPM unit'i yeni sürümle yeniden kurar (bkz. internal/php)
+	// ve alt alan adları da onu izler.
+	if provisioner.TenantFPMActive(sk) {
+		httpx.WriteError(w, http.StatusConflict,
+			"Bu hesap kendine ait bir PHP-FPM servisi kullanıyor; alt alan adları ana domainle "+
+				"AYNI PHP sürümünü paylaşır. Farklı bir sürüm için ana domainin PHP sürümünü "+
+				"değiştirin (alt alan adları da onu izler).")
+		return
+	}
+	socket, err := provisioner.PHPSocketFor(sk, yeni)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "PHP sürümü sunucuda kurulu değil: "+yeni)
+		return
+	}
+
+	// Mevcut conf'u sakla: nginx doğrulaması başarısız olursa BİREBİR geri
+	// yazılır. Yeniden üretmek yerine kopyalamak, conf'a elle eklenmiş
+	// satırların kaybolmamasını da sağlar.
+	conf := confPath(sk, altAd)
+	eskiConf, okumaHatasi := os.ReadFile(conf)
+
+	docroot := docrootOf(sk, tamAd)
+	crt, key := certYolu(sk, tamAd)
+	yeniIcerik := vhost(tamAd, docroot, socket)
+	if dosyaVar(crt) && dosyaVar(key) {
+		yeniIcerik = vhostSSL(tamAd, docroot, socket, crt, key)
+	}
+	if err := os.WriteFile(conf, []byte(yeniIcerik), 0o644); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "vhost yazılamadı")
+		return
+	}
+	_ = exec.Command("restorecon", conf).Run()
+	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
+		if okumaHatasi == nil {
+			_ = os.WriteFile(conf, eskiConf, 0o644)
+		} else {
+			_ = os.Remove(conf)
+		}
+		_ = exec.Command("systemctl", "reload", "nginx").Run()
+		httpx.WriteError(w, http.StatusInternalServerError, "nginx doğrulanamadı: "+strings.TrimSpace(string(out)))
+		return
+	}
+	_ = exec.Command("systemctl", "reload", "nginx").Run()
+
+	// DB en SON güncellenir: nginx doğrulamasından geçmeyen bir sürümü kayda
+	// yazmak, panelin gerçekte çalışmayan bir sürümü göstermesine yol açardı.
+	if _, err := h.DB.ExecContext(r.Context(),
+		`UPDATE subdomanlar SET php_surum=? WHERE domain_id=? AND tam_ad=?`, yeni, id, tamAd); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kayıt güncellenemedi: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "tam_ad": tamAd, "php_surum": yeni})
+}
+
 // DELETE /domains/{id}/subdomain/{sid}
 func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	id, sk, _, _, demo, ok := h.parent(r)
@@ -209,11 +325,31 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = os.Remove(confPath(sk, altAd))
 	_ = exec.Command("systemctl", "reload", "nginx").Run()
-	// docroot sil (guard: subdomains altında + tam_ad eşleşmeli)
-	docroot := docrootOf(sk, tamAd)
-	base := "/home/" + sk + "/subdomains/"
-	if strings.HasPrefix(docroot, base) && filepath.Clean(docroot) != filepath.Clean(base) {
-		_ = os.RemoveAll(docroot)
+	// docroot sil — symlink-GÜVENLİ.
+	//
+	// 🔴 Eskiden os.RemoveAll(docroot) idi ve tek koruma bir STRING öneki
+	// kontrolüydü. Panel root çalışır ve ~/subdomains tenant'ın yazabildiği bir
+	// dizindir: tenant onu /etc'ye bakan bir symlink'e çevirirse yol çözümlemesi
+	// jail DIŞINA gider ve silme orada gerçekleşirdi. String kontrolü bunu
+	// göremez, çünkü yolun kendisi hâlâ /home/<sk>/subdomains/... görünür.
+	//
+	// jailpath.Sil fd-göreli ilerler ve hiçbir bileşende symlink takip etmez.
+	if home, herr := jailpath.TenantHome(sk); herr == nil {
+		if err := jailpath.Sil(home, "subdomains/"+tamAd); err != nil && !os.IsNotExist(err) {
+			log.Printf("subdomain docroot silinemedi (%s): %v", tamAd, err)
+		}
+	}
+	// SSL sertifikası da gitmeli: docroot ve vhost silindikten sonra
+	// ~/ssl/<tam_ad>.crt|.key yetim kalırdı. Aynı ad tekrar oluşturulursa eski
+	// (artık alan adına ait olmayan) sertifikanın yeniden kullanılması da
+	// önlenir. Yol sabit ve tenant home'unun ALTINDA olduğu için symlink-güvenli
+	// silme kullanılır — bkz. yukarıdaki docroot notu.
+	if home, herr := jailpath.TenantHome(sk); herr == nil {
+		for _, uzanti := range []string{".crt", ".key"} {
+			if err := jailpath.Sil(home, "ssl/"+tamAd+uzanti); err != nil && !os.IsNotExist(err) {
+				log.Printf("subdomain sertifikası silinemedi (%s%s): %v", tamAd, uzanti, err)
+			}
+		}
 	}
 	_, _ = h.DB.Exec(`DELETE FROM subdomanlar WHERE id=? AND domain_id=?`, sid, id)
 	_, _ = h.DB.Exec(`DELETE FROM dns_records WHERE domain_id=? AND ad=? AND tip='A'`, id, altAd)

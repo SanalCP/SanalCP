@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.19",
-  "duyuru": "Düzeltme: Dosya yöneticisinde arşiv açma 'dosya bulunamadı veya klasör' hatası veriyordu. Aynı hata arşiv oluşturmada boyutu 0 gösteriyor, arama sonuçlarında izin ve tarih sütunlarını boş bırakıyordu. Ayrıca domain listesinde alt alan adları artık ana domainin altında girintili olarak görünüyor ve aranabiliyor.",
+  "son_surum": "0.5.20",
+  "duyuru": "Alt alan adları: PHP sürümü artık sonradan değiştirilebiliyor (kendi PHP-FPM servisi olan hesaplarda sürüm ana domaine bağlıdır; bu durum artık açıkça belirtiliyor). Farklı PHP sürümü gerektiğinde alt alan adı yerine ayrı domain eklenmesi öneriliyor. Silme uyarısı nelerin kaldırılacağını tek tek yazıyor; silme artık SSL sertifikasını da temizliyor. Domain listesinde alt alan adlarının SSL durumu görünüyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

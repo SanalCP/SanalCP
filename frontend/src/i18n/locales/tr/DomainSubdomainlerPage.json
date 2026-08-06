@@ -4,7 +4,7 @@
   "subtitle": "Bu domain altında alt alan adları (örn. blog.alan.com) oluşturun; her biri ayrı web dizinine sahiptir.",
   "created": "{{ad}} oluşturuldu. DNS A kaydı eklendi.",
   "create_failed": "Oluşturulamadı",
-  "confirm_delete": "{{ad}} subdomaini silinsin mi?\nvhost + dosyaları (docroot) + DNS kaydı kaldırılır. Geri alınamaz.",
+  "confirm_delete": "{{ad}} alt alan adı KALICI olarak silinsin mi?\n\nSilinecekler:\n• Tüm dosyalar ve klasörler (docroot)\n• SSL sertifikası\n• nginx yapılandırması\n• DNS A kaydı\n\nBu işlemin GERİ DÖNÜŞÜ YOKTUR. Yedeğiniz yoksa dosyalar geri getirilemez.",
   "delete_failed": "Silinemedi",
   "ssl_installed_lets": "{{ad}} için SSL kuruldu (Let's Encrypt). Artık https:// ile erişilebilir.",
   "ssl_installed_self": "{{ad}} için SSL kuruldu (öz-imzalı). Artık https:// ile erişilebilir.",
@@ -22,5 +22,12 @@
   "selfsigned_button": "öz-imza",
   "delete": "Sil",
   "info_note": "ℹ️ Subdomain hemen web sunucusunda tanımlanır. Erişim için alan adınızın DNS'i (A kaydı) bu sunucuya yönlendirilmiş olmalıdır.",
-  "back_to_subscription": "← Aboneliğe dön"
+  "back_to_subscription": "← Aboneliğe dön",
+  "php_changed": "{{ad}} artık PHP {{surum}} kullanıyor.",
+  "php_change_failed": "PHP sürümü değiştirilemedi",
+  "php_select_title": "Bu alt alan adının PHP sürümü",
+  "php_locked_title": "Bu hesap kendi PHP-FPM servisini kullanıyor; sürüm ana domaine bağlı",
+  "php_locked_note": "Bu hesap kendine ait bir PHP-FPM servisi kullandığı için alt alan adları ana domainle aynı PHP sürümünü paylaşır. Farklı bir sürüm gerekiyorsa ana domainin PHP sürümünü değiştirin — alt alan adları da onu izler.",
+  "delete_note": "Silme işlemi alt alan adına ait TÜM dosyaları, SSL sertifikasını, nginx yapılandırmasını ve DNS kaydını kaldırır. Geri dönüşü yoktur.",
+  "php_ayri_domain_note": "Alt alan adı için FARKLI bir PHP sürümü gerekiyorsa, onu alt alan adı yerine AYRI BİR DOMAIN olarak ekleyin. Ayrı domain kendi sistem kullanıcısını ve kendi PHP-FPM servisini alır, böylece ana domainden bağımsız bir PHP sürümü kullanabilir. Alt alan adları ise ana domainin PHP servisini paylaşır."
 }

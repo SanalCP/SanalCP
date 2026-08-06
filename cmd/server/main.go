@@ -447,6 +447,7 @@ func main() {
 				r.With(middleware.AdminOnly).Post("/firewall/{id}/durum", fwH.Durum)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/subdomain", subH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/subdomain", subH.Olustur)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/subdomain/{sid}", subH.Guncelle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/subdomain/{sid}", subH.Sil)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/subdomain/{sid}/ssl", subH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/subdomain/{sid}/ssl", subH.SSLKur)
