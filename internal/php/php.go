@@ -386,16 +386,20 @@ func (h *Handlers) Versions(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		gorulen[s.Surum] = true
-		aciklama := "Remi · " + s.Aciklama
-		if s.Kaynak == "appstream" {
-			aciklama = "AppStream · OPcache"
-		}
+		// Aciklama BİLEREK BOŞ: domain oluşturma ekranındaki sürüm listesi sade
+		// olmalı ("PHP 8.3"). Eskiden buraya "AppStream · OPcache" / "Remi ·
+		// Remi modular — geliştirme/test/legacy" yazılıyordu; ikisi de yanıltıcıydı:
+		//   • OPcache yalnız AppStream satırına elle yazılmıştı, oysa DefaultBundle
+		//     her sürüme php-opcache kurar — sunucuda 7.4'ten 8.5'e hepsinde yüklü.
+		//   • "geliştirme/test/legacy" tüm Remi paketlerini kapsıyordu, yani en
+		//     güncel 8.4/8.5'i de. Remi modular paketleri üretim kalitesindedir.
+		// Sürümün kaynağı/durumu PHP Sürümleri yönetim sayfasında zaten görünür;
+		// burada karar için gereken tek bilgi sürüm numarasıdır.
 		yuklu = append(yuklu, Surum{
-			Surum:    s.Surum,
-			PoolDir:  s.PoolDir,
-			SockDir:  s.SockDir,
-			Service:  s.Service,
-			Aciklama: aciklama,
+			Surum:   s.Surum,
+			PoolDir: s.PoolDir,
+			SockDir: s.SockDir,
+			Service: s.Service,
 		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, yuklu)

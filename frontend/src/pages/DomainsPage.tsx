@@ -65,8 +65,10 @@ export default function DomainsPage() {
   const [olusturuluyor, setOlusturuluyor] = useState(false)
   const [olusturmaSonuc, setOlusturmaSonuc] = useState<OlusturmaSonuc | null>(null)
   const [sonucKopyalandi, setSonucKopyalandi] = useState(false)
+  const [wpYonlendir, setWpYonlendir] = useState<{ id: number; alanAdi: string } | null>(null)
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
+  const [fSiteTipi, setFSiteTipi] = useState<'php'|'wordpress'|'statik'>('php')
   const [fPlanID, setFPlanID] = useState<number | ''>('')
   const [fSSL, setFSSL] = useState(false)
   const [fWWW, setFWWW] = useState(false)
@@ -123,7 +125,7 @@ export default function DomainsPage() {
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
-    setFAlanAdi(''); setFPHPSurum('8.3'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
+    setFAlanAdi(''); setFPHPSurum('8.3'); setFSiteTipi('php'); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
     setOlusturAcik(true)
     modalVeriYukle() // lazy: plan/php sürümleri henüz gelmediyse şimdi çek (listeyi bloklamaz)
   }
@@ -138,7 +140,7 @@ export default function DomainsPage() {
     }
     setOlusturuluyor(true)
     try {
-      const body: any = { alan_adi: alanAdi, php_surum: fPHPSurum }
+      const body: any = { alan_adi: alanAdi, php_surum: fPHPSurum, site_tipi: fSiteTipi }
       if (fPlanID !== '') body.plan_id = fPlanID
       const r = await api.post<OlusturmaSonuc>('/domains', body)
       setOlusturAcik(false)
@@ -165,6 +167,13 @@ export default function DomainsPage() {
       setBasari(mesaj)
       setTimeout(() => setBasari(null), 8000)
       yukle()
+      // WordPress tipinde kurulumu BURADA çalıştırmıyoruz: WP kurulumu site
+      // başlığı + admin kullanıcı/e-posta ister ve admin parolası üretilip
+      // kullanıcıya gösterilmek zorundadır. Bunları uydurmak yerine kullanıcıyı
+      // kendi kurulum ekranına gönderiyoruz.
+      if (fSiteTipi === 'wordpress') {
+        setWpYonlendir({ id: r.data.id, alanAdi })
+      }
     } catch (e: any) {
       setHata(apiHata(e, t('DomainsPage:create_modal.create_error')))
     } finally {
@@ -299,6 +308,24 @@ export default function DomainsPage() {
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+
+      {/* WordPress tipi seçildiyse kurulum tek tıkla erişilebilir olmalı —
+          domain açıldı ama site henüz boş. */}
+      {wpYonlendir && (
+        <div className="mb-3 px-3 py-2.5 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-md flex items-center gap-3 flex-wrap">
+          <span className="text-sm text-sky-800 dark:text-sky-200">
+            {t('DomainsPage:wp_redirect.text', { domain: wpYonlendir.alanAdi })}
+          </span>
+          <Link to={`/abonelikler/${wpYonlendir.id}/wordpress`}
+            className="text-xs px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded font-medium">
+            {t('DomainsPage:wp_redirect.button')}
+          </Link>
+          <button onClick={() => setWpYonlendir(null)}
+            className="text-xs px-2 py-1.5 text-sky-700 dark:text-sky-300 hover:underline ml-auto">
+            {t('common:close')}
+          </button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -467,6 +494,32 @@ export default function DomainsPage() {
             {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
             <div className="space-y-3">
+              {/* Site tipi — ilk karar. Statik HTML'de veritabanı hiç açılmaz;
+                  WordPress domaini açar ve kurulum ekranına yönlendirir (admin
+                  kullanıcı/parola orada sorulur, otomatik üretilmez). */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">{t('DomainsPage:create_modal.type_label')}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    ['php', '🐘', t('DomainsPage:create_modal.type_php'), t('DomainsPage:create_modal.type_php_desc')],
+                    ['wordpress', '📝', t('DomainsPage:create_modal.type_wordpress'), t('DomainsPage:create_modal.type_wordpress_desc')],
+                    ['statik', '📄', t('DomainsPage:create_modal.type_statik'), t('DomainsPage:create_modal.type_statik_desc')],
+                  ] as const).map(([tip, ikon, ad, ac]) => (
+                    <button key={tip} type="button" disabled={olusturuluyor}
+                      onClick={() => setFSiteTipi(tip)}
+                      className={`text-left px-3 py-2.5 rounded-lg border transition ${
+                        fSiteTipi === tip
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 ring-1 ring-brand-500'
+                          : 'border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}>
+                      <div className="text-lg leading-none mb-1">{ikon}</div>
+                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">{ad}</div>
+                      <div className="text-[10px] leading-snug text-slate-500 dark:text-slate-400 mt-0.5">{ac}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainsPage:create_modal.domain_label')} <span className="text-red-500">*</span></label>
                 <input

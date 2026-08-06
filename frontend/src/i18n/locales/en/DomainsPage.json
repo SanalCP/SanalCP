@@ -61,7 +61,14 @@
     "www_placeholder_domain": "domain",
     "www_hint": "Visiting the bare domain ({{domain}}) will automatically 301-redirect to www.{{domain}}. You can change this later from the SSL/TLS Certificates page too.",
     "www_success": " ✓ www redirect enabled.",
-    "www_error": " ⚠ Could not enable www redirect — you can retry from the SSL/TLS Certificates page."
+    "www_error": " ⚠ Could not enable www redirect — you can retry from the SSL/TLS Certificates page.",
+    "type_label": "Site type",
+    "type_php": "PHP",
+    "type_php_desc": "Database included",
+    "type_wordpress": "WordPress",
+    "type_wordpress_desc": "Database + installer",
+    "type_statik": "Static HTML",
+    "type_statik_desc": "No database"
   },
   "result_modal": {
     "title": "✓ Domain Created",
@@ -104,5 +111,9 @@
     "success": "Owner updated for {{count}} domain(s).",
     "error": "Could not change the owner",
     "load_error": "Could not load the customer list"
+  },
+  "wp_redirect": {
+    "text": "{{domain}} has been created. To finish the WordPress installation you need to enter the site title and administrator details.",
+    "button": "Go to WordPress setup"
   }
 }

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.14",
-  "duyuru": "Sahiplik zinciri düzeltmeleri: Domain eklendiğinde müşteri panel hesabı artık ANINDA oluşuyor (önceden yalnız panel yeniden başlatılınca beliriyordu). Domainler sayfasına 'Sahip değiştir' eklendi — domain devri artık arayüzden yapılabiliyor. Yöneticinin açtığı müşteri hesapları da müşteri kaydı alıyor (önceden yalnız bayilerinki alıyordu).",
+  "son_surum": "0.5.15",
+  "duyuru": "Domain oluştururken site tipi seçilebiliyor: PHP, WordPress veya Statik HTML. Statik HTML seçildiğinde gereksiz veritabanı ve DB kullanıcısı artık oluşturulmuyor. PHP sürüm listesindeki yanıltıcı etiketler ('AppStream · OPcache', 'geliştirme/test/legacy') kaldırıldı — OPcache zaten tüm sürümlerde var.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

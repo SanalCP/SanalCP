@@ -61,7 +61,14 @@
     "www_placeholder_domain": "alan adı",
     "www_hint": "Çıplak alan adı ({{domain}}) ziyaret edilince otomatik olarak www.{{domain}}'e 301 ile yönlendirilir. İstersen kurulumdan sonra SSL/TLS Sertifikaları sayfasından da değiştirebilirsin.",
     "www_success": " ✓ www yönlendirmesi açıldı.",
-    "www_error": " ⚠ www yönlendirmesi açılamadı — SSL/TLS Sertifikaları sayfasından tekrar deneyebilirsiniz."
+    "www_error": " ⚠ www yönlendirmesi açılamadı — SSL/TLS Sertifikaları sayfasından tekrar deneyebilirsiniz.",
+    "type_label": "Site tipi",
+    "type_php": "PHP",
+    "type_php_desc": "Veritabanı dahil",
+    "type_wordpress": "WordPress",
+    "type_wordpress_desc": "Veritabanı + kurulum",
+    "type_statik": "Statik HTML",
+    "type_statik_desc": "Veritabanı yok"
   },
   "result_modal": {
     "title": "✓ Domain Oluşturuldu",
@@ -104,5 +111,9 @@
     "success": "{{count}} domainin sahibi güncellendi.",
     "error": "Sahip değiştirilemedi",
     "load_error": "Müşteri listesi alınamadı"
+  },
+  "wp_redirect": {
+    "text": "{{domain}} oluşturuldu. WordPress kurulumunu tamamlamak için site başlığı ve yönetici bilgilerini girmeniz gerekiyor.",
+    "button": "WordPress kurulumuna git"
   }
 }
