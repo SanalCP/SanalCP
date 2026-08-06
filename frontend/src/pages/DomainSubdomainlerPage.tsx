@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
-type Sub = { id: number; alt_ad: string; tam_ad: string; php_surum: string; docroot: string; created_at: string }
+type Sub = { id: number; alt_ad: string; tam_ad: string; php_surum: string; docroot: string; created_at: string; php_sabit?: boolean }
 
 export default function DomainSubdomainlerPage() {
   const { t } = useTranslation(['DomainSubdomainlerPage', 'common'])
@@ -43,6 +43,30 @@ export default function DomainSubdomainlerPage() {
   }
 
   const [sslMesgul, setSslMesgul] = useState<number | null>(null)
+  // Kurulu PHP sürümleri — subdomain'in sürümünü sonradan değiştirebilmek için.
+  // Eskiden sürüm YALNIZ oluşturma anında seçilebiliyordu; PHP 7.4 isteyen eski
+  // bir uygulama için tek çare subdomain'i silip yeniden kurmaktı (dosyalar ve
+  // sertifika da giderdi).
+  const [phpSurumler, setPhpSurumler] = useState<{ surum: string }[]>([])
+  const [phpMesgul, setPhpMesgul] = useState<number | null>(null)
+
+  useEffect(() => {
+    api.get<{ surum: string }[]>('/php/versions').then(r => setPhpSurumler(r.data || [])).catch(() => {})
+  }, [])
+
+  async function phpDegistir(s: Sub, yeni: string) {
+    if (yeni === s.php_surum) return
+    setPhpMesgul(s.id); setHata(null); setOk(null)
+    try {
+      await api.put(`/domains/${id}/subdomain/${s.id}`, { php_surum: yeni })
+      setOk(t('DomainSubdomainlerPage:php_changed', { ad: s.tam_ad, surum: yeni }))
+      yukle()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainSubdomainlerPage:php_change_failed')))
+    } finally {
+      setPhpMesgul(null)
+    }
+  }
   async function sslKur(s: Sub, tip: 'letsencrypt' | 'self-signed') {
     setHata(null); setOk(null); setSslMesgul(s.id)
     try {
@@ -97,9 +121,24 @@ export default function DomainSubdomainlerPage() {
                 <li key={s.id} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <a href={`http://${s.tam_ad}`} target="_blank" rel="noreferrer" className="font-mono text-sm text-brand-600 dark:text-brand-400 hover:underline">{s.tam_ad}</a>
-                    <div className="text-[11px] text-slate-400 font-mono truncate">{s.docroot} · PHP {s.php_surum}</div>
+                    <div className="text-[11px] text-slate-400 font-mono truncate">{s.docroot}</div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* PHP sürümü — seçince anında uygulanır (vhost yeniden
+                        yazılır, nginx -t geçmezse eski conf geri yüklenir). */}
+                    <select
+                      value={s.php_surum}
+                      onChange={e => phpDegistir(s, e.target.value)}
+                      disabled={phpMesgul === s.id || !!s.php_sabit}
+                      title={s.php_sabit
+                        ? t('DomainSubdomainlerPage:php_locked_title')
+                        : t('DomainSubdomainlerPage:php_select_title')}
+                      className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 disabled:opacity-50"
+                    >
+                      {(phpSurumler.length ? phpSurumler : [{ surum: s.php_surum }]).map(p => (
+                        <option key={p.surum} value={p.surum}>PHP {p.surum}</option>
+                      ))}
+                    </select>
                     <button onClick={() => sslKur(s, 'letsencrypt')} disabled={sslMesgul === s.id} title={t('DomainSubdomainlerPage:letsencrypt_title')}
                       className="text-xs px-2.5 py-1 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50">
                       {sslMesgul === s.id ? '…' : t('DomainSubdomainlerPage:letsencrypt_button')}
@@ -114,7 +153,23 @@ export default function DomainSubdomainlerPage() {
               ))}
             </ul>
           )}
-        <p className="text-[11px] text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+        {/* Farklı PHP sürümü gereken alt alan adları için doğru yol AYRI DOMAIN.
+            Alt alan adı, ana domainin sistem kullanıcısı ve PHP-FPM servisi
+            altında yaşar; ayrı domain kendi kullanıcısını ve servisini alır. */}
+        <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2 flex items-start gap-2">
+          <span className="leading-none mt-0.5">⚠</span>
+          <span>{t('DomainSubdomainlerPage:php_ayri_domain_note')}</span>
+        </p>
+        {liste.some(s => s.php_sabit) && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-2">
+            {t('DomainSubdomainlerPage:php_locked_note')}
+          </p>
+        )}
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60">
+          <span className="text-red-600 dark:text-red-400 font-medium">{t('common:delete')}:</span>{' '}
+          {t('DomainSubdomainlerPage:delete_note')}
+        </p>
+        <p className="text-[11px] text-slate-400 mt-1.5">
           {t('DomainSubdomainlerPage:info_note')}
         </p>
       </div>

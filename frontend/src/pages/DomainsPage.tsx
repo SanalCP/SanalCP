@@ -17,7 +17,7 @@ type Domain = {
   php_surum?: string; is_demo?: boolean
   olusturulma?: string; plan_id?: number; plan_ad?: string
   ssl?: boolean; ssl_bitis?: string; ssl_kaynak?: string
-  alt_alanlar?: { id: number; tam_ad: string; php_surum: string }[]
+  alt_alanlar?: { id: number; tam_ad: string; php_surum: string; ssl?: boolean; ssl_kaynak?: string }[]
   bayi_adi?: string; bayi_paket_adi?: string
   ipv4?: string
 }
@@ -31,6 +31,32 @@ type OlusturmaSonuc = {
   // Sunucuda ortak nameserver tanımlı değilse backend bu alanı hiç göndermez
   // (vanity değerler müşteriye verilemez) → bölüm gösterilmez.
   nameserver?: { ns1: string; ns2: string }
+}
+
+// SSLIkon: üç durumlu kilit. Ana domain ve alt alan adları AYNI bileşeni
+// kullanır — iki ayrı kopya tutmak, birinde yapılan düzeltmenin diğerinde
+// unutulmasına yol açardı.
+//
+//   letsencrypt / imported / bilinmeyen → yeşil kapalı kilit
+//   self-signed                         → KIRMIZI kapalı kilit (ziyaretçi
+//                                          tarayıcıda uyarı ekranı görür)
+//   sertifika yok                       → gri açık kilit
+//
+// Kaynak BOŞ olduğunda yeşil kalır: bilinmiyor demektir, kırmızı göstermek
+// yanlış alarm olurdu.
+function SSLIkon({ ssl, kaynak, baslik, kucuk }: { ssl?: boolean; kaynak?: string; baslik: string; kucuk?: boolean }) {
+  const kilitli = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+  const acik = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM9 11V7a3 3 0 016 0'
+  const selfSigned = ssl && kaynak === 'self-signed'
+  const renk = !ssl ? 'text-slate-300 dark:text-slate-600' : selfSigned ? 'text-red-500' : 'text-emerald-500'
+  const boyut = kucuk ? 'w-3 h-3' : 'w-3.5 h-3.5'
+  return (
+    <span title={baslik}>
+      <svg className={`${boyut} ${renk}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={ssl ? kilitli : acik} />
+      </svg>
+    </span>
+  )
 }
 
 function fmtKB(kb: number) {
@@ -487,31 +513,12 @@ export default function DomainsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
-                          {/* SSL rozeti ÜÇ durumlu. Eskiden yalnız var/yok vardı ve
-                              self-signed sertifika da yeşil görünüyordu — oysa ziyaretçi
-                              tam sayfa tarayıcı uyarısı alır, yani site fiilen açılmaz.
-                              ssl_kaynak BOŞ ise (sütun eklenmeden önceki kayıtlar) kaynak
-                              bilinmiyor demektir; kırmızı göstermek yanlış alarm olurdu,
-                              o yüzden yeşilde bırakılır. */}
-                          {(() => {
-                            const kilitli = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
-                            const acik = 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM9 11V7a3 3 0 016 0'
-                            const selfSigned = d.ssl && d.ssl_kaynak === 'self-signed'
-                            const baslik = !d.ssl
+                          <SSLIkon ssl={d.ssl} kaynak={d.ssl_kaynak}
+                            baslik={!d.ssl
                               ? t('DomainsPage:table.ssl_none')
-                              : selfSigned
+                              : d.ssl_kaynak === 'self-signed'
                                 ? t('DomainsPage:table.ssl_self_signed')
-                                : t('DomainsPage:table.ssl_active') + (d.ssl_bitis ? t('DomainsPage:table.ssl_expires', { date: d.ssl_bitis }) : '')
-                            const renk = !d.ssl ? 'text-slate-300 dark:text-slate-600'
-                              : selfSigned ? 'text-red-500' : 'text-emerald-500'
-                            return (
-                              <span title={baslik}>
-                                <svg className={`w-3.5 h-3.5 ${renk}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d={d.ssl ? kilitli : acik} />
-                                </svg>
-                              </span>
-                            )
-                          })()}
+                                : t('DomainsPage:table.ssl_active') + (d.ssl_bitis ? t('DomainsPage:table.ssl_expires', { date: d.ssl_bitis }) : '')} />
                         </span>
                         {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">{t('DomainsPage:table.demo')}</span>}
                       </td>
@@ -573,9 +580,12 @@ export default function DomainsPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
                             </a>
-                            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                              {t('DomainsPage:table.subdomain_badge')}
-                            </span>
+                            <SSLIkon ssl={alt.ssl} kaynak={alt.ssl_kaynak} kucuk
+                              baslik={!alt.ssl
+                                ? t('DomainsPage:table.ssl_none')
+                                : alt.ssl_kaynak === 'self-signed'
+                                  ? t('DomainsPage:table.ssl_self_signed')
+                                  : t('DomainsPage:table.ssl_active')} />
                             {alt.php_surum && (
                               <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">PHP {alt.php_surum}</span>
                             )}
