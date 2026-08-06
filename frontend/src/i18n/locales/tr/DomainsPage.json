@@ -68,7 +68,8 @@
     "type_wordpress": "WordPress",
     "type_wordpress_desc": "Veritabanı + kurulum",
     "type_statik": "Statik HTML",
-    "type_statik_desc": "Veritabanı yok"
+    "type_statik_desc": "Veritabanı yok",
+    "ssl_error_detail": "Let's Encrypt sertifikası alınamadı; site self-signed sertifika ile korunuyor (tarayıcı uyarı gösterir). Domainin DNS'i bu sunucuya işaret ettikten sonra SSL sayfasından tekrar deneyin."
   },
   "result_modal": {
     "title": "✓ Domain Oluşturuldu",
@@ -115,5 +116,6 @@
   "wp_redirect": {
     "text": "{{domain}} oluşturuldu. WordPress kurulumunu tamamlamak için site başlığı ve yönetici bilgilerini girmeniz gerekiyor.",
     "button": "WordPress kurulumuna git"
-  }
+  },
+  "refresh": "Yenile"
 }

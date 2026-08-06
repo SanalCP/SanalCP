@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.15",
-  "duyuru": "Domain oluştururken site tipi seçilebiliyor: PHP, WordPress veya Statik HTML. Statik HTML seçildiğinde gereksiz veritabanı ve DB kullanıcısı artık oluşturulmuyor. PHP sürüm listesindeki yanıltıcı etiketler ('AppStream · OPcache', 'geliştirme/test/legacy') kaldırıldı — OPcache zaten tüm sürümlerde var.",
+  "son_surum": "0.5.16",
+  "duyuru": "Domainler sayfasına 'Yenile' butonu eklendi. İki hata düzeltildi: (1) 'Let's Encrypt SSL kur' işaretliyken yeni domain listeye hemen düşmüyor, sertifika alınana kadar görünmüyordu. (2) Let's Encrypt alınamayıp self-signed sertifikaya düşüldüğünde uyarı yeşil 'başarılı' kutusunda gösteriliyordu; artık ayrı bir uyarı kutusunda net biçimde belirtiliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }
