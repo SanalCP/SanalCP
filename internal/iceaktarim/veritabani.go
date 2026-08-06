@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,10 +45,19 @@ func (h *Handlers) SQLYukle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, durumKodu(err), err.Error())
 		return
 	}
+	// Tek tenant'ın paralel dump yüklemeleriyle diski tüketmesini engelle;
+	// kota doluysa beklemeden 429 (kuyruğa almak slow-DoS'u yeniden üretirdi).
+	birak, ok := httpx.YuklemeSlotVeyaHata(w, "sql:"+strconv.FormatInt(domainID, 10))
+	if !ok {
+		return
+	}
+	defer birak()
 	// Büyük SQL dump yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
 	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
 	httpx.ExtendDeadline(w, 30*time.Minute)
-	r.Body = http.MaxBytesReader(w, r.Body, MaxDumpBayt+(1<<20))
+	// ExtendBodyLimit (r.Body = ... değil): global httpx.LimitBody gövdeyi zaten
+	// 2 MiB'e sarmaladı, üstüne sarmak iç içe iki sınırın KÜÇÜĞÜNÜ geçerli kılardı.
+	httpx.ExtendBodyLimit(w, r, MaxDumpBayt+(1<<20))
 	mr, err := r.MultipartReader()
 	if err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "çok parçalı (multipart) gövde gerekli")

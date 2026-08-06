@@ -323,16 +323,27 @@ func (h *Handlers) Upload(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "/"
 	}
+	// Tek tenant'ın paralel yüklemelerle diski/goroutine'leri tüketmesini engelle;
+	// kota doluysa beklemeden 429 (kuyruğa almak slow-DoS'u yeniden üretirdi).
+	birak, ok := httpx.YuklemeSlotVeyaHata(w, "files:"+sk)
+	if !ok {
+		return
+	}
+	defer birak()
 	// Büyük dosya yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
 	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
 	httpx.ExtendDeadline(w, 30*time.Minute)
 	// DoS savunması: istek gövdesini üst sınırla kes. MaxBytesReader hem RAM'i hem
-	// diski korur; sınır aşılınca okuma *http.MaxBytesError döner.
-	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes)
+	// diski korur; sınır aşılınca okuma *http.MaxBytesError döner. ExtendBodyLimit
+	// (r.Body = ... değil) çünkü global httpx.LimitBody gövdeyi zaten 2 MiB'e
+	// sarmaladı — üstüne sarmak iç içe iki sınırın KÜÇÜĞÜNÜ geçerli kılar,
+	// yani yükleme 2 MiB'de kesilirdi.
+	httpx.ExtendBodyLimit(w, r, MaxUploadBytes)
 	// maxMemory küçük → gövde RAM yerine geçici diske taşar (RAM DoS engellenir).
 	if err := r.ParseMultipartForm(maxMultipartMemory); err != nil {
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) || strings.Contains(err.Error(), "too large") {
+		// multipart ayrıştırıcı MaxBytesError'ı bazen sarmalamadan düz metne
+		// çevirdiği için metin kontrolü de korunur.
+		if httpx.GovdeSinirAsildi(err) || strings.Contains(err.Error(), "too large") {
 			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "yükleme boyutu sınırı aştı (max 2 GiB)")
 			return
 		}

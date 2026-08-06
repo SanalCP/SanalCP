@@ -82,6 +82,10 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	// Büyük DB dump yüklemeleri sunucunun kısa varsayılan zaman aşımını (bkz.
 	// cmd/server/main.go) aşabilir — bu uç için istisna açılır.
 	httpx.ExtendDeadline(w, 10*time.Minute)
+	// Aynı şekilde gövde sınırı: cliSrv'nin global 2 MiB varsayılanı (bkz.
+	// httpx.LimitBody) bu ucu keserdi. Asıl üst sınır aşağıdaki io.LimitReader
+	// (maxDBImportBytes) — buradaki sarmalayıcı yalnız varsayılanı devre dışı bırakır.
+	httpx.ExtendBodyLimit(w, r, maxDBImportBytes+1)
 	domainID, _, ok := DomainFrom(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "geçersiz token")
