@@ -14,6 +14,15 @@
     "enabling": "Etkinleştiriliyor…",
     "resource_warning": "E-posta hizmeti (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM ve CPU tüketir. Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun."
   },
+  "disable": {
+    "title": "E-posta hizmetini kapat",
+    "desc": "Bu domain için e-posta alışverişini durdurur. Posta kutuları, yönlendiriciler ve ayarlar SİLİNMEZ — kayıtlı kalır ve hizmeti yeniden etkinleştirdiğinizde olduğu gibi geri gelir. Kapalıyken gelen e-postalar teslim edilmez.",
+    "button": "Hizmeti kapat",
+    "working": "Kapatılıyor…",
+    "confirm": "{{domain}} için e-posta hizmeti kapatılsın mı?\n\nPosta kutuları ve yönlendiriciler SİLİNMEZ, hizmeti yeniden açtığınızda geri gelir. Ancak kapalı olduğu sürece bu domaine gelen e-postalar teslim EDİLMEZ.",
+    "success": "E-posta hizmeti kapatıldı. Posta kutuları korundu; yeniden etkinleştirdiğinizde geri gelecek.",
+    "failed": "Hizmet kapatılamadı"
+  },
   "newPassword": {
     "title": "✓ {{email}} parolası",
     "hint": "Bunu güvenli bir yere kaydedin, sonra tekrar gösterilmez:"

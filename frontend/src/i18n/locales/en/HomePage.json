@@ -73,7 +73,8 @@
     "no_tool_badge": "No tool",
     "up_to_date_badge": "Up to date",
     "system_packages": "System packages",
-    "manage_link": "Manage →"
+    "manage_link": "Manage →",
+    "log_waiting": "Update started, waiting for output…"
   },
   "son_yedek": {
     "baslik": "Latest Server Backup",

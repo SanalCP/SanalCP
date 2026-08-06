@@ -125,6 +125,12 @@ export default function HomePage() {
   const [s, setS] = useState<Sistem | null>(null)
   const [domainler, setDomainler] = useState<Domain[]>([])
   const [guncelleme, setGuncelleme] = useState<Guncelleme | null>(null)
+  // Güncelleme çalışırken canlı log (Araçlar & Ayarlar'daki PanelGuncelleme ile
+  // aynı desen). Panel güncellenirken kendi servisi yeniden başlar → API kısa
+  // süre kesilir; poll hataları bu yüzden YUTULUR, log sunucuda kaldığı için
+  // servis dönünce kaldığı yerden okunmaya devam eder.
+  const [guncellemeLog, setGuncellemeLog] = useState('')
+  const logRef = useRef<HTMLPreElement>(null)
   const [optimize, setOptimize] = useState<Optimize | null>(null)
   const [yedek, setYedek] = useState<YedekOzet | null>(null)
   const [wp, setWp] = useState<WpKurulum[] | null>(null)
@@ -223,6 +229,26 @@ export default function HomePage() {
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(idK); clearInterval(idB); document.removeEventListener('visibilitychange', onVis) }
   }, [])
+
+  // Güncelleme log'u — SADECE iş çalışırken poll edilir (aksi hâlde boşa istek).
+  // Sekme gizliyken duraklatılmaz: kullanıcı güncellemeyi başlatıp sekmeyi
+  // değiştirebilir, dönünce log'un tamamını görmeli.
+  const guncellemeCalisiyor = guncelleme?.calisiyor === true
+  useEffect(() => {
+    if (!guncellemeCalisiyor) return
+    let dur = false
+    const tik = () => {
+      api.get<{ log: string }>('/system/guncelleme/log')
+        .then((r) => { if (!dur) setGuncellemeLog(r.data.log) })
+        .catch(() => { /* panel yeniden başlıyor olabilir — yut, poll'e devam */ })
+    }
+    tik()
+    const id = window.setInterval(tik, 2000)
+    return () => { dur = true; window.clearInterval(id) }
+  }, [guncellemeCalisiyor])
+
+  // Yeni satırlar geldikçe terminali en alta kaydır.
+  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }) }, [guncellemeLog])
 
   const aktif = domainler.filter((d) => d.durum === 'aktif').length
   const sslli = domainler.filter((d) => d.ssl).length
@@ -400,6 +426,14 @@ export default function HomePage() {
               metin={guncelleme?.calisiyor ? t('HomePage:panel_guncelleme.running_badge') : guncelleme?.arac_var === false ? t('HomePage:panel_guncelleme.no_tool_badge') : t('HomePage:panel_guncelleme.up_to_date_badge')} />
           </span>
         </div>
+        {/* Canlı terminal — Araçlar & Ayarlar'daki panel güncelleme kartıyla aynı
+            görünüm. Yalnız iş çalışırken (veya bitip log elde kalmışken) görünür. */}
+        {(guncellemeCalisiyor || guncellemeLog) && (
+          <pre ref={logRef}
+            className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2.5 font-mono text-[11px] leading-relaxed text-slate-300">
+            {guncellemeLog || t('HomePage:panel_guncelleme.log_waiting')}
+          </pre>
+        )}
         <Link to="/araclar/paketler" className="-mx-2 mt-3 flex items-center justify-between rounded-xl border-t border-slate-100 px-2 pt-3 text-xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
           <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-slate-400"><path d={I.paket} /></svg>

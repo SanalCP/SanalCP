@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.10",
-  "duyuru": "Önemli: 0.5.9'daki nginx güvenlik ayarları (CSP sertleştirmesi ve istek gövdesi sınırları) mevcut kurulumlara inmiyordu — panel nginx yapılandırması yalnızca ilk kurulumda yazılıyordu. Panel artık bu dosyayı kendisi güncelliyor; elle düzenlenmişse dokunmuyor ve uyarı düşüyor. 0.5.9 kuranların bu sürüme geçmesi gerekiyor, aksi hâlde 0.5.9'un güvenlik düzeltmeleri etkin değil.",
-  "kritik": true,
+  "son_surum": "0.5.11",
+  "duyuru": "Arayüz iyileştirmeleri: E-posta ayarları sayfası iki sütunlu düzene geçti; e-posta hizmeti artık panelden kapatılabiliyor (posta kutuları silinmez, yeniden açınca geri gelir); SSL sertifikası kurulumunda ilerleme göstergesi eklendi; ana ekrandaki güncelleme kartı işlemin canlı çıktısını gösteriyor.",
+  "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

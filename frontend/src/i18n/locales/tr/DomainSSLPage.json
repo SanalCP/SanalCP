@@ -40,5 +40,13 @@
   "www_redirect_disable": "Yönlendirmeyi Kapat",
   "www_redirect_enabled": "www yönlendirmesi açıldı — {{domain}} artık www.{{domain}}'e yönlendiriliyor.",
   "www_redirect_disabled": "www yönlendirmesi kapatıldı.",
-  "www_redirect_failed": "www yönlendirme ayarı kaydedilemedi"
+  "www_redirect_failed": "www yönlendirme ayarı kaydedilemedi",
+  "progress": {
+    "title_le": "Let's Encrypt sertifikası alınıyor…",
+    "title_self": "Kendinden imzalı sertifika oluşturuluyor…",
+    "hint_le": "Alan adı doğrulanıyor ve sertifika imzalanıyor. DNS'e bağlı olarak bu adım bir dakikayı bulabilir.",
+    "hint_self": "Anahtar üretiliyor ve web sunucusu yeniden yükleniyor.",
+    "elapsed": "{{n}} sn",
+    "dont_close": "İşlem bitene kadar bu sayfayı kapatmayın."
+  }
 }

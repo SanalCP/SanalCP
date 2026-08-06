@@ -73,7 +73,8 @@
     "no_tool_badge": "Araç yok",
     "up_to_date_badge": "Güncel",
     "system_packages": "Sistem paketleri",
-    "manage_link": "Yönet →"
+    "manage_link": "Yönet →",
+    "log_waiting": "Güncelleme başlatıldı, çıktı bekleniyor…"
   },
   "son_yedek": {
     "baslik": "Son Sunucu Yedeklemesi",
