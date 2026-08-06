@@ -389,6 +389,9 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/mail/durum", mailH.MailDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail/etkinlestir", mailH.Etkinlestir)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/etkinlestir", mailH.Devredisi)
+				// Geri dönüşü OLMAYAN kaldırma (kutular + diskteki posta dosyaları).
+				// Devredisi'nin aksine soft-disable değil; ayrı yol = kazara çağrılamaz.
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/hizmet", mailH.HizmetiSil)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/mail", mailH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/mail", mailH.Ekle)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/mail/{mid}", mailH.Sil)

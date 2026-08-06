@@ -15,13 +15,27 @@
     "resource_warning": "E-posta hizmeti (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM ve CPU tüketir. Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun."
   },
   "disable": {
-    "title": "E-posta hizmetini kapat",
-    "desc": "Bu domain için e-posta alışverişini durdurur. Posta kutuları, yönlendiriciler ve ayarlar SİLİNMEZ — kayıtlı kalır ve hizmeti yeniden etkinleştirdiğinizde olduğu gibi geri gelir. Kapalıyken gelen e-postalar teslim edilmez.",
-    "button": "Hizmeti kapat",
+    "title": "Hizmeti Geçici Kapat",
+    "desc": "E-posta alışverişini geçici olarak durdurur. Posta kutuları, yönlendiriciler ve ayarlar SİLİNMEZ; hizmeti yeniden açtığınızda olduğu gibi geri gelir. Kapalıyken gelen e-postalar teslim edilmez.",
+    "button": "Geçici kapat",
     "working": "Kapatılıyor…",
     "confirm": "{{domain}} için e-posta hizmeti kapatılsın mı?\n\nPosta kutuları ve yönlendiriciler SİLİNMEZ, hizmeti yeniden açtığınızda geri gelir. Ancak kapalı olduğu sürece bu domaine gelen e-postalar teslim EDİLMEZ.",
     "success": "E-posta hizmeti kapatıldı. Posta kutuları korundu; yeniden etkinleştirdiğinizde geri gelecek.",
     "failed": "Hizmet kapatılamadı"
+  },
+  "purge": {
+    "title": "Hizmeti Kapat ve Sil",
+    "desc": "E-posta hizmetini bu domainden tamamen kaldırır. BU İŞLEMİN GERİ DÖNÜŞÜ YOKTUR.",
+    "item_mailboxes": "Tüm posta kutuları, yönlendiriciler, filtreler ve otomatik yanıtlar silinir.",
+    "item_files": "Sunucudaki posta dosyaları (gelen/giden tüm e-postalar) diskten silinir.",
+    "item_dns": "DNS kayıtlarına (MX/SPF/DKIM/DMARC) dokunulmaz — onları DNS sayfasından yönetebilirsiniz.",
+    "button": "Kapat ve Sil",
+    "working": "Siliniyor…",
+    "confirm_prompt": "GERİ DÖNÜŞÜ OLMAYAN İŞLEM\n\nBu domaindeki tüm posta kutuları ve sunucudaki e-posta dosyaları kalıcı olarak silinecek. Yedeğiniz yoksa geri getirilemez.\n\nOnaylamak için alan adını yazın:\n{{domain}}",
+    "confirm_mismatch": "Alan adı eşleşmedi, silme işlemi yapılmadı.",
+    "success": "E-posta hizmeti ve tüm posta verileri kaldırıldı.",
+    "partial": "E-posta hizmeti kaldırıldı, ancak diskteki posta dosyalarının bir kısmı silinemedi: {{detay}}",
+    "failed": "E-posta hizmeti kaldırılamadı"
   },
   "newPassword": {
     "title": "✓ {{email}} parolası",

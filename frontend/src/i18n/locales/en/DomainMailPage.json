@@ -15,13 +15,27 @@
     "resource_warning": "The email service (Postfix, Dovecot, Rspamd, Webmail) adds extra RAM and CPU usage on the server. On small or resource-limited servers, consider your current load before enabling it."
   },
   "disable": {
-    "title": "Disable email service",
-    "desc": "Stops email exchange for this domain. Mailboxes, forwarders and settings are NOT deleted — they are kept and come back exactly as they were when you re-enable the service. While disabled, incoming email is not delivered.",
-    "button": "Disable service",
+    "title": "Temporarily Disable Service",
+    "desc": "Temporarily stops email exchange. Mailboxes, forwarders and settings are NOT deleted; they come back exactly as they were when you re-enable it. While disabled, incoming email is not delivered.",
+    "button": "Disable temporarily",
     "working": "Disabling…",
     "confirm": "Disable the email service for {{domain}}?\n\nMailboxes and forwarders will NOT be deleted; they come back when you re-enable it. However, while disabled, email sent to this domain will NOT be delivered.",
     "success": "Email service disabled. Mailboxes were preserved and will return when you re-enable it.",
     "failed": "Could not disable the service"
+  },
+  "purge": {
+    "title": "Disable and Delete Service",
+    "desc": "Completely removes the email service from this domain. THIS CANNOT BE UNDONE.",
+    "item_mailboxes": "All mailboxes, forwarders, filters and autoresponders are deleted.",
+    "item_files": "Mail files on the server (every message, incoming and outgoing) are erased from disk.",
+    "item_dns": "DNS records (MX/SPF/DKIM/DMARC) are left untouched — manage them from the DNS page.",
+    "button": "Disable and Delete",
+    "working": "Deleting…",
+    "confirm_prompt": "IRREVERSIBLE ACTION\n\nEvery mailbox on this domain and all mail files on the server will be permanently deleted. Without a backup this cannot be recovered.\n\nType the domain name to confirm:\n{{domain}}",
+    "confirm_mismatch": "The domain name did not match; nothing was deleted.",
+    "success": "The email service and all mail data have been removed.",
+    "partial": "The email service was removed, but some mail files on disk could not be deleted: {{detay}}",
+    "failed": "Could not remove the email service"
   },
   "newPassword": {
     "title": "✓ Password for {{email}}",
