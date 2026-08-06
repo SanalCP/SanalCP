@@ -9,6 +9,8 @@ import (
 	"context"
 	"database/sql"
 	"log"
+
+	"sanalcp/internal/tenanthesap"
 )
 
 // MusteriHesapGocu: mevcut domainleri çok kullanıcılı hesap modeline taşır.
@@ -66,7 +68,9 @@ func MusteriHesapGocu(ctx context.Context, db *sql.DB) {
 
 	var uretilen, atlanan int
 	for _, t := range liste {
-		if err := tenantGocur(ctx, db, t.sk, t.alanAdi); err != nil {
+		// Toplu doldurma: sahipsiz tenant'lar doğrudan admin'e bağlanır
+		// (sahip bayi bilgisi geçmiş veride yok) — bu yüzden nil.
+		if _, err := tenanthesap.Hazirla(ctx, db, t.sk, t.alanAdi, nil); err != nil {
 			log.Printf("müşteri hesap göçü: %s atlandı: %v", t.sk, err)
 			atlanan++
 			continue
@@ -75,51 +79,4 @@ func MusteriHesapGocu(ctx context.Context, db *sql.DB) {
 	}
 	log.Printf("müşteri hesap göçü: %d tenant taşındı, %d atlandı — üretilen hesaplar PAROLASIZ, "+
 		"Kullanıcılar ekranından parola atanmadan giriş yapamazlar", uretilen, atlanan)
-}
-
-func tenantGocur(ctx context.Context, db *sql.DB, sistemKullanici, alanAdi string) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback() //nolint:errcheck // commit başarılıysa no-op
-
-	// users: aynı kullanıcı adı varsa yeniden kullan (göç yarıda kalmış olabilir).
-	var userID int64
-	err = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE username=?`, sistemKullanici).Scan(&userID)
-	if err == sql.ErrNoRows {
-		res, iErr := tx.ExecContext(ctx, `
-			INSERT INTO users(username, email, password_hash, role, full_name, status)
-			VALUES(?, '', '', 'user', ?, 'active')`, sistemKullanici, alanAdi)
-		if iErr != nil {
-			return iErr
-		}
-		userID, _ = res.LastInsertId()
-	} else if err != nil {
-		return err
-	}
-
-	// customers: bu panel hesabına bağlı kayıt varsa yeniden kullan.
-	var customerID int64
-	err = tx.QueryRowContext(ctx, `SELECT id FROM customers WHERE user_id=?`, userID).Scan(&customerID)
-	if err == sql.ErrNoRows {
-		res, iErr := tx.ExecContext(ctx, `
-			INSERT INTO customers(ad, eposta, durum, notlar, user_id)
-			VALUES(?, '', 'aktif', 'panel göçüyle otomatik oluşturuldu', ?)`, alanAdi, userID)
-		if iErr != nil {
-			return iErr
-		}
-		customerID, _ = res.LastInsertId()
-	} else if err != nil {
-		return err
-	}
-
-	// Bu tenant'ın sahipsiz domainlerini müşteriye bağla.
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE domains SET customer_id=?
-		WHERE sistem_kullanici=? AND customer_id IS NULL`, customerID, sistemKullanici); err != nil {
-		return err
-	}
-
-	return tx.Commit()
 }

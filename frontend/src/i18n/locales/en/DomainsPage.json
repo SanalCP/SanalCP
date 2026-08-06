@@ -10,7 +10,8 @@
     "delete": "🗑 Delete ({{count}})",
     "clear_selection": "Clear selection",
     "status_changed": "✓ {{count}} domain(s) set to \"{{status}}\" status",
-    "status_error": "Failed to change status"
+    "status_error": "Failed to change status",
+    "change_owner": "Change owner"
   },
   "empty": {
     "title": "No domains yet",
@@ -92,5 +93,16 @@
     "confirm_word": "DELETE",
     "confirm_yes": "Yes, Delete",
     "success": "✓ {{success}}/{{total}} domain(s) deleted"
+  },
+  "owner_modal": {
+    "title": "Change domain owner",
+    "desc": "The {{count}} selected domain(s) will be linked to the customer you pick below.",
+    "none": "— Unassigned (belongs to the administrator) —",
+    "hint": "To hand a domain over to another reseller, pick a customer that belongs to them. If the reseller has no customer record yet, they must create one from their own panel first — customer records you create as an administrator stay bound to you.",
+    "apply": "Apply",
+    "applying": "Applying…",
+    "success": "Owner updated for {{count}} domain(s).",
+    "error": "Could not change the owner",
+    "load_error": "Could not load the customer list"
   }
 }
