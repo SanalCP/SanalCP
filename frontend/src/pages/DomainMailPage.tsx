@@ -30,6 +30,7 @@ export default function DomainMailPage() {
   const [localPart, setLocalPart] = useState('')
   const [parola, setParola] = useState('')
   const [isleniyor, setIsleniyor] = useState(false)
+  const [siliniyor, setSiliniyor] = useState(false)
   const [yeniPw, setYeniPw] = useState<{ email: string; parola: string } | null>(null)
   const [aliasKaynak, setAliasKaynak] = useState('')
   const [aliasCatchAll, setAliasCatchAll] = useState(false)
@@ -104,6 +105,32 @@ export default function DomainMailPage() {
       setHata(apiHata(e, t('DomainMailPage:disable.failed')))
     } finally {
       setIsleniyor(false)
+    }
+  }
+
+  // Hizmeti tamamen kaldır — GERİ DÖNÜŞÜ YOK (kutular, alias'lar, filtreler ve
+  // DİSKTEKİ posta dosyaları silinir). Bu yüzden tek tıklık confirm yetmez:
+  // kullanıcıya alan adını YAZDIRIYORUZ. Yanlışlıkla "Tamam"a basmak, yıllarca
+  // birikmiş postayı silmeye yetmemeli.
+  async function hizmetiSil() {
+    const yazilan = window.prompt(t('DomainMailPage:purge.confirm_prompt', { domain: domain?.alan_adi }))
+    if (yazilan === null) return // vazgeçildi
+    if (yazilan.trim().toLowerCase() !== (domain?.alan_adi || '').toLowerCase()) {
+      setHata(t('DomainMailPage:purge.confirm_mismatch'))
+      return
+    }
+    setSiliniyor(true); setHata(null); setOk(null)
+    try {
+      const { data } = await api.delete(`/domains/${id}/mail/hizmet`)
+      // Sunucu DB'yi temizleyip diskte takılırsa 200 + uyari döner: hizmet
+      // gerçekten kaldırıldı ama dosyalar kalmış olabilir — bunu gizleme.
+      if (data?.uyari) setHata(t('DomainMailPage:purge.partial', { detay: data.uyari }))
+      else setOk(t('DomainMailPage:purge.success'))
+      yukle()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainMailPage:purge.failed')))
+    } finally {
+      setSiliniyor(false)
     }
   }
 
@@ -615,15 +642,33 @@ export default function DomainMailPage() {
             )}
             </div>
 
-            {/* Hizmeti kapat — yıkıcı görünümlü ama GERİ ALINABİLİR bir işlem
-                olduğu için ayrı, tam genişlikte ve en altta. */}
-            <div className="mt-5 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900/50 rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:disable.title')}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">{t('DomainMailPage:disable.desc')}</p>
-              <button onClick={devredisiBirak} disabled={isleniyor}
-                className="mt-3 px-4 py-2 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50 text-sm font-medium rounded-lg transition">
-                {isleniyor ? t('DomainMailPage:disable.working') : t('DomainMailPage:disable.button')}
-              </button>
+            {/* İki kapatma yolu yan yana. Ayrımın görsel olarak da okunması
+                gerekiyor: soldaki GERİ ALINABİLİR (amber), sağdaki GERİ
+                DÖNÜŞSÜZ (kırmızı + dolu buton). Aynı renkte olsalardı kullanıcı
+                ikisini eşdeğer sanardı. */}
+            <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+              <div className="bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainMailPage:disable.title')}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('DomainMailPage:disable.desc')}</p>
+                <button onClick={devredisiBirak} disabled={isleniyor || siliniyor}
+                  className="mt-3 px-4 py-2 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 disabled:opacity-50 text-sm font-medium rounded-lg transition">
+                  {isleniyor ? t('DomainMailPage:disable.working') : t('DomainMailPage:disable.button')}
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 border border-red-300 dark:border-red-800 rounded-2xl p-5 shadow-sm">
+                <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">{t('DomainMailPage:purge.title')}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('DomainMailPage:purge.desc')}</p>
+                <ul className="mt-2 space-y-0.5 text-xs text-slate-500 dark:text-slate-400 list-disc list-inside">
+                  <li>{t('DomainMailPage:purge.item_mailboxes')}</li>
+                  <li>{t('DomainMailPage:purge.item_files')}</li>
+                  <li>{t('DomainMailPage:purge.item_dns')}</li>
+                </ul>
+                <button onClick={hizmetiSil} disabled={isleniyor || siliniyor}
+                  className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 text-sm font-medium rounded-lg transition">
+                  {siliniyor ? t('DomainMailPage:purge.working') : t('DomainMailPage:purge.button')}
+                </button>
+              </div>
             </div>
           </>
         )}

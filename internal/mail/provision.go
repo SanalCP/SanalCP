@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"sanalcp/internal/dns"
+	"sanalcp/internal/jailpath"
 )
 
 // MailUygula: bir domain için maili etkinleştirir (idempotent) — mail_domains satırını
@@ -62,6 +63,72 @@ func MailUygula(ctx context.Context, db *sql.DB, domainID int64) error {
 func MailKaldir(ctx context.Context, db *sql.DB, domainID int64) error {
 	_, err := db.ExecContext(ctx, `UPDATE mail_domains SET durum='suspended' WHERE domain_id=?`, domainID)
 	return err
+}
+
+// TumunuKaldir: MailUygula'nın YIKICI karşıtı — domain için e-posta hizmetini
+// tamamen kaldırır. MailKaldir (soft-disable) ile karıştırılmamalı: burada
+// posta kutuları, yönlendiriciler, filtreler, otomatik yanıtlar ve DİSKTEKİ
+// posta dosyaları GERİ DÖNÜŞSÜZ silinir.
+//
+// SİLME SIRASI ÖNEMLİ — önce DB, sonra disk:
+// DB silinip disk silinemezse geriye yalnız sahipsiz dosyalar kalır ve hizmet
+// kapalıdır (güvenli taraf). Tersi olsaydı (disk gidip DB kalsaydı) Dovecot
+// var olmayan maildir'lere bakıp hata verirdi.
+//
+// CASCADE HARİTASI (bkz. migrations/0040_mail.sql, 0052, 0054):
+//   mail_domains  -> mailboxes -> mail_autoresponders, mail_filters   (otomatik)
+//   mail_aliases, mail_send_log, mail_spam_settings                   (domains'e
+//     bağlı, mail_domains'e DEĞİL → cascade OLMAZ, elle silinir)
+//
+// DNS'e (MX/SPF/DKIM/DMARC) KASITLI OLARAK DOKUNULMAZ: kullanıcı MX'i harici bir
+// sağlayıcıya (ör. Google Workspace) çevirmiş olabilir ve o kayıtlar DNS
+// sayfasından ayrıca yönetiliyor. Sessizce silmek, bırakmaktan daha kötü olurdu.
+//
+// diskHata nil değilse DB temizliği BAŞARILI olmuştur, yalnız dosya silme
+// kısmen/tamamen başarısızdır — çağıran bunu kullanıcıya bildirmelidir.
+func TumunuKaldir(ctx context.Context, db *sql.DB, domainID int64) (diskHata error, err error) {
+	var sk string
+	if err := db.QueryRowContext(ctx,
+		`SELECT sistem_kullanici FROM domains WHERE id=?`, domainID).Scan(&sk); err != nil {
+		return nil, fmt.Errorf("domain bulunamadı: %w", err)
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("işlem başlatılamadı: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// mail_domains'e cascade ETMEYENLER (hepsi domains(id)'e bağlı).
+	for _, q := range []string{
+		`DELETE FROM mail_aliases WHERE domain_id=?`,
+		`DELETE FROM mail_send_log WHERE domain_id=?`,
+		`DELETE FROM mail_spam_settings WHERE domain_id=?`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, domainID); err != nil {
+			return nil, fmt.Errorf("mail kayıtları silinemedi: %w", err)
+		}
+	}
+	// Bu satırın silinmesi mailboxes'ı, o da autoresponder/filter'ları düşürür.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM mail_domains WHERE domain_id=?`, domainID); err != nil {
+		return nil, fmt.Errorf("mail_domains silinemedi: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("işlem tamamlanamadı: %w", err)
+	}
+
+	// Disk: /home/<sk>/mail. 🔴 Panel ROOT çalışıyor — tenant'ın ev dizininde YOL
+	// tabanlı silme (os.RemoveAll) yapılamaz: tenant "mail"i /etc'ye bakan bir
+	// symlink'le değiştirip jail dışında silme yaptırabilirdi. jailpath.Sil
+	// fd-göreli ve symlink takip etmeyen bir silme yapar (bkz. internal/jailpath).
+	home, herr := jailpath.TenantHome(sk)
+	if herr != nil {
+		return fmt.Errorf("ev dizini bulunamadı (%s): %w", sk, herr), nil
+	}
+	if serr := jailpath.Sil(home, "mail"); serr != nil && !os.IsNotExist(serr) {
+		return fmt.Errorf("posta dosyaları silinemedi: %w", serr), nil
+	}
+	return nil, nil
 }
 
 // KapatDomain: domain SİLİNİRKEN çağrılır (domains.Delete, redis.KapatDomain ile aynı

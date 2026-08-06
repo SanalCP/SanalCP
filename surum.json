@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.11",
-  "duyuru": "Arayüz iyileştirmeleri: E-posta ayarları sayfası iki sütunlu düzene geçti; e-posta hizmeti artık panelden kapatılabiliyor (posta kutuları silinmez, yeniden açınca geri gelir); SSL sertifikası kurulumunda ilerleme göstergesi eklendi; ana ekrandaki güncelleme kartı işlemin canlı çıktısını gösteriyor.",
+  "son_surum": "0.5.12",
+  "duyuru": "E-posta ayarları sayfasına iki ayrı kapatma seçeneği eklendi: 'Hizmeti Geçici Kapat' (posta kutuları korunur, yeniden açınca geri gelir) ve 'Hizmeti Kapat ve Sil' (kutular ve sunucudaki posta dosyaları kalıcı olarak silinir — onay için alan adı yazılır). DNS kayıtlarına her iki durumda da dokunulmaz.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

@@ -113,6 +113,37 @@ func (h *Handlers) Devredisi(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// DELETE /domains/{id}/mail/hizmet — e-posta hizmetini TAMAMEN kaldırır.
+//
+// Devredisi'den (soft-disable) farkı: bu GERİ DÖNÜŞSÜZDÜR — kutular, alias'lar,
+// filtreler, otomatik yanıtlar ve diskteki posta dosyaları silinir. Arayüz bu
+// ikisini ayrı kartlarda ve farklı dille sunar (bkz. DomainMailPage).
+func (h *Handlers) HizmetiSil(w http.ResponseWriter, r *http.Request) {
+	id, _, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	diskHata, err := TumunuKaldir(r.Context(), h.DB, id)
+	if err != nil {
+		h.audit(r, "mail.hizmet_sil", strconv.FormatInt(id, 10), false)
+		httpx.WriteError(w, http.StatusInternalServerError, "e-posta hizmeti kaldırılamadı: "+err.Error())
+		return
+	}
+	h.audit(r, "mail.hizmet_sil", strconv.FormatInt(id, 10), true)
+	// diskHata: DB temizliği başarılı ama dosyalar kalmış olabilir. Bunu 200 ile
+	// dönüyoruz çünkü hizmet GERÇEKTEN kaldırıldı; kullanıcı yine de bilmeli.
+	if diskHata != nil {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "uyari": diskHata.Error()})
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // GET /domains/{id}/mail
 func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	id, _, _, ok := h.domain(r)
