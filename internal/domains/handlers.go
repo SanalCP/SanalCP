@@ -62,6 +62,19 @@ type Domain struct {
 	// boş = doğrudan admin'e ait (bkz. migrations/0048 "NULL = doğrudan admin").
 	BayiAdi      string `json:"bayi_adi,omitempty"`
 	BayiPaketAdi string `json:"bayi_paket_adi,omitempty"` // bayinin bağlı olduğu bayi paketi (varsa)
+	// AltAlanlar: bu domaine bağlı alt alan adları (subdomanlar tablosu).
+	// Listede ana domainin altında girintili gösterilir. TEK sorguyla topluca
+	// çekilir — domain başına ayrı istek atmak 14 domainde 14 ek sorgu demekti.
+	AltAlanlar []AltAlan `json:"alt_alanlar,omitempty"`
+}
+
+// AltAlan: domain listesinde gösterilen alt alan adı özeti. Yönetim ekranının
+// (DomainSubdomainlerPage) döndürdüğü tam kayıt değil — listede yalnız ad ve
+// PHP sürümü gösteriliyor.
+type AltAlan struct {
+	ID       int64  `json:"id"`
+	TamAd    string `json:"tam_ad"`
+	PHPSurum string `json:"php_surum"`
 }
 
 type Handlers struct {
@@ -125,7 +138,50 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, d)
 	}
+	h.altAlanlariEkle(r, out)
 	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// altAlanlariEkle: listedeki domainlerin alt alan adlarını TEK sorguda çeker
+// ve ilgili domaine iliştirir.
+//
+// Kapsam: yalnızca ZATEN döndürülmüş domain id'leri sorgulanır. Böylece
+// listenin kapsam filtresi (admin/bayi/müşteri) burada da geçerli kalır —
+// ayrı bir yetki kontrolü gerekmez, sızdıracak bir şey yoktur.
+//
+// Hata durumunda sessizce geçilir: alt alan listesi tamamlayıcı bilgidir,
+// tek bir sorgu hatası yüzünden tüm domain listesini düşürmek doğru olmaz.
+func (h *Handlers) altAlanlariEkle(r *http.Request, liste []Domain) {
+	if len(liste) == 0 {
+		return
+	}
+	idx := make(map[int64]int, len(liste))
+	args := make([]any, 0, len(liste))
+	ph := make([]string, 0, len(liste))
+	for i := range liste {
+		idx[liste[i].ID] = i
+		args = append(args, liste[i].ID)
+		ph = append(ph, "?")
+	}
+	rows, err := h.DB.QueryContext(r.Context(),
+		`SELECT domain_id, id, tam_ad, php_surum FROM subdomanlar
+		 WHERE domain_id IN (`+strings.Join(ph, ",")+`) ORDER BY tam_ad`, args...)
+	if err != nil {
+		log.Printf("alt alan listesi okunamadı: %v", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var dID int64
+		var a AltAlan
+		if err := rows.Scan(&dID, &a.ID, &a.TamAd, &a.PHPSurum); err != nil {
+			continue
+		}
+		if i, ok := idx[dID]; ok {
+			liste[i].AltAlanlar = append(liste[i].AltAlanlar, a)
+		}
+	}
+	_ = rows.Err()
 }
 
 func (h *Handlers) Get(w http.ResponseWriter, r *http.Request) {

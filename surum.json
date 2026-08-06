@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.18",
-  "duyuru": "Domain oluşturma ekranı: Yönetici artık domaini doğrudan bir bayiye atayabiliyor (varsayılan 'Yönetici (bana ait)'). Ayrıca pencere işlem bitene kadar açık kalıp hangi adımda olunduğunu gösteren bir ilerleme çubuğu sunuyor; SSL kurulumu da dahil her şey tamamlanınca sonuç ekranına geçiliyor.",
+  "son_surum": "0.5.19",
+  "duyuru": "Düzeltme: Dosya yöneticisinde arşiv açma 'dosya bulunamadı veya klasör' hatası veriyordu. Aynı hata arşiv oluşturmada boyutu 0 gösteriyor, arama sonuçlarında izin ve tarih sütunlarını boş bırakıyordu. Ayrıca domain listesinde alt alan adları artık ana domainin altında girintili olarak görünüyor ve aranabiliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

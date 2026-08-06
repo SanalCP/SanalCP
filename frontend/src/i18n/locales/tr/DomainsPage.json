@@ -36,7 +36,8 @@
     "open_site": "Siteyi yeni sekmede aç",
     "add_subdomain": "+ Subdomain",
     "manage": "Yönet →",
-    "ssl_self_signed": "Self-signed sertifika — ziyaretçiler tarayıcıda güvenlik uyarısı görür. SSL sayfasından Let's Encrypt deneyin."
+    "ssl_self_signed": "Self-signed sertifika — ziyaretçiler tarayıcıda güvenlik uyarısı görür. SSL sayfasından Let's Encrypt deneyin.",
+    "subdomain_badge": "alt alan"
   },
   "create_modal": {
     "title": "Yeni Domain Oluştur",
