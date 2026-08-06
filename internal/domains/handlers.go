@@ -49,6 +49,7 @@ type Domain struct {
 	IsDemo          bool   `json:"is_demo"`
 	Notlar          string `json:"notlar,omitempty"`
 	PlanID          *int64 `json:"plan_id,omitempty"`
+	SiteTipi        string `json:"site_tipi,omitempty"`
 	PlanAd          string `json:"plan_ad,omitempty"`
 	SshErisim       bool   `json:"ssh_erisim"`
 	Askida          bool   `json:"askida"`
@@ -68,7 +69,7 @@ const selectAll = `SELECT d.id, d.alan_adi, d.sistem_kullanici, d.php_surum, d.s
   d.db_host, d.db_user, d.db_adi, d.web_root, d.boyut_kb, d.trafik_kb, d.is_demo,
   COALESCE(d.notlar,''), DATE_FORMAT(d.olusturulma,'%Y-%m-%d'),
   d.plan_id, COALESCE(p.ad,''), d.ssh_erisim, COALESCE(d.askida,0),
-  COALESCE(bu.username,''), COALESCE(brp.ad,'')
+  COALESCE(bu.username,''), COALESCE(brp.ad,''), COALESCE(d.site_tipi,'php')
   FROM domains d
   LEFT JOIN service_plans p ON p.id=d.plan_id
   LEFT JOIN customers cu ON cu.id = d.customer_id
@@ -85,7 +86,7 @@ func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 		&d.DBHost, &d.DBUser, &d.DBAdi, &d.WebRoot, &d.BoyutKB, &d.TrafikKB, &demo,
 		&d.Notlar, &d.Olusturulma,
 		&planID, &d.PlanAd, &sshE, &askida,
-		&d.BayiAdi, &d.BayiPaketAdi)
+		&d.BayiAdi, &d.BayiPaketAdi, &d.SiteTipi)
 	d.SSL = ssl == 1
 	d.IsDemo = demo == 1
 	d.SshErisim = sshE == 1
@@ -141,6 +142,23 @@ type createReq struct {
 	PHPSurum   string `json:"php_surum"`
 	CustomerID *int64 `json:"customer_id,omitempty"`
 	PlanID     *int64 `json:"plan_id,omitempty"`
+	// SiteTipi: php | wordpress | statik (bkz. migrations/0064). Boş gelirse
+	// "php" varsayılır — eski istemciler ve API çağrıları bozulmaz.
+	SiteTipi string `json:"site_tipi,omitempty"`
+}
+
+// gecerliSiteTipi: bilinmeyen bir değer sessizce "php"ye düşer. Tip yalnızca
+// NE SAĞLANACAĞINI belirler; yanlış bir değer yüzünden domain oluşturmayı
+// reddetmek, kullanıcıyı hiçbir şey kazandırmadan bloklardı.
+func gecerliSiteTipi(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "statik":
+		return "statik"
+	case "wordpress":
+		return "wordpress"
+	default:
+		return "php"
+	}
 }
 
 type createResp struct {
@@ -247,6 +265,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	siteTipi := gecerliSiteTipi(req.SiteTipi)
+
 	pr, err := provisioner.Provision(req.AlanAdi, req.PHPSurum)
 	if err != nil {
 		log.Printf("provision %q başarısız: %v", req.AlanAdi, err)
@@ -254,16 +274,22 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbUser := pr.SistemKullanici + "_db"
-	dbName := pr.SistemKullanici + "_main"
+	// Statik sitede veritabanı SAĞLANMAZ; domains satırındaki db_* alanları da
+	// boş kalır. Ad üretip veritabanını açmamak, panelde var olmayan bir
+	// veritabanını varmış gibi gösterirdi.
+	dbUser, dbName := "", ""
+	if siteTipi != "statik" {
+		dbUser = pr.SistemKullanici + "_db"
+		dbName = pr.SistemKullanici + "_main"
+	}
 
 	// 2) domains satırı
 	res, err := h.DB.ExecContext(r.Context(),
 		`INSERT INTO domains(alan_adi, sistem_kullanici, php_surum, ssl_aktif, durum, ipv4,
-		   ftp_host, ftp_user, db_host, db_user, db_adi, web_root, is_demo)
-		 VALUES(?,?,?,0,'aktif',?,?,?, 'localhost',?,?,?, 0)`,
+		   ftp_host, ftp_user, db_host, db_user, db_adi, web_root, is_demo, site_tipi)
+		 VALUES(?,?,?,0,'aktif',?,?,?, 'localhost',?,?,?, 0, ?)`,
 		req.AlanAdi, pr.SistemKullanici, req.PHPSurum, h.IPv4,
-		h.IPv4, pr.SistemKullanici, dbUser, dbName, pr.WebRoot)
+		h.IPv4, pr.SistemKullanici, dbUser, dbName, pr.WebRoot, siteTipi)
 	if err != nil {
 		_ = provisioner.Deprovision(req.AlanAdi, pr.SistemKullanici)
 		httpx.WriteError(w, http.StatusInternalServerError, "DB kayıt başarısız: "+err.Error())
@@ -319,10 +345,17 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		log.Printf("FTP create %q hata: %v", pr.SistemKullanici, err)
 	}
 
-	// 4) Default MySQL veritabanı + kullanıcı
-	dbPass := hesaplar.RandomParola(24)
-	if err := hesaplar.MySQLCreateDB(h.DB, id, dbName, dbUser, dbPass); err != nil {
-		log.Printf("MySQL create %q hata: %v", dbName, err)
+	// 4) Default MySQL veritabanı + kullanıcı — STATİK sitede atlanır.
+	// Statik HTML'in veritabanına ihtiyacı yok; koşulsuz açmak kullanılmayan
+	// bir veritabanı, kullanılmayan bir DB kullanıcısı ve gereksiz bir saldırı
+	// yüzeyi bırakırdı. Kullanıcı sonradan ihtiyaç duyarsa Veritabanları
+	// sayfasından kendisi ekleyebilir.
+	var dbPass string
+	if siteTipi != "statik" {
+		dbPass = hesaplar.RandomParola(24)
+		if err := hesaplar.MySQLCreateDB(h.DB, id, dbName, dbUser, dbPass); err != nil {
+			log.Printf("MySQL create %q hata: %v", dbName, err)
+		}
 	}
 
 	// 4b) Site kullanıcısı CLI token'ı (db:export/import, cache:purge komutları için)

@@ -1,0 +1,22 @@
+-- 0064 — Site tipi (php | wordpress | statik).
+--
+-- NEDEN: Her domain oluşturulurken koşulsuz bir MySQL veritabanı + kullanıcısı
+-- açılıyordu. Statik HTML sitelerinde bunun karşılığı yok — kullanılmayan bir
+-- veritabanı, kullanılmayan bir DB kullanıcısı ve gereksiz bir saldırı yüzeyi
+-- bırakıyor. Site tipi, oluşturma anında neyin sağlanacağını belirler.
+--
+-- 'php'       : mevcut davranış — veritabanı + DB kullanıcısı açılır (VARSAYILAN)
+-- 'wordpress' : php ile aynı sağlama; arayüz kurulum sonrası WordPress kurulum
+--               ekranına yönlendirir (admin kullanıcı/parola orada sorulur —
+--               otomatik üretip kullanıcıya söylememek kabul edilebilir değil)
+-- 'statik'    : veritabanı AÇILMAZ
+--
+-- VARSAYILAN 'php': mevcut tüm domainler bugüne kadar veritabanıyla açıldı,
+-- dolayısıyla geçmiş kayıtların doğru etiketi budur. Sütun NOT NULL + DEFAULT
+-- olduğu için göç sırasında ek bir doldurma adımı gerekmez.
+--
+-- NOT: PHP-FPM havuzu statik sitelerde de kurulmaya devam eder. Havuzu kaldırmak
+-- sağlama yolunun (kaynak limitleri, per-tenant FPM geçişi, subdomain'ler,
+-- performans sayfası) çok sayıda yerine dokunur; ayrı bir adım olarak ele alınacak.
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS site_tipi VARCHAR(16) NOT NULL DEFAULT 'php';
