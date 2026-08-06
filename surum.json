@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.12",
-  "duyuru": "E-posta ayarları sayfasına iki ayrı kapatma seçeneği eklendi: 'Hizmeti Geçici Kapat' (posta kutuları korunur, yeniden açınca geri gelir) ve 'Hizmeti Kapat ve Sil' (kutular ve sunucudaki posta dosyaları kalıcı olarak silinir — onay için alan adı yazılır). DNS kayıtlarına her iki durumda da dokunulmaz.",
+  "son_surum": "0.5.13",
+  "duyuru": "Sunucuda e-posta altyapısı (Postfix/Dovecot) kapalıysa panel artık bunu fark ediyor: domain için 'E-postayı Etkinleştir' butonu devre dışı kalıyor ve nedeni gösteriliyor. Önceden buton çalışıyor görünüp DNS kayıtlarını yazıyor, ama posta hiç çalışmıyordu.",
   "kritik": false,
   "yayin_tarihi": "2026-08-06"
 }

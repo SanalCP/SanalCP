@@ -6,13 +6,46 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"sanalcp/internal/dns"
 	"sanalcp/internal/jailpath"
 )
+
+// gerekliServisler: e-postanın FİİLEN çalışması için ayakta olması gereken
+// servisler. rspamd/opendkim KASITLI olarak listede değil — onlar olmadan da
+// posta akar (yalnız spam filtresi/DKIM imzası olmaz), postfix'in milter
+// ayarı milter_default_action=accept (bkz. scripts/sanalcp-mail-setup.sh).
+var gerekliServisler = []string{"postfix", "dovecot"}
+
+// MailAltyapisiVar: e-posta yığını sunucuda kurulu VE çalışıyor mu?
+//
+// 🔴 NEDEN GEREKLİ: MailUygula yalnızca DB satırı + maildir + DNS kaydı üretir;
+// paket kurmaz, servis başlatmaz. Sunucu yöneticisi mail yığınını kapatmışsa
+// (tek müşteri kalmayınca RAM için makul bir tercih) panel "etkinleştirildi"
+// deyip DNS'e MX/SPF/DKIM yazar ama posta HİÇ çalışmazdı — sessiz arıza.
+// Kullanıcının bunu ancak gönderilen postalar kaybolunca fark etmesi gerekirdi.
+//
+// eksik: kullanıcıya gösterilecek servis adları (boşsa altyapı hazırdır).
+func MailAltyapisiVar(ctx context.Context) (eksik []string) {
+	for _, s := range gerekliServisler {
+		if !servisAktif(ctx, s) {
+			eksik = append(eksik, s)
+		}
+	}
+	return eksik
+}
+
+// servisAktif: testlerde değiştirilebilsin diye değişken (systemd'ye bağımlı
+// bir kontrolü birim testinde çalıştırmak, ortama göre farklı sonuç verirdi).
+var servisAktif = func(ctx context.Context, ad string) bool {
+	out, err := exec.CommandContext(ctx, "systemctl", "is-active", ad).Output()
+	return err == nil && strings.TrimSpace(string(out)) == "active"
+}
 
 // MailUygula: bir domain için maili etkinleştirir (idempotent) — mail_domains satırını
 // oluşturur/günceller, Maildir kök dizinini tenant kullanıcısına ait olarak hazırlar,
@@ -76,9 +109,10 @@ func MailKaldir(ctx context.Context, db *sql.DB, domainID int64) error {
 // var olmayan maildir'lere bakıp hata verirdi.
 //
 // CASCADE HARİTASI (bkz. migrations/0040_mail.sql, 0052, 0054):
-//   mail_domains  -> mailboxes -> mail_autoresponders, mail_filters   (otomatik)
-//   mail_aliases, mail_send_log, mail_spam_settings                   (domains'e
-//     bağlı, mail_domains'e DEĞİL → cascade OLMAZ, elle silinir)
+//
+//	mail_domains  -> mailboxes -> mail_autoresponders, mail_filters   (otomatik)
+//	mail_aliases, mail_send_log, mail_spam_settings                   (domains'e
+//	  bağlı, mail_domains'e DEĞİL → cascade OLMAZ, elle silinir)
 //
 // DNS'e (MX/SPF/DKIM/DMARC) KASITLI OLARAK DOKUNULMAZ: kullanıcı MX'i harici bir
 // sağlayıcıya (ör. Google Workspace) çevirmiş olabilir ve o kayıtlar DNS

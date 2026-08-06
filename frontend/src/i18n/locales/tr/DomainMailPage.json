@@ -12,7 +12,8 @@
     "hint": "Etkinleştirince MX/SPF/DKIM/DMARC kayıtları otomatik olarak DNS'e eklenir.",
     "button": "E-postayı Etkinleştir",
     "enabling": "Etkinleştiriliyor…",
-    "resource_warning": "E-posta hizmeti (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM ve CPU tüketir. Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun."
+    "resource_warning": "E-posta hizmeti (Postfix, Dovecot, Rspamd, Webmail) sunucuda ek RAM ve CPU tüketir. Kaynakları kısıtlı küçük sunucularda etkinleştirmeden önce mevcut yükü göz önünde bulundurun.",
+    "stack_down": "Sunucuda e-posta altyapısı çalışmıyor ({{servisler}}). Sunucu yöneticisi e-posta hizmetini kapatmış olabilir — açmak için sunucuda `sanalcp-mail-setup` çalıştırılmalı."
   },
   "disable": {
     "title": "Hizmeti Geçici Kapat",
