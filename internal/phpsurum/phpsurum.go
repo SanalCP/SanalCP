@@ -189,6 +189,17 @@ func Discover(m SurumMeta) Surum {
 	}
 	// Kurulabilirlik: yüklüyse zaten kurulabilir; değilse dnf'e sor (cache'li).
 	s.Kurulabilir = s.Yuklu || paketMevcut(m)
+	// 🔴 AppStream girdisi "8.3" etiketini TAŞIR ama binary her zaman /usr/bin/php'dir —
+	// AlmaLinux 10'da bu native olarak 8.3'tür, AlmaLinux 9'da ise kurulum betiğinin
+	// modül akışını remi-8.3'e sabitlemesine bağlıdır (bkz. sanalcp-install.sh adım 3).
+	// O sabitleme sessizce başarısız olursa (ör. Remi'ye ağ erişimi yoktu) sistem php'si
+	// gerçekte 8.1/8.2 gibi başka bir sürüm olabilir — yüklü olması "8.3 kurulabilir"
+	// anlamına GELMEZ, gerçek sürümü doğrula. Aksi hâlde müşteri "8.3" seçip sessizce
+	// başka bir sürüm çalıştırır.
+	if m.Kaynak == "appstream" && s.Yuklu && s.GercekSurum != "" && !strings.HasPrefix(s.GercekSurum, "8.3") {
+		s.Kurulabilir = false
+		s.Aciklama = "Sistem PHP'si 8.3 değil, " + s.GercekSurum + " (kurulum betiği modül akışını sabitleyemedi) — elle düzeltin: dnf module reset php -y && dnf module enable php:remi-8.3 -y && dnf install -y php php-fpm"
+	}
 	return s
 }
 

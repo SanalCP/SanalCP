@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sanalcp-install — turns a blank AlmaLinux 10 server into a full SanalCP install.
+# sanalcp-install — turns a blank AlmaLinux 9.4+/10 (or Rocky/RHEL equivalent) server into a full SanalCP install.
 # Designed to be idempotent (safe to re-run). Run as root.
 #
 #   ./sanalcp-install.sh [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
@@ -42,7 +42,18 @@ if [ -f "$A/SHA256SUMS" ]; then
 else
   die "assets/SHA256SUMS not found — missing or hand-assembled release"
 fi
-grep -qiE "AlmaLinux|Rocky|Red Hat|CentOS" /etc/os-release || warn "expected AlmaLinux/RHEL10 — continuing anyway"
+grep -qiE "AlmaLinux|Rocky|Red Hat|CentOS" /etc/os-release || warn "expected an AlmaLinux/RHEL-family OS — continuing anyway"
+
+# ============ 0) OS MAJOR VERSION ============
+# PLATFORM_ID (e.g. "platform:el9", "platform:el10") is set consistently
+# across every RHEL-family derivative (AlmaLinux/Rocky/RHEL) — more reliable
+# than parsing VERSION_ID (same pattern already used in
+# assets/ops/sanalcp-mail-setup.sh). Falls back to the newest supported
+# major (10) if it can't be determined.
+. /etc/os-release 2>/dev/null || true
+EL_MAJOR=$(printf '%s' "${PLATFORM_ID:-platform:el10}" | sed 's/.*el//')
+case "$EL_MAJOR" in ''|*[!0-9]*) EL_MAJOR=10 ;; esac
+ok "detected OS: ${PRETTY_NAME:-unknown} (EL${EL_MAJOR})"
 
 # ============ 0) PANEL LANGUAGE ============
 # curl | bash pipes the SCRIPT into stdin, not the user's keystrokes — so `read`
@@ -77,17 +88,26 @@ PHP_EXT="fpm cli mysqlnd mbstring bcmath intl gd soap opcache pdo xml zip pgsql 
 # ============ 1) REPOSITORIES ============
 step "1) Repositories (EPEL + Remi + CRB)"
 dnf install -y epel-release >/dev/null 2>&1 && ok "EPEL"
-rpm -q remi-release >/dev/null 2>&1 || dnf install -y https://rpms.remirepo.net/enterprise/remi-release-10.rpm >/dev/null 2>&1
-rpm -q remi-release >/dev/null 2>&1 && ok "Remi" || die "could not add Remi"
+rpm -q remi-release >/dev/null 2>&1 || dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-${EL_MAJOR}.rpm" >/dev/null 2>&1
+rpm -q remi-release >/dev/null 2>&1 && ok "Remi (EL${EL_MAJOR})" || die "could not add Remi"
+# `config-manager` is a plugin (dnf-plugins-core on EL9 / dnf5-plugins on EL10)
+# that isn't guaranteed to be preinstalled on a minimal cloud image — the
+# virtual provide resolves to the right package on either dnf4 or dnf5.
+dnf install -y 'dnf-command(config-manager)' >/dev/null 2>&1
 dnf config-manager --set-enabled crb >/dev/null 2>&1 && ok "CRB"
 
 # ============ 2) BASE PACKAGES ============
 step "2) Base packages"
-dnf install -y nginx httpd mariadb-server valkey certbot python3-certbot-nginx \
+# 🔴 valkey is intentionally NOT in this batch: it doesn't exist on EL9 (package
+# is still "redis" there — see step 11's sanalcp-redis-setup, which installs
+# whichever one is available). A single missing package name in a batch `dnf
+# install` can abort the WHOLE transaction, so this would have taken down nginx/
+# mariadb/httpd install too, not just Redis.
+dnf install -y nginx httpd mariadb-server certbot python3-certbot-nginx \
   clamav clamav-update httpd-tools mod_proxy_html tar openssl policycoreutils-python-utils \
   setools-console jq bind bind-utils nftables unzip zip cronie xfsprogs sudo \
   bubblewrap rsync git curl acl lftp sshpass >/dev/null 2>&1 \
-  && ok "nginx, httpd, mariadb, valkey, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" || die "base package install"
+  && ok "nginx, httpd, mariadb, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" || die "base package install"
 
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, in the
 # base repo, reliably reads RAR/RAR5 and itself rejects path-traversal). 🔴 NOTE:
@@ -143,7 +163,30 @@ BASE_PKGS="php php-fpm php-cli php-mysqlnd php-mbstring php-json php-pecl-zip ph
 #    contention / false negatives). Managed panel updates handle this themselves;
 #    auto-update stays OFF (avoids lock contention + surprise patches).
 systemctl disable --now dnf-automatic.timer dnf-makecache.timer >/dev/null 2>&1 || true
+# 🔴 On AlmaLinux 10 the AppStream `php` package IS 8.3 natively — no module
+# selection needed (RHEL 10 dropped PHP modularity). AlmaLinux 9 (and older)
+# still distributes PHP via module streams whose DEFAULT stream is an older
+# version, not 8.3. The panel's phpMap (internal/provisioner/provisioner.go)
+# hardcodes "system php = 8.3" for every OS — so on EL9 we explicitly pin
+# Remi's own php:remi-8.3 module stream to make the base `php` package
+# resolve to 8.3 there too, keeping that invariant true across both OSes
+# without any Go-side change.
+if [ "$EL_MAJOR" -lt 10 ]; then
+  dnf module reset -y php >/dev/null 2>&1
+  dnf module enable -y php:remi-8.3 >/dev/null 2>&1 \
+    && ok "PHP module stream pinned to remi-8.3 (EL${EL_MAJOR})" \
+    || warn "could not pin PHP module stream to 8.3 — base php version may not match what the panel expects"
+fi
 dnf install -y $BASE_PKGS >/dev/null 2>&1 && ok "base php + php-redis"
+# Turn a silent mismatch into a visible one: the panel assumes system php=8.3
+# unconditionally (webmail, phpMyAdmin, and any domain set to PHP "8.3" use
+# the base php-fpm pool, not a Remi per-version one).
+BASE_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "?")
+if [ "$BASE_PHP_VER" = "8.3" ]; then
+  ok "system PHP is 8.3 (what webmail/phpMyAdmin/'8.3' domains expect)"
+else
+  warn "system PHP is $BASE_PHP_VER, expected 8.3 — webmail, phpMyAdmin and any domain set to PHP '8.3' may not work. Fix manually: dnf module reset php -y && dnf module enable php:remi-8.3 -y && dnf install -y $BASE_PKGS"
+fi
 for v in $PHP_VERS; do
   pkgs=""; for e in $PHP_EXT; do pkgs="$pkgs php$v-php-$e"; done
   dnf install -y $pkgs php$v-php-pecl-redis6 >/dev/null 2>&1 && ok "php$v (+redis)" || warn "php$v — some packages skipped"
@@ -496,7 +539,8 @@ step "15) Verification"
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 CODE=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ 2>/dev/null)
 API=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/api/v1/domains 2>/dev/null)
-echo -e "  services: $(systemctl is-active mariadb nginx valkey php-fpm named pure-ftpd sanalcp crond | tr '\n' ' ')"
+KV_SVC=valkey; systemctl list-unit-files --no-legend valkey.service 2>/dev/null | grep -q valkey || KV_SVC=redis
+echo -e "  services: $(systemctl is-active mariadb nginx "$KV_SVC" php-fpm named pure-ftpd sanalcp crond | tr '\n' ' ')"
 echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active named)   ·   FTP :21 → $(systemctl is-active pure-ftpd)"
 echo -e "  tools: SSL/acme.sh $([ -x /root/.acme.sh/acme.sh ] && echo ✓ || echo ✗)   ·   firewall/nft $(command -v nft >/dev/null && echo ✓ || echo ✗)   ·   unzip/zip $(command -v unzip >/dev/null && command -v zip >/dev/null && echo ✓ || echo ✗)   ·   composer $(command -v composer >/dev/null && echo ✓ || echo ✗)   ·   apache/httpd $(systemctl is-active httpd)"
 echo -e "  isolation: plan-driven resource limits (cgroup slice) + per-tenant PHP-FPM (CageFS equivalent) READY   ·   bubblewrap $(command -v bwrap >/dev/null && echo ✓ || echo ✗)"

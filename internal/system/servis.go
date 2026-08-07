@@ -37,6 +37,13 @@ func tanimBul(birim string) (servisTanim, bool) {
 		if s.Birim == birim {
 			return s, true
 		}
+		// valkey/redis aynı allowlist girdisini paylaşır: AlmaLinux 10 AppStream
+		// valkey'i, AlmaLinux 9 (ve öncesi) hâlâ redis paketini kurar — ikisi de
+		// protokol uyumlu, tek fark birim adı (bkz. birimVarMi).
+		if s.Birim == "valkey" && birim == "redis" {
+			s.Birim = "redis"
+			return s, true
+		}
 	}
 	return servisTanim{}, false
 }
@@ -49,6 +56,9 @@ func ServisDurumlar(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]satir, 0, len(servisAllow))
 	for _, s := range servisAllow {
+		if s.Birim == "valkey" && !birimVarMi("valkey") && birimVarMi("redis") {
+			s.Birim = "redis" // EL9: paket adı hâlâ redis
+		}
 		st := strings.TrimSpace(runOut("systemctl", "is-active", s.Birim))
 		// is-active: active / inactive / failed / unknown; birim yoksa "inactive"/boş döner
 		if st == "" {
@@ -57,6 +67,12 @@ func ServisDurumlar(w http.ResponseWriter, r *http.Request) {
 		out = append(out, satir{servisTanim: s, Durum: st})
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// birimVarMi: systemd unit dosyası yüklü mü (servis kurulu mu)? "valkey"
+// birimi EL9'da hiç yoktur — bunu "kurulu ama durmuş" ile karıştırmamak için.
+func birimVarMi(birim string) bool {
+	return strings.Contains(runOut("systemctl", "list-unit-files", "--no-legend", birim+".service"), birim+".service")
 }
 
 // ServisIslem: POST {birim, aksiyon:"restart"|"reload"} — allowlist'li servisi yeniden başlat.

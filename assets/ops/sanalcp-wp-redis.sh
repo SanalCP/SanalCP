@@ -22,7 +22,10 @@ ADMIN=$(grep -oP '^PANEL_REDIS_ADMIN_PASS=\K.*' "$ENV" 2>/dev/null)
 [ -z "$ADMIN" ] && { echo "PANEL_REDIS_ADMIN_PASS yok -> once: sanalcp-redis-setup"; exit 1; }
 id "$SK" >/dev/null 2>&1 || { echo "sistem kullanicisi yok: $SK"; exit 1; }
 
-vc(){ REDISCLI_AUTH="$ADMIN" valkey-cli "$@"; }
+# valkey-cli (AlmaLinux 10) yoksa redis-cli'ye düş (AlmaLinux 9 ve öncesi) —
+# ikisi de aynı RESP protokolünü/komut setini konuşur.
+KVBIN=valkey-cli; command -v valkey-cli >/dev/null 2>&1 || KVBIN=redis-cli
+vc(){ REDISCLI_AUTH="$ADMIN" "$KVBIN" "$@"; }
 wpc(){ runuser -u "$SK" -- env HOME="/home/$SK" /usr/bin/php -d memory_limit=512M /usr/local/bin/wp "$@"; }
 say(){ printf '  %s\n' "$*"; }
 

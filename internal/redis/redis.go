@@ -1,6 +1,7 @@
 // Package redis: per-tenant izole Valkey/Redis cache yönetimi.
-// Tek Valkey instance + her domain'e ACL user (~<sk>:* key-prefix + @dangerous/@admin reddedilir).
-// Böylece siteler birbirinin cache'ini göremez. ACL yönetimi valkey-cli ile (ek Go bağımlılığı yok).
+// Tek Valkey/Redis instance + her domain'e ACL user (~<sk>:* key-prefix + @dangerous/@admin reddedilir).
+// Böylece siteler birbirinin cache'ini göremez. ACL yönetimi valkey-cli/redis-cli ile
+// (ek Go bağımlılığı yok) — hangisi PATH'te varsa o kullanılır, bkz. cliBin().
 package redis
 
 import (
@@ -16,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"sanalcp/internal/httpx"
@@ -35,9 +37,28 @@ const (
 
 func adminPass() string { return os.Getenv("PANEL_REDIS_ADMIN_PASS") }
 
-// cli: valkey-cli'yi admin parolasıyla çalıştırır (parola argv'de değil, REDISCLI_AUTH env'de).
+// cliBin: valkey-cli (AlmaLinux 10 AppStream) varsa onu, yoksa redis-cli'yi
+// (AlmaLinux 9 ve öncesi — paket adı hâlâ redis) kullanır. İkisi de aynı RESP
+// protokolünü konuşur, komut seti birebir aynı — yalnız binary adı değişir.
+var (
+	cliBinOnce sync.Once
+	cliBinVal  string
+)
+
+func cliBin() string {
+	cliBinOnce.Do(func() {
+		if _, err := exec.LookPath("valkey-cli"); err == nil {
+			cliBinVal = "valkey-cli"
+		} else {
+			cliBinVal = "redis-cli"
+		}
+	})
+	return cliBinVal
+}
+
+// cli: admin parolasıyla çalıştırır (parola argv'de değil, REDISCLI_AUTH env'de).
 func cli(args ...string) (string, error) {
-	cmd := exec.Command("valkey-cli", args...)
+	cmd := exec.Command(cliBin(), args...)
 	cmd.Env = append(os.Environ(), "REDISCLI_AUTH="+adminPass())
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
