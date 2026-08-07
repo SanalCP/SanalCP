@@ -231,7 +231,7 @@ export default function HesapAktarimiPage() {
   )
 }
 
-const inputClass = 'w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100'
+const inputClass = 'ta-input w-full'
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label><span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">{label}</span>{children}</label>
 }

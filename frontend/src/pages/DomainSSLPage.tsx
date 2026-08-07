@@ -116,7 +116,7 @@ export default function DomainSSLPage() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainSSLPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">
-          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
           {' · '}
           {t('DomainSSLPage:ip_label')} <span className="font-mono">{domain.ipv4}</span>
         </p>
@@ -187,7 +187,7 @@ export default function DomainSSLPage() {
             </button>
           </div>
         ) : (
-          <div className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">
+          <div className="text-sm text-slate-600 dark:text-slate-400">
             {t('DomainSSLPage:no_ssl')}
           </div>
         )}

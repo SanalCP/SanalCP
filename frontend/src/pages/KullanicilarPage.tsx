@@ -13,6 +13,7 @@ import EmptyState from '@/components/EmptyState'
 import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { T } from '@/lib/tablo'
 
 type Kullanici = {
   id: number
@@ -278,27 +279,27 @@ export default function KullanicilarPage() {
       ) : suzulmus.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-400">{t('KullanicilarPage:empty.no_search_results')}</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/60">
+        <div className="lg:overflow-x-auto lg:rounded-xl lg:border lg:border-slate-200 dark:lg:border-slate-800">
+          <table className={T.tablo}>
+            <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900/60`}>
               <tr>
                 {[t('KullanicilarPage:table.user'), t('KullanicilarPage:table.full_name'), t('KullanicilarPage:table.role'), t('KullanicilarPage:table.status'), t('KullanicilarPage:table.twofa'), t('KullanicilarPage:table.last_login'), ''].map((b, i) => (
-                  <th key={i} className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">{b}</th>
+                  <th key={i} className={`${T.baslik} whitespace-nowrap`}>{b}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-950">
+            <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800 lg:bg-white dark:lg:bg-slate-950`}>
               {suzulmus.map((k) => (
-                <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition">
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                <tr key={k.id} className={T.satir}>
+                  <td className={T.hucreBaslik}>
                     <span className="font-mono text-slate-900 dark:text-slate-100">{k.kullanici_adi}</span>
                     {k.id === 1 && <span className="ml-1.5 text-[10px] text-slate-400">{t('KullanicilarPage:table.system_tag')}</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{k.ad_soyad || '—'}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                  <td className={T.hucre} data-etiket={t('KullanicilarPage:table.full_name')}><span className="text-slate-600 dark:text-slate-400">{k.ad_soyad || '—'}</span></td>
+                  <td className={T.hucre} data-etiket={t('KullanicilarPage:table.role')}>
                     <span className={`px-2 py-0.5 rounded text-xs ${ROL_STIL[k.rol]}`}>{ROL_ETIKET[k.rol] ?? k.rol}</span>
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                  <td className={T.hucre} data-etiket={t('KullanicilarPage:table.status')}>
                     {k.durum === 'active'
                       ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('KullanicilarPage:table.active')}</span>
                       : <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{t('KullanicilarPage:table.suspended')}</span>}
@@ -311,14 +312,14 @@ export default function KullanicilarPage() {
                       >{t('KullanicilarPage:table.no_password')}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                  <td className={T.hucre} data-etiket={t('KullanicilarPage:table.twofa')}>
                     {k.iki_fa ? <span className="text-emerald-600 dark:text-emerald-400">{t('KullanicilarPage:table.twofa_on')}</span> : <span className="text-slate-400">{t('KullanicilarPage:table.twofa_off')}</span>}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-xs text-slate-500">
+                  <td className={`${T.hucre} text-xs text-slate-500`} data-etiket={t('KullanicilarPage:table.last_login')}>
                     {k.son_giris || '—'}
                     {k.son_giris_ip && <span className="ml-1 opacity-60">({k.son_giris_ip})</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  <td className={T.hucreAksiyon}>
                     {k.id === 1 ? (
                       <span className="text-xs text-slate-400">{t('KullanicilarPage:table.system_account')}</span>
                     ) : (
@@ -376,7 +377,7 @@ export default function KullanicilarPage() {
               />
               <p className="mt-1 text-[11px] text-slate-400">{t('KullanicilarPage:modal_new.password_hint')}</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('KullanicilarPage:modal_new.role')}</label>
                 <select
@@ -482,7 +483,7 @@ export default function KullanicilarPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
                   {t('KullanicilarPage:modal_limits.max_customer')}
@@ -523,7 +524,7 @@ export default function KullanicilarPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
                   {t('KullanicilarPage:modal_limits.disk_quota')}

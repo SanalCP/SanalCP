@@ -66,7 +66,7 @@ export default function LoadHistoryChart() {
     : []
 
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+    <div className="ta-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('LoadHistoryChart:title')}</h3>

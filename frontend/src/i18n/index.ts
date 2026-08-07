@@ -2,27 +2,33 @@
 // Yeni bir namespace eklemek için sadece iki JSON dosyası oluşturmak yeterli;
 // aşağıdaki import.meta.glob otomatik toplar, elle kayıt gerekmez.
 
-import i18n from 'i18next'
+import i18n, { type BackendModule } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
 export type Lang = 'tr' | 'en'
 
-const trModules = import.meta.glob('./locales/tr/*.json', { eager: true }) as Record<string, { default: Record<string, unknown> }>
-const enModules = import.meta.glob('./locales/en/*.json', { eager: true }) as Record<string, { default: Record<string, unknown> }>
+type LocaleModule = { default: Record<string, unknown> }
 
-function buildResources(modules: Record<string, { default: Record<string, unknown> }>) {
-  const out: Record<string, Record<string, unknown>> = {}
-  for (const path in modules) {
-    const match = path.match(/([^/]+)\.json$/)
-    if (!match) continue
-    out[match[1]] = modules[path].default
-  }
-  return out
+// Her JSON dosyası ayrı bir dinamik parça olur. Önceki eager glob iki dildeki
+// 168 namespace'i ana JavaScript paketine gömüyordu; artık yalnız aktif dil ve
+// ekranda kullanılan namespace indirilir.
+const localeModules = import.meta.glob<LocaleModule>('./locales/*/*.json')
+
+const localeBackend: BackendModule = {
+  type: 'backend',
+  init() { /* ek ayar gerekmiyor */ },
+  read(language, namespace, callback) {
+    const lang = language.split('-')[0]
+    const load = localeModules[`./locales/${lang}/${namespace}.json`]
+    if (!load) {
+      callback(new Error(`Çeviri bulunamadı: ${lang}/${namespace}`), false)
+      return
+    }
+    load()
+      .then(module => callback(null, module.default))
+      .catch(error => callback(error instanceof Error ? error : new Error(String(error)), false))
+  },
 }
-
-const trResources = buildResources(trModules)
-const enResources = buildResources(enModules)
-const namespaces = Array.from(new Set([...Object.keys(trResources), ...Object.keys(enResources)]))
 
 const KEY = 'sanalcp.lang'
 
@@ -43,14 +49,16 @@ export function setLang(lang: Lang) {
   window.dispatchEvent(new CustomEvent('sanalcp:lang-change', { detail: lang }))
 }
 
-i18n.use(initReactI18next).init({
-  resources: { tr: trResources, en: enResources },
+export const i18nReady = i18n.use(localeBackend).use(initReactI18next).init({
   lng: getLang(),
   fallbackLng: 'tr',
+  supportedLngs: ['tr', 'en'],
+  load: 'languageOnly',
   defaultNS: 'common',
-  ns: namespaces,
+  ns: ['common'],
   interpolation: { escapeValue: false },
   returnEmptyString: false,
+  react: { useSuspense: true },
 })
 
 // Boot-time: main.tsx bootTheme ile aynı noktada çağırır (FOUC engelleme dahil değil, sadece <html lang>).

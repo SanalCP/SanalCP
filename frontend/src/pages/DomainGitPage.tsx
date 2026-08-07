@@ -199,7 +199,7 @@ export default function DomainGitPage() {
 
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">Git Deploy</h1>
       {domain && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
         {' · '}Repo bağlayın, deploy key'i GitHub'a ekleyin, otomatik pull için webhook URL'ini kullanın.
       </p>}
 
@@ -221,13 +221,13 @@ export default function DomainGitPage() {
                 </div>
               </div>
               {ghConn.login && (
-                <button onClick={ghDisconnect} className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded">Bağlantıyı kaldır</button>
+                <button onClick={ghDisconnect} className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded">Bağlantıyı kaldır</button>
               )}
             </div>
 
             {ghConn.yok || !ghConn.login ? (
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Personal Access Token (classic)</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Personal Access Token (classic)</label>
                 <div className="flex gap-2">
                   <input type="password" value={ghToken}
                     onChange={e => setGhToken(e.target.value)}
@@ -240,7 +240,7 @@ export default function DomainGitPage() {
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-2">
                   <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noreferrer"
-                    className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">github.com/settings/tokens</a> →
+                    className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300">github.com/settings/tokens</a> →
                   Fine-grained PAT → scope: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">repo</code> +
                   <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded ml-1">admin:repo_hook</code> (auto-deploy için).
                 </p>
@@ -260,7 +260,7 @@ export default function DomainGitPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Repo</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Repo</label>
                     <select value={ghSelectedRepo} onChange={e => ghLoadBranches(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-white dark:bg-slate-800">
                       <option value="">— seç —</option>
@@ -273,7 +273,7 @@ export default function DomainGitPage() {
                     <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5 block">{ghRepos.length} repo bulundu</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Branch</label>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
                     <select value={ghSelectedBranch} onChange={e => setGhSelectedBranch(e.target.value)}
                       disabled={!ghSelectedRepo}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-white dark:bg-slate-800 disabled:bg-slate-50 dark:bg-slate-900">
@@ -309,20 +309,20 @@ export default function DomainGitPage() {
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{repo ? 'Repo Ayarları' : 'Repo Bağla'}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Git URL (SSH)</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Git URL (SSH)</label>
                 <input type="text" value={repoUrl} onChange={e => setRepoUrl(e.target.value)}
                   placeholder="git@github.com:kullanici/repo.git"
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Private repo için SSH URL kullanın; HTTPS ile auth çalışmaz.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Branch</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
                   <input type="text" value={branch} onChange={e => setBranch(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">Hedef Dizin</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Hedef Dizin</label>
                   <input type="text" value={targetDir} onChange={e => setTargetDir(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono" />
                 </div>
@@ -380,7 +380,7 @@ export default function DomainGitPage() {
               {/* Durum */}
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">Sync Durumu</h3>
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                   <Stat e="Son sync" d={repo.son_sync || '— (henüz yok)'} />
                   <Stat e="Son commit" d={repo.son_commit ? repo.son_commit.slice(0, 8) : '—'} mono />
                   <Stat e="Durum"

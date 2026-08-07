@@ -22,7 +22,7 @@ export default function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
   // görsün, geriye doğru kaydırarak üst seviyelere ulaşsın.
   return (
     <nav
-      className="flex items-center gap-1 text-sm mb-3 text-slate-500 dark:text-slate-500 overflow-x-auto [&>*]:flex-shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex items-center gap-1 text-sm mb-4 text-slate-500 dark:text-slate-400 overflow-x-auto [&>*]:flex-shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       aria-label={t('Breadcrumb:path_label')}
     >
       <button
@@ -49,7 +49,7 @@ export default function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
                 {it.etiket}
               </Link>
             ) : (
-              <span className={`whitespace-nowrap ${son ? 'text-slate-700 dark:text-slate-300 font-medium' : ''}`}>
+              <span className={`whitespace-nowrap ${son ? 'text-slate-900 dark:text-slate-200 font-semibold' : ''}`}>
                 {it.etiket}
               </span>
             )}

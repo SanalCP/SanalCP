@@ -77,32 +77,33 @@ export default function SubscriptionDetailPage() {
   }
 
   if (hata && !domain) return (
-    <div className="px-6 py-5">
+    <div className="ta-page-fluid">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' }, { etiket: 'Hata' }]} />
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 text-sm text-red-700 dark:text-red-300">{hata}</div>
     </div>
   )
 
   if (!domain) return (
-    <div className="px-6 py-5">
+    <div className="ta-page-fluid">
       <Breadcrumb items={[{ etiket: 'Anasayfa', href: '/' }, { etiket: 'Domainler', href: '/domainler' }]} />
       <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('SubscriptionDetailPage:loading')}</div>
     </div>
   )
 
   return (
-    <div className="px-6 py-5">
+    <div className="ta-page-fluid">
       <Breadcrumb items={[
         { etiket: 'Anasayfa', href: '/' },
         { etiket: 'Domainler', href: '/domainler' },
         { etiket: domain.alan_adi },
       ]} />
 
-      <div className="flex items-center gap-3 mb-1">
-        <h1 className="text-2xl font-semibold text-brand-700 dark:text-brand-300">{domain.alan_adi}</h1>
+      <p className="ta-eyebrow">Domain yönetimi</p>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <h1 className="ta-page-title text-brand-700 dark:text-brand-300">{domain.alan_adi}</h1>
         <button
           onClick={() => navigate('/abonelikler')}
-          className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300"
+          className="ta-icon-button"
           title={t('SubscriptionDetailPage:switch_subscription')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -116,7 +117,7 @@ export default function SubscriptionDetailPage() {
           </span>
         ) : (
           <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider flex items-center gap-1 ${
-            domain.durum === 'aktif' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:text-slate-400 dark:text-slate-500'
+            domain.durum === 'aktif' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:text-slate-400'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${domain.durum === 'aktif' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
             {domain.durum}
@@ -126,7 +127,7 @@ export default function SubscriptionDetailPage() {
           <button
             onClick={() => setMenuAcik(v => !v)}
             disabled={isleniyor}
-            className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-50"
+            className="ta-icon-button disabled:opacity-50"
             title={t('SubscriptionDetailPage:more_actions')}>
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
@@ -160,20 +161,20 @@ export default function SubscriptionDetailPage() {
       {bildirim && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{bildirim}</div>}
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
-      <div className="flex items-center gap-5 border-b border-slate-200 dark:border-slate-700 mb-5">
+      <div role="tablist" aria-label={domain.alan_adi} className="mb-6 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <TabBtn aktif={tab === 'dashboard'} onClick={() => setTab('dashboard')}>{t('SubscriptionDetailPage:dashboard')}</TabBtn>
         <TabBtn aktif={tab === 'hosting'}   onClick={() => setTab('hosting')}>{t('SubscriptionDetailPage:hosting_dns')}</TabBtn>
         <TabBtn aktif={tab === 'baslangic'} onClick={() => setTab('baslangic')}>{t('SubscriptionDetailPage:getting_started')}</TabBtn>
       </div>
 
       <div className="grid grid-cols-12 gap-5">
-        <aside className="col-span-12 lg:col-span-3 space-y-4">
+        <aside className="order-2 col-span-12 space-y-4 md:col-span-6 xl:order-1 xl:col-span-3">
           <WebSitePreview alanAdi={domain.alan_adi} ssl={domain.ssl} />
 
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+          <div className="ta-card p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('SubscriptionDetailPage:statistics')}</h3>
-              <button className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300" title={t('SubscriptionDetailPage:refresh')}>
+              <button type="button" aria-label={t('SubscriptionDetailPage:refresh')} className="ta-icon-button !h-8 !w-8 !rounded-lg" title={t('SubscriptionDetailPage:refresh')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
@@ -188,7 +189,7 @@ export default function SubscriptionDetailPage() {
           </div>
         </aside>
 
-        <section className="col-span-12 lg:col-span-6">
+        <section className="order-1 col-span-12 xl:order-2 xl:col-span-6">
           {tab === 'dashboard' && <DomainPano domain={domain} />}
           {tab === 'hosting'   && <HostingTab domain={domain} />}
           {tab === 'baslangic' && <BaslangicTab />}
@@ -199,11 +200,11 @@ export default function SubscriptionDetailPage() {
               <span>IP: <span className="font-mono text-slate-700 dark:text-slate-300">{domain.ipv4}</span></span>
               <span>{t('SubscriptionDetailPage:system_user')}: <span className="font-mono text-slate-700 dark:text-slate-300">{domain.sistem_kullanici}</span></span>
             </div>
-            <button className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('SubscriptionDetailPage:add_description')}</button>
+            <button className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300">{t('SubscriptionDetailPage:add_description')}</button>
           </div>
         </section>
 
-        <aside className="col-span-12 lg:col-span-3">
+        <aside className="order-3 col-span-12 md:col-span-6 xl:col-span-3">
           <DomainKaynakKart domainId={domain.id} />
         </aside>
       </div>
@@ -278,13 +279,15 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
 function TabBtn({ aktif, onClick, children }: { aktif: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
+      type="button"
+      role="tab"
+      aria-selected={aktif}
       onClick={onClick}
-      className={`relative pb-3 pt-1 text-sm transition ${
-        aktif ? 'text-slate-900 dark:text-slate-100 font-semibold' : 'text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300'
+      className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+        aktif ? 'bg-brand-50 text-brand-600 shadow-sm dark:bg-brand-900/30 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
       }`}
     >
       {children}
-      {aktif && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-t"></span>}
     </button>
   )
 }

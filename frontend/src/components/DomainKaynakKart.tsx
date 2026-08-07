@@ -30,7 +30,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
 
   if (yuk) {
     return (
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+      <div className="ta-card p-5">
         <div className="h-5 bg-slate-100 dark:bg-slate-800 rounded w-32 mb-3 animate-pulse" />
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => (
@@ -45,7 +45,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
   return (
     <div className="space-y-3">
       {/* Plan + Özet */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+      <div className="ta-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainKaynakKart:plan_resources')}</h3>
           <button onClick={yukle} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" title={t('common:refresh')}>
@@ -69,7 +69,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
       </div>
 
       {/* Yapılandırma Özeti */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+      <div className="ta-card p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainKaynakKart:configuration')}</h3>
         <Sat e={t('DomainKaynakKart:ip_address')} d={ozet.ipv4 || '—'} mono />
         <Sat e={t('DomainKaynakKart:system_user')} d={ozet.sk} mono />
@@ -93,7 +93,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
       </div>
 
       {/* İlave Sayaclar */}
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+      <div className="ta-card p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainKaynakKart:counters')}</h3>
         <div className="grid grid-cols-2 gap-y-2 gap-x-3">
           <Mini etiket={t('DomainKaynakKart:dns_records')} deger={ozet.dns_kayit} />

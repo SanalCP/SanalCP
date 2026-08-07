@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import Modal from '@/components/Modal'
 
 type Surum = { surum: string; ini_dir: string; service: string }
 type Ext = { adi: string; aktif: boolean; ini_dosya: string }
@@ -160,7 +161,7 @@ export default function PHPModuleriPage() {
           <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium text-xs">
             {t('PHPModuleriPage:active_count', { count: aktifSayi })}
           </span>
-          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500 font-medium text-xs">
+          <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium text-xs">
             {t('PHPModuleriPage:passive_count', { count: pasifSayi })}
           </span>
           <span className="text-slate-400 dark:text-slate-500 text-xs">{t('PHPModuleriPage:total_count', { count: exts.length })}</span>
@@ -209,9 +210,7 @@ export default function PHPModuleriPage() {
       )}
 
       {peclModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setPeclModal(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('PHPModuleriPage:pecl_modal_title')}</h3>
+        <Modal acik baslik={t('PHPModuleriPage:pecl_modal_title')} onKapat={() => setPeclModal(false)} kapatEtiketi={t('common:close')}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">{t('PHPModuleriPage:pecl_modal_desc_prefix')} <code className="font-mono">mongodb, swoole, geoip, oauth, yaml, msgpack</code></p>
             <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded p-2 mb-3">
               {t('PHPModuleriPage:pecl_modal_warn_prefix', { version: aktifSurum })} <code className="font-mono">/etc/php.d/</code> {t('PHPModuleriPage:pecl_modal_warn_suffix')}
@@ -226,14 +225,13 @@ export default function PHPModuleriPage() {
               }} />
             <div className="flex justify-end gap-2">
               <button onClick={() => setPeclModal(false)}
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
+                className="ta-secondary-button">{t('common:cancel')}</button>
               <button onClick={() => {
                 const v = (document.getElementById('peclPaketAdi') as HTMLInputElement)?.value?.trim()
                 if (v) peclKur(v)
-              }} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('PHPModuleriPage:pecl_modal_install_btn')}</button>
+              }} className="ta-primary-button">{t('PHPModuleriPage:pecl_modal_install_btn')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

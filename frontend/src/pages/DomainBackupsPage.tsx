@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import Modal from '@/components/Modal'
 import { T } from '@/lib/tablo'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
@@ -212,7 +213,7 @@ export default function DomainBackupsPage() {
 
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainBackupsPage:title')}</h1>
       {domain && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
         {' · '}{t('DomainBackupsPage:subtitle.base')} · {sched.freq === 'none'
           ? t('DomainBackupsPage:subtitle.auto_off')
           : t('DomainBackupsPage:subtitle.auto_on', { freq: sched.freq === 'daily' ? t('DomainBackupsPage:freq.daily') : sched.freq === 'weekly' ? t('DomainBackupsPage:freq.weekly') : t('DomainBackupsPage:freq.monthly'), hour: String(sched.hour).padStart(2,'0'), retention: sched.retention })}
@@ -255,7 +256,7 @@ export default function DomainBackupsPage() {
                   {aktif && <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-300">{t('DomainBackupsPage:schedule.active_badge')}</span>}
                 </div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{m.ad}</div>
-                <div className="text-[11px] text-slate-600 dark:text-slate-400 dark:text-slate-500 mt-1 leading-snug">{m.aciklama}</div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">{m.aciklama}</div>
               </button>
             )
           })}
@@ -264,7 +265,7 @@ export default function DomainBackupsPage() {
         {sched.freq !== 'none' && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500">{t('DomainBackupsPage:schedule.hour_label')}</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:schedule.hour_label')}</span>
               <select
                 value={sched.hour}
                 onChange={e => scheduleKaydet({ ...sched, hour: Number(e.target.value) })}
@@ -276,7 +277,7 @@ export default function DomainBackupsPage() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500">{t('DomainBackupsPage:schedule.retention_label')}</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:schedule.retention_label')}</span>
               <input type="number" min={1} max={90} value={sched.retention}
                 onChange={e => setSched(s => ({...s, retention: Math.max(1, Math.min(90, Number(e.target.value)||1))}))}
                 onBlur={() => scheduleKaydet(sched)}
@@ -301,7 +302,7 @@ export default function DomainBackupsPage() {
             <span className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded ${
               dest.son_durum === 'basarili' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
               dest.son_durum === 'hata' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
-              'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500'
+              'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
             }`}>{dest.son_durum === 'basarili' ? t('DomainBackupsPage:destination.status_ok') : dest.son_durum === 'hata' ? t('DomainBackupsPage:destination.status_err') : dest.son_durum}</span>
           )}
         </div>
@@ -317,7 +318,7 @@ export default function DomainBackupsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 mb-3">
           <div className="sm:col-span-6">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainBackupsPage:destination.protocol_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainBackupsPage:destination.protocol_label')}</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['sftp','ftp','s3','b2'] as const).map(tip => {
                 const aktif = destForm.tip === tip
@@ -340,33 +341,33 @@ export default function DomainBackupsPage() {
           </div>
           {(destForm.tip === 'ftp' || destForm.tip === 'sftp') ? <>
             <div className="sm:col-span-5">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainBackupsPage:destination.host_label')}</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainBackupsPage:destination.host_label')}</label>
               <input type="text" value={destForm.host} placeholder={t('DomainBackupsPage:destination.host_placeholder')}
                 onChange={e => setDestForm(f => ({...f, host: e.target.value}))}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
             </div>
             <div className="sm:col-span-1">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainBackupsPage:destination.port_label')}</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainBackupsPage:destination.port_label')}</label>
               <input type="number" value={destForm.port}
                 onChange={e => setDestForm(f => ({...f, port: Number(e.target.value)||0}))}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
             </div>
           </> : <>
             <div className="sm:col-span-3">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainBackupsPage:destination.bucket_label')}</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainBackupsPage:destination.bucket_label')}</label>
               <input type="text" value={destForm.bucket} placeholder={t('DomainBackupsPage:destination.bucket_placeholder')}
                 onChange={e => setDestForm(f => ({...f, bucket: e.target.value.trim()}))}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
             </div>
             <div className="sm:col-span-3">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainBackupsPage:destination.region_label')}</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainBackupsPage:destination.region_label')}</label>
               <input type="text" value={destForm.region}
                 placeholder={destForm.tip === 'b2' ? t('DomainBackupsPage:destination.region_placeholder_b2') : t('DomainBackupsPage:destination.region_placeholder_s3')}
                 onChange={e => setDestForm(f => ({...f, region: e.target.value.trim()}))}
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
             </div>
             <div className="sm:col-span-6">
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                 {t('DomainBackupsPage:destination.endpoint_label')} {destForm.tip === 's3' && <span className="text-[10px] text-slate-400">{t('DomainBackupsPage:destination.endpoint_hint_s3')}</span>}
               </label>
               <input type="url" value={destForm.endpoint}
@@ -376,19 +377,19 @@ export default function DomainBackupsPage() {
             </div>
           </>}
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.access_key_label') : t('DomainBackupsPage:destination.user_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.access_key_label') : t('DomainBackupsPage:destination.user_label')}</label>
             <input type="text" value={destForm.kullanici} autoComplete="off"
               onChange={e => setDestForm(f => ({...f, kullanici: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.secret_key_label') : t('DomainBackupsPage:destination.password_label')} {!dest.yok && <span className="text-[10px] text-slate-400 dark:text-slate-500">{t('DomainBackupsPage:destination.password_hint_existing')}</span>}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.secret_key_label') : t('DomainBackupsPage:destination.password_label')} {!dest.yok && <span className="text-[10px] text-slate-400 dark:text-slate-500">{t('DomainBackupsPage:destination.password_hint_existing')}</span>}</label>
             <input type="password" value={destForm.parola} autoComplete="new-password"
               onChange={e => setDestForm(f => ({...f, parola: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.prefix_label') : t('DomainBackupsPage:destination.remote_dir_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{destForm.tip === 's3' || destForm.tip === 'b2' ? t('DomainBackupsPage:destination.prefix_label') : t('DomainBackupsPage:destination.remote_dir_label')}</label>
             <input type="text" value={destForm.uzak_dizin}
               onChange={e => setDestForm(f => ({...f, uzak_dizin: e.target.value}))}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
@@ -430,7 +431,7 @@ export default function DomainBackupsPage() {
         <button onClick={olustur} disabled={isleniyor} className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-md">
           {isleniyor ? t('DomainBackupsPage:creating') : t('DomainBackupsPage:create_button')}
         </button>
-        <button onClick={yukle} className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md">↻ {t('common:refresh')}</button>
+        <button onClick={yukle} className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md">↻ {t('common:refresh')}</button>
         <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{t('DomainBackupsPage:count', { count: yedekler.length })}</span>
       </div>
 
@@ -457,7 +458,7 @@ export default function DomainBackupsPage() {
                 <td className={T.hucreBaslik}><span className="font-mono lg:text-sm text-base break-all">{y.dosya}</span></td>
                 <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.type')}>
                   <span className={`text-xs px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold ${
-                    y.tip === 'planli' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500'
+                    y.tip === 'planli' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}>{y.tip === 'planli' ? t('DomainBackupsPage:type_scheduled') : y.tip}</span>
                 </td>
                 <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.remote_copy')}>
@@ -466,8 +467,8 @@ export default function DomainBackupsPage() {
                    y.uzak_durum === 'yukleniyor' ? <span className="text-xs text-sky-600 dark:text-sky-400">{t('DomainBackupsPage:remote_status.uploading')}</span> :
                    <span title={y.uzak_hata} className="text-xs text-red-600 dark:text-red-400">{t('DomainBackupsPage:remote_status.error')}</span>}
                 </td>
-                <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.size')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{formatBoyut(y.boyut_b)}</span></td>
-                <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.created')}><span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{y.olusturma}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.size')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{formatBoyut(y.boyut_b)}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.created')}><span className="text-sm text-slate-600 dark:text-slate-400">{y.olusturma}</span></td>
                 <td className={T.hucreAksiyon}>
                   <button onClick={() => indir(y)} className="text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 px-2 py-1 rounded">{t('DomainBackupsPage:download')}</button>
                   <button onClick={() => setGeriYukle(y)} className="text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 dark:bg-amber-900/20 px-2 py-1 rounded">{t('DomainBackupsPage:restore_button')}</button>
@@ -489,9 +490,7 @@ export default function DomainBackupsPage() {
       />
 
       {geriYukle && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-5">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('DomainBackupsPage:restore_modal.title')}</h3>
+        <Modal acik baslik={t('DomainBackupsPage:restore_modal.title')} onKapat={() => { if (!isleniyor) setGeriYukle(null) }} genislik="lg" kapatEtiketi={t('common:cancel')}>
             <p className="mt-1 text-xs text-slate-500 font-mono break-all">{geriYukle.dosya}</p>
             <label className="block mt-4 text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:restore_modal.scope_label')}</label>
             <select value={restoreScope} onChange={e => setRestoreScope(e.target.value as RestoreScope)}
@@ -525,15 +524,14 @@ export default function DomainBackupsPage() {
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setGeriYukle(null)} disabled={isleniyor}
-                className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded">{t('common:cancel')}</button>
+                className="ta-secondary-button">{t('common:cancel')}</button>
               <button onClick={restore}
                 disabled={isleniyor || (restoreScope === 'file' && !restorePath.trim()) || (restoreScope === 'database' && !restoreDatabase)}
                 className="px-3 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50">
                 {isleniyor ? t('DomainBackupsPage:restore_modal.restoring') : t('DomainBackupsPage:restore_modal.restore')}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

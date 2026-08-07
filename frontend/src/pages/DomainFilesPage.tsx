@@ -1,13 +1,17 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useLayoutEffect, useState, useRef } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import DizinAgac from '@/components/DizinAgac'
-import KodEditor from '@/components/KodEditor'
+import Modal from '@/components/Modal'
 import { T } from '@/lib/tablo'
+
+// CodeMirror ve dil paketleri yalnız kullanıcı gerçekten bir dosya açtığında
+// indirilir. Dosya yöneticisinin normal liste görünümü editör paketini taşımaz.
+const KodEditor = lazy(() => import('@/components/KodEditor'))
 
 type Entry = {
   adi: string
@@ -491,9 +495,9 @@ export default function DomainFilesPage() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainFilesPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
           {' · '}
-          <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500">/home/{domain.sistem_kullanici}</span>
+          <span className="font-mono text-slate-600 dark:text-slate-400">/home/{domain.sistem_kullanici}</span>
         </p>
       )}
 
@@ -626,13 +630,13 @@ export default function DomainFilesPage() {
 
       {/* Path breadcrumb */}
       <div className="flex items-center gap-1 mb-4 text-sm flex-wrap bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-        <button onClick={() => git('/')} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-mono">~</button>
+        <button onClick={() => git('/')} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-mono">~</button>
         {parcalar.map((p, i) => {
           const yolBuraya = '/' + parcalar.slice(0, i + 1).join('/')
           return (
             <span key={i} className="flex items-center gap-1">
               <span className="text-slate-300">/</span>
-              <button onClick={() => git(yolBuraya)} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-mono">{p}</button>
+              <button onClick={() => git(yolBuraya)} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-mono">{p}</button>
             </span>
           )
         })}
@@ -698,7 +702,7 @@ export default function DomainFilesPage() {
                     {e.tip === 'klasor' ? (
                       <button
                         onClick={() => git(e.yol)}
-                        className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium flex items-center gap-2"
+                        className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium flex items-center gap-2"
                       >
                         <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
@@ -718,19 +722,19 @@ export default function DomainFilesPage() {
                     )}
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainFilesPage:table.size')}>
-                    <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500">{e.tip === 'klasor' ? '—' : formatBoyut(e.boyut_b)}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-400">{e.tip === 'klasor' ? '—' : formatBoyut(e.boyut_b)}</span>
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainFilesPage:table.permissions')}>
-                    <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500" title={e.mod}>{e.yetkiler || e.mod}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-400" title={e.mod}>{e.yetkiler || e.mod}</span>
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainFilesPage:table.owner')}>
-                    <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500 break-all">{e.sahip || '—'}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-400 break-all">{e.sahip || '—'}</span>
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainFilesPage:table.group')}>
-                    <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500 break-all">{e.grup || '—'}</span>
+                    <span className="font-mono text-slate-600 dark:text-slate-400 break-all">{e.grup || '—'}</span>
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainFilesPage:table.modified')}>
-                    <span className="text-slate-600 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">{formatTarih(e.degisme)}</span>
+                    <span className="text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatTarih(e.degisme)}</span>
                   </td>
                   <td className={`${T.hucreAksiyon} lg:text-right`}>
                     <button
@@ -752,10 +756,18 @@ export default function DomainFilesPage() {
         )}
       </div>
       {editor && (
-        <KodEditor yol={editor.yol} icerik={editor.icerik}
-          onChange={s => setEditor({ ...editor, icerik: s })}
-          onKaydet={editorKaydet}
-          onKapat={() => setEditor(null)} />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm" role="status">
+            <div className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-medium text-slate-200 shadow-2xl">
+              {t('DomainFilesPage:table.loading')}
+            </div>
+          </div>
+        }>
+          <KodEditor yol={editor.yol} icerik={editor.icerik}
+            onChange={s => setEditor({ ...editor, icerik: s })}
+            onKaydet={editorKaydet}
+            onKapat={() => setEditor(null)} />
+        </Suspense>
       )}
       {renameFor && (
         <RenameModal entry={renameFor}
@@ -787,9 +799,7 @@ export default function DomainFilesPage() {
           onIptal={() => setYeniDosyaModal(false)} />
       )}
       {boyutSonuc && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setBoyutSonuc(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('DomainFilesPage:sizeModal.title')}</h3>
+        <Modal acik baslik={t('DomainFilesPage:sizeModal.title')} onKapat={() => setBoyutSonuc(null)} kapatEtiketi={t('DomainFilesPage:sizeModal.ok')}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-3 font-mono">{boyutSonuc.yol}</p>
             <div className="text-2xl font-bold text-brand-700 dark:text-brand-300 mb-2">
               {(() => {
@@ -804,13 +814,10 @@ export default function DomainFilesPage() {
             <div className="mt-4 flex justify-end">
               <button onClick={() => setBoyutSonuc(null)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('DomainFilesPage:sizeModal.ok')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {izinSifirlaOnay && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaOnay(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-amber-700 dark:text-amber-300 mb-2">{t('DomainFilesPage:resetConfirm.title')}</h3>
+        <Modal acik baslik={t('DomainFilesPage:resetConfirm.title')} onKapat={() => setIzinSifirlaOnay(false)} kapatEtiketi={t('common:cancel')}>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
               {t('DomainFilesPage:resetConfirm.body', { owner: domain?.sistem_kullanici })}
             </p>
@@ -818,26 +825,20 @@ export default function DomainFilesPage() {
               <button onClick={() => setIzinSifirlaOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
               <button onClick={izinleriSifirla} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded font-medium">{t('DomainFilesPage:resetConfirm.confirm')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {izinSifirlaSonuc && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setIzinSifirlaSonuc(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{t('DomainFilesPage:resetDone.title')}</h3>
+        <Modal acik baslik={t('DomainFilesPage:resetDone.title')} onKapat={() => setIzinSifirlaSonuc(false)} kapatEtiketi={t('DomainFilesPage:sizeModal.ok')}>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
               {t('DomainFilesPage:resetDone.body', { owner: domain?.sistem_kullanici })}
             </p>
             <div className="flex justify-end">
               <button onClick={() => setIzinSifirlaSonuc(false)} className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded font-medium">{t('DomainFilesPage:sizeModal.ok')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {topluSilOnay && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setTopluSilOnay(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">{t('DomainFilesPage:bulkDeleteConfirm.title')}</h3>
+        <Modal acik baslik={t('DomainFilesPage:bulkDeleteConfirm.title')} onKapat={() => setTopluSilOnay(false)} kapatEtiketi={t('common:cancel')}>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
               {t('DomainFilesPage:bulkDeleteConfirm.body', { count: seciliSet.size })}
             </p>
@@ -849,8 +850,7 @@ export default function DomainFilesPage() {
               <button onClick={() => setTopluSilOnay(false)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
               <button onClick={topluSil} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-medium">{t('DomainFilesPage:bulkDeleteConfirm.confirm')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
         </section>
@@ -961,9 +961,7 @@ function RenameModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (yeni
   const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [ad, setAd] = useState(entry.adi)
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:renameModal.title')}</h3>
+    <Modal acik baslik={t('DomainFilesPage:renameModal.title')} onKapat={onIptal} kapatEtiketi={t('common:cancel')}>
         <p className="text-xs text-slate-500 dark:text-slate-500 mb-3"><code className="font-mono">{entry.yol}</code></p>
         <input value={ad} onChange={e => setAd(e.target.value)} autoFocus
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
@@ -972,8 +970,7 @@ function RenameModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (yeni
           <button onClick={() => onTamam(ad)} disabled={!ad || ad === entry.adi}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:renameModal.confirm')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -989,9 +986,7 @@ function ChmodModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (mod: 
   }
   const cls = (on: boolean) => `text-xs px-2 py-1 rounded border ${on ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-500'}`
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:chmodModal.title')}</h3>
+    <Modal acik baslik={t('DomainFilesPage:chmodModal.title')} onKapat={onIptal} kapatEtiketi={t('common:cancel')}>
         <p className="text-xs text-slate-500 dark:text-slate-500 mb-3"><code className="font-mono">{entry.yol}</code></p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3 text-center">
           <div className="text-xs text-slate-500 dark:text-slate-500 font-semibold">{t('DomainFilesPage:chmodModal.owner')}</div>
@@ -1006,8 +1001,7 @@ function ChmodModal({ entry, onTamam, onIptal }: { entry: Entry; onTamam: (mod: 
           <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(mod)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('DomainFilesPage:chmodModal.apply')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1035,14 +1029,12 @@ function KopyaTasiModal({ tip, yollar, domainId, onTamam, onIptal }:
   const [hedef, setHedef] = useState('/public_html')
   const baslik = tip === 'kopyala' ? t('DomainFilesPage:copyMoveModal.titleCopy') : t('DomainFilesPage:copyMoveModal.titleMove')
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{baslik} ({t('DomainFilesPage:toolbar.itemCount', { count: yollar.length })})</h3>
+    <Modal acik baslik={`${baslik} (${t('DomainFilesPage:toolbar.itemCount', { count: yollar.length })})`} onKapat={onIptal} genislik="lg" kapatEtiketi={t('common:cancel')}>
         <ul className="text-xs font-mono text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 rounded p-2 max-h-32 overflow-auto mb-4">
           {yollar.slice(0, 5).map(y => <li key={y} className="truncate">{y}</li>)}
           {yollar.length > 5 && <li className="text-slate-400 dark:text-slate-500 italic">{t('DomainFilesPage:copyMoveModal.more', { count: yollar.length - 5 })}</li>}
         </ul>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:copyMoveModal.targetLabel')}</label>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainFilesPage:copyMoveModal.targetLabel')}</label>
         <input value={hedef} onChange={e => setHedef(e.target.value)} placeholder={t('DomainFilesPage:copyMoveModal.targetPlaceholder')}
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
         <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('DomainFilesPage:copyMoveModal.hintExists')} {tip === 'kopyala' ? t('DomainFilesPage:copyMoveModal.hintCopy') : t('DomainFilesPage:copyMoveModal.hintMove')}</p>
@@ -1050,8 +1042,7 @@ function KopyaTasiModal({ tip, yollar, domainId, onTamam, onIptal }:
           <button onClick={onIptal} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('common:cancel')}</button>
           <button onClick={() => onTamam(hedef)} className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{baslik}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1060,20 +1051,18 @@ function ArsivModal({ adetSayi, onTamam, onIptal }: { adetSayi: number; onTamam:
   const [ad, setAd] = useState('yedek-' + new Date().toISOString().slice(0, 10))
   const [format, setFormat] = useState<'zip' | 'tar.gz'>('zip')
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:archiveModal.title', { count: adetSayi })}</h3>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:archiveModal.filename')}</label>
+    <Modal acik baslik={t('DomainFilesPage:archiveModal.title', { count: adetSayi })} onKapat={onIptal} kapatEtiketi={t('common:cancel')}>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainFilesPage:archiveModal.filename')}</label>
         <input value={ad} onChange={e => setAd(e.target.value)}
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm mb-3" />
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:archiveModal.format')}</label>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainFilesPage:archiveModal.format')}</label>
         <div className="flex gap-2">
           <button onClick={() => setFormat('zip')}
-            className={`px-3 py-1.5 text-sm rounded border ${format === 'zip' ? 'bg-brand-50 dark:bg-brand-900/20 border-brand-500 text-brand-700 dark:text-brand-300' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded border ${format === 'zip' ? 'bg-brand-50 dark:bg-brand-900/20 border-brand-500 text-brand-700 dark:text-brand-300' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
             ZIP
           </button>
           <button onClick={() => setFormat('tar.gz')}
-            className={`px-3 py-1.5 text-sm rounded border ${format === 'tar.gz' ? 'bg-brand-50 dark:bg-brand-900/20 border-brand-500 text-brand-700 dark:text-brand-300' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded border ${format === 'tar.gz' ? 'bg-brand-50 dark:bg-brand-900/20 border-brand-500 text-brand-700 dark:text-brand-300' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
             TAR.GZ
           </button>
         </div>
@@ -1083,8 +1072,7 @@ function ArsivModal({ adetSayi, onTamam, onIptal }: { adetSayi: number; onTamam:
           <button onClick={() => onTamam(ad, format)} disabled={!ad}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:archiveModal.submit')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1092,10 +1080,8 @@ function YeniDosyaModal({ onTamam, onIptal }: { onTamam: (ad: string) => void; o
   const { t } = useTranslation(['DomainFilesPage', 'common'])
   const [ad, setAd] = useState('yeni-dosya.txt')
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onIptal}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFilesPage:newFileModal.title')}</h3>
-        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainFilesPage:newFileModal.filename')}</label>
+    <Modal acik baslik={t('DomainFilesPage:newFileModal.title')} onKapat={onIptal} kapatEtiketi={t('common:cancel')}>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainFilesPage:newFileModal.filename')}</label>
         <input value={ad} onChange={e => setAd(e.target.value)} autoFocus
           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm" />
         <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">{t('DomainFilesPage:newFileModal.hint')}</p>
@@ -1104,7 +1090,6 @@ function YeniDosyaModal({ onTamam, onIptal }: { onTamam: (ad: string) => void; o
           <button onClick={() => onTamam(ad)} disabled={!ad}
             className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded">{t('DomainFilesPage:newFileModal.submit')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
