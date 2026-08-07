@@ -12,6 +12,15 @@ type ReadResp = { dosya: string; yol: string; satirlar: string[]; mevcut: boolea
 
 const MAX_PENCERE = 1000
 
+const LOG_T = {
+  tablo: 'w-full text-xs border-collapse',
+  baslik: 'hidden md:table-header-group sticky top-0 z-10 bg-slate-900/95 backdrop-blur text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800',
+  govde: 'block md:table-row-group md:divide-y md:divide-slate-800/70',
+  satir: 'block mx-2 mb-2 rounded-lg border border-slate-800 bg-slate-950/50 p-3 md:mx-0 md:mb-0 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0 md:hover:bg-slate-800/40',
+  baslikHucre: 'block pb-2 mb-1 border-b border-slate-800 font-mono text-slate-300 md:table-cell md:border-0 md:mb-0 md:px-3 md:py-1.5 md:whitespace-nowrap',
+  hucre: 'flex items-start justify-between gap-3 py-1.5 text-right md:table-cell md:px-3 md:py-1.5 md:text-left before:shrink-0 before:text-[10px] before:font-semibold before:uppercase before:tracking-wider before:text-slate-500 md:before:hidden',
+} as const
+
 export default function DomainLogsPage() {
   const { t } = useTranslation(['DomainLogsPage', 'common'])
   const { id } = useParams()
@@ -285,8 +294,8 @@ function AccessTablosu({ satirlar }: { satirlar: string[] }) {
   const { t } = useTranslation(['DomainLogsPage'])
   const satirNesne = useMemo(() => satirlar.map(parseAccess), [satirlar])
   return (
-    <table className="w-full text-xs border-collapse">
-      <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+    <table className={LOG_T.tablo}>
+      <thead className={LOG_T.baslik}>
         <tr>
           <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:access_table.time')}</th>
           <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:access_table.ip')}</th>
@@ -297,32 +306,32 @@ function AccessTablosu({ satirlar }: { satirlar: string[] }) {
           <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:access_table.browser')}</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-800/70">
+      <tbody className={LOG_T.govde}>
         {satirlar.map((ham, i) => {
           const r = satirNesne[i]
           if (!r) {
             return (
-              <tr key={i}>
-                <td colSpan={7} className="px-3 py-1.5 font-mono text-slate-500 break-all">{ham}</td>
+              <tr key={i} className={LOG_T.satir}>
+                <td colSpan={7} className="block break-all font-mono text-slate-500 md:table-cell md:px-3 md:py-1.5">{ham}</td>
               </tr>
             )
           }
           return (
-            <tr key={i} className="hover:bg-slate-800/40">
-              <td className="px-3 py-1.5 font-mono text-slate-400 whitespace-nowrap">{kisaZaman(r.zaman)}</td>
-              <td className="px-3 py-1.5 font-mono text-slate-300 whitespace-nowrap">{r.ip}</td>
-              <td className="px-3 py-1.5">
+            <tr key={i} className={LOG_T.satir}>
+              <td className={LOG_T.baslikHucre}>{kisaZaman(r.zaman)}</td>
+              <td className={`${LOG_T.hucre} font-mono text-slate-300`} data-etiket={t('DomainLogsPage:access_table.ip')}>{r.ip}</td>
+              <td className={LOG_T.hucre} data-etiket={t('DomainLogsPage:access_table.method')}>
                 <span className={`inline-block px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] ${methodRenk(r.method)}`}>{r.method || '—'}</span>
               </td>
-              <td className="px-3 py-1.5 font-mono text-slate-200 max-w-0">
-                <div className="truncate" title={r.referer && r.referer !== '-' ? `${r.yol}\n← ${r.referer}` : r.yol}>{r.yol}</div>
+              <td className={`${LOG_T.hucre} font-mono text-slate-200 md:max-w-0`} data-etiket={t('DomainLogsPage:access_table.path')}>
+                <div className="min-w-0 break-all md:truncate" title={r.referer && r.referer !== '-' ? `${r.yol}\n← ${r.referer}` : r.yol}>{r.yol}</div>
               </td>
-              <td className="px-3 py-1.5">
+              <td className={LOG_T.hucre} data-etiket={t('DomainLogsPage:access_table.status')}>
                 <span className={`inline-block px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] ${durumRenk(r.durum)}`}>{r.durum}</span>
               </td>
-              <td className="px-3 py-1.5 font-mono text-slate-400 text-right whitespace-nowrap">{boyutFmt(r.boyut)}</td>
-              <td className="px-3 py-1.5 text-slate-400 max-w-[220px]">
-                <div className="truncate" title={r.ua}>{uaKisa(r.ua)}</div>
+              <td className={`${LOG_T.hucre} font-mono text-slate-400 md:text-right`} data-etiket={t('DomainLogsPage:access_table.size')}>{boyutFmt(r.boyut)}</td>
+              <td className={`${LOG_T.hucre} text-slate-400 md:max-w-[220px]`} data-etiket={t('DomainLogsPage:access_table.browser')}>
+                <div className="min-w-0 break-words md:truncate" title={r.ua}>{uaKisa(r.ua)}</div>
               </td>
             </tr>
           )
@@ -341,8 +350,8 @@ const CLIENT_RE = /client: (\S+?)[,\s]/
 function ErrorTablosu({ satirlar }: { satirlar: string[] }) {
   const { t } = useTranslation(['DomainLogsPage'])
   return (
-    <table className="w-full text-xs border-collapse">
-      <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+    <table className={LOG_T.tablo}>
+      <thead className={LOG_T.baslik}>
         <tr>
           <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('DomainLogsPage:error_table.time')}</th>
           <th className="text-left font-medium px-3 py-2">{t('DomainLogsPage:error_table.level')}</th>
@@ -350,27 +359,27 @@ function ErrorTablosu({ satirlar }: { satirlar: string[] }) {
           <th className="text-left font-medium px-3 py-2 w-full">{t('DomainLogsPage:error_table.message')}</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-800/70">
+      <tbody className={LOG_T.govde}>
         {satirlar.map((ham, i) => {
           const m = ERROR_RE.exec(ham)
           if (!m) {
             return (
-              <tr key={i}>
-                <td colSpan={4} className="px-3 py-1.5 font-mono text-slate-500 break-all">{ham}</td>
+              <tr key={i} className={LOG_T.satir}>
+                <td colSpan={4} className="block break-all font-mono text-slate-500 md:table-cell md:px-3 md:py-1.5">{ham}</td>
               </tr>
             )
           }
           const cm = CLIENT_RE.exec(m[3])
           const client = cm ? cm[1] : ''
           return (
-            <tr key={i} className="hover:bg-slate-800/40">
-              <td className="px-3 py-1.5 font-mono text-slate-400 whitespace-nowrap">{m[1].slice(5)}</td>
-              <td className="px-3 py-1.5">
+            <tr key={i} className={LOG_T.satir}>
+              <td className={LOG_T.baslikHucre}>{m[1].slice(5)}</td>
+              <td className={LOG_T.hucre} data-etiket={t('DomainLogsPage:error_table.level')}>
                 <span className={`inline-block px-1.5 py-0.5 rounded font-mono font-semibold text-[10px] ${seviyeRenk(m[2])}`}>{m[2]}</span>
               </td>
-              <td className="px-3 py-1.5 font-mono text-slate-300 whitespace-nowrap">{client || '—'}</td>
-              <td className="px-3 py-1.5 font-mono text-slate-200 max-w-0">
-                <div className="truncate" title={m[3]}>{m[3]}</div>
+              <td className={`${LOG_T.hucre} font-mono text-slate-300`} data-etiket={t('DomainLogsPage:error_table.client')}>{client || '—'}</td>
+              <td className={`${LOG_T.hucre} font-mono text-slate-200 md:max-w-0`} data-etiket={t('DomainLogsPage:error_table.message')}>
+                <div className="min-w-0 break-all md:truncate" title={m[3]}>{m[3]}</div>
               </td>
             </tr>
           )

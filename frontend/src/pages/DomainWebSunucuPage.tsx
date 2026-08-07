@@ -180,7 +180,7 @@ export default function DomainWebSunucuPage() {
 
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainWebSunucuPage:title')}</h1>
       {yanit && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{yanit.alan_adi}</Link>
+        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{yanit.alan_adi}</Link>
         {' · '}{t('DomainWebSunucuPage:subtitle')}
       </p>}
 
@@ -218,7 +218,7 @@ export default function DomainWebSunucuPage() {
                   {aktif && <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-300">{t('DomainWebSunucuPage:active_label')}</span>}
                 </div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{b.ad}</div>
-                <div className="text-[11px] text-slate-600 dark:text-slate-400 dark:text-slate-500 mt-1.5 leading-snug">{b.aciklama}</div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">{b.aciklama}</div>
               </button>
             )
           })}
@@ -269,7 +269,7 @@ export default function DomainWebSunucuPage() {
             {a.hdr_hsts && (
               <div className="mt-3 pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainWebSunucuPage:max_age_label')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainWebSunucuPage:max_age_label')}</label>
                   <select value={a.hsts_max_age} onChange={e => P('hsts_max_age', parseInt(e.target.value))}
                     className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono">
                     <option value={300}>{t('DomainWebSunucuPage:max_age_5min')}</option>
@@ -308,7 +308,7 @@ export default function DomainWebSunucuPage() {
             />
             {a.fastcgi_cache && (
               <div className="mt-3 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainWebSunucuPage:cache_minutes_label')}</label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainWebSunucuPage:cache_minutes_label')}</label>
                 <select value={a.fastcgi_cache_dakika} onChange={e => P('fastcgi_cache_dakika', parseInt(e.target.value))}
                   className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono">
                   <option value={5}>{t('DomainWebSunucuPage:cache_5min')}</option>
@@ -330,7 +330,7 @@ export default function DomainWebSunucuPage() {
               />
               {a.browser_cache && (
                 <div className="mt-3 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainWebSunucuPage:cache_days_label')}</label>
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainWebSunucuPage:cache_days_label')}</label>
                   <select value={a.browser_cache_gun} onChange={e => P('browser_cache_gun', parseInt(e.target.value))}
                     className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono">
                     <option value={1}>{t('DomainWebSunucuPage:cache_1d_short')}</option>

@@ -47,13 +47,13 @@ export default function CPanelGirisPage() {
 
         <form onSubmit={gir} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('CPanelGirisPage:username')}</label>
+            <label className="ta-label-sm">{t('CPanelGirisPage:username')}</label>
             <input type="text" value={kullanici} onChange={e => setKullanici(e.target.value)}
               autoComplete="username" required autoFocus
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm focus:border-brand-500 outline-none" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('CPanelGirisPage:password')}</label>
+            <label className="ta-label-sm">{t('CPanelGirisPage:password')}</label>
             <input type="password" value={parola} onChange={e => setParola(e.target.value)}
               autoComplete="current-password" required
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm focus:border-brand-500 outline-none" />

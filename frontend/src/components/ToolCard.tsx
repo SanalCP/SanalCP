@@ -35,7 +35,7 @@ export default function ToolCard({
   }
   const govde = (
     <>
-      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${BG[renk]}`}>
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${BG[renk]}`}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-5 h-5">
           <path strokeLinecap="round" strokeLinejoin="round" d={ikon} />
         </svg>
@@ -54,7 +54,7 @@ export default function ToolCard({
       </div>
     </>
   )
-  const klass = 'group flex items-start gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:shadow-sm transition text-left w-full cursor-pointer'
+  const klass = 'group flex items-start gap-3.5 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/40 hover:border-brand-200 dark:hover:border-brand-800 hover:bg-brand-50/40 dark:hover:bg-brand-500/5 hover:shadow-md hover:shadow-slate-900/5 transition-all text-left w-full cursor-pointer'
 
   return <button type="button" onClick={tikla} className={klass}>{govde}</button>
 }

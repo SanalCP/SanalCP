@@ -77,11 +77,11 @@ export default function DomainDatabasesPage() {
       ]} />
 
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainDatabasesPage:title')}</h1>
-      {domain && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5"><Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link></p>}
+      {domain && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5"><Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link></p>}
 
       <div className="flex items-center gap-2 mb-4">
         <button onClick={() => setEkleAcik(true)} className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-md">{t('DomainDatabasesPage:new_database')}</button>
-        <button onClick={yukle} className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md">↻ {t('DomainDatabasesPage:refresh')}</button>
+        <button onClick={yukle} className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md">↻ {t('DomainDatabasesPage:refresh')}</button>
         <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{dbler.length} {t('DomainDatabasesPage:count_suffix')}</span>
       </div>
 
@@ -105,8 +105,8 @@ export default function DomainDatabasesPage() {
             {dbler.map(d => (
               <tr key={d.id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800`}>
                 <td className={T.hucreBaslik}><span className="font-mono lg:text-sm text-base">{d.db_adi}</span></td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_user')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.db_kullanici}</span></td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_server')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.db_host}:3306</span></td>
+                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_user')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{d.db_kullanici}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_server')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{d.db_host}:3306</span></td>
                 <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_password')}>
                   <div className="flex items-center gap-1">
                     <button
@@ -123,7 +123,7 @@ export default function DomainDatabasesPage() {
                     )}
                   </div>
                 </td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_created')}><span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.olusturulma}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_created')}><span className="text-sm text-slate-600 dark:text-slate-400">{d.olusturulma}</span></td>
                 <td className={T.hucreAksiyon}>
                   <button onClick={() => pmaAc(d)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded" title={t('DomainDatabasesPage:pma_open_title')}>{t('DomainDatabasesPage:pma_button')}</button>
                   <button onClick={() => setPwResetFor(d)} className="text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 px-2 py-1 rounded">{t('DomainDatabasesPage:reset_password')}</button>
@@ -245,7 +245,7 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-md text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none disabled:opacity-50'
+  const inputCls = 'ta-input ta-input-sm w-full font-mono'
 
   return (
     <Modal acik={true} baslik={t('DomainDatabasesPage:new_db_modal_title')} onKapat={sonuc ? onTamam : onKapat} genislik="lg">
@@ -377,11 +377,11 @@ function PwResetModal({ db, onKapat, onTamam, t }: { db: DB; onKapat: () => void
     <Modal acik={true} baslik={t('DomainDatabasesPage:reset_modal_title', { ad: db.db_adi })} onKapat={yeniPw ? onTamam : onKapat} genislik="md">
       {!yeniPw ? (
         <div className="space-y-4">
-          <div className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">
+          <div className="text-sm text-slate-600 dark:text-slate-400">
             {t('DomainDatabasesPage:reset_user_desc', { kullanici: db.db_kullanici })}
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDatabasesPage:custom_password_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabasesPage:custom_password_label')}</label>
             <input
               type="text"
               value={ozelPw}

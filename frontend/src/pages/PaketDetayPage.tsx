@@ -331,7 +331,7 @@ export default function PaketDetayPage() {
   )
 }
 
-const inp = 'w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none'
+const inp = 'ta-input ta-input-sm w-full'
 const inpNum = inp + ' font-mono'
 
 function Kart({ baslik, alt, ikon, children }: { baslik: string; alt?: string; ikon?: string; children: React.ReactNode }) {

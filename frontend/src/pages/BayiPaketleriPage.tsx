@@ -202,11 +202,11 @@ function PaketModal({ paket, onKapat, onKayit }: { paket: Paket; onKapat: () => 
   return (
     <Modal acik={true} baslik={yeni ? t('BayiPaketleriPage:modal.title_new') : t('BayiPaketleriPage:modal.title_edit')} onKapat={onKapat} genislik="lg">
       <form onSubmit={gonder} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Alan etiket={t('BayiPaketleriPage:modal.fields.package_name')} value={form.ad} setVal={v => setForm({ ...form, ad: v })} required />
           <Alan etiket={t('BayiPaketleriPage:modal.fields.description')} value={form.aciklama} setVal={v => setForm({ ...form, aciklama: v })} />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Sayi etiket={t('BayiPaketleriPage:modal.fields.max_customer')} value={form.max_customer} setVal={v => setForm({ ...form, max_customer: v })} />
           <Sayi etiket={t('BayiPaketleriPage:modal.fields.max_domain')} value={form.max_domain} setVal={v => setForm({ ...form, max_domain: v })} />
           <Sayi etiket={t('BayiPaketleriPage:modal.fields.disk_mb')} value={form.disk_kota_mb} setVal={v => setForm({ ...form, disk_kota_mb: v })} />
@@ -221,15 +221,15 @@ function PaketModal({ paket, onKapat, onKayit }: { paket: Paket; onKapat: () => 
           <input type="checkbox" checked={form.fazla_satis} onChange={e => setForm({ ...form, fazla_satis: e.target.checked })} className="rounded" />
           {t('BayiPaketleriPage:modal.checkboxes.allow_oversell')}
         </label>
-        <p className="text-xs text-slate-500 dark:text-slate-500">
+        <p className="ta-hint">
           {t('BayiPaketleriPage:modal.info_note')}
         </p>
 
-        {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">{hata}</div>}
+        {hata && <div className="ta-form-error" role="alert">{hata}</div>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onKapat} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{t('BayiPaketleriPage:modal.buttons.cancel')}</button>
-          <button type="submit" disabled={isleniyor || !form.ad.trim()} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm rounded-md">{isleniyor ? t('BayiPaketleriPage:modal.buttons.saving') : (yeni ? t('BayiPaketleriPage:modal.buttons.add') : t('BayiPaketleriPage:modal.buttons.update'))}</button>
+        <div className="ta-form-actions">
+          <button type="button" onClick={onKapat} className="ta-secondary-button">{t('BayiPaketleriPage:modal.buttons.cancel')}</button>
+          <button type="submit" disabled={isleniyor || !form.ad.trim()} className="ta-primary-button">{isleniyor ? t('BayiPaketleriPage:modal.buttons.saving') : (yeni ? t('BayiPaketleriPage:modal.buttons.add') : t('BayiPaketleriPage:modal.buttons.update'))}</button>
         </div>
       </form>
     </Modal>
@@ -239,18 +239,18 @@ function PaketModal({ paket, onKapat, onKayit }: { paket: Paket; onKapat: () => 
 function Alan({ etiket, value, setVal, required }: { etiket: string; value: string; setVal: (v: string) => void; required?: boolean }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{etiket}</label>
+      <label className="ta-label-sm">{etiket}</label>
       <input type="text" value={value} onChange={e => setVal(e.target.value)} required={required}
-        className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+        className="ta-input ta-input-sm w-full" />
     </div>
   )
 }
 function Sayi({ etiket, value, setVal }: { etiket: string; value: number; setVal: (v: number) => void }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{etiket}</label>
+      <label className="ta-label-sm">{etiket}</label>
       <input type="number" min={0} value={value} onChange={e => setVal(parseInt(e.target.value) || 0)}
-        className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+        className="ta-input ta-input-sm w-full font-mono" />
     </div>
   )
 }

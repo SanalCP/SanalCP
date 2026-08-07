@@ -193,9 +193,9 @@ export default function WordPressPage() {
       <form onSubmit={kur} className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 max-w-2xl">
         <h3 className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-3">{t('WordPressPage:new_install_title')}</h3>
         <div className="mb-3">
-          <label className="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1.5">{t('WordPressPage:domain_label')}</label>
+          <label className="ta-label-sm">{t('WordPressPage:domain_label')}</label>
           <select value={domainId ?? ''} onChange={e => setDomainId(Number(e.target.value))}
-            className="w-full sm:w-80 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none">
+            className="ta-input ta-input-sm w-full sm:w-80">
             {domainler.map(d => <option key={d.id} value={d.id}>{d.alan_adi}</option>)}
           </select>
         </div>
@@ -205,7 +205,7 @@ export default function WordPressPage() {
           <Alan et={t('WordPressPage:admin_user_label')} v={adminK} set={setAdminK} zorunlu mono />
           <Alan et={t('WordPressPage:admin_email_label')} v={adminE} set={setAdminE} zorunlu type="email" ph={t('WordPressPage:admin_email_placeholder')} />
         </div>
-        <button disabled={kuruyor || !domainId} className="mt-3 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
+        <button disabled={kuruyor || !domainId} className="ta-primary-button mt-3 w-full sm:w-auto">
           {kuruyor ? t('WordPressPage:installing_button') : (sel ? t('WordPressPage:install_button_with_domain', { domain: sel.alan_adi }) : t('WordPressPage:install_button'))}
         </button>
       </form>
@@ -251,9 +251,9 @@ function Bilgi({ et, v, mono, link }: { et: string; v: string; mono?: boolean; l
 function Alan({ et, v, set, zorunlu, ph, mono, type }: { et: string; v: string; set: (s: string) => void; zorunlu?: boolean; ph?: string; mono?: boolean; type?: string }) {
   return (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">{et}</span>
+      <span className="ta-label-sm">{et}</span>
       <input value={v} onChange={e => set(e.target.value)} required={zorunlu} placeholder={ph} type={type || 'text'}
-        className={`mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none ${mono ? 'font-mono' : ''}`} />
+        className={`ta-input ta-input-sm w-full ${mono ? 'font-mono' : ''}`} />
     </label>
   )
 }

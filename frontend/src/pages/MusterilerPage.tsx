@@ -14,6 +14,7 @@ import EmptyState from '@/components/EmptyState'
 import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { T } from '@/lib/tablo'
 
 type Musteri = {
   id: number
@@ -156,30 +157,30 @@ export default function MusterilerPage() {
       ) : suzulmus.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-400">{t('MusterilerPage:search_empty')}</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/60">
+        <div className="lg:overflow-x-auto lg:rounded-xl lg:border lg:border-slate-200 dark:lg:border-slate-800">
+          <table className={T.tablo}>
+            <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900/60`}>
               <tr>
                 {[t('MusterilerPage:table.name'), t('MusterilerPage:table.email'), t('MusterilerPage:table.plan'), t('MusterilerPage:table.status'), t('MusterilerPage:table.created'), ''].map((b, i) => (
-                  <th key={i} className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <th key={i} className={`${T.baslik} whitespace-nowrap`}>
                     {b}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-950">
+            <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800 lg:bg-white dark:lg:bg-slate-950`}>
               {suzulmus.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition">
-                  <td className="px-3 py-2.5 font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">{m.ad}</td>
-                  <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{m.eposta}</td>
-                  <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{planAdi(m.plan_id)}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                <tr key={m.id} className={T.satir}>
+                  <td className={T.hucreBaslik}>{m.ad}</td>
+                  <td className={T.hucre} data-etiket={t('MusterilerPage:table.email')}><span className="break-all text-slate-600 dark:text-slate-400">{m.eposta}</span></td>
+                  <td className={T.hucre} data-etiket={t('MusterilerPage:table.plan')}><span className="text-slate-600 dark:text-slate-400">{planAdi(m.plan_id)}</span></td>
+                  <td className={T.hucre} data-etiket={t('MusterilerPage:table.status')}>
                     {m.durum === 'aktif'
                       ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('MusterilerPage:status.active')}</span>
                       : <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{t('MusterilerPage:status.inactive')}</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap">{m.olusturma}</td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  <td className={`${T.hucre} text-xs text-slate-500`} data-etiket={t('MusterilerPage:table.created')}>{m.olusturma}</td>
+                  <td className={T.hucreAksiyon}>
                     <button onClick={() => setDuzenlenen({ ...m })} className="text-xs text-brand-600 dark:text-brand-400 hover:underline mr-3">
                       {t('MusterilerPage:actions.edit')}
                     </button>
@@ -218,7 +219,7 @@ export default function MusterilerPage() {
                 className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('MusterilerPage:fields.plan')}</label>
                 <select

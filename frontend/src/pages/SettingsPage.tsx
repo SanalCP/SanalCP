@@ -12,9 +12,9 @@ type Ben = {
 
 function Kart({ baslik, aciklama, ikon, cocuk }: { baslik: string; aciklama?: string; ikon: React.ReactNode; cocuk: React.ReactNode }) {
   return (
-    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm">
+    <section className="ta-card p-6">
       <div className="flex items-start gap-3 mb-5">
-        <div className="w-10 h-10 rounded-2xl bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">{ikon}</div>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-100 bg-brand-50 text-brand-600 dark:border-brand-900/50 dark:bg-brand-900/20 dark:text-brand-400">{ikon}</div>
         <div>
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{baslik}</h2>
           {aciklama && <p className="text-xs text-slate-500 dark:text-slate-500 mt-0.5">{aciklama}</p>}
@@ -29,7 +29,7 @@ function Girdi({ etiket, ...p }: { etiket: string } & React.InputHTMLAttributes<
   return (
     <label className="block">
       <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{etiket}</span>
-      <input {...p} className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-800 dark:text-slate-100 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none disabled:opacity-60 disabled:bg-slate-100 dark:disabled:bg-slate-800" />
+      <input {...p} className="ta-input disabled:cursor-not-allowed disabled:opacity-60" />
     </label>
   )
 }
@@ -151,14 +151,15 @@ export default function SettingsPage() {
   }
 
 
-  const btn = 'px-4 py-2 text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-50 inline-flex items-center gap-2'
+  const btn = 'ta-primary-button disabled:cursor-not-allowed disabled:opacity-50'
   const secretGruplu = f2Kur ? (f2Kur.secret.match(/.{1,4}/g) || []).join(' ') : ''
 
   return (
-    <div className="px-6 md:px-8 py-6">
+    <div className="ta-page">
       <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('SettingsPage:title') }]} />
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('SettingsPage:title')}</h1>
-      <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">{t('SettingsPage:subtitle')}</p>
+      <p className="ta-eyebrow">SanalCP</p>
+      <h1 className="ta-page-title">{t('SettingsPage:title')}</h1>
+      <p className="ta-page-description mb-7">{t('SettingsPage:subtitle')}</p>
       {yukHata && <div className="mb-4"><Uyari tip="err" mesaj={yukHata} /></div>}
 
       <div className="space-y-5">

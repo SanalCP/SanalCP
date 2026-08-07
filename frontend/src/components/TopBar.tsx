@@ -248,7 +248,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
   }
 
   return (
-    <header className="h-14 bg-white dark:bg-slate-800 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 dark:border-slate-800 flex items-center px-3 sm:px-4 sticky top-0 z-30 gap-2 sm:gap-4">
+    <header className="h-20 bg-white/95 dark:bg-[#101828]/95 backdrop-blur border-b border-slate-200 dark:border-slate-800 flex items-center px-4 sm:px-6 sticky top-0 z-30 gap-3 sm:gap-5">
       {/* Hamburger — yalnız < lg; kenar çubuğu orada çekmeceye dönüşüyor */}
       <button
         onClick={onMenuAc}
@@ -283,9 +283,11 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
             }}
             placeholder={t('TopBar:search_placeholder')}
             aria-label={t('TopBar:search_aria')}
+            role="combobox"
+            aria-autocomplete="list"
             aria-expanded={aramaAcik && !!arama.trim()}
             aria-controls="global-arama-sonuclari"
-            className="w-full pl-9 pr-16 py-1.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:bg-white dark:focus:bg-slate-800 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 outline-none transition"
+            className="w-full pl-10 pr-16 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 outline-none transition"
           />
           <span className="hidden sm:block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 pointer-events-none">{t('TopBar:search_shortcut')}</span>
           {aramaAcik && arama.trim() && (
@@ -341,7 +343,9 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
         )}
         <LanguageSwitcher />
         <button onClick={temaDegistir}
-          className="p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition"
+          type="button"
+          aria-label={t('TopBar:theme_toggle_title', { theme: tema })}
+          className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200 rounded-md transition"
           title={t('TopBar:theme_toggle_title', { theme: tema })}>
           {tema === 'dark' ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
@@ -357,7 +361,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
             </svg>
           )}
         </button>
-        <button className="hidden sm:inline-flex p-2 text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 dark:text-slate-400 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 rounded-md transition" title={t('TopBar:notifications')}>
+        <button type="button" aria-label={t('TopBar:notifications')} className="hidden sm:inline-flex p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200 rounded-md transition" title={t('TopBar:notifications')}>
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
@@ -365,9 +369,11 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
 
         <div className="relative">
           <button
+            type="button"
             onClick={() => setMenuAcik((v) => !v)}
             className="flex items-center gap-2 px-1.5 sm:px-2 py-1.5 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800 rounded-md transition"
             aria-label={t('TopBar:account_menu')}
+            aria-expanded={menuAcikProfil}
           >
             <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-semibold text-xs flex items-center justify-center flex-shrink-0">
               {(kullanici?.ad_soyad || kullanici?.adi || '?').slice(0, 1).toUpperCase()}
