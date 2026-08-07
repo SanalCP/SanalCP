@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import GenelListe, { type Kolon } from '@/components/GenelListe'
 import { api, apiHata } from '@/lib/api'
+import { T } from '@/lib/tablo'
 
 type Satir = {
   domain_id: number
@@ -132,12 +133,12 @@ export default function MailGenelPage() {
       />
       <div className="w-full px-6 pb-8">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-          <div className="p-5 flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700">
+          <div className="p-5 flex flex-col items-stretch justify-between gap-3 border-b border-slate-200 dark:border-slate-700 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('MailGenelPage:queue_title')}</h2>
               <p className="text-xs text-slate-500 mt-1">{t('MailGenelPage:queue_subtitle')}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button onClick={queueYukle} disabled={queueYuk}
                 className="px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded">{t('MailGenelPage:refresh')}</button>
               <button onClick={() => queueAction('flush')} disabled={!!queueIslem}
@@ -149,22 +150,22 @@ export default function MailGenelPage() {
           {queueHata && <div className="m-4 p-3 text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-300 rounded">{queueHata}</div>}
           {queueYuk ? <div className="p-8 text-center text-sm text-slate-400">{t('MailGenelPage:queue_loading')}</div> :
            queue.length === 0 ? <div className="p-8 text-center text-sm text-emerald-600 dark:text-emerald-400">{t('MailGenelPage:queue_empty')}</div> :
-           <div className="overflow-x-auto">
-             <table className="w-full text-sm">
-               <thead className="bg-slate-50 dark:bg-slate-900 text-xs text-slate-500">
-                 <tr><th className="text-left p-3">{t('MailGenelPage:col_queue_id')}</th><th className="text-left p-3">{t('MailGenelPage:col_sender_recipients')}</th><th className="text-left p-3">{t('MailGenelPage:col_size_time')}</th><th className="text-right p-3">{t('MailGenelPage:col_actions')}</th></tr>
+           <div className="lg:overflow-x-auto">
+             <table className={T.tablo}>
+               <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900 text-xs text-slate-500`}>
+                 <tr><th className={T.baslik}>{t('MailGenelPage:col_queue_id')}</th><th className={T.baslik}>{t('MailGenelPage:col_sender_recipients')}</th><th className={T.baslik}>{t('MailGenelPage:col_size_time')}</th><th className={`${T.baslik} text-right`}>{t('MailGenelPage:col_actions')}</th></tr>
                </thead>
-               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                 {queue.map(m => <tr key={m.queue_id}>
-                   <td className="p-3 font-mono">{m.queue_id}<div className="text-[10px] text-slate-400">{m.queue_name}</div></td>
-                   <td className="p-3">
-                     <div className="font-mono text-xs">{m.sender || t('MailGenelPage:no_recipient')}</div>
-                     <div className="font-mono text-xs text-slate-500">→ {m.recipients.map(r => r.address).join(', ')}</div>
+               <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-700`}>
+                 {queue.map(m => <tr key={m.queue_id} className={T.satir}>
+                   <td className={`${T.hucreBaslik} font-mono`}>{m.queue_id}<div className="text-[10px] text-slate-400">{m.queue_name}</div></td>
+                   <td className={T.hucre} data-etiket={t('MailGenelPage:col_sender_recipients')}>
+                     <div className="min-w-0 text-right lg:text-left"><div className="break-all font-mono text-xs">{m.sender || t('MailGenelPage:no_recipient')}</div>
+                     <div className="break-all font-mono text-xs text-slate-500">→ {m.recipients.map(r => r.address).join(', ')}</div>
                      {m.recipients.find(r => r.delay_reason)?.delay_reason &&
-                       <div className="mt-1 text-[10px] text-amber-600 max-w-xl">{m.recipients.find(r => r.delay_reason)?.delay_reason}</div>}
+                       <div className="mt-1 max-w-xl break-words text-[10px] text-amber-600">{m.recipients.find(r => r.delay_reason)?.delay_reason}</div>}</div>
                    </td>
-                   <td className="p-3 text-xs text-slate-500">{formatBoyut(m.message_size, t)}<div>{new Date(m.arrival_time * 1000).toLocaleString(locale)}</div></td>
-                   <td className="p-3 text-right whitespace-nowrap">
+                   <td className={`${T.hucre} text-xs text-slate-500`} data-etiket={t('MailGenelPage:col_size_time')}><span className="text-right lg:text-left">{formatBoyut(m.message_size, t)}<span className="block">{new Date(m.arrival_time * 1000).toLocaleString(locale)}</span></span></td>
+                   <td className={T.hucreAksiyon}>
                      {m.queue_name === 'hold' ?
                        <button onClick={() => queueAction('release', m.queue_id)} className="text-xs text-emerald-600 px-2">{t('MailGenelPage:release')}</button> :
                        <button onClick={() => queueAction('hold', m.queue_id)} className="text-xs text-amber-600 px-2">{t('MailGenelPage:hold')}</button>}

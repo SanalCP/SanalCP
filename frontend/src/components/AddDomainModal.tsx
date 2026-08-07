@@ -88,7 +88,7 @@ export default function AddDomainModal({
     <Modal acik={acik} baslik={t('AddDomainModal:title')} onKapat={onKapat} genislik="md">
       <form onSubmit={gonder} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:domain_label')}</label>
+          <label className="ta-label">{t('AddDomainModal:domain_label')}</label>
           <input
             type="text"
             value={alanAdi}
@@ -96,36 +96,36 @@ export default function AddDomainModal({
             placeholder={t('AddDomainModal:domain_placeholder')}
             autoFocus
             required
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition text-sm"
+            className="ta-input w-full"
           />
-          <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('AddDomainModal:domain_hint')} <code className="font-mono">site.com</code>, <code className="font-mono">musteri-1.org</code></p>
+          <p className="ta-hint">{t('AddDomainModal:domain_hint')} <code className="font-mono">site.com</code>, <code className="font-mono">musteri-1.org</code></p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:plan_label')}</label>
+            <label className="ta-label">{t('AddDomainModal:plan_label')}</label>
             <select
               value={planId}
               onChange={(e) => planDegis(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition text-sm bg-white dark:bg-slate-800"
+              className="ta-input w-full"
             >
               <option value="">{t('AddDomainModal:plan_none')}</option>
               {planlar.map(p => (
                 <option key={p.id} value={p.id}>{p.ad}{p.varsayilan ? t('AddDomainModal:plan_default_suffix') : ''}</option>
               ))}
             </select>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{t('AddDomainModal:plan_hint')}</p>
+            <p className="ta-hint">{t('AddDomainModal:plan_hint')}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('AddDomainModal:php_label')}</label>
+            <label className="ta-label">{t('AddDomainModal:php_label')}</label>
             <select
               value={phpSurum}
               onChange={(e) => setPhpSurum(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition text-sm bg-white dark:bg-slate-800"
+              className="ta-input w-full"
             >
               {phpOpts.map(v => <option key={v} value={v}>PHP {v}</option>)}
             </select>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+            <p className="ta-hint">
               {phpPlandan ? <span className="text-brand-600 dark:text-brand-400">{t('AddDomainModal:php_from_plan', { ad: seciliPlan?.ad })}</span> : t('AddDomainModal:php_independent')}
             </p>
           </div>
@@ -135,22 +135,22 @@ export default function AddDomainModal({
           <strong>{t('AddDomainModal:auto_box_title')}</strong> {t('AddDomainModal:auto_box_user')} (<code className="font-mono">c_&lt;slug&gt;</code>) {t('AddDomainModal:auto_box_middle')} (<code className="font-mono">/home/c_&lt;slug&gt;/public_html</code>) {t('AddDomainModal:auto_box_end')}
         </div>
 
-        {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
-        {basari && <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+        {hata && <div className="ta-form-error" role="alert">{hata}</div>}
+        {basari && <div className="ta-form-success" role="status">{basari}</div>}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="ta-form-actions">
           <button
             type="button"
             onClick={onKapat}
             disabled={yukleniyor}
-            className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded-md text-sm transition"
+            className="ta-secondary-button"
           >
             {t('common:cancel')}
           </button>
           <button
             type="submit"
             disabled={yukleniyor || !alanAdi.trim()}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 rounded-md text-sm font-medium transition"
+            className="ta-primary-button"
           >
             {yukleniyor ? t('AddDomainModal:provisioning') : t('AddDomainModal:add_domain')}
           </button>

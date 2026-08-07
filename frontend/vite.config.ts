@@ -22,5 +22,19 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Sık değişmeyen framework paketlerini uygulama/çeviri kodundan ayırır.
+        // Böylece küçük bir sayfa değişikliği React, router ve i18n önbelleğini
+        // geçersiz kılmaz; CodeMirror da yalnız editör kullanan rotalara kalır.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('/@codemirror/') || id.includes('/@uiw/react-codemirror/')) return 'editor-vendor'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-router') || id.includes('/scheduler/')) return 'react-vendor'
+          if (id.includes('/i18next/') || id.includes('/react-i18next/')) return 'i18n-vendor'
+          if (id.includes('/axios/') || id.includes('/zustand/')) return 'data-vendor'
+        },
+      },
+    },
   },
 })

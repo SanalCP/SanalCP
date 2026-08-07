@@ -44,7 +44,7 @@ export default function ToolPage() {
         )}
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-1">
-        {d ? <>{t('ToolPage:domain_prefix')} <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{d.alan_adi}</Link></> : t('ToolPage:loading')}
+        {d ? <>{t('ToolPage:domain_prefix')} <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{d.alan_adi}</Link></> : t('ToolPage:loading')}
       </p>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">{aciklama}</p>
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
@@ -59,7 +59,7 @@ export default function ToolPage() {
         <p className="text-sm text-slate-500 dark:text-slate-500">
           {faz ? t('ToolPage:wip_desc', { phase: <span className="font-mono text-brand-700 dark:text-brand-300">{faz}</span> }) : t('ToolPage:wip_desc_no_phase')}
         </p>
-        <Link to={`/abonelikler/${id}`} className="inline-block mt-4 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">
+        <Link to={`/abonelikler/${id}`} className="inline-block mt-4 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">
           {t('ToolPage:back_to_domain')}
         </Link>
       </div>

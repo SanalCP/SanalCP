@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import Modal from '@/components/Modal'
 
 type Surum = {
   surum: string; kod: string; kaynak: 'remi' | 'appstream'
@@ -88,10 +89,10 @@ export default function PHPSurumleriPage() {
 
       {/* Filtre */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500 mr-2">{t('PHPSurumleriPage:filter_label')}</span>
+        <span className="text-sm text-slate-600 dark:text-slate-400 mr-2">{t('PHPSurumleriPage:filter_label')}</span>
         {(['tumu', 'yuklu', 'yuklenebilir'] as const).map(f => (
           <button key={f} onClick={() => setFiltre(f)}
-            className={`px-3 py-1 text-sm rounded ${filtre === f ? 'bg-brand-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+            className={`px-3 py-1 text-sm rounded ${filtre === f ? 'bg-brand-600 text-white' : 'border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
             {f === 'tumu' ? t('PHPSurumleriPage:filter_all') : f === 'yuklu' ? t('PHPSurumleriPage:filter_installed', { count: yukluSayi }) : t('PHPSurumleriPage:filter_installable', { count: surumler.length - yukluSayi })}
           </button>
         ))}
@@ -123,7 +124,7 @@ export default function PHPSurumleriPage() {
                 {s.aciklama && <div className="text-xs text-slate-500 dark:text-slate-500 mb-2">{s.aciklama}</div>}
 
                 {s.yuklu && (
-                  <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 space-y-0.5 mb-3 font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 space-y-0.5 mb-3 font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2">
                     {s.gercek_surum && <div>{t('PHPSurumleriPage:version_label')} <span className="text-slate-900 dark:text-slate-100">{s.gercek_surum}</span></div>}
                     {s.modul_sayi !== undefined && <div>{t('PHPSurumleriPage:module_label')} <span className="text-slate-900 dark:text-slate-100">{s.modul_sayi}</span></div>}
                     {s.service && <div className="truncate">{t('PHPSurumleriPage:service_label')} <span className="text-slate-700 dark:text-slate-300">{s.service}</span></div>}
@@ -154,19 +155,12 @@ export default function PHPSurumleriPage() {
       )}
 
       {output && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOutput(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full shadow-xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{output.baslik}</h3>
-              <button onClick={() => setOutput(null)} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300">×</button>
-            </div>
-            <pre className="flex-1 overflow-auto p-3 bg-slate-900 text-slate-100 text-xs font-mono whitespace-pre-wrap">{output.output}</pre>
-            <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 text-right">
-              <button onClick={() => setOutput(null)}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('common:close')}</button>
-            </div>
+        <Modal acik baslik={output.baslik} onKapat={() => setOutput(null)} genislik="lg" kapatEtiketi={t('common:close')}>
+          <pre className="max-h-[58dvh] overflow-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-slate-100 whitespace-pre-wrap">{output.output}</pre>
+          <div className="mt-4 flex justify-end">
+            <button onClick={() => setOutput(null)} className="ta-primary-button">{t('common:close')}</button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

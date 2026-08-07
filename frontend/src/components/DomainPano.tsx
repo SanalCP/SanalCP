@@ -36,9 +36,12 @@ const ICONS = {
 
 function Grup({ baslik, children }: { baslik: string; children: React.ReactNode }) {
   return (
-    <section className="mb-5 last:mb-0">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-2">{baslik}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">{children}</div>
+    <section className="mb-7 last:mb-0">
+      <div className="mb-3 flex items-center gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{baslik}</h3>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">{children}</div>
     </section>
   )
 }

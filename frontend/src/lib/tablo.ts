@@ -25,7 +25,7 @@ export const T = {
   // Başlık satırı yalnız masaüstünde görünür; mobilde etiketi ::before taşıyor.
   baslikGrubu: 'hidden lg:table-header-group',
   baslik:
-    'px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider ' +
+    'px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.1em] ' +
     'text-slate-500 dark:text-slate-400',
 
   govde: 'block lg:table-row-group',
@@ -35,13 +35,13 @@ export const T = {
     'relative lg:static block lg:table-row mb-3 lg:mb-0 rounded-xl lg:rounded-none ' +
     'border border-slate-200 dark:border-slate-700 lg:border-0 ' +
     'lg:border-b lg:border-slate-100 dark:lg:border-slate-800 ' +
-    'bg-white dark:bg-slate-800 lg:bg-transparent dark:lg:bg-transparent ' +
-    'p-3 lg:p-0 shadow-sm lg:shadow-none',
+    'bg-white dark:bg-slate-900 lg:bg-transparent dark:lg:bg-transparent ' +
+    'p-4 lg:p-0 shadow-sm lg:shadow-none lg:hover:bg-brand-50/40 dark:lg:hover:bg-brand-500/5 transition-colors',
 
   // Normal hücre: mobilde "etiket ......... değer" satırı.
   hucre:
     'flex items-start justify-between gap-3 py-1.5 lg:table-cell ' +
-    'lg:px-3 lg:py-2.5 text-sm text-slate-700 dark:text-slate-300 ' +
+    'lg:px-4 lg:py-3.5 text-sm text-slate-700 dark:text-slate-300 ' +
     'before:shrink-0 before:text-[11px] ' +
     'before:font-semibold before:uppercase before:tracking-wider ' +
     'before:text-slate-400 dark:before:text-slate-500 before:pt-0.5 lg:before:hidden',

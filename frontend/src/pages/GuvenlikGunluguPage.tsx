@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
+import { T } from '@/lib/tablo'
 
 type Kayit = {
   id: number
@@ -136,30 +137,30 @@ export default function GuvenlikGunluguPage() {
       ) : suzulmus.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-400">{t('GuvenlikGunluguPage:no_search_results')}</div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-900/60">
+        <div className="lg:overflow-x-auto lg:rounded-xl lg:border lg:border-slate-200 dark:lg:border-slate-800">
+          <table className={T.tablo}>
+            <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900/60`}>
               <tr>
                 {[t('GuvenlikGunluguPage:col_time'), t('GuvenlikGunluguPage:col_result'), t('GuvenlikGunluguPage:col_action'), t('GuvenlikGunluguPage:col_user'), t('GuvenlikGunluguPage:col_ip'), t('GuvenlikGunluguPage:col_target')].map((b) => (
-                  <th key={b} className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <th key={b} className={`${T.baslik} whitespace-nowrap`}>
                     {b}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-950">
+            <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800 lg:bg-white dark:lg:bg-slate-950`}>
               {suzulmus.map((k) => (
-                <tr key={k.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition">
-                  <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-slate-500">{k.zaman}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
+                <tr key={k.id} className={T.satir}>
+                  <td className={`${T.hucreBaslik} font-mono text-xs text-slate-500`}>{k.zaman}</td>
+                  <td className={T.hucre} data-etiket={t('GuvenlikGunluguPage:col_result')}>
                     {k.basarili
                       ? <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{t('GuvenlikGunluguPage:result_success')}</span>
                       : <span className="px-2 py-0.5 rounded text-xs bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300">{t('GuvenlikGunluguPage:result_failed')}</span>}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{k.eylem}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{k.kullanici || <span className="text-slate-400">—</span>}</td>
-                  <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-slate-500">{k.ip || '—'}</td>
-                  <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{k.hedef || <span className="text-slate-400">—</span>}</td>
+                  <td className={`${T.hucre} font-mono text-xs`} data-etiket={t('GuvenlikGunluguPage:col_action')}>{k.eylem}</td>
+                  <td className={T.hucre} data-etiket={t('GuvenlikGunluguPage:col_user')}>{k.kullanici || <span className="text-slate-400">—</span>}</td>
+                  <td className={`${T.hucre} font-mono text-xs text-slate-500`} data-etiket={t('GuvenlikGunluguPage:col_ip')}>{k.ip || '—'}</td>
+                  <td className={T.hucre} data-etiket={t('GuvenlikGunluguPage:col_target')}><span className="break-all text-slate-600 dark:text-slate-400">{k.hedef || <span className="text-slate-400">—</span>}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.20",
-  "duyuru": "Alt alan adları: PHP sürümü artık sonradan değiştirilebiliyor (kendi PHP-FPM servisi olan hesaplarda sürüm ana domaine bağlıdır; bu durum artık açıkça belirtiliyor). Farklı PHP sürümü gerektiğinde alt alan adı yerine ayrı domain eklenmesi öneriliyor. Silme uyarısı nelerin kaldırılacağını tek tek yazıyor; silme artık SSL sertifikasını da temizliyor. Domain listesinde alt alan adlarının SSL durumu görünüyor.",
+  "son_surum": "0.5.21",
+  "duyuru": "TailAdmin esintili yeni arayüz: tam genişlikte sayfalar, light/dark tema logoları, responsive tablolar ve araç çubukları, erişilebilir ortak modal sistemi, standart form ve buton bileşenleri, mobil görünüm ve dark tema iyileştirmeleri. CodeMirror, çeviri paketleri ve vendor bağımlılıkları tembel yükleme ve kod bölme ile optimize edildi.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-06"
+  "yayin_tarihi": "2026-08-07"
 }

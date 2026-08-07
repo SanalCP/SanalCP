@@ -113,7 +113,7 @@ export default function DomainPHPPage() {
 
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainPHPPage:title')}</h1>
       {yanit && <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{yanit.alan_adi}</Link>
+        <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{yanit.alan_adi}</Link>
         {' · '}{t('DomainPHPPage:sk_label')} <code className="font-mono">{yanit.sk}</code>
       </p>}
 
@@ -138,7 +138,7 @@ export default function DomainPHPPage() {
                       className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-mono transition ${
                         sec
                           ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-slate-100 ring-1 ring-brand-300'
-                          : 'text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100 hover:bg-white dark:bg-slate-800/60'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:bg-slate-800/60'
                       }`}>
                       <span className="font-semibold">PHP {s.surum}</span>
                       {akt && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title={t('DomainPHPPage:active_dot_title')} />}
@@ -298,7 +298,7 @@ export default function DomainPHPPage() {
               <p className="text-xs text-slate-500 dark:text-slate-500">
                 {t('DomainPHPPage:modules_desc', { version: yanit.php_surum, count: yanit.moduller?.length || 0 })}
               </p>
-              <Link to="/araclar/php-modulleri" className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium whitespace-nowrap">
+              <Link to="/araclar/php-modulleri" className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium whitespace-nowrap">
                 {t('DomainPHPPage:manage_server_modules')}
               </Link>
             </div>
@@ -384,7 +384,7 @@ export default function DomainPHPPage() {
                                 {blokeli ? t('DomainPHPPage:blocked') : (karisik ? t('DomainPHPPage:mixed') : t('common:active'))}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-600 dark:text-slate-400 dark:text-slate-500 font-mono mt-0.5 break-all">
+                            <div className="text-[11px] text-slate-600 dark:text-slate-400 font-mono mt-0.5 break-all">
                               {g.fonk.join(', ')}
                             </div>
                           </div>
@@ -397,7 +397,7 @@ export default function DomainPHPPage() {
             })()}
 
             <details className="mt-4">
-              <summary className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100">{t('DomainPHPPage:manual_edit')}</summary>
+              <summary className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100">{t('DomainPHPPage:manual_edit')}</summary>
               <input value={a.disable_functions} onChange={e => P('disable_functions', e.target.value)}
                 className="w-full mt-2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono" />
               <p className="text-[11px] text-slate-500 dark:text-slate-500 mt-1">{t('DomainPHPPage:comma_separated')}</p>
@@ -442,7 +442,7 @@ function Kart({ baslik, children }: { baslik: string; children: any }) {
   )
 }
 function Grid({ children }: { children: any }) {
-  return <div className="grid grid-cols-2 gap-x-6 gap-y-3">{children}</div>
+  return <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">{children}</div>
 }
 function Etiket({ children }: { children: any }) {
   return <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">{children}</label>
@@ -487,7 +487,7 @@ function Bayrak({ etiket, yardim, value, onChange }: { etiket: string; yardim: s
   return (
     <Sec etiket={etiket} yardim={yardim}>
       <button onClick={() => onChange(!value)}
-        className={`px-3 py-2 rounded-md text-sm font-mono w-full text-left transition border ${value ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500'}`}>
+        className={`px-3 py-2 rounded-md text-sm font-mono w-full text-left transition border ${value ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
         {value ? '✓ On' : '○ Off'}
       </button>
     </Sec>
