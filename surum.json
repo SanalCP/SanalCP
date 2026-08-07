@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.25",
-  "duyuru": "AlmaLinux 9.8 üzerinde canlı kurulum testinde bulunan 2 sorun düzeltildi: install.sh artık eksikse tar'ı otomatik kuruyor; nginx vhost şablonları eski nginx 1.20 (AlmaLinux 9 AppStream) ile uyumlu 'listen ... http2;' söz dizimine geçti (standalone 'http2 on;' o sürümde tanınmıyordu).",
+  "son_surum": "0.5.26",
+  "duyuru": "AlmaLinux 9.8 canlı testinde bulunan 2 sorun daha düzeltildi: sanalcp-optimize'ın nginx tuning'i, AlmaLinux 9'un stok nginx.conf'unda zaten var olan tcp_nodelay ile çakışıp nginx -t'yi düşürüyordu. sanalcp-mail-setup, panelin zaten kurduğu Redis/Valkey'i kendi başına ikinci kez kurup restart etmeye çalışıyordu — AlmaLinux 9.8'de hem redis hem valkey paketi aynı anda mevcut olduğundan ikisi aynı 6379 portunda çakışıp posta altyapısını düşürüyordu; artık zaten çalışan instance paylaşılıyor. AlmaLinux 9.8'de uçtan uca canlı kurulum artık başarıyla tamamlanıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-07"
 }

@@ -173,10 +173,14 @@ grep -q 'multi_accept' "$NGINX_CONF" || sed -i '/worker_connections/a\    multi_
 # 2) http-seviyesi tuning (conf.d — http{} include'a girer; nginx.conf'ta OLMAYAN direktifler)
 # Not: client_max_body_size + types_hash_max_size nginx.conf http{}'de ZATEN tanımlı
 # (panel yönetir) → burada TEKRAR ETME, yoksa "duplicate directive" ile nginx -t patlar.
+# 🔴 tcp_nodelay de BURAYA EKLENMEZ: AlmaLinux 9'un stok nginx paketi (1.20.1)
+# nginx.conf'un http{} bloğuna bunu zaten yazıyor (AlmaLinux 10'un stok
+# nginx.conf'unda yok) — canlı AlmaLinux 9.8 testinde tam bu yüzden "duplicate
+# directive" ile nginx -t patladı. nginx'in kendi varsayılanı zaten "on" olduğu
+# için burada tekrar yazmaya hiç gerek yok.
 cat > "$NGX_PERF" <<'NGX'
 # SanalCP nginx performans tuning — otomatik üretildi. sanalcp-optimize ile yenile.
 server_tokens off;
-tcp_nodelay on;
 reset_timedout_connection on;
 keepalive_requests 1000;
 client_body_timeout 15s;
