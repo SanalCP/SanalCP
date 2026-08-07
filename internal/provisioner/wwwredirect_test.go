@@ -38,7 +38,7 @@ func TestWWWRedirectTmplSSLli(t *testing.T) {
 	if !strings.Contains(out, "location /.well-known/acme-challenge/") {
 		t.Errorf("acme-challenge location'ı eksik (LE yenilemesi kırılır):\n%s", out)
 	}
-	if !strings.Contains(out, "listen 443 ssl;") {
+	if !strings.Contains(out, "listen 443 ssl http2;") {
 		t.Errorf("SSL aktifken 443 bloğu eksik:\n%s", out)
 	}
 }

@@ -28,7 +28,15 @@ c_b="\033[1;34m"; c_g="\033[32m"; c_y="\033[33m"; c_r="\033[31m"; c_0="\033[0m"
 
 [ "$(id -u)" = 0 ] || { echo -e "${c_r}✗ root required:  curl ... | sudo bash${c_0}"; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo -e "${c_r}✗ curl required${c_0}"; exit 1; }
-command -v tar  >/dev/null 2>&1 || { echo -e "${c_r}✗ tar required${c_0}"; exit 1; }
+# 🔴 Some minimal cloud VPS templates (seen on a bare AlmaLinux 9.8 image) ship
+# without `tar` — everything else needed here (dnf, coreutils' sha256sum) is
+# always present on a RHEL-family base install, but tar apparently isn't
+# guaranteed. We already require root, so just install it instead of dying.
+command -v tar >/dev/null 2>&1 || {
+  echo -e "${c_y}! tar not found — installing it${c_0}"
+  dnf install -y tar >/dev/null 2>&1
+  command -v tar >/dev/null 2>&1 || { echo -e "${c_r}✗ tar required and could not be installed${c_0}"; exit 1; }
+}
 command -v sha256sum >/dev/null 2>&1 || { echo -e "${c_r}✗ sha256sum required${c_0}"; exit 1; }
 
 if [ "$REF" = "main" ]; then

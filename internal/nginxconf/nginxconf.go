@@ -41,6 +41,10 @@ const PanelConfYol = "/etc/nginx/conf.d/_panel.conf"
 var BilinenHashler = map[string]string{
 	// 0.5.5 – 0.5.9 arası değişmeden kalan sürüm (assets/nginx/_panel.conf).
 	"8455894d0e5f0fc47875bb9cdb53911220de1dfa1499c61519e109975bbd09f5": "0.5.5-0.5.9",
+	// 0.5.9 – 0.5.24 arası değişmeden kalan sürüm — standalone "http2 on;" nginx
+	// 1.20 (AlmaLinux 9 AppStream) tarafından tanınmıyordu ("unknown directive"),
+	// yerine listen satırlarına http2 parametresi eklendi (bkz. 0.5.25 duyurusu).
+	"5c92ea24317f08fdd48014ca46d09a3c05a20db12aec4785262d8363cc12056c": "0.5.9-0.5.24",
 }
 
 // Hash, verilen içeriğin sha256'sını onaltılık olarak döner.
