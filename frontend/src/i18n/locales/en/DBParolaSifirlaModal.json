@@ -1,0 +1,16 @@
+{
+  "reset_modal_title": "Reset Password — {{ad}}",
+  "reset_user_desc": "The password for user {{kullanici}} is updated in MariaDB and the panel at the same time.",
+  "custom_password_label": "Custom password (leave blank for random)",
+  "custom_password_placeholder": "At least 6 characters",
+  "custom_password_too_short": "Password must be at least 6 characters",
+  "reset_failed": "Password reset failed",
+  "cancel": "Cancel",
+  "set_this": "Set This",
+  "resetting": "Resetting…",
+  "generate_random": "Generate Random",
+  "password_updated": "✓ Password updated",
+  "password_updated_save": "Save this somewhere safe. You won't see it again:",
+  "copy": "Copy",
+  "ok": "OK"
+}

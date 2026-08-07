@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
 )
@@ -185,6 +186,7 @@ type DBSatir struct {
 	DBAdi     string `json:"db_adi"`
 	DBUser    string `json:"db_user"`
 	DBHost    string `json:"db_host"`
+	DBParola  string `json:"db_parola"`
 	BoyutKB   int64  `json:"boyut_kb"`
 	Olusturma string `json:"olusturma"`
 }
@@ -227,7 +229,7 @@ func dbBoyutlari() map[string]int64 {
 
 func (h *Handlers) Veritabanlari(w http.ResponseWriter, r *http.Request) {
 	q := `
-SELECT a.id, a.domain_id, d.alan_adi, a.db_name, a.db_user, a.db_host,
+SELECT a.id, a.domain_id, d.alan_adi, a.db_name, a.db_user, a.db_host, a.db_pass_plain,
        COALESCE(DATE_FORMAT(a.created_at, '%Y-%m-%d'), '')
 FROM db_accounts a
 JOIN domains d ON d.id = a.domain_id`
@@ -246,8 +248,11 @@ ORDER BY d.alan_adi, a.db_name`
 	out := make([]DBSatir, 0)
 	for rows.Next() {
 		var s DBSatir
-		if err := rows.Scan(&s.ID, &s.DomainID, &s.AlanAdi, &s.DBAdi, &s.DBUser, &s.DBHost, &s.Olusturma); err != nil {
+		if err := rows.Scan(&s.ID, &s.DomainID, &s.AlanAdi, &s.DBAdi, &s.DBUser, &s.DBHost, &s.DBParola, &s.Olusturma); err != nil {
 			continue
+		}
+		if dec, err := hesaplar.DecryptDBPassword(s.DBParola); err == nil {
+			s.DBParola = dec
 		}
 		out = append(out, s)
 	}

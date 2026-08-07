@@ -34,8 +34,7 @@ export default function LoginPage() {
     fetch('/healthz').then(r => r.json()).then(d => { if (d?.surum) setSurum(d.surum) }).catch(() => {})
   }, [])
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function girisYap() {
     setHata(null); setYukleniyor(true)
     try {
       const { data } = await api.post<LoginResp>('/auth/login', { kullanici, parola, kod })
@@ -52,20 +51,25 @@ export default function LoginPage() {
     }
   }
 
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    void girisYap()
+  }
+
+  // 2FA kodu 6 haneye ulaşınca elle "Giriş"e basmaya gerek kalmadan otomatik gönder.
+  useEffect(() => {
+    if (ikiFa && kod.length === 6 && !yukleniyor) void girisYap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kod, ikiFa])
+
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-orange-50 dark:from-slate-950 dark:to-slate-900 px-4">
       <LanguageSwitcher className="absolute top-4 right-4 px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/60 rounded-md transition" />
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
-            <svg viewBox="0 0 32 32" className="w-7 h-7 text-white" fill="currentColor">
-              <path d="M9 10h14v3H9zM9 15h14v3H9zM9 20h9v3H9z" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">SanalCP</div>
-            <div className="text-xs text-slate-500 dark:text-slate-500">{t('LoginPage:subtitle')}</div>
-          </div>
+        <div className="flex flex-col items-center justify-center mb-8">
+          <img src="/brand/sanalcp-logo-light.png" alt="SanalCP" className="h-14 w-auto max-w-[220px] object-contain dark:hidden" />
+          <img src="/brand/sanalcp-logo-dark.png" alt="SanalCP" className="hidden h-14 w-auto max-w-[220px] object-contain dark:block" />
+          <div className="text-xs text-slate-500 dark:text-slate-500 mt-2">{t('LoginPage:subtitle')}</div>
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700/60 p-8">
