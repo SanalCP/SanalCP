@@ -317,6 +317,9 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", usersH.Me)
+			// Footer sürüm bilgisi: her rol (müşteri dahil) erişebilsin —
+			// dış güncelleme/duyuru verisi taşımaz, bkz. system.SurumBilgi.
+			r.Get("/system/surum", system.SurumBilgi)
 			// Kendi hesabı — her panel kullanıcısı (admin + bayi) kendi profilini,
 			// parolasını ve 2FA'sını yönetir. Kapsam sorusu yok: hedef daima
 			// token'daki kullanıcının kendisi.
