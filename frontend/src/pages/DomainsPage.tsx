@@ -498,7 +498,7 @@ export default function DomainsPage() {
                       </td>
                       <td className={T.hucreBaslikSecimli}>
                         <span className="inline-flex items-center gap-1.5">
-                          <Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">
+                          <Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">
                             {d.alan_adi}
                           </Link>
                           <a
@@ -523,7 +523,7 @@ export default function DomainsPage() {
                         {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">{t('DomainsPage:table.demo')}</span>}
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.system_user')}>
-                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.sistem_kullanici}</span>
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{d.sistem_kullanici}</span>
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.reseller')}>
                         {d.bayi_adi ? (
@@ -539,10 +539,10 @@ export default function DomainsPage() {
                         {d.plan_ad ? <span className="text-slate-700 dark:text-slate-300">{d.plan_ad}</span> : <span className="text-slate-400 dark:text-slate-500 italic">—</span>}
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.php')}>
-                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{d.php_surum || '-'}</span>
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{d.php_surum || '-'}</span>
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.disk')}>
-                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{fmtKB(d.boyut_kb)}</span>
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{fmtKB(d.boyut_kb)}</span>
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.status')}>
                         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-semibold ${
@@ -550,11 +550,11 @@ export default function DomainsPage() {
                         }`}>{d.durum === 'aktif' ? t('common:active') : t('common:inactive')}</span>
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.created')}>
-                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">{d.olusturulma || '-'}</span>
+                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{d.olusturulma || '-'}</span>
                       </td>
                       <td className={`${T.hucreAksiyon} lg:text-right`}>
                         <Link to={`/abonelikler/${d.id}/subdomainler`} className="text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 lg:mr-3">{t('DomainsPage:table.add_subdomain')}</Link>
-                        <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('DomainsPage:table.manage')}</Link>
+                        <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300">{t('DomainsPage:table.manage')}</Link>
                       </td>
                     </tr>
 
@@ -604,9 +604,8 @@ export default function DomainsPage() {
 
       {/* Domain Oluştur Modal */}
       {olusturAcik && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !olusturuluyor && setOlusturAcik(false)}>
-          <form onSubmit={olusturGonder} className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainsPage:create_modal.title')}</h3>
+        <Modal acik baslik={t('DomainsPage:create_modal.title')} onKapat={() => { if (!olusturuluyor) setOlusturAcik(false) }} genislik="lg" kapatEtiketi={t('common:cancel')}>
+          <form onSubmit={olusturGonder}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
               {t('DomainsPage:create_modal.desc')}
             </p>
@@ -619,7 +618,7 @@ export default function DomainsPage() {
                   kullanıcı/parola orada sorulur, otomatik üretilmez). */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">{t('DomainsPage:create_modal.type_label')}</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {([
                     ['php', '🐘', t('DomainsPage:create_modal.type_php'), t('DomainsPage:create_modal.type_php_desc')],
                     ['wordpress', '📝', t('DomainsPage:create_modal.type_wordpress'), t('DomainsPage:create_modal.type_wordpress_desc')],
@@ -641,7 +640,7 @@ export default function DomainsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainsPage:create_modal.domain_label')} <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainsPage:create_modal.domain_label')} <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={fAlanAdi}
@@ -656,7 +655,7 @@ export default function DomainsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                   {t('DomainsPage:create_modal.php_label')}
                   {modalVeriYuk && phpSurumler.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">{t('common:loading')}</span>}
                 </label>
@@ -676,7 +675,7 @@ export default function DomainsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                   {t('DomainsPage:create_modal.plan_label')}
                   {modalVeriYuk && planlar.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">{t('common:loading')}</span>}
                 </label>
@@ -774,14 +773,12 @@ export default function DomainsPage() {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {/* Oluşturma Sonucu Modal (FTP + DB parolaları) */}
       {olusturmaSonuc && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOlusturmaSonuc(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-emerald-700 dark:text-emerald-300 mb-1">{t('DomainsPage:result_modal.title')}</h3>
+        <Modal acik baslik={t('DomainsPage:result_modal.title')} onKapat={() => setOlusturmaSonuc(null)} genislik="lg" kapatEtiketi={t('common:close')}>
             <p className="text-xs text-slate-500 dark:text-slate-500 mb-4">
               <span className="font-mono text-slate-700 dark:text-slate-300">{olusturmaSonuc.alan_adi}</span>{t('DomainsPage:result_modal.desc_before')}<strong>{t('DomainsPage:result_modal.desc_strong')}</strong>{t('DomainsPage:result_modal.desc_after')}
             </p>
@@ -831,8 +828,7 @@ export default function DomainsPage() {
               <button onClick={() => setOlusturmaSonuc(null)}
                 className="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-sm rounded">{t('common:ok')}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Toplu Sil Onay */}
@@ -842,9 +838,7 @@ export default function DomainsPage() {
         const beklenenMetin = tekDomain || t('DomainsPage:delete_modal.confirm_word')
         const silOnaylandi = silOnayMetin === beklenenMetin
         return (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setSilOnay(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-red-700 dark:text-red-300 mb-2">{t('DomainsPage:delete_modal.title')}</h3>
+        <Modal acik baslik={t('DomainsPage:delete_modal.title')} onKapat={() => setSilOnay(false)} kapatEtiketi={t('common:cancel')}>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-3">
               {t('DomainsPage:delete_modal.desc', { count: secili.size })}
             </p>
@@ -877,8 +871,7 @@ export default function DomainsPage() {
                 {t('DomainsPage:delete_modal.confirm_yes')}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
         )
       })()}
 
@@ -939,7 +932,7 @@ function KopyaSatir({ e, v, kopyala, parola }: { e: string; v: string; kopyala: 
       </code>
       {parola && (
         <button type="button" onClick={() => setAcik(s => !s)}
-          className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">
+          className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">
           {acik ? t('DomainsPage:result_modal.hide') : t('DomainsPage:result_modal.show')}
         </button>
       )}

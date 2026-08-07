@@ -80,9 +80,9 @@ export default function DomainCronPage() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainCronPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-6">
-          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+          <Link to={`/abonelikler/${id}`} className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">{domain.alan_adi}</Link>
           {' · '}
-          <span className="font-mono text-slate-600 dark:text-slate-400 dark:text-slate-500">/var/spool/cron/{domain.sistem_kullanici}</span>
+          <span className="font-mono text-slate-600 dark:text-slate-400">/var/spool/cron/{domain.sistem_kullanici}</span>
         </p>
       )}
 
@@ -96,7 +96,7 @@ export default function DomainCronPage() {
           </svg>
           {t('DomainCronPage:addTask')}
         </button>
-        <button onClick={yukle} className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md transition">{t('DomainCronPage:refresh')}</button>
+        <button onClick={yukle} className="ta-secondary-button">{t('DomainCronPage:refresh')}</button>
         <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{t('DomainCronPage:taskCount', { count: gorevler.length })}</span>
       </div>
 
@@ -207,43 +207,43 @@ function CronEkleModal({ acik, onKapat, onEklendi, domainId }: {
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <Alan etiket={t('DomainCronPage:modal.minute')} value={dakika} onChange={setDakika} />
           <Alan etiket={t('DomainCronPage:modal.hour')}   value={saat}   onChange={setSaat} />
           <Alan etiket={t('DomainCronPage:modal.day')}    value={gun}    onChange={setGun} />
           <Alan etiket={t('DomainCronPage:modal.month')}  value={ay}     onChange={setAy} />
           <Alan etiket={t('DomainCronPage:modal.week')}   value={hafta}  onChange={setHafta} />
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-500">{t('DomainCronPage:modal.cronHint')}</p>
+        <p className="ta-hint">{t('DomainCronPage:modal.cronHint')}</p>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('DomainCronPage:modal.commandLabel')}</label>
+          <label className="ta-label">{t('DomainCronPage:modal.commandLabel')}</label>
           <input
             type="text"
             value={komut}
             onChange={e => setKomut(e.target.value)}
             placeholder={t('DomainCronPage:modal.commandPlaceholder')}
             required
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm font-mono"
+            className="ta-input w-full font-mono"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t('DomainCronPage:modal.descLabel')}</label>
+          <label className="ta-label">{t('DomainCronPage:modal.descLabel')}</label>
           <input
             type="text"
             value={yorum}
             onChange={e => setYorum(e.target.value)}
             placeholder={t('DomainCronPage:modal.descPlaceholder')}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm"
+            className="ta-input w-full"
           />
         </div>
 
-        {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
+        {hata && <div className="ta-form-error" role="alert">{hata}</div>}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onKapat} disabled={isleniyor} className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded-md text-sm">{t('common:cancel')}</button>
-          <button type="submit" disabled={isleniyor || !komut.trim()} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-md">
+        <div className="ta-form-actions">
+          <button type="button" onClick={onKapat} disabled={isleniyor} className="ta-secondary-button">{t('common:cancel')}</button>
+          <button type="submit" disabled={isleniyor || !komut.trim()} className="ta-primary-button">
             {isleniyor ? t('DomainCronPage:modal.adding') : t('DomainCronPage:modal.add')}
           </button>
         </div>
@@ -255,12 +255,12 @@ function CronEkleModal({ acik, onKapat, onEklendi, domainId }: {
 function Alan({ etiket, value, onChange }: { etiket: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{etiket}</label>
+      <label className="ta-label-sm">{etiket}</label>
       <input
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
+        className="ta-input ta-input-sm w-full font-mono"
       />
     </div>
   )

@@ -5,6 +5,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import Modal from '@/components/Modal'
 
 function panoYaz(text: string, promptMesaj: string): boolean {
   // 1) Modern API (HTTPS / localhost only) — kullanıcı gesture içindeyse async ok
@@ -85,7 +86,7 @@ export default function DomainConnectionPage() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainConnectionPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
           {' · '}<span className="text-xs text-slate-400 dark:text-slate-500">{t('DomainConnectionPage:click_to_copy_hint')}</span>
         </p>
       )}
@@ -99,7 +100,7 @@ export default function DomainConnectionPage() {
             <Sat e={t('DomainConnectionPage:username')} d={domain.ftp_user} onKopya={kopyala} kopya={kopya} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="ftp" onAc={() => setParolaModal({ tip: 'ftp' })} />
             <Sat e={t('DomainConnectionPage:home_dir')} d={`/home/${domain.sistem_kullanici}`} onKopya={kopyala} kopya={kopya} mono />
-            <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:ftp_manage_link')}</Link>
+            <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:ftp_manage_link')}</Link>
           </Kart>
 
           <Kart baslik={t('DomainConnectionPage:mysql_mariadb')} renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
@@ -108,7 +109,7 @@ export default function DomainConnectionPage() {
             <Sat e={t('DomainConnectionPage:database')} d={domain.db_adi} onKopya={kopyala} kopya={kopya} mono />
             <Sat e={t('DomainConnectionPage:username')} d={domain.db_user} onKopya={kopyala} kopya={kopya} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="db" onAc={() => setParolaModal({ tip: 'db' })} />
-            <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:db_manage_link')}</Link>
+            <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:db_manage_link')}</Link>
           </Kart>
 
           <Kart baslik={t('DomainConnectionPage:web')} renk="amber" ikon="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" cift>
@@ -262,13 +263,8 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
   const tipAd = tip === 'ftp' ? t('DomainConnectionPage:ftp_password_title') : t('DomainConnectionPage:db_password_title')
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onKapat}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-5 shadow-xl" onClick={ev => ev.stopPropagation()}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-2xl">🔑</span>
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{tipAd}</h3>
-        </div>
-        <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-4 bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
+    <Modal acik baslik={tipAd} onKapat={onKapat} kapatEtiketi={t('common:close')}>
+        <div className="text-xs text-slate-600 dark:text-slate-400 mb-4 bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded">
           <span className="text-slate-500 dark:text-slate-500">{t('DomainConnectionPage:user_label')}</span> <code className="font-mono text-slate-900 dark:text-slate-100">{user}</code>
         </div>
 
@@ -317,8 +313,7 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
             {isleniyor ? t('DomainConnectionPage:generating') : (yeni ? t('DomainConnectionPage:regenerate') : t('DomainConnectionPage:generate_new'))}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

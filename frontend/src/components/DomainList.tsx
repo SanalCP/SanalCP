@@ -35,14 +35,14 @@ export default function DomainList({
 }) {
   const { t } = useTranslation(['DomainList', 'common'])
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+    <div className="ta-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
           {t('DomainList:title')} {!yukleniyor && <span className="text-slate-400 dark:text-slate-500 font-normal">({items.length})</span>}
         </h3>
         <button
           type="button"
-          className="text-xs px-2 py-1 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded font-medium shadow-sm transition"
+          className="text-xs px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-semibold shadow-sm shadow-brand-500/20 transition disabled:opacity-60"
           title={t('DomainList:add_domain_hint')}
           disabled
         >
@@ -65,7 +65,7 @@ export default function DomainList({
                 type="button"
                 onClick={() => onSec(d.id)}
                 className={`w-full text-left px-4 py-3 transition ${
-                  sec ? 'bg-brand-50 dark:bg-brand-900/20 border-l-4 border-brand-500 pl-3' : 'hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border-l-4 border-transparent'
+                  sec ? 'bg-brand-50 dark:bg-brand-500/10 border-l-4 border-brand-500 pl-3' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 border-l-4 border-transparent'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -76,7 +76,7 @@ export default function DomainList({
                     className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider flex-shrink-0 ${
                       d.durum === 'aktif'
                         ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-slate-200 text-slate-600 dark:text-slate-400 dark:text-slate-500'
+                        : 'bg-slate-200 text-slate-600 dark:text-slate-400'
                     }`}
                   >
                     {d.durum === 'aktif' ? t('common:active') : d.durum === 'pasif' ? t('common:inactive') : d.durum}

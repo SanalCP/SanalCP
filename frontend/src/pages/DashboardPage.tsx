@@ -39,18 +39,19 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="w-full px-6 py-5">
-      <div className="mb-5 flex items-baseline justify-between">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-7">
+      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t('DashboardPage:title')}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-500 mt-0.5">
+          <div className="ta-eyebrow mb-2">SanalCP Overview</div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t('DashboardPage:title')}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
             {t('DashboardPage:welcome')} <span className="text-slate-700 dark:text-slate-300 font-medium">{kullanici?.ad_soyad || kullanici?.adi}</span>
           </p>
         </div>
         {secili && (
-          <div className="text-right text-xs text-slate-500 dark:text-slate-500">
+          <div className="ta-card px-4 py-3 text-left sm:text-right text-xs text-slate-500 dark:text-slate-400">
             <span className="block">{t('DashboardPage:selected_domain')}</span>
-            <span className="text-brand-700 dark:text-brand-300 font-mono font-semibold text-sm">{secili.alan_adi}</span>
+            <span className="text-brand-600 dark:text-brand-300 font-mono font-semibold text-sm">{secili.alan_adi}</span>
           </div>
         )}
       </div>
@@ -61,7 +62,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-12 gap-6">
         <aside className="col-span-12 lg:col-span-3">
           <DomainList items={domainler} seciliId={secili?.id} onSec={secimYap} yukleniyor={yukleniyor} />
         </aside>

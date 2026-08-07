@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import Modal from '@/components/Modal'
 
 type Paket = {
   adi: string; surum?: string; aciklama?: string;
@@ -219,11 +220,11 @@ export default function PaketlerPage() {
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">
           <button onClick={() => { setSekme('ara'); setSonuc([]); setArandi(false) }}
-            className={`px-3 py-1.5 text-sm rounded ${sekme === 'ara' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded ${sekme === 'ara' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
             {t('PaketlerPage:search.tab_repo')}
           </button>
           <button onClick={() => { setSekme('kurulu'); setSonuc([]); setArandi(false) }}
-            className={`px-3 py-1.5 text-sm rounded ${sekme === 'kurulu' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+            className={`px-3 py-1.5 text-sm rounded ${sekme === 'kurulu' ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
             {t('PaketlerPage:search.tab_installed')}
           </button>
         </div>
@@ -256,7 +257,7 @@ export default function PaketlerPage() {
                     {p.kurulu && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium">{t('PaketlerPage:installed_badge')}</span>}
                     {p.korunan && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-medium">{t('PaketlerPage:protected_badge')}</span>}
                   </div>
-                  {p.aciklama && <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 truncate">{p.aciklama}</div>}
+                  {p.aciklama && <div className="text-xs text-slate-600 dark:text-slate-400 truncate">{p.aciklama}</div>}
                 </div>
                 {p.kurulu ? (
                   <button onClick={() => kaldir(p.adi)}
@@ -278,19 +279,12 @@ export default function PaketlerPage() {
       </div>
 
       {outputModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setOutputModal(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full shadow-xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{outputModal.baslik}</h3>
-              <button onClick={() => setOutputModal(null)} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 dark:text-slate-300">×</button>
-            </div>
-            <pre className="flex-1 overflow-auto p-3 bg-slate-900 text-slate-100 text-xs font-mono whitespace-pre-wrap">{outputModal.output}</pre>
-            <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 text-right">
-              <button onClick={() => setOutputModal(null)}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded">{t('PaketlerPage:output_modal.close')}</button>
-            </div>
+        <Modal acik baslik={outputModal.baslik} onKapat={() => setOutputModal(null)} genislik="lg" kapatEtiketi={t('PaketlerPage:output_modal.close')}>
+          <pre className="max-h-[58dvh] overflow-auto rounded-xl bg-slate-950 p-4 font-mono text-xs text-slate-100 whitespace-pre-wrap">{outputModal.output}</pre>
+          <div className="mt-4 flex justify-end">
+            <button onClick={() => setOutputModal(null)} className="ta-primary-button">{t('PaketlerPage:output_modal.close')}</button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

@@ -37,7 +37,7 @@ export default function ResourceCard() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+      <div className="ta-card p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center justify-between">
           {t('ResourceCard:resource_usage')}
           {u && <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t('ResourceCard:live')}</span>}
@@ -73,7 +73,7 @@ export default function ResourceCard() {
         )}
       </div>
 
-      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+      <div className="ta-card p-5">
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('ResourceCard:system_status')}</h3>
         {!s ? (
           <div className="text-sm text-slate-400 dark:text-slate-500">{t('ResourceCard:waiting')}</div>
@@ -117,7 +117,7 @@ function Cubuk({ etiket, yuzde, alt, renk }: { etiket: string; yuzde: number; al
 function Satir({ etiket, deger, ok }: { etiket: string; deger: string; ok: boolean }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-600 dark:text-slate-400 dark:text-slate-500">{etiket}</span>
+      <span className="text-slate-600 dark:text-slate-400">{etiket}</span>
       <span className={`font-medium flex items-center gap-1.5 ${ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
         {deger}

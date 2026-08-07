@@ -194,9 +194,9 @@ function SunucuIzleme() {
       <Kart baslik={t('IzlemePage:server.processes_title')} sag={
         <div className="flex items-center gap-1">
           <button onClick={() => setProcSort('cpu')}
-            className={`text-[11px] px-2 py-1 rounded ${procSort === 'cpu' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-200'}`}>{t('IzlemePage:server.table.cpu')}</button>
+            className={`text-[11px] px-2 py-1 rounded ${procSort === 'cpu' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}>{t('IzlemePage:server.table.cpu')}</button>
           <button onClick={() => setProcSort('mem')}
-            className={`text-[11px] px-2 py-1 rounded ${procSort === 'mem' ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-200'}`}>{t('IzlemePage:server.snap.mem')}</button>
+            className={`text-[11px] px-2 py-1 rounded ${procSort === 'mem' ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}>{t('IzlemePage:server.snap.mem')}</button>
         </div>
       }>
         <div className="lg:overflow-x-auto">
@@ -216,13 +216,13 @@ function SunucuIzleme() {
               )}
               {procs.map(p => (
                 <tr key={p.pid} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800`}>
-                  <td className={T.hucre} data-etiket="PID"><span className="font-mono text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{p.pid}</span></td>
+                  <td className={T.hucre} data-etiket="PID"><span className="font-mono text-xs text-slate-600 dark:text-slate-400">{p.pid}</span></td>
                   <td className={T.hucreBaslik}><span className="font-mono text-xs lg:text-xs text-base truncate max-w-[160px] inline-block align-bottom">{p.user}</span></td>
                   <td className={T.hucre} data-etiket="CPU%">
-                    <span className={`font-mono text-xs ${p.cpu_yuzde >= 50 ? 'text-red-600 dark:text-red-400 font-semibold' : p.cpu_yuzde >= 20 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400 dark:text-slate-500'}`}>{p.cpu_yuzde.toFixed(1)}</span>
+                    <span className={`font-mono text-xs ${p.cpu_yuzde >= 50 ? 'text-red-600 dark:text-red-400 font-semibold' : p.cpu_yuzde >= 20 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>{p.cpu_yuzde.toFixed(1)}</span>
                   </td>
                   <td className={T.hucre} data-etiket="MEM%">
-                    <span className={`font-mono text-xs ${p.mem_yuzde >= 30 ? 'text-red-600 dark:text-red-400 font-semibold' : p.mem_yuzde >= 10 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400 dark:text-slate-500'}`}>{p.mem_yuzde.toFixed(1)}</span>
+                    <span className={`font-mono text-xs ${p.mem_yuzde >= 30 ? 'text-red-600 dark:text-red-400 font-semibold' : p.mem_yuzde >= 10 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>{p.mem_yuzde.toFixed(1)}</span>
                   </td>
                   <td className={T.hucre} data-etiket="Komut">
                     <span className="font-mono text-xs text-slate-800 dark:text-slate-200 truncate max-w-md" title={p.komut}>{p.komut}</span>
@@ -308,7 +308,7 @@ function DomainIzleme() {
           )}
           {seciliDomain && (
             <a href={`https://${seciliDomain.alan_adi}`} target="_blank" rel="noreferrer"
-              className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300">{t('IzlemePage:domain.open_site')}</a>
+              className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300">{t('IzlemePage:domain.open_site')}</a>
           )}
         </div>
       </Kart>
@@ -450,7 +450,7 @@ function Snap({ baslik, deger, alt, renk }: { baslik: string; deger: string; alt
   )
 }
 function Lej({ renk, et }: { renk: string; et: string }) {
-  return <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 dark:text-slate-500"><span className={`w-3 h-3 rounded ${renk}`}></span>{et}</span>
+  return <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400"><span className={`w-3 h-3 rounded ${renk}`}></span>{et}</span>
 }
 
 function CokSeriliGrafik({
@@ -503,7 +503,7 @@ function SaglikKart({ h }: { h: Health }) {
       <div className="text-3xl font-bold font-mono mt-1">
         {h.durum_kodu > 0 ? h.durum_kodu : '—'}
       </div>
-      <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500 mt-1 truncate" title={h.url}>{h.url}</div>
+      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 truncate" title={h.url}>{h.url}</div>
       {h.hata && <div className="mt-2 text-[11px] text-red-700 dark:text-red-300 break-words">{h.hata}</div>}
       {h.server && <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-500">{t('IzlemePage:domain.health.server_label')} <span className="font-mono">{h.server}</span></div>}
     </div>
@@ -515,7 +515,7 @@ function SSLKart({ ssl, sema }: { ssl?: SSLBilgi; sema: string }) {
     return (
       <div className="rounded-2xl p-4 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
         <div className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">{t('IzlemePage:domain.ssl.no_ssl_title')}</div>
-        <div className="text-xs text-slate-600 dark:text-slate-400 dark:text-slate-500">{t('IzlemePage:domain.ssl.no_ssl_desc')}</div>
+        <div className="text-xs text-slate-600 dark:text-slate-400">{t('IzlemePage:domain.ssl.no_ssl_desc')}</div>
       </div>
     )
   }

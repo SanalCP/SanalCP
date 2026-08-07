@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import Modal from '@/components/Modal'
 
 type Kurulum = { dizin: string; site_url: string; admin_url: string; surum: string }
 type Sonuc = { site_url: string; admin_url: string; admin_kullanici: string; admin_parola: string; surum: string }
@@ -458,17 +459,14 @@ function Satir({ et, v, mono, link }: { et: string; v: string; mono?: boolean; l
 
 function ParolaModal({ s, kapat, t }: { s: { kullanici: string; parola: string }; kapat: () => void; t: (k: string) => string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4" onClick={kapat}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainWordPressPage:password_modal_title')}</div>
+    <Modal acik baslik={t('DomainWordPressPage:password_modal_title')} onKapat={kapat} genislik="sm" kapatEtiketi={t('DomainWordPressPage:ok')}>
         <div className="text-xs text-slate-400 mb-4">{t('DomainWordPressPage:password_modal_user_label')} <span className="font-mono text-slate-600 dark:text-slate-300">{s.kullanici}</span></div>
         <div className="flex items-center gap-2">
           <code className="flex-1 px-3.5 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm font-mono text-slate-800 dark:text-slate-100 break-all border border-slate-100 dark:border-slate-700">{s.parola}</code>
           <button onClick={() => navigator.clipboard?.writeText(s.parola)} className="text-xs px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">{t('DomainWordPressPage:copy')}</button>
         </div>
         <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">{t('DomainWordPressPage:password_modal_warning')}</p>
-        <button onClick={kapat} className="mt-5 w-full py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium hover:bg-slate-800 dark:hover:bg-slate-100 transition">{t('DomainWordPressPage:ok')}</button>
-      </div>
-    </div>
+        <button onClick={kapat} className="ta-primary-button mt-5 w-full">{t('DomainWordPressPage:ok')}</button>
+    </Modal>
   )
 }

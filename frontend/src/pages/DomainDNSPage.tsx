@@ -178,7 +178,7 @@ export default function DomainDNSPage() {
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainDNSPage:title')}</h1>
       {domain && (
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
-          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
+          <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
           {' · '}{t('DomainDNSPage:ip_label')} <span className="font-mono">{domain.ipv4}</span>
         </p>
       )}
@@ -330,12 +330,12 @@ export default function DomainDNSPage() {
         </button>
         <button
           onClick={sablonUygula}
-          className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md transition"
+          className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md transition"
           title={t('DomainDNSPage:actions.apply_template_tooltip')}
         >
           {t('DomainDNSPage:actions.apply_template')}
         </button>
-        <button onClick={yukle} className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md transition">{t('DomainDNSPage:actions.refresh')}</button>
+        <button onClick={yukle} className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md transition">{t('DomainDNSPage:actions.refresh')}</button>
         <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{t('DomainDNSPage:actions.record_count', { count: kayitlar.length })}</span>
       </div>
 
@@ -394,8 +394,8 @@ export default function DomainDNSPage() {
                     <span className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded font-mono font-semibold">{k.tip}</span>
                   </td>
                   <td className={T.hucre} data-etiket={t('DomainDNSPage:table.value')}><span className="font-mono text-sm text-slate-800 dark:text-slate-200 break-all">{k.deger}</span></td>
-                  <td className={T.hucre} data-etiket={t('DomainDNSPage:table.ttl')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{k.ttl}</span></td>
-                  <td className={T.hucre} data-etiket={t('DomainDNSPage:table.priority')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500">{k.tip === 'MX' || k.tip === 'SRV' ? k.oncelik : '—'}</span></td>
+                  <td className={T.hucre} data-etiket={t('DomainDNSPage:table.ttl')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{k.ttl}</span></td>
+                  <td className={T.hucre} data-etiket={t('DomainDNSPage:table.priority')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{k.tip === 'MX' || k.tip === 'SRV' ? k.oncelik : '—'}</span></td>
                   <td className={T.hucre} data-etiket={t('common:status')}>
                     {k.aktif ? (
                       <span className="text-xs text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{t('common:active')}</span>
@@ -404,7 +404,7 @@ export default function DomainDNSPage() {
                     )}
                   </td>
                   <td className={T.hucreAksiyon}>
-                    <button onClick={() => setDuzenle(k)} className="text-sm text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 dark:text-slate-100 px-2 py-1 rounded hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800">{t('common:edit')}</button>
+                    <button onClick={() => setDuzenle(k)} className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-800">{t('common:edit')}</button>
                     <button onClick={() => setSilinecek(k)} className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20">{t('common:delete')}</button>
                   </td>
                 </tr>
@@ -493,15 +493,15 @@ function KayitModal({ mevcut, domainId, ipv4, onKapat, onKayit }: {
   return (
     <Modal acik={true} baslik={yeni ? t('DomainDNSPage:modal.new_title') : t('DomainDNSPage:modal.edit_title')} onKapat={onKapat} genislik="md">
       <form onSubmit={gonder} className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDNSPage:modal.name_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDNSPage:modal.name_label')}</label>
             <input type="text" value={form.ad} onChange={e => setForm({ ...form, ad: e.target.value })} required
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
             <p className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">{t('DomainDNSPage:modal.name_hint')}</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDNSPage:modal.type_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDNSPage:modal.type_label')}</label>
             <select value={form.tip} onChange={e => { const tip = e.target.value; setForm(f => ({ ...f, tip, oncelik: (tip === 'MX' || tip === 'SRV') ? (f.oncelik || 10) : 0 })) }}
               className="w-full px-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-white dark:bg-slate-800">
               {TIPLER.map(tp => <option key={tp} value={tp}>{tp}</option>)}
@@ -510,21 +510,21 @@ function KayitModal({ mevcut, domainId, ipv4, onKapat, onKayit }: {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDNSPage:modal.value_label')}</label>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDNSPage:modal.value_label')}</label>
           <input type="text" value={form.deger} onChange={e => setForm({ ...form, deger: e.target.value })} required
             className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
           {t(`DomainDNSPage:value_hints.${form.tip}`, { defaultValue: '' }) && <p className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">{t(`DomainDNSPage:value_hints.${form.tip}`)}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDNSPage:modal.ttl_label')}</label>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDNSPage:modal.ttl_label')}</label>
             <input type="number" min={60} value={form.ttl} onChange={e => setForm({ ...form, ttl: parseInt(e.target.value) || 3600 })}
               className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono" />
           </div>
           {(form.tip === 'MX' || form.tip === 'SRV') && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1">{t('DomainDNSPage:modal.priority_label')}</label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDNSPage:modal.priority_label')}</label>
               <input type="number" min={0} value={form.oncelik} onChange={e => setForm({ ...form, oncelik: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono" />
             </div>
