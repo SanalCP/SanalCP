@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.26",
-  "duyuru": "AlmaLinux 9.8 canlı testinde bulunan 2 sorun daha düzeltildi: sanalcp-optimize'ın nginx tuning'i, AlmaLinux 9'un stok nginx.conf'unda zaten var olan tcp_nodelay ile çakışıp nginx -t'yi düşürüyordu. sanalcp-mail-setup, panelin zaten kurduğu Redis/Valkey'i kendi başına ikinci kez kurup restart etmeye çalışıyordu — AlmaLinux 9.8'de hem redis hem valkey paketi aynı anda mevcut olduğundan ikisi aynı 6379 portunda çakışıp posta altyapısını düşürüyordu; artık zaten çalışan instance paylaşılıyor. AlmaLinux 9.8'de uçtan uca canlı kurulum artık başarıyla tamamlanıyor.",
+  "son_surum": "0.5.27",
+  "duyuru": "AlmaLinux 9.8'de reboot sonrası panele erişilemiyor sorunu düzeltildi: bazı minimal AlmaLinux 9 imajlarında firewalld varsayılan aktif geliyor ve SanalCP'nin kendi nftables güvenlik duvarıyla paralel çalışıp 8443/80/443 dahil tüm portları engelliyordu. Kurulum artık firewalld'yi devre dışı bırakıyor (SanalCP tek güvenlik duvarı olarak kalıyor) ve kurulum sonunda panelin dış IP üzerinden gerçekten erişilebilir olduğunu ayrıca doğruluyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-07"
 }

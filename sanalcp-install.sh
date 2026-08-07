@@ -155,6 +155,24 @@ else
   warn "Disk quota needs a ONE-TIME reboot to take effect (root fs quota can't be enabled via remount)."
 fi
 
+# ============ 2c) FIREWALLD ============
+# 🔴 SanalCP manages its own nftables-based firewall (internal/guvenlikduvari —
+# critical-port protection + admin-panel whitelist/ban rules). Some minimal
+# AlmaLinux 9 cloud images ship with firewalld ACTIVE by default, and its
+# restrictive public zone (only ssh/dhcpv6-client/cockpit) runs IN PARALLEL
+# with SanalCP's own nftables table — even though the panel's own rules default
+# to "policy accept" (allow everything), firewalld independently blocks every
+# other port (8443/80/443/53/21/25/587/993...). Found live on an AlmaLinux 9.8
+# test VPS: the panel worked over localhost right after install, but was
+# completely unreachable from outside after a reboot — firewalld was silently
+# doing this the whole time. SanalCP should be the only firewall in play.
+step "2c) Firewalld"
+if systemctl is-active --quiet firewalld 2>/dev/null; then
+  systemctl disable --now firewalld >/dev/null 2>&1 && ok "firewalld disabled (SanalCP manages its own nftables firewall)" || warn "could not disable firewalld — it may block panel/site access"
+else
+  ok "firewalld not active"
+fi
+
 # ============ 3) PHP (5 versions + base + wp-cli) ============
 step "3) PHP versions (5 Remi + base) + wp-cli"
 BASE_PKGS="php php-fpm php-cli php-mysqlnd php-mbstring php-json php-pecl-zip php-pecl-redis6"
@@ -539,6 +557,19 @@ step "15) Verification"
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 CODE=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/ 2>/dev/null)
 API=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/api/v1/domains 2>/dev/null)
+# 🔴 Localhost reachability alone doesn't catch an external firewall (firewalld,
+# cloud provider security group) silently blocking everything — exactly what
+# happened on the AlmaLinux 9.8 test VPS this section is built for. Check the
+# public IP too, over a real TCP connection, so a misconfigured firewall shows
+# up here instead of as a confusing "installed fine but I can't reach it" report.
+if [ -n "$IP" ]; then
+  EXT_CODE=$(curl -sk -o /dev/null -w '%{http_code}' --connect-timeout 5 "https://${IP}:8443/" 2>/dev/null)
+  if [ "$EXT_CODE" = "200" ]; then
+    ok "panel reachable from outside (https://${IP}:8443/ → HTTP 200)"
+  else
+    warn "panel is NOT reachable from outside (https://${IP}:8443/ → '${EXT_CODE:-no response}') — check your cloud provider's firewall/security group; SanalCP's own firewall (nftables) and firewalld were already handled by this installer"
+  fi
+fi
 KV_SVC=valkey; systemctl list-unit-files --no-legend valkey.service 2>/dev/null | grep -q valkey || KV_SVC=redis
 echo -e "  services: $(systemctl is-active mariadb nginx "$KV_SVC" php-fpm named pure-ftpd sanalcp crond | tr '\n' ' ')"
 echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active named)   ·   FTP :21 → $(systemctl is-active pure-ftpd)"
