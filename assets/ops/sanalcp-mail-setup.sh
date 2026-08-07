@@ -46,15 +46,30 @@ if ! command -v rspamadm >/dev/null 2>&1; then
 fi
 dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
   || { log "✗ rspamd kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
-# EL10 AppStream, Redis'in topluluk devamı olan protokol-uyumlu Valkey'i varsayılan
-# sunucu olarak sunuyor. Eski EL sürümlerinde redis, EL10'da valkey kullan.
-KV_SERVICE=redis
-if ! dnf install -y redis >>/tmp/rspamd-setup.log 2>&1; then
-  dnf install -y valkey >>/tmp/rspamd-setup.log 2>&1 \
-    || { log "✗ Redis/Valkey kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+# 🔴 rspamd, panelin per-tenant cache Redis/Valkey'iyle AYNI INSTANCE'I paylaşır
+# (ikisi de 127.0.0.1:6379) — sanalcp-redis-setup panelin cache sunucusunu bu
+# betikten ÖNCE (kurulumda bir adım önce) zaten kurup çalıştırdı. AlmaLinux
+# 9.8'de hem redis HEM valkey paketleri AYNI ANDA mevcut: burada AYRICA birini
+# kurup restart edersek ikisi aynı 6379 portunu tutmaya çalışır ve ikincisi
+# "Address already in use" ile çöker — canlı AlmaLinux 9.8 testinde tam bu
+# şekilde bulundu (redis.service "control process exited with error code").
+# Bu yüzden burada kurmuyoruz/restart etmiyoruz — hangisi ZATEN ÇALIŞIYORSA onu
+# kullanıyoruz; ikisi de çalışmıyorsa (redis-setup hiç koşmamışsa/başarısızsa)
+# ancak o zaman kendimiz kuruyoruz.
+if systemctl is-active --quiet valkey; then
   KV_SERVICE=valkey
+elif systemctl is-active --quiet redis; then
+  KV_SERVICE=redis
+else
+  KV_SERVICE=valkey
+  if ! dnf install -y valkey >>/tmp/rspamd-setup.log 2>&1; then
+    KV_SERVICE=redis
+    dnf install -y redis >>/tmp/rspamd-setup.log 2>&1 \
+      || { log "✗ Redis/Valkey kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+  fi
+  systemctl enable --now "$KV_SERVICE" >/dev/null 2>&1
 fi
-log "rspamd + ${KV_SERVICE} kuruldu"
+log "rspamd + ${KV_SERVICE} (paylaşılan instance) kullanılıyor"
 
 echo "════ mailro (salt-okunur) DB parolası ════"
 DBPASS=$(grep -oP '^PANEL_MAIL_DB_PASS=\K.*' "$ENV" 2>/dev/null)
@@ -146,7 +161,11 @@ postconf -e 'milter_default_action=accept'
 postconf -e 'smtpd_end_of_data_restrictions=check_policy_service inet:127.0.0.1:10040'
 postconf -e 'smtpd_policy_service_default_action=DUNNO'
 systemctl enable "$KV_SERVICE" rspamd >/dev/null 2>&1
-systemctl restart "$KV_SERVICE"
+# 🔴 "$KV_SERVICE" burada RESTART EDİLMEZ: panelin per-tenant cache'iyle
+# paylaşılan aynı instance (bkz. yukarıdaki not) — zaten çalışıyor, yeniden
+# başlatmak yalnızca panelin cache bağlantılarını gereksiz yere kesintiye
+# uğratır. `enable` (boot'ta otomatik başlasın diye) zaten çalışan bir serviste
+# no-op'tur ve restart TETİKLEMEZ.
 if ! rspamadm configtest >/tmp/rspamd-configtest.log 2>&1; then
   log "✗ Rspamd config geçersiz"; cat /tmp/rspamd-configtest.log; exit 1
 fi
@@ -190,7 +209,7 @@ systemctl is-active --quiet opendkim || { log "✗ opendkim başlatılamadı —
 systemctl is-active --quiet rspamd   || { log "✗ rspamd başlatılamadı — journalctl -u rspamd"; OK=0; }
 systemctl is-active --quiet "$KV_SERVICE" || { log "✗ ${KV_SERVICE} başlatılamadı"; OK=0; }
 if [ "$OK" = 1 ]; then
-  log "✓ postfix + dovecot + opendkim + rspamd + redis ACTIVE"
+  log "✓ postfix + dovecot + opendkim + rspamd + ${KV_SERVICE} ACTIVE"
 else
   exit 1
 fi
