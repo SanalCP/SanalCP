@@ -50,16 +50,5 @@
   "validation_user_suffix": "Kullanıcı soneki: yalnız küçük harf/rakam/alt-çizgi, 1-32 karakter",
   "validation_user_long": "Kullanıcı adı çok uzun (önek + sonek ≤64 karakter olmalı)",
   "validation_password": "Parola en az 12 karakter ve harf+rakam karışık olmalı",
-  "validation_select_user": "Mevcut bir kullanıcı seçin",
-  "reset_modal_title": "Parola Sıfırla — {{ad}}",
-  "reset_user_desc": "{{kullanici}} kullanıcısının parolası MariaDB ve panel'de eşzamanlı güncellenir.",
-  "custom_password_label": "Özel parola (boş bırakırsanız rastgele)",
-  "custom_password_placeholder": "En az 6 karakter",
-  "reset_failed": "Sıfırlama başarısız",
-  "custom_password_too_short": "Parola en az 6 karakter olmalı",
-  "set_this": "Bunu Ayarla",
-  "resetting": "Sıfırlanıyor…",
-  "generate_random": "Rastgele Üret",
-  "password_updated": "✓ Parola güncellendi",
-  "password_updated_save": "Bunu güvenli bir yere kaydedin. Sonra göremezsiniz:"
+  "validation_select_user": "Mevcut bir kullanıcı seçin"
 }

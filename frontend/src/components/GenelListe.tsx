@@ -20,7 +20,7 @@ export type Kolon<T> = {
 export type Rozet = { etiket: string; deger: React.ReactNode; vurgu?: 'normal' | 'uyari' | 'tehlike' }
 
 export default function GenelListe<T>({
-  baslik, aciklama, uc, kolonlar, araAlan, satirAnahtar, bosMesaj, ozet,
+  baslik, aciklama, uc, kolonlar, araAlan, satirAnahtar, bosMesaj, ozet, yenilemeTetik,
 }: {
   baslik: string
   aciklama: string
@@ -30,6 +30,9 @@ export default function GenelListe<T>({
   satirAnahtar: (satir: T) => string | number
   bosMesaj: string
   ozet?: (liste: T[]) => Rozet[]
+  // Değeri artınca listeyi yeniden çeker — satır-içi bir işlem (silme/parola
+  // sıfırlama gibi) sonrası veriyi tazelemek isteyen sayfalar için.
+  yenilemeTetik?: number
 }) {
   const { t } = useTranslation(['GenelListe', 'common'])
   const [liste, setListe] = useState<T[]>([])
@@ -45,7 +48,7 @@ export default function GenelListe<T>({
       .catch((e) => { if (!iptal) setHata(apiHata(e, t('common:load_failed'))) })
       .finally(() => { if (!iptal) setYukleniyor(false) })
     return () => { iptal = true }
-  }, [uc])
+  }, [uc, yenilemeTetik])
 
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()

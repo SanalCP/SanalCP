@@ -50,16 +50,5 @@
   "validation_user_suffix": "User suffix: lowercase letters/digits/underscore only, 1-32 characters",
   "validation_user_long": "User name too long (prefix + suffix must be ≤64 characters)",
   "validation_password": "Password must be at least 12 characters and contain letters+digits",
-  "validation_select_user": "Select an existing user",
-  "reset_modal_title": "Reset Password — {{ad}}",
-  "reset_user_desc": "Password for user {{kullanici}} is updated in MariaDB and the panel simultaneously.",
-  "custom_password_label": "Custom password (leave blank to generate randomly)",
-  "custom_password_placeholder": "At least 6 characters",
-  "reset_failed": "Could not reset",
-  "custom_password_too_short": "Password must be at least 6 characters",
-  "set_this": "Set This",
-  "resetting": "Resetting…",
-  "generate_random": "Generate Random",
-  "password_updated": "✓ Password updated",
-  "password_updated_save": "Save this somewhere safe. You will not be able to see it again:"
+  "validation_select_user": "Select an existing user"
 }

@@ -7,6 +7,7 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import Modal from '@/components/Modal'
+import DBParolaSifirlaModal from '@/components/DBParolaSifirlaModal'
 import { T } from '@/lib/tablo'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
@@ -147,11 +148,10 @@ export default function DomainDatabasesPage() {
       )}
 
       {pwResetFor && (
-        <PwResetModal
+        <DBParolaSifirlaModal
           db={pwResetFor}
           onKapat={() => setPwResetFor(null)}
           onTamam={() => { setPwResetFor(null); yukle() }}
-          t={t}
         />
       )}
 
@@ -350,68 +350,3 @@ function SonucSatir({ e, v, t }: { e: string; v: string; t: (k: string, opts?: R
   )
 }
 
-function PwResetModal({ db, onKapat, onTamam, t }: { db: DB; onKapat: () => void; onTamam: () => void; t: (k: string, opts?: Record<string, unknown>) => string }) {
-  const [ozelPw, setOzelPw] = useState('')
-  const [isleniyor, setIsleniyor] = useState(false)
-  const [hata, setHata] = useState<string | null>(null)
-  const [yeniPw, setYeniPw] = useState<string | null>(null)
-
-  async function sifirla(rastgele: boolean) {
-    if (!rastgele && ozelPw.length < 6) {
-      setHata(t('DomainDatabasesPage:custom_password_too_short'))
-      return
-    }
-    setIsleniyor(true); setHata(null)
-    try {
-      const body = rastgele ? {} : { parola: ozelPw }
-      const { data } = await api.put(`/databases/${db.id}/password`, body)
-      setYeniPw(data.db_parola)
-    } catch (e) {
-      setHata(apiHata(e, t('DomainDatabasesPage:reset_failed')))
-    } finally {
-      setIsleniyor(false)
-    }
-  }
-
-  return (
-    <Modal acik={true} baslik={t('DomainDatabasesPage:reset_modal_title', { ad: db.db_adi })} onKapat={yeniPw ? onTamam : onKapat} genislik="md">
-      {!yeniPw ? (
-        <div className="space-y-4">
-          <div className="text-sm text-slate-600 dark:text-slate-400">
-            {t('DomainDatabasesPage:reset_user_desc', { kullanici: db.db_kullanici })}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabasesPage:custom_password_label')}</label>
-            <input
-              type="text"
-              value={ozelPw}
-              onChange={e => setOzelPw(e.target.value)}
-              placeholder={t('DomainDatabasesPage:custom_password_placeholder')}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
-            />
-          </div>
-          {hata && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">{hata}</div>}
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onKapat} disabled={isleniyor} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-md text-sm">{t('DomainDatabasesPage:cancel')}</button>
-            <button onClick={() => sifirla(false)} disabled={isleniyor || !ozelPw} className="px-4 py-2 bg-white dark:bg-slate-800 border border-brand-600 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 disabled:opacity-50 rounded-md text-sm">{t('DomainDatabasesPage:set_this')}</button>
-            <button onClick={() => sifirla(true)} disabled={isleniyor} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-md">{isleniyor ? t('DomainDatabasesPage:resetting') : t('DomainDatabasesPage:generate_random')}</button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md p-4">
-            <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium mb-2">{t('DomainDatabasesPage:password_updated')}</p>
-            <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-2">{t('DomainDatabasesPage:password_updated_save')}</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-white dark:bg-slate-800 px-3 py-2 font-mono text-sm text-slate-900 dark:text-slate-100 rounded border border-emerald-200 dark:border-emerald-800 break-all">{yeniPw}</code>
-              <button onClick={() => navigator.clipboard.writeText(yeniPw)} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded">{t('DomainDatabasesPage:copy')}</button>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <button onClick={onTamam} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-md">{t('DomainDatabasesPage:ok')}</button>
-          </div>
-        </div>
-      )}
-    </Modal>
-  )
-}

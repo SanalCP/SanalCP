@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.22",
-  "duyuru": "Footer'da panel sürümü ve derleme tarihi artık her rol için (müşteri dahil) görünüyor. Kenar çubuğundaki logo ana sayfaya bağlandı.",
+  "son_surum": "0.5.23",
+  "duyuru": "Admin/bayi Veritabanları sayfasına phpMyAdmin, parola göster/sıfırla ve silme işlemleri eklendi. Giriş ekranına logo eklendi; 2FA kodu 6 haneye ulaşınca otomatik gönderiliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-07"
 }

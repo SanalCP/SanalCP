@@ -1,0 +1,16 @@
+{
+  "reset_modal_title": "Parola Sıfırla — {{ad}}",
+  "reset_user_desc": "{{kullanici}} kullanıcısının parolası MariaDB ve panel'de eşzamanlı güncellenir.",
+  "custom_password_label": "Özel parola (boş bırakırsanız rastgele)",
+  "custom_password_placeholder": "En az 6 karakter",
+  "custom_password_too_short": "Parola en az 6 karakter olmalı",
+  "reset_failed": "Parola sıfırlama başarısız",
+  "cancel": "İptal",
+  "set_this": "Bunu Ayarla",
+  "resetting": "Sıfırlanıyor…",
+  "generate_random": "Rastgele Üret",
+  "password_updated": "✓ Parola güncellendi",
+  "password_updated_save": "Bunu güvenli bir yere kaydedin. Sonra göremezsiniz:",
+  "copy": "Kopyala",
+  "ok": "Tamam"
+}
