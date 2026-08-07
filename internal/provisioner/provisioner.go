@@ -268,9 +268,8 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name {{.SunucuAdlari}};
 
     ssl_certificate     {{.CertPath}};
@@ -448,9 +447,8 @@ var wwwRedirectTmpl = template.Must(template.New("wr").Parse(`
 server {
     listen 80;
     listen [::]:80;
-{{if .SSL}}    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+{{if .SSL}}    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     ssl_certificate     {{.CertPath}};
     ssl_certificate_key {{.KeyPath}};
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -545,9 +543,8 @@ server {
 }
 {{if .SSL}}
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name {{.SunucuAdlari}};
 
     ssl_certificate     {{.CertPath}};
@@ -594,9 +591,8 @@ server {
 }
 {{if .SSL}}
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name {{.SunucuAdlari}};
 
     ssl_certificate     {{.CertPath}};

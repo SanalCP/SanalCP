@@ -11,7 +11,7 @@ func TestPanelConfGomulu(t *testing.T) {
 		t.Fatalf("gömülü _panel.conf beklenenden kısa (%d bayt) — embed başarısız olmuş olabilir", len(PanelConf))
 	}
 	for _, gerekli := range []string{
-		"listen 8443 ssl default_server;",
+		"listen 8443 ssl http2 default_server;",
 		"location /api/",
 		"location ^~ /pma/",
 		"location ^~ /webmail/",

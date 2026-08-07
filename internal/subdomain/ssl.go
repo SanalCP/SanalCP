@@ -187,9 +187,8 @@ func vhostSSL(tamAd, docroot, socket, crt, key string) string {
     location / { return 301 https://$host$request_uri; }
 }
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name %[1]s;
 
     ssl_certificate     %[4]s;

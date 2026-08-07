@@ -94,8 +94,7 @@ func EkVhostIcerik(alanAdi, docroot, socket, certPath, keyPath string) string {
 		"    location / {\n        return 301 https://$host$request_uri;\n    }\n" +
 		"}\n\n" +
 		"server {\n" +
-		"    listen 443 ssl;\n    listen [::]:443 ssl;\n" +
-		"    http2 on;\n" +
+		"    listen 443 ssl http2;\n    listen [::]:443 ssl http2;\n" +
 		"    server_name " + adlar + ";\n\n" +
 		"    ssl_certificate     " + certPath + ";\n" +
 		"    ssl_certificate_key " + keyPath + ";\n" +
