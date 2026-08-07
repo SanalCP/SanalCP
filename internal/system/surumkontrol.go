@@ -320,3 +320,18 @@ func SurumKontrolDurum(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, cevap)
 }
+
+// SurumBilgi — footer için TÜM oturum açmış kullanıcılara (müşteri dahil)
+// açık, minimal uç. SurumKontrolDurum'un aksine dış güncelleme/duyuru
+// verisi taşımaz — yalnız BU kurulumun kendi sürüm ve derleme tarihi.
+// Rol kısıtı yok: BayiVeUstu arkasındaki /system/surum-kontrol'e
+// erişemeyen sıradan müşteri hesapları da footer'da sürümü görebilsin diye.
+func SurumBilgi(w http.ResponseWriter, r *http.Request) {
+	surumMu.RLock()
+	mevcut, buildTarihi := surumMevcut, surumBuildTarihi
+	surumMu.RUnlock()
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"mevcut":       mevcut,
+		"build_tarihi": buildTarihi,
+	})
+}

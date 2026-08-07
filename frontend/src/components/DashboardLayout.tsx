@@ -2,7 +2,7 @@
 // sanal-dark-swept-v2
 // sp-mobil-v1
 import { Suspense, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { api } from '@/lib/api'
@@ -14,6 +14,7 @@ import DomainSecici from './DomainSecici'
 const SURUM_UYARI_KAPALI_KEY = 'sp-surum-duyuru-kapatildi'
 const MENU_KAPALI_GRUP_KEY = 'sp-menu-kapali-gruplar'
 type SurumKontrol = { guncelleme_var: boolean; kritik: boolean; duyuru: string; son: string; mevcut?: string; build_tarihi?: string }
+type SurumBilgi = { mevcut?: string; build_tarihi?: string }
 
 type NavItem = { to: string; etiket: string; ikon: string; end?: boolean }
 // baslikKey: dil değişse de kararlı kalan iç anahtar (kapalı-grup state'i ve
@@ -223,7 +224,15 @@ export default function DashboardLayout() {
         const anahtar = `${r.data.son}:${r.data.duyuru}`
         setDuyuruKapali(localStorage.getItem(SURUM_UYARI_KAPALI_KEY) === anahtar)
       })
-      .catch(() => {})
+      .catch(() => {}) // yalnız bayi/admin — müşteride 403 beklenir, footer buna bağlı değil
+  }, [])
+
+  // Footer sürüm bilgisi — rol farkı gözetmeksizin (müşteri dahil) tüm oturum
+  // açmış kullanıcılara açık uçtan (bkz. internal/system/surumkontrol.go
+  // SurumBilgi). /system/surum-kontrol'ün aksine dış duyuru verisi taşımaz.
+  const [surumBilgi, setSurumBilgi] = useState<SurumBilgi | null>(null)
+  useEffect(() => {
+    api.get<SurumBilgi>('/system/surum').then((r) => setSurumBilgi(r.data)).catch(() => {})
   }, [])
 
   // Rota değişince çekmeceyi kapat (link tıklamasında da onClick kapatıyor;
@@ -322,16 +331,18 @@ export default function DashboardLayout() {
         } lg:sticky lg:top-0 lg:bottom-auto lg:left-auto lg:z-20 lg:w-[290px] lg:translate-x-0 lg:self-start`}
       >
         <div className="relative flex h-20 items-center justify-center border-b border-slate-100 px-4 dark:border-slate-800">
-          <img
-            src="/brand/sanalcp-logo-light.png"
-            alt="SanalCP"
-            className="h-16 w-auto max-w-[230px] object-contain dark:hidden"
-          />
-          <img
-            src="/brand/sanalcp-logo-dark.png"
-            alt="SanalCP"
-            className="hidden h-16 w-auto max-w-[230px] object-contain dark:block"
-          />
+          <Link to="/" onClick={() => setMobilAcik(false)} className="flex items-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+            <img
+              src="/brand/sanalcp-logo-light.png"
+              alt="SanalCP"
+              className="h-16 w-auto max-w-[230px] object-contain dark:hidden"
+            />
+            <img
+              src="/brand/sanalcp-logo-dark.png"
+              alt="SanalCP"
+              className="hidden h-16 w-auto max-w-[230px] object-contain dark:block"
+            />
+          </Link>
           <button
             onClick={() => setMobilAcik(false)}
             className="absolute right-3 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition lg:hidden"
@@ -486,8 +497,8 @@ export default function DashboardLayout() {
             </Suspense>
           </div>
           <footer className="py-4 text-center text-xs text-slate-400 dark:text-slate-600">
-            SanalCP {surum?.mevcut ? `v${surum.mevcut}` : ''}
-            {surum?.build_tarihi ? ` · Build: ${surum.build_tarihi}` : ''}
+            SanalCP {surumBilgi?.mevcut ? `v${surumBilgi.mevcut}` : ''}
+            {surumBilgi?.build_tarihi ? ` · Build: ${surumBilgi.build_tarihi}` : ''}
           </footer>
         </main>
       </div>

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.21",
-  "duyuru": "TailAdmin esintili yeni arayüz: tam genişlikte sayfalar, light/dark tema logoları, responsive tablolar ve araç çubukları, erişilebilir ortak modal sistemi, standart form ve buton bileşenleri, mobil görünüm ve dark tema iyileştirmeleri. CodeMirror, çeviri paketleri ve vendor bağımlılıkları tembel yükleme ve kod bölme ile optimize edildi.",
+  "son_surum": "0.5.22",
+  "duyuru": "Footer'da panel sürümü ve derleme tarihi artık her rol için (müşteri dahil) görünüyor. Kenar çubuğundaki logo ana sayfaya bağlandı.",
   "kritik": false,
   "yayin_tarihi": "2026-08-07"
 }
