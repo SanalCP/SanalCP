@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.23",
-  "duyuru": "Admin/bayi Veritabanları sayfasına phpMyAdmin, parola göster/sıfırla ve silme işlemleri eklendi. Giriş ekranına logo eklendi; 2FA kodu 6 haneye ulaşınca otomatik gönderiliyor.",
+  "son_surum": "0.5.24",
+  "duyuru": "AlmaLinux 9.4 kurulum desteği: Remi repo sürümü, PHP modül akışı ve Redis/Valkey artık işletim sistemine göre otomatik seçiliyor. Henüz canlı bir AlmaLinux 9.4 sunucuda doğrulanmadı — ilk kurulumu birlikte test edeceğiz.",
   "kritik": false,
   "yayin_tarihi": "2026-08-07"
 }

@@ -1,16 +1,32 @@
 #!/usr/bin/env bash
-# sanalcp-redis-setup — per-tenant izole Redis (Valkey) altyapısını kurar.
+# sanalcp-redis-setup — per-tenant izole Redis/Valkey altyapısını kurar.
 # Idempotent. Kurulumda çalıştırılır; panelin "Redis Cache aç" özelliği bunu gerektirir.
+#
+# 🔴 AlmaLinux 10 AppStream, Redis'in protokol-uyumlu topluluk devamı Valkey'i
+# sunar; AlmaLinux 9 (ve öncesi) hâlâ "redis" paketini sağlar. İkisi RESP
+# protokolü ve komut seti bakımından birebir aynı — yalnız paket/birim/binary
+# adı ve config dizini değişir. Script boyunca KV değişkeni hangisi kuruluysa
+# onu taşır; elle "valkey" yazılmaz.
 set -uo pipefail
 log(){ printf '  %s\n' "$*"; }
 
-echo "════ Valkey + php-redis kurulumu ════"
+echo "════ Redis/Valkey + php-redis kurulumu ════"
 PHP_REDIS_PKGS=""
 for v in php74 php80 php81 php82 php83 php84 php85; do
   [ -d "/etc/opt/remi/$v" ] && PHP_REDIS_PKGS="$PHP_REDIS_PKGS ${v}-php-pecl-redis6"
 done
-dnf install -y valkey php-pecl-redis6 $PHP_REDIS_PKGS >/tmp/redis-setup.log 2>&1 \
-  && log "valkey + php-redis kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
+KV=valkey
+if ! dnf install -y valkey >/tmp/redis-setup.log 2>&1; then
+  KV=redis
+  dnf install -y redis >>/tmp/redis-setup.log 2>&1 || { log "✗ redis/valkey kurulamadı"; cat /tmp/redis-setup.log; exit 1; }
+fi
+dnf install -y php-pecl-redis6 $PHP_REDIS_PKGS >>/tmp/redis-setup.log 2>&1
+log "$KV + php-redis kuruldu"
+
+KV_BIN="${KV}-cli"
+KV_ETC="/etc/$KV"
+KV_CONF="$KV_ETC/$KV.conf"
+KV_ACL="$KV_ETC/users.acl"
 
 echo "════ Admin parolası + ACL dosyası ════"
 ENV=/etc/sanalcp/env
@@ -21,39 +37,37 @@ if [ -z "$ADMIN" ]; then
   log "admin parolası üretildi ve env'e eklendi"
 fi
 # users.acl'de default admin satırı yoksa yaz (mevcut tenant ACL'lerini KORU)
-ACLF=/etc/valkey/users.acl
-if [ ! -f "$ACLF" ] || ! grep -q '^user default ' "$ACLF"; then
-  printf 'user default on >%s ~* &* +@all\n' "$ADMIN" > "$ACLF"
+if [ ! -f "$KV_ACL" ] || ! grep -q '^user default ' "$KV_ACL"; then
+  printf 'user default on >%s ~* &* +@all\n' "$ADMIN" > "$KV_ACL"
   log "users.acl oluşturuldu"
 fi
-chown valkey:valkey "$ACLF" 2>/dev/null; chmod 640 "$ACLF"
+chown "$KV:$KV" "$KV_ACL" 2>/dev/null; chmod 640 "$KV_ACL"
 
-echo "════ valkey.conf cache tuning ════"
-CONF=/etc/valkey/valkey.conf
-if ! grep -q 'sanalcp-cache' "$CONF"; then
-cat >> "$CONF" <<VK
+echo "════ $KV.conf cache tuning ════"
+if ! grep -q 'sanalcp-cache' "$KV_CONF"; then
+cat >> "$KV_CONF" <<VK
 
 # ===== sanalcp-cache =====
 maxmemory 256mb
 maxmemory-policy allkeys-lru
 save ""
 appendonly no
-aclfile /etc/valkey/users.acl
+aclfile $KV_ACL
 VK
-  log "valkey.conf tuning eklendi"
+  log "$KV.conf tuning eklendi"
 fi
-sed -i '/^requirepass /d' "$CONF"   # aclfile ile çakışır
+sed -i '/^requirepass /d' "$KV_CONF"   # aclfile ile çakışır
 
 echo "════ SELinux (php-fpm → redis TCP) ════"
 setsebool -P httpd_can_network_connect 1 2>/dev/null && log "httpd_can_network_connect=1"
 
-echo "════ valkey enable + (re)start ════"
-systemctl enable valkey >/dev/null 2>&1
-systemctl restart valkey; sleep 2
-if systemctl is-active --quiet valkey && REDISCLI_AUTH="$ADMIN" valkey-cli PING 2>/dev/null | grep -q PONG; then
-  log "✓ valkey ACTIVE + admin auth OK"
+echo "════ $KV enable + (re)start ════"
+systemctl enable "$KV" >/dev/null 2>&1
+systemctl restart "$KV"; sleep 2
+if systemctl is-active --quiet "$KV" && REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null | grep -q PONG; then
+  log "✓ $KV ACTIVE + admin auth OK"
 else
-  log "✗ valkey başlatılamadı — journalctl -u valkey"
+  log "✗ $KV başlatılamadı — journalctl -u $KV"
   exit 1
 fi
-echo "════════ ✓ Redis altyapısı hazır ════════"
+echo "════════ ✓ Redis altyapısı hazır ($KV) ════════"
