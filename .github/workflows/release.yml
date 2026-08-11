@@ -1,0 +1,77 @@
+name: Yayınla (kur betiğini güncelle)
+
+# /kur SADECE etiket attığınızda ilerler (push:tags, main değil). main'e commit
+# akmaya devam eder, kurulan sürüm sizin bilerek attığınız etikettir.
+#   git tag v0.2 && git push origin v0.2
+on:
+  push:
+    tags: ["v*"]
+
+concurrency: publish-installer   # aynı anda iki yayın çakışmasın
+
+jobs:
+  publish-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Etiketlenen commit'in tarball hash'ini hesapla
+        id: pin
+        env:
+          REPO: ${{ github.repository }}
+          REF: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHA256=$(curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" | sha256sum | cut -d' ' -f1)
+          echo "ref=$REF"       >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "Sabitlenen: $REF  /  $SHA256"
+
+      - name: kur betiğini üret
+        env:
+          REPO: ${{ github.repository }}
+          TAG:  ${{ github.ref_name }}
+          REF:  ${{ steps.pin.outputs.ref }}
+          SHA:  ${{ steps.pin.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          TODAY=$(date -u +%Y-%m-%d)
+          cat > kur <<EOF
+          #!/usr/bin/env bash
+          # SanalCP — sanalcp.com/kur
+          # OTOMATİK ÜRETİLİR — elle düzenlemeyin. Kaynak: .github/workflows/release.yml
+          # Sürüm: ${TAG}  ·  Üretim: ${TODAY}
+          set -euo pipefail
+
+          SANALCP_REF=${REF}
+          SANALCP_SHA256=${SHA}
+          export SANALCP_REF SANALCP_SHA256
+
+          curl -fsSL "https://raw.githubusercontent.com/${REPO}/\${SANALCP_REF}/install.sh" | bash -s -- "\$@"
+          EOF
+          echo "----- üretilen kur -----"; cat kur
+
+      - name: Sunucuya yükle (scp/sftp kapalı — cat-pipe ile)
+        env:
+          DEPLOY_KEY:  ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i ~/.ssh/id_ed25519 -p $DEPLOY_PORT -o BatchMode=yes ${DEPLOY_USER}@${DEPLOY_HOST}"
+          # atomik: geçici dosyaya yaz, sonra mv
+          $SSH "cat > ${DEPLOY_PATH}/kur.tmp && chmod 644 ${DEPLOY_PATH}/kur.tmp && mv -f ${DEPLOY_PATH}/kur.tmp ${DEPLOY_PATH}/kur" < kur
+          echo "yüklendi: ${DEPLOY_PATH}/kur"
+
+      - name: Canlıda doğrula
+        run: |
+          set -euo pipefail
+          sleep 2
+          LIVE=$(curl -fsSL https://sanalcp.com/kur)
+          echo "$LIVE" | grep -q "SANALCP_REF=${{ steps.pin.outputs.ref }}" \
+            && echo "✓ /kur canlıda doğru commit'e sabitli" \
+            || { echo "✗ /kur beklenen commit'i göstermiyor"; exit 1; }
