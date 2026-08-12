@@ -1,6 +1,27 @@
 module sanalcp
 
-go 1.23
+go 1.24
+
+// Go 1.24 dil sürümüne geçerken DAVRANIŞ değişikliklerini bilerek sabitliyoruz.
+// (go direktifini bump'lamak, GODEBUG varsayılanlarını da 1.24'e taşır.)
+//
+//   multipathtcp=0 — 1.24'te dinleyiciler varsayılan olarak MPTCP soketi olur.
+//     Ölçüldü: 1.23 ile 0, 1.24 ile 3 MPTCP soketi (panel + cliSrv + mail policy).
+//     Panel kendi nftables kural setini yönettiği için bu etkileşimi bilerek
+//     açmak gerekir; şimdilik eski davranış (düz TCP) korunuyor.
+//
+//   x509rsacrt=0 — 1.24'te ParsePKCS1PrivateKey, RSA özel anahtarındaki bozuk
+//     CRT değerlerini yeniden hesaplamak yerine HATA döndürür. Müşterinin daha
+//     önce sorunsuz içe aktardığı bir sertifika anahtarı bu yüzden aniden
+//     reddedilebilirdi (bkz. provisioner/imported_ssl.go, ssl_heal.go).
+//
+// Bilerek YENİ davranışta bırakılanlar: rsa1024min (1024 bit altı RSA reddi —
+// DKIM zaten 2048), tlsmlkem (yalnız monitor'ün dış probe'larını etkiler),
+// x509usepolicies (CreateCertificate kullanılmıyor), randseednop (math/rand yok).
+godebug (
+	multipathtcp=0
+	x509rsacrt=0
+)
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
