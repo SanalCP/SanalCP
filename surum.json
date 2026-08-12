@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.5.27",
-  "duyuru": "AlmaLinux 9.8'de reboot sonrası panele erişilemiyor sorunu düzeltildi: bazı minimal AlmaLinux 9 imajlarında firewalld varsayılan aktif geliyor ve SanalCP'nin kendi nftables güvenlik duvarıyla paralel çalışıp 8443/80/443 dahil tüm portları engelliyordu. Kurulum artık firewalld'yi devre dışı bırakıyor (SanalCP tek güvenlik duvarı olarak kalıyor) ve kurulum sonunda panelin dış IP üzerinden gerçekten erişilebilir olduğunu ayrıca doğruluyor.",
-  "kritik": false,
-  "yayin_tarihi": "2026-08-07"
+  "son_surum": "0.5.28",
+  "duyuru": "Güvenlik düzeltmesi: WordPress kurulumu sırasında WordPress admin parolası ve sitenin MySQL parolası wp-cli'ye komut satırı argümanı olarak veriliyordu. /proc/<pid>/cmdline dünya-okunur (mod 444) olduğu için, kurulum sürdüğü birkaç saniye boyunca aynı sunucudaki BAŞKA bir hosting hesabı bu iki parolayı okuyabiliyordu. Parolalar artık argüman olarak geçmiyor, wp-cli'nin --prompt mekanizmasıyla stdin üzerinden veriliyor ve kurulumdan sonra hem wp-config.php'ye yazılan DB parolası hem admin parolası fiilen doğrulanıyor. Ayrıca: hesap yedekleri artık /home/<kullanici>/.sanalcp/token dosyasını arşive dahil etmiyor (yedekler uzak hedefe/S3'e gidebildiği için sızan bir arşiv canlı panel API token'ı veriyordu), parola üretecindeki modulo yanlılığı giderildi ve crypto/rand hatası artık sessizce yutulmuyor. Veritabanı bağlantı havuzu sabit 16 yerine çekirdek sayısına göre ölçekleniyor (SANALCP_DB_MAX_CONNS ile ayarlanabilir).",
+  "kritik": true,
+  "yayin_tarihi": "2026-08-12"
 }

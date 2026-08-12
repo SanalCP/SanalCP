@@ -67,6 +67,60 @@ func wpKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
+// wpKomutStdin — wpKomut'un gizli değer alan sürümü: değeri ARGÜMAN OLARAK
+// GEÇMEZ, wp-cli'nin `--prompt=<arg>` mekanizmasıyla STDIN'den okutur.
+//
+// 🔴 /proc/<pid>/cmdline mod 444'tür — DÜNYA-OKUNUR. Parola argümana konursa
+// komut çalıştığı sürece aynı sunucudaki BAŞKA bir kiracı (c_*) onu okuyabilir;
+// çok kiracılı bir panelde bu çapraz-tenant parola sızıntısıdır. Buna karşılık
+// /proc/<pid>/environ mod 400'dür ve stdin hiçbir yerde görünmez.
+// Yöntem wp-cli'nin kendi el kitabındaki önerinin aynısıdır:
+//
+//	wp core install ... --prompt=admin_password < parola.txt
+//
+// `--quiet` ŞARTTIR: prompt modu, birleştirdiği komut satırını (gizli değer
+// dahil) STDOUT'a basar; --quiet bunu susturur, hata mesajları STDERR'de kalır.
+// Çağıranlar --quiet'i argümanlara eklemek zorundadır.
+func wpKomutStdin(ctx context.Context, sk, stdin string, args ...string) ([]byte, error) {
+	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
+		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
+	cmd := exec.CommandContext(ctx, "runuser", full...)
+	cmd.Stdin = strings.NewReader(stdin)
+	return cmd.CombinedOutput()
+}
+
+// reWPConfigDBPass — wp-cli'nin ürettiği `define( 'DB_PASSWORD', '...' );` satırı.
+var reWPConfigDBPass = regexp.MustCompile(`define\(\s*'DB_PASSWORD',\s*'([^']*)'\s*\)`)
+
+// wpConfigDBParolaDogrula — wp-config.php'ye parolanın GERÇEKTEN yazıldığını doğrular.
+//
+// 🔴 Neden gerekli: wp-cli, tanımadığı bir `--prompt=<ad>` argümanını SESSİZCE
+// yok sayar — çıkış kodu 0, stderr boş, parola BOŞ yazılır. Ad bir sürümde
+// değişirse (ya da yazım hatası olursa) hata hiçbir yerde görünmez, site
+// sessizce "veritabanına bağlanılamıyor" durumuna düşerdi.
+func wpConfigDBParolaDogrula(hedef, beklenen string) error {
+	raw, err := os.ReadFile(filepath.Join(hedef, "wp-config.php"))
+	if err != nil {
+		return fmt.Errorf("wp-config.php okunamadı: %w", err)
+	}
+	m := reWPConfigDBPass.FindSubmatch(raw)
+	if m == nil {
+		return fmt.Errorf("wp-config.php içinde DB_PASSWORD tanımı bulunamadı")
+	}
+	// RandomParola yalnız harf+rakam üretir; PHP kaçışı (\' \\) devreye girmez.
+	if string(m[1]) != beklenen {
+		return fmt.Errorf("wp-config.php'ye DB parolası yazılamadı (--prompt=dbpass yok sayılmış olabilir)")
+	}
+	return nil
+}
+
+// wpParolaDogrulaPHP — admin parolasının fiilen kurulduğunu doğrulayan wp eval kodu.
+// Kullanıcı adı ve parola KOD İÇİNE GÖMÜLMEZ, ikisi de STDIN'den okunur:
+// böylece hem PHP kod enjeksiyonu yüzeyi yok, hem parola cmdline'a düşmez.
+const wpParolaDogrulaPHP = `$l=trim(fgets(STDIN)); $p=trim(fgets(STDIN)); ` +
+	`$u=get_user_by("login",$l); ` +
+	`echo ($u && wp_check_password($p,$u->user_pass,$u->ID)) ? "PAROLA_OK" : "PAROLA_BAD";`
+
 func (h *Handlers) scheme(ssl bool) string {
 	if ssl {
 		return "https://"
@@ -381,9 +435,15 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		basarisiz("WordPress indirme", out)
 		return
 	}
-	if out, err := wpKomut(ctx, sk, "config", "create", "--dbname="+dbName, "--dbuser="+dbUser,
-		"--dbpass="+dbPass, "--dbhost=localhost", "--locale=tr_TR", "--path="+hedef, "--skip-check"); err != nil {
+	// dbPass argüman DEĞİL, stdin ile geçer (bkz. wpKomutStdin).
+	if out, err := wpKomutStdin(ctx, sk, dbPass+"\n", "config", "create", "--dbname="+dbName,
+		"--dbuser="+dbUser, "--prompt=dbpass", "--dbhost=localhost", "--locale=tr_TR",
+		"--path="+hedef, "--skip-check", "--quiet"); err != nil {
 		basarisiz("wp-config oluşturma", out)
+		return
+	}
+	if err := wpConfigDBParolaDogrula(hedef, dbPass); err != nil {
+		basarisiz("wp-config doğrulama", []byte(err.Error()))
 		return
 	}
 	url := h.scheme(ssl) + alanAdi
@@ -391,10 +451,21 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		url += "/" + req.AltDizin
 	}
 	adminParola := randParola()
-	if out, err := wpKomut(ctx, sk, "core", "install", "--url="+url, "--title="+req.SiteBasligi,
-		"--admin_user="+req.AdminKullanici, "--admin_password="+adminParola,
-		"--admin_email="+req.AdminEmail, "--skip-email", "--path="+hedef); err != nil {
+	// adminParola argüman DEĞİL, stdin ile geçer (bkz. wpKomutStdin).
+	if out, err := wpKomutStdin(ctx, sk, adminParola+"\n", "core", "install", "--url="+url,
+		"--title="+req.SiteBasligi, "--admin_user="+req.AdminKullanici,
+		"--prompt=admin_password", "--admin_email="+req.AdminEmail,
+		"--skip-email", "--path="+hedef, "--quiet"); err != nil {
 		basarisiz("WordPress kurulum", out)
+		return
+	}
+	// Sessiz --prompt yok sayımı burada PAROLASIZ ADMİN HESABI demek olurdu;
+	// kurulan parolayı fiilen doğrula. reAdmin (^[A-Za-z0-9._@-]{3,60}$) satır
+	// sonu içeremediği için iki satırlık stdin protokolü güvenli.
+	out, err := wpKomutStdin(ctx, sk, req.AdminKullanici+"\n"+adminParola+"\n",
+		"eval", wpParolaDogrulaPHP, "--path="+hedef, "--quiet")
+	if err != nil || !bytes.Contains(out, []byte("PAROLA_OK")) {
+		basarisiz("admin parolası doğrulama", out)
 		return
 	}
 	_ = exec.Command("chown", "-R", sk+":"+sk, hedef).Run()
@@ -552,17 +623,14 @@ func (h *Handlers) dbSahipMi(ctx context.Context, dbName string, domainID int64)
 
 func randSlug() string {
 	b := make([]byte, 4)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Sıfır slug = her sitede aynı DB adı → çakışma. Sessizce üretmektense çök.
+		panic("crypto/rand okunamadı, slug üretilemiyor: " + err.Error())
+	}
 	return hex.EncodeToString(b) // 8 hex char
 }
 
-func randParola() string {
-	const alfabe = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
-	b := make([]byte, 18)
-	_, _ = rand.Read(b)
-	out := make([]byte, 18)
-	for i, c := range b {
-		out[i] = alfabe[int(c)%len(alfabe)]
-	}
-	return string(out)
-}
+// randParola — WP admin parolası (18 karakter).
+// Üretim tek kaynaktan: hesaplar.RandomParola (reddetme örneklemesi + rand
+// hatasında panik; ayrıntı için oradaki nota bak).
+func randParola() string { return hesaplar.RandomParola(18) }

@@ -82,18 +82,41 @@ func DecryptDBPassword(enc string) (string, error) {
 	return box.Decrypt(enc)
 }
 
-// RandomParola: URL-safe alphanumeric parola (default 20 karakter)
+// RandomParola: URL-safe alphanumeric parola (default 20 karakter).
+//
+// İki incelik — ikisi de "sessizce zayıf parola üretme" riskine karşı:
+//
+//  1. rand.Read hatası YUTULMAZ. Go 1.23'te crypto/rand.Read hâlâ hata
+//     dönebilir (hiç dönmeme garantisi 1.24 ile geldi); yutulsaydı tampon
+//     sıfır kalır ve parola sabit "AAAA..." olurdu. Zayıf parola üretmektense
+//     panikliyoruz: chimw.Recoverer isteği 500'e çevirir, panel ayakta kalır
+//     (Go 1.24'ün crypto/rand'ı da aynı şeyi yapar).
+//  2. Doğrudan modulo yerine reddetme örneklemesi. 256 % 56 = 32 olduğundan
+//     `b[i] % 56` alfabenin ilk 32 karakterini diğerlerinden %25 daha olası
+//     kılardı; eşiğin (224) üstündeki baytları atıp yeniden çekiyoruz.
 func RandomParola(n int) string {
 	if n <= 0 {
 		n = 20
 	}
 	const harf = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	for i := range b {
-		b[i] = harf[int(b[i])%len(harf)]
+	const esik = 256 - (256 % len(harf)) // 224
+	out := make([]byte, 0, n)
+	buf := make([]byte, n)
+	for len(out) < n {
+		if _, err := rand.Read(buf); err != nil {
+			panic("crypto/rand okunamadı, parola üretilemiyor: " + err.Error())
+		}
+		for _, c := range buf {
+			if int(c) >= esik {
+				continue // biaslı kuyruk — at, yeniden çek
+			}
+			out = append(out, harf[int(c)%len(harf)])
+			if len(out) == n {
+				break
+			}
+		}
 	}
-	return string(b)
+	return string(out)
 }
 
 var reDBKimlik = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)

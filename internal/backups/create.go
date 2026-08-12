@@ -75,7 +75,13 @@ func createArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, 
 		return 0, err
 	}
 
-	args := []string{"czf", filePath, "-C", "/home", sk, "-C", stage, "manifest.json", "databases"}
+	// 🔴 .sanalcp/token arşive GİRMEZ: /home/<sk>/.sanalcp/token canlı bir panel
+	// CLI kimlik bilgisidir (cliapi.WriteTokenFile). Yedekler S3'e / uzak hedefe
+	// gidiyor (bkz. s3.go, remote.go); sızan tek bir arşiv o domain için geçerli
+	// bir API token'ı verirdi. Token panel tarafından yeniden üretilebildiği için
+	// geri yüklemede kaybı yok. Desen anchored değildir → <sk>/.sanalcp/token eşleşir.
+	args := []string{"czf", filePath, "--exclude=.sanalcp/token",
+		"-C", "/home", sk, "-C", stage, "manifest.json", "databases"}
 	if out, err := exec.CommandContext(ctx, "tar", args...).CombinedOutput(); err != nil {
 		_ = os.Remove(filePath)
 		return 0, fmt.Errorf("tar: %s: %w", strings.TrimSpace(string(out)), err)
