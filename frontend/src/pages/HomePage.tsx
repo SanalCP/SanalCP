@@ -45,7 +45,11 @@ type Optimize = { calisiyor: boolean; durum: string }
 type YedekSatir = { domain_id: number; alan_adi: string; sayi: number; toplam_b: number; son_yedek: string }
 type YedekOzet = {
   domainler: YedekSatir[]; toplam_boyut_b: number; toplam_yedek: number
-  hedef_sayisi: number; zamanlama: string
+  hedef_sayisi: number
+  // Zamanlama artık sabit metin değil, gerçek ayarlardan geliyor:
+  // otomatik_domain 0 ise plan kapalı, zamanlama_saat -1 ise domainler
+  // farklı saatlerde çalışıyor demektir (bkz. backups.Ozet).
+  otomatik_domain: number; zamanlama_saat: number
 }
 type WpKurulum = {
   domain_id: number; alan_adi: string; dizin: string; surum: string
@@ -459,7 +463,11 @@ export default function HomePage() {
               <KV etiket={t('HomePage:son_yedek.last_backup')} deger={sonYedek || '—'} />
               <KV etiket={t('HomePage:son_yedek.backed_up_sites')} deger={t('HomePage:son_yedek.backed_up_value', { backed: yedekliDomain, total: yedek.domainler.length })} />
               <KV etiket={t('HomePage:son_yedek.remote_target')} deger={yedek.hedef_sayisi > 0 ? t('HomePage:son_yedek.target_active_count', { count: yedek.hedef_sayisi }) : t('HomePage:son_yedek.target_none')} />
-              <KV etiket={t('HomePage:son_yedek.schedule')} deger={yedek.zamanlama} />
+              <KV etiket={t('HomePage:son_yedek.schedule')} deger={
+                !yedek.otomatik_domain ? t('HomePage:son_yedek.schedule_off')
+                : yedek.zamanlama_saat < 0 ? t('HomePage:son_yedek.schedule_mixed')
+                : t('HomePage:son_yedek.schedule_daily', { hour: String(yedek.zamanlama_saat).padStart(2, '0') })
+              } />
             </div>
           </>
         )}

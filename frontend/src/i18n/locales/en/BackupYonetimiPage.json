@@ -4,19 +4,27 @@
   "breadcrumb": {
     "tools_settings": "Tools and Settings"
   },
-  "success_triggered": "Scheduled backup triggered — it will complete in a few seconds, then refresh.",
   "error_trigger_failed": "Could not trigger backup",
   "kpi": {
     "total_size": "Total Backup Size",
     "total_backups": "Total Backups",
+    "split": "{{auto}} automatic · {{manual}} manual",
     "domain_count": "Domain Count",
     "active_remote_target": "Active Remote Target",
     "s3_sftp": "S3 / SFTP"
   },
   "schedule": {
     "label": "🕒 Automatic backup:",
-    "default_time": "Daily at 03:00",
-    "retention": "7-day retention"
+    "off": "off",
+    "time": "Daily at {{hour}}:00",
+    "time_mixed": "per-domain hours",
+    "auto_none": "no automatic backups",
+    "auto_retention": "last {{n}} automatic backups kept",
+    "auto_retention_range": "last {{min}}–{{max}} automatic backups kept (varies by domain)",
+    "manual_unlimited": "manual backups kept indefinitely",
+    "manual_retention": "last {{n}} manual backups kept",
+    "manual_retention_range": "last {{min}}–{{max}} manual backups kept (varies by domain)",
+    "manual_mixed": "manual retention varies by domain"
   },
   "buttons": {
     "backup_now": "⏱ Backup All Domains Now",
@@ -25,6 +33,7 @@
   "table": {
     "title": "Domain Backups",
     "backup_count": "Backup Count",
+    "split": "{{auto}} automatic · {{manual}} manual",
     "total_size": "Total Size",
     "last_backup": "Last Backup",
     "no_domain": "No domains.",
@@ -32,6 +41,46 @@
     "manage": "Manage →",
     "manage_text": "Manage"
   },
+  "cleanup": {
+    "title": "Bulk Backup Cleanup",
+    "desc": "Retention limits only apply going forward — use this to clear backups that have already piled up. Deleted backups cannot be recovered.",
+    "count_label": "backups",
+    "nothing": "No backups match this criterion.",
+    "failed": "Cleanup failed",
+    "done": "{{count}} backups deleted, {{size}} freed.",
+    "confirm_title": "Delete backups",
+    "confirm_ok": "Delete permanently",
+    "confirm_oto": "{{count}} AUTOMATIC backups ({{size}}) across {{domains}} domains will be permanently deleted. Manual backups are not affected. This cannot be undone.",
+    "confirm_manuel": "{{count}} MANUAL backups ({{size}}) across {{domains}} domains will be permanently deleted. Automatic backups are not affected. This cannot be undone.",
+    "confirm_gun": "{{count}} backups ({{size}}) older than the last {{days}} days, across {{domains}} domains, will be permanently deleted. Both automatic and manual backups are included. This cannot be undone.",
+    "auto": {
+      "title": "All automatic backups",
+      "desc": "Deletes every backup taken by the scheduler. Your manual backups stay in place.",
+      "button": "Delete all automatic backups"
+    },
+    "manual": {
+      "title": "All manual backups",
+      "desc": "Deletes every backup taken by hand via \"Create Backup\". Scheduled backups stay in place.",
+      "button": "Delete all manual backups"
+    },
+    "days": {
+      "title": "Backups older than a given age",
+      "desc": "Deletes every backup older than the number of days you choose — automatic and manual alike.",
+      "keep_label": "Days to keep:",
+      "button": "Delete all except last {{days}} days"
+    }
+  },
   "info_note_before": "ℹ️ Backups are kept under ",
-  "info_note_after": ". Even if a domain is deleted, its backups are preserved (accidental-deletion recovery). For single-backup download/restore/target settings, go to \"{{manage}}\"."
+  "info_note_after": ". Even if a domain is deleted, its backups are preserved (accidental-deletion recovery). For single-backup download/restore/target settings, go to \"{{manage}}\".",
+  "bulk": {
+    "started": "Backup started for {{count}} domains — progress below.",
+    "no_domain": "No domains to back up.",
+    "running_button": "⏳ Backing up {{done}}/{{total}}",
+    "progress": "Backing up: {{done}} / {{total}} · currently {{domain}}",
+    "progress_other": "Another user's bulk backup is running: {{done}} / {{total}}",
+    "failed_count": "{{count}} failed",
+    "done": "Bulk backup complete — {{ok}} domains backed up.",
+    "done_partial": "Bulk backup finished — {{ok}} succeeded, {{failed}} failed.",
+    "errors_title": "Domains that could not be backed up"
+  }
 }

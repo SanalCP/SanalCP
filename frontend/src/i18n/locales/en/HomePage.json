@@ -87,7 +87,10 @@
     "remote_target": "Remote target",
     "target_active_count": "{{count}} active",
     "target_none": "None",
-    "schedule": "Schedule"
+    "schedule": "Schedule",
+    "schedule_off": "Off",
+    "schedule_daily": "Daily at {{hour}}:00",
+    "schedule_mixed": "Per domain"
   },
   "performans": {
     "baslik": "Performance / Optimize",

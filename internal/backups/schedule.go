@@ -15,11 +15,24 @@ import (
 )
 
 type Schedule struct {
-	Freq         string `json:"freq"`           // "none" | "daily" | "weekly" | "monthly"
-	Hour         int    `json:"hour"`           // 0-23
-	Retention    int    `json:"retention"`      // keep last N
-	LastBackupAt string `json:"last_backup_at"` // RFC3339 or empty
+	Freq string `json:"freq"` // "none" | "daily" | "weekly" | "monthly"
+	Hour int    `json:"hour"` // 0-23
+	// Retention: kaç OTOMATİK yedek tutulacağı (adet, gün değil). Frekans
+	// weekly ise 7 = 7 hafta demektir.
+	Retention int `json:"retention"`
+	// ManuelRetention: kaç MANUEL yedek tutulacağı. 0 = sınırsız (varsayılan),
+	// yani elle alınan yedek kendiliğinden silinmez. Bkz. migrations/0065.
+	ManuelRetention int    `json:"manuel_retention"`
+	LastBackupAt    string `json:"last_backup_at"` // RFC3339 or empty
 }
+
+// Yedek tipleri: DB'deki backups.tip sütununun aldığı iki değer.
+// TipOto scheduler tarafından, TipManuel ise kullanıcı "Yedek Al" dediğinde
+// yazılır. Retention ikisini AYRI havuz olarak budar.
+const (
+	TipOto    = "oto"
+	TipManuel = "tam"
+)
 
 func gecerliFreq(f string) bool {
 	return f == "none" || f == "daily" || f == "weekly" || f == "monthly"
@@ -41,13 +54,14 @@ func StartScheduler(db *sql.DB) {
 }
 
 type dueDomain struct {
-	ID        int64
-	AlanAdi   string
-	SK        string
-	Freq      string
-	Hour      int
-	Retention int
-	IsDemo    int
+	ID              int64
+	AlanAdi         string
+	SK              string
+	Freq            string
+	Hour            int
+	Retention       int
+	ManuelRetention int
+	IsDemo          int
 }
 
 // TickOnce: scheduler tick'i tek seferlik manuel çağrı (test + operatör force-run için).
@@ -63,7 +77,7 @@ func tickOnce(db *sql.DB) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, alan_adi, sistem_kullanici,
 		       COALESCE(backup_freq,'none'), COALESCE(backup_hour,3),
-		       COALESCE(backup_retention,7), is_demo,
+		       COALESCE(backup_retention,7), COALESCE(backup_manuel_retention,0), is_demo,
 		       UNIX_TIMESTAMP(last_backup_at)
 		FROM domains
 		WHERE COALESCE(backup_freq,'none') != 'none'
@@ -80,7 +94,8 @@ func tickOnce(db *sql.DB) {
 	for rows.Next() {
 		var d dueDomain
 		var lastTs sql.NullInt64
-		if err := rows.Scan(&d.ID, &d.AlanAdi, &d.SK, &d.Freq, &d.Hour, &d.Retention, &d.IsDemo, &lastTs); err != nil {
+		if err := rows.Scan(&d.ID, &d.AlanAdi, &d.SK, &d.Freq, &d.Hour, &d.Retention,
+			&d.ManuelRetention, &d.IsDemo, &lastTs); err != nil {
 			log.Printf("backup scheduler scan: %v", err)
 			continue
 		}
@@ -104,18 +119,30 @@ func tickOnce(db *sql.DB) {
 	log.Printf("backup scheduler: %d due domain bulundu", len(due))
 
 	for _, d := range due {
-		if err := runOneBackup(db, d); err != nil {
+		if err := runOneBackup(db, d, "Otomatik yedek ("+d.Freq+")"); err != nil {
 			log.Printf("backup scheduler %s: %v", d.AlanAdi, err)
-			continue
+			// continue YOK: yedek başarısız olsa da retention uygulanır.
+			// Aksi halde sürekli hata veren bir domainde (dolu disk, bozuk
+			// veritabanı) eski yedekler sonsuza dek birikir — yani tam da
+			// diskin en dar olduğu anda temizlik durur.
 		}
 		if err := pruneOld(db, d.ID, d.SK, d.Retention); err != nil {
 			log.Printf("backup retention %s: %v", d.AlanAdi, err)
+		}
+		if err := pruneManuel(db, d.ID, d.SK, d.ManuelRetention); err != nil {
+			log.Printf("backup manuel retention %s: %v", d.AlanAdi, err)
 		}
 	}
 }
 
 // runOneBackup: bir domain için backup üret + DB'ye kaydet + last_backup_at güncelle.
-func runOneBackup(db *sql.DB, d dueDomain) error {
+//
+// notlar, backups.notlar sütununa yazılır: yedeğin planlayıcıdan mı yoksa
+// operatörün "Tüm Domainleri Şimdi Yedekle" düğmesinden mi geldiğini listede
+// ayırt edebilmek için. Her iki yol da tip='oto' üretir — ikisi de otomatik
+// retention havuzuna girer, aksi halde düğmeye her basış diskte kalıcı bir
+// yedek bırakırdı.
+func runOneBackup(db *sql.DB, d dueDomain, notlar string) error {
 	if !strings.HasPrefix(d.SK, "c_") {
 		return fmt.Errorf("güvensiz sk: %s", d.SK)
 	}
@@ -133,7 +160,7 @@ func runOneBackup(db *sql.DB, d dueDomain) error {
 
 	res, err := db.Exec(
 		`INSERT INTO backups(domain_id, tip, dosya, boyut_b, notlar) VALUES(?,?,?,?,?)`,
-		d.ID, "oto", dosya, boyut, "Otomatik yedek ("+d.Freq+")")
+		d.ID, TipOto, dosya, boyut, notlar)
 	if err != nil {
 		return fmt.Errorf("DB kayıt: %w", err)
 	}
@@ -147,15 +174,34 @@ func runOneBackup(db *sql.DB, d dueDomain) error {
 	return nil
 }
 
-// pruneOld: en yeni N yedek kalsın, geri kalan tüm 'oto' tipli yedekleri sil (manuel yedek korunur).
+// pruneOld: otomatik yedeklerden en yeni N tanesi kalsın, gerisi silinsin.
+// Manuel yedeklere DOKUNMAZ — onların ayrı sayacı var (bkz. pruneManuel).
 func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 	if retention < 1 {
 		retention = 1
 	}
+	return pruneTip(db, domainID, sk, TipOto, retention)
+}
+
+// pruneManuel: elle alınan yedeklerden en yeni N tanesi kalsın.
+//
+// keep < 1 ise HİÇBİR ŞEY silinmez (sınırsız). Bu, sütunun varsayılanıdır ve
+// kasıtlıdır: manuel yedek kullanıcının bilinçli bir kararıdır, panel onu
+// kullanıcı bir sınır koymadıkça kendi başına atmaz.
+func pruneManuel(db *sql.DB, domainID int64, sk string, keep int) error {
+	if keep < 1 {
+		return nil
+	}
+	return pruneTip(db, domainID, sk, TipManuel, keep)
+}
+
+// pruneTip: tek bir yedek tipi içinde en yeni `keep` kaydı bırakır, gerisini
+// diskten + uzak hedeften + DB'den siler.
+func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
 	rows, err := db.Query(
 		`SELECT id, dosya, uzak_durum FROM backups
-		 WHERE domain_id=? AND tip='oto'
-		 ORDER BY id DESC`, domainID)
+		 WHERE domain_id=? AND tip=?
+		 ORDER BY id DESC`, domainID, tip)
 	if err != nil {
 		return err
 	}
@@ -175,11 +221,11 @@ func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 		all = append(all, it)
 	}
 	rows.Close()
-	if len(all) <= retention {
+	if len(all) <= keep {
 		return nil
 	}
 	// En yeni N tut, geri kalan sil
-	old := all[retention:]
+	old := all[keep:]
 	sort.Slice(old, func(i, j int) bool { return old[i].ID < old[j].ID })
 	for _, it := range old {
 		yol := filepath.Join(BackupRoot, sk, it.Dosya)
@@ -187,6 +233,7 @@ func pruneOld(db *sql.DB, domainID int64, sk string, retention int) error {
 		deleteRemoteBestEffort(db, domainID, it.Dosya, it.UzakDurum)
 		_, _ = db.Exec(`DELETE FROM backups WHERE id=?`, it.ID)
 	}
-	log.Printf("backup retention domain=%d: %d eski yedek silindi (keep %d)", domainID, len(old), retention)
+	log.Printf("backup retention domain=%d tip=%s: %d eski yedek silindi (keep %d)",
+		domainID, tip, len(old), keep)
 	return nil
 }

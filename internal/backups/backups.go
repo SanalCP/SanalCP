@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -102,6 +103,23 @@ type OzetSatir struct {
 	Sayi     int    `json:"sayi"`
 	ToplamB  int64  `json:"toplam_b"`
 	SonYedek string `json:"son_yedek"`
+	// Kırılım: arayüz "7 saklanır ama 9 var" çelişkisini ancak otomatik ve
+	// manuel sayıyı ayrı gösterebilirse açıklayabilir.
+	OtoSayi         int    `json:"oto_sayi"`
+	ManuelSayi      int    `json:"manuel_sayi"`
+	Freq            string `json:"freq"`
+	Retention       int    `json:"retention"`
+	ManuelRetention int    `json:"manuel_retention"`
+}
+
+// otomatikDosya: dosya adından yedeğin otomatik mi olduğunu söyler.
+//
+// runOneBackup "<sk>-auto-<damga>.tar.gz", manuel Create ise "<sk>-<damga>.tar.gz"
+// yazar. Ayrım sk ÖNEKİNE dayanmalı, düz "-auto-" araması yapılmamalı: sistem
+// kullanıcısı domainden türediği için "c_my-auto" gibi bir sk mümkündür ve onun
+// manuel dosyası da "-auto-" içerir. Önek kontrolü bu tuzağa düşmez.
+func otomatikDosya(sk, ad string) bool {
+	return strings.HasPrefix(ad, sk+"-auto-")
 }
 
 // Ozet: GET /admin/backups/ozet — TÜM domainlerin yedek özeti (dosya sisteminden, gerçek disk kullanımı).
@@ -109,7 +127,10 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	// Kapsam: bayi yalnız kendi müşterilerinin yedek özetini görür.
 	kosul, arg := middleware.KapsamSQL(r, "d")
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT d.id, d.alan_adi, d.sistem_kullanici FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
+		`SELECT d.id, d.alan_adi, d.sistem_kullanici,
+		        COALESCE(d.backup_freq,'none'), COALESCE(d.backup_hour,3),
+		        COALESCE(d.backup_retention,7), COALESCE(d.backup_manuel_retention,0)
+		 FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
 		return
@@ -117,14 +138,24 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	out := []OzetSatir{}
 	var toplamB int64
-	var toplamSayi int
+	var toplamSayi, toplamOto, toplamManuel int
+	// Banner artık sabit metin değil, gerçek veriden kuruluyor. Domainler farklı
+	// ayarlarda olabildiği için tek değer yerine aralık taşınır; arayüz min==max
+	// ise tek sayı, değilse "1–30" gösterir.
+	otoDomain, saat := 0, -1
+	saatKarisik := false
+	retMin, retMax := 0, 0
+	manRetMin, manRetMax := -1, -1
 	for rows.Next() {
 		var id int64
 		var alanAdi, sk string
-		if err := rows.Scan(&id, &alanAdi, &sk); err != nil {
+		var hour int
+		s := OzetSatir{}
+		if err := rows.Scan(&id, &alanAdi, &sk, &s.Freq, &hour,
+			&s.Retention, &s.ManuelRetention); err != nil {
 			continue
 		}
-		s := OzetSatir{DomainID: id, AlanAdi: alanAdi}
+		s.DomainID, s.AlanAdi = id, alanAdi
 		var sonMod time.Time
 		if entries, e := os.ReadDir(filepath.Join(BackupRoot, sk)); e == nil {
 			for _, en := range entries {
@@ -136,6 +167,11 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				s.Sayi++
+				if otomatikDosya(sk, en.Name()) {
+					s.OtoSayi++
+				} else {
+					s.ManuelSayi++
+				}
 				s.ToplamB += fi.Size()
 				if fi.ModTime().After(sonMod) {
 					sonMod = fi.ModTime()
@@ -145,19 +181,54 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 		if !sonMod.IsZero() {
 			s.SonYedek = sonMod.Format("2006-01-02 15:04")
 		}
+		if s.Freq != "none" {
+			otoDomain++
+			if saat == -1 {
+				saat = hour
+			} else if saat != hour {
+				saatKarisik = true
+			}
+			if retMin == 0 || s.Retention < retMin {
+				retMin = s.Retention
+			}
+			if s.Retention > retMax {
+				retMax = s.Retention
+			}
+		}
+		if manRetMin == -1 || s.ManuelRetention < manRetMin {
+			manRetMin = s.ManuelRetention
+		}
+		if s.ManuelRetention > manRetMax {
+			manRetMax = s.ManuelRetention
+		}
 		out = append(out, s)
 		toplamB += s.ToplamB
 		toplamSayi += s.Sayi
+		toplamOto += s.OtoSayi
+		toplamManuel += s.ManuelSayi
 	}
 	_ = rows.Err()
+	if saatKarisik {
+		saat = -1 // arayüz "domain bazında" yazar
+	}
+	if manRetMin == -1 {
+		manRetMin, manRetMax = 0, 0
+	}
 	var hedefSayisi int
 	_ = h.DB.QueryRow(`SELECT COUNT(*) FROM backup_destinations WHERE aktif=1`).Scan(&hedefSayisi)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"domainler":      out,
-		"toplam_boyut_b": toplamB,
-		"toplam_yedek":   toplamSayi,
-		"hedef_sayisi":   hedefSayisi,
-		"zamanlama":      "Her gün 03:00 (otomatik)",
+		"domainler":       out,
+		"toplam_boyut_b":  toplamB,
+		"toplam_yedek":    toplamSayi,
+		"toplam_oto":      toplamOto,
+		"toplam_manuel":   toplamManuel,
+		"hedef_sayisi":    hedefSayisi,
+		"otomatik_domain": otoDomain,
+		"zamanlama_saat":  saat, // -1: domainler farklı saatlerde
+		"retention_min":   retMin,
+		"retention_max":   retMax,
+		"manuel_ret_min":  manRetMin,
+		"manuel_ret_max":  manRetMax,
 	})
 }
 
@@ -194,7 +265,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.DB.ExecContext(r.Context(),
 		`INSERT INTO backups(domain_id, tip, dosya, boyut_b, notlar) VALUES(?,?,?,?,?)`,
-		id, "tam", dosya, boyut, "alan adı: "+alanAdi)
+		id, TipManuel, dosya, boyut, "alan adı: "+alanAdi)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB kayıt: "+err.Error())
 		return
@@ -202,6 +273,19 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	yid, _ := res.LastInsertId()
 	// Uzak hedef varsa arkaplanda yükle (API cevabını bloke etme)
 	pushToDestinationAsync(h.DB, id, yid, abs, dosya)
+
+	// Manuel retention'ı BURADA uygula, scheduler'da değil: scheduler yalnızca
+	// backup_freq != 'none' olan domainlere uğrar, dolayısıyla otomatik yedeği
+	// kapalı bir domainde manuel sınır hiç işlemezdi. Yeni kayıt en yüksek
+	// id'ye sahip olduğu için budama onu asla silmez.
+	var manuelRet int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COALESCE(backup_manuel_retention,0) FROM domains WHERE id=?`, id).
+		Scan(&manuelRet); err == nil {
+		if err := pruneManuel(h.DB, id, sk, manuelRet); err != nil {
+			log.Printf("manuel retention domain=%d: %v", id, err)
+		}
+	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
 		"ok":      true,
 		"id":      yid,

@@ -19,15 +19,30 @@
     "desc": "While the schedule is active, the panel scans every hour; a backup is produced in the matching hour slot and backups outside the retention window are deleted.",
     "last_backup": "Last auto-backup:",
     "options": {
-      "none": { "name": "Off", "desc": "No automatic backup. Manual \"Backup Now\" only." },
-      "daily": { "name": "Daily", "desc": "A backup is produced every day at the selected hour, last N kept." },
-      "weekly": { "name": "Weekly", "desc": "One backup every 7 days, more economical disk usage." },
-      "monthly": { "name": "Monthly", "desc": "Roughly monthly long-term archive backup." }
+      "none": {
+        "name": "Off",
+        "desc": "No automatic backup. Manual \"Backup Now\" only."
+      },
+      "daily": {
+        "name": "Daily",
+        "desc": "A backup is produced every day at the selected hour, last N kept."
+      },
+      "weekly": {
+        "name": "Weekly",
+        "desc": "One backup every 7 days, more economical disk usage."
+      },
+      "monthly": {
+        "name": "Monthly",
+        "desc": "Roughly monthly long-term archive backup."
+      }
     },
     "active_badge": "● Active",
     "hour_label": "Run hour (local)",
-    "retention_label": "Number of backups to keep (retention)",
-    "retention_hint": "Older auto-backups beyond this number are deleted. Manual backups are preserved.",
+    "retention_label": "Number of automatic backups to keep",
+    "retention_hint": "Older AUTOMATIC backups beyond this number are deleted. This is a count, not days.",
+    "manual_retention_label": "Number of manual backups to keep",
+    "manual_retention_hint": "The newest {{n}} manual backups are kept, older ones deleted. Enter 0 to remove the limit.",
+    "manual_retention_hint_unlimited": "0 = unlimited. Backups you take by hand are never auto-deleted; enter 1-90 to set a limit.",
     "saved_off": "Automatic backup disabled",
     "saved_on": "Automatic backup active: {{freq}}, {{hour}}:00, last {{retention}} backups kept",
     "save_failed": "Schedule could not be saved"
@@ -39,7 +54,12 @@
     "status_err": "✗ Last: error",
     "last_upload": "Last upload:",
     "protocol_label": "Provider / protocol",
-    "providers": { "sftp": "🔒 SFTP", "ftp": "📡 FTP", "s3": "☁️ Amazon S3", "b2": "🗄️ Backblaze B2" },
+    "providers": {
+      "sftp": "🔒 SFTP",
+      "ftp": "📡 FTP",
+      "s3": "☁️ Amazon S3",
+      "b2": "🗄️ Backblaze B2"
+    },
     "host_label": "Host",
     "host_placeholder": "backup.company.com",
     "port_label": "Port",

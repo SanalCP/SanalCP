@@ -591,6 +591,13 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-schedule", backupsH.SetSchedule)
 				r.With(middleware.AdminOnly).Post("/admin/backups/tick", backupsH.TickNow)
 				r.With(middleware.BayiVeUstu).Get("/admin/backups/ozet", backupsH.Ozet)
+				// Toplu temizlik: kapsam Ozet ile aynı — bayi yalnız kendi
+				// müşterilerinin yedeklerini siler (bkz. middleware.KapsamSQL).
+				r.With(middleware.BayiVeUstu).Post("/admin/backups/temizle", backupsH.Temizle)
+				// Toplu yedekleme: /tick'ten farkı, saat/frekans filtresi
+				// uygulamadan kapsamdaki her domaini şimdi yedeklemesi.
+				r.With(middleware.BayiVeUstu).Post("/admin/backups/hepsini-yedekle", backupsH.HepsiniYedekle)
+				r.With(middleware.BayiVeUstu).Get("/admin/backups/toplu-durum", backupsH.TopluYedekDurum)
 				r.With(middleware.AdminOnly).Post("/admin/transfers/analyze", transfersH.Analyze)
 				r.With(middleware.AdminOnly).Post("/admin/transfers/import", transfersH.Import)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-destination", backupsH.GetDestination)

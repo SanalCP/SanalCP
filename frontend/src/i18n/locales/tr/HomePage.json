@@ -87,7 +87,10 @@
     "remote_target": "Uzak hedef",
     "target_active_count": "{{count}} aktif",
     "target_none": "Yok",
-    "schedule": "Zamanlama"
+    "schedule": "Zamanlama",
+    "schedule_off": "Kapalı",
+    "schedule_daily": "Her gün {{hour}}:00",
+    "schedule_mixed": "Domain bazında"
   },
   "performans": {
     "baslik": "Performans / Optimize",

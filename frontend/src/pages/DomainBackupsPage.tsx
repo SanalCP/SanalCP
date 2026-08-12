@@ -13,7 +13,13 @@ type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string }
 type DB = { db_name: string }
 type RestoreScope = 'full' | 'files' | 'file' | 'database' | 'email'
-type Schedule = { freq: 'none' | 'daily' | 'weekly' | 'monthly'; hour: number; retention: number; last_backup_at?: string }
+type Schedule = {
+  freq: 'none' | 'daily' | 'weekly' | 'monthly'; hour: number
+  retention: number          // kaç OTOMATİK yedek tutulacak
+  manuel_retention: number   // kaç MANUEL yedek tutulacak — 0 = sınırsız
+  last_backup_at?: string
+}
+const bosSchedule: Schedule = { freq: 'none', hour: 3, retention: 7, manuel_retention: 0 }
 type Destination = {
   yok?: boolean
   id?: number; tip?: DestTip; host?: string; port?: number
@@ -44,7 +50,7 @@ export default function DomainBackupsPage() {
   const [restoreDatabase, setRestoreDatabase] = useState('')
   const [databases, setDatabases] = useState<DB[]>([])
 
-  const [sched, setSched] = useState<Schedule>({ freq: 'none', hour: 3, retention: 7 })
+  const [sched, setSched] = useState<Schedule>(bosSchedule)
   const [schedKayit, setSchedKayit] = useState(false)
 
   const [dest, setDest] = useState<Destination>({ yok: true })
@@ -57,7 +63,7 @@ export default function DomainBackupsPage() {
     setYuk(true)
     Promise.all([
       api.get<Yedek[]>(`/domains/${id}/backups`),
-      api.get<Schedule>(`/domains/${id}/backup-schedule`).catch(() => ({ data: { freq: 'none', hour: 3, retention: 7 } as Schedule })),
+      api.get<Schedule>(`/domains/${id}/backup-schedule`).catch(() => ({ data: bosSchedule })),
       api.get<Destination>(`/domains/${id}/backup-destination`).catch(() => ({ data: { yok: true } as Destination })),
       api.get<DB[]>(`/domains/${id}/databases`).catch(() => ({ data: [] as DB[] })),
     ]).then(([y, s, d, dbs]) => {
@@ -287,6 +293,24 @@ export default function DomainBackupsPage() {
             </label>
           </div>
         )}
+
+        {/* Manuel saklama: freq'ten BAĞIMSIZ gösterilir — otomatik yedek kapalı
+            olsa da kullanıcı elle yedek alabilir, sınır orada da geçerlidir. */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+          <label className="block sm:w-1/2">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:schedule.manual_retention_label')}</span>
+            <input type="number" min={0} max={90} value={sched.manuel_retention}
+              onChange={e => setSched(s => ({...s, manuel_retention: Math.max(0, Math.min(90, Number(e.target.value)||0))}))}
+              onBlur={() => scheduleKaydet(sched)}
+              disabled={schedKayit}
+              className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
+            <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5 block">
+              {sched.manuel_retention === 0
+                ? t('DomainBackupsPage:schedule.manual_retention_hint_unlimited')
+                : t('DomainBackupsPage:schedule.manual_retention_hint', { n: sched.manuel_retention })}
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Uzak Yedek Hedefi */}

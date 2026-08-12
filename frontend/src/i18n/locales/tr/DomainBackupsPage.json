@@ -19,15 +19,30 @@
     "desc": "Plan aktifken panel her saat tarama yapar; gelen saat slot'unda yedek üretilip retention dışına çıkanlar silinir.",
     "last_backup": "Son oto-yedek:",
     "options": {
-      "none": { "name": "Kapalı", "desc": "Otomatik yedek yok. Yalnız manuel \"Şimdi Yedekle\"." },
-      "daily": { "name": "Günlük", "desc": "Her gün seçilen saatte yedek üretilir, son N tutulur." },
-      "weekly": { "name": "Haftalık", "desc": "Her 7 günde bir yedek, daha ekonomik disk kullanımı." },
-      "monthly": { "name": "Aylık", "desc": "Yaklaşık her ay uzun dönem arşiv yedeği." }
+      "none": {
+        "name": "Kapalı",
+        "desc": "Otomatik yedek yok. Yalnız manuel \"Şimdi Yedekle\"."
+      },
+      "daily": {
+        "name": "Günlük",
+        "desc": "Her gün seçilen saatte yedek üretilir, son N tutulur."
+      },
+      "weekly": {
+        "name": "Haftalık",
+        "desc": "Her 7 günde bir yedek, daha ekonomik disk kullanımı."
+      },
+      "monthly": {
+        "name": "Aylık",
+        "desc": "Yaklaşık her ay uzun dönem arşiv yedeği."
+      }
     },
     "active_badge": "● Aktif",
     "hour_label": "Çalışma saati (yerel)",
-    "retention_label": "Tutulacak yedek sayısı (retention)",
-    "retention_hint": "Bu sayıyı aşan eski oto-yedekler silinir. Manuel yedekler korunur.",
+    "retention_label": "Tutulacak otomatik yedek sayısı",
+    "retention_hint": "Bu sayıyı aşan eski OTOMATİK yedekler silinir. Sayı adettir, gün değil.",
+    "manual_retention_label": "Tutulacak manuel yedek sayısı",
+    "manual_retention_hint": "En yeni {{n}} manuel yedek tutulur, eskileri silinir. 0 yazarsanız sınır kalkar.",
+    "manual_retention_hint_unlimited": "0 = sınırsız. Elle aldığınız yedekler kendiliğinden silinmez; sınır koymak için 1-90 arası bir sayı girin.",
     "saved_off": "Otomatik yedek kapatıldı",
     "saved_on": "Otomatik yedek aktif: {{freq}}, {{hour}}:00, son {{retention}} yedek tutulur",
     "save_failed": "Plan kaydedilemedi"
@@ -39,7 +54,12 @@
     "status_err": "✗ Son: hata",
     "last_upload": "Son yükleme:",
     "protocol_label": "Sağlayıcı / protokol",
-    "providers": { "sftp": "🔒 SFTP", "ftp": "📡 FTP", "s3": "☁️ Amazon S3", "b2": "🗄️ Backblaze B2" },
+    "providers": {
+      "sftp": "🔒 SFTP",
+      "ftp": "📡 FTP",
+      "s3": "☁️ Amazon S3",
+      "b2": "🗄️ Backblaze B2"
+    },
     "host_label": "Host",
     "host_placeholder": "backup.firma.com",
     "port_label": "Port",

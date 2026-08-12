@@ -4,19 +4,27 @@
   "breadcrumb": {
     "tools_settings": "Araçlar ve Ayarlar"
   },
-  "success_triggered": "Planlı yedekleme tetiklendi — birkaç saniye içinde tamamlanır, sonra yenileyin.",
   "error_trigger_failed": "Yedekleme tetiklenemedi",
   "kpi": {
     "total_size": "Toplam Yedek Boyutu",
     "total_backups": "Toplam Yedek",
+    "split": "{{auto}} otomatik · {{manual}} manuel",
     "domain_count": "Domain Sayısı",
     "active_remote_target": "Aktif Uzak Hedef",
     "s3_sftp": "S3 / SFTP"
   },
   "schedule": {
     "label": "🕒 Otomatik yedekleme:",
-    "default_time": "Her gün 03:00",
-    "retention": "7 günlük saklama"
+    "off": "kapalı",
+    "time": "Her gün {{hour}}:00",
+    "time_mixed": "domain bazında saatlerde",
+    "auto_none": "otomatik yedek alınmıyor",
+    "auto_retention": "son {{n}} otomatik yedek saklanır",
+    "auto_retention_range": "son {{min}}–{{max}} otomatik yedek saklanır (domaine göre)",
+    "manual_unlimited": "manuel yedekler sınırsız saklanır",
+    "manual_retention": "son {{n}} manuel yedek saklanır",
+    "manual_retention_range": "son {{min}}–{{max}} manuel yedek saklanır (domaine göre)",
+    "manual_mixed": "manuel saklama domaine göre değişir"
   },
   "buttons": {
     "backup_now": "⏱ Tüm Domainleri Şimdi Yedekle",
@@ -25,6 +33,7 @@
   "table": {
     "title": "Domain Yedekleri",
     "backup_count": "Yedek Sayısı",
+    "split": "{{auto}} otomatik · {{manual}} manuel",
     "total_size": "Toplam Boyut",
     "last_backup": "Son Yedek",
     "no_domain": "Domain yok.",
@@ -32,6 +41,46 @@
     "manage": "Yönet →",
     "manage_text": "Yönet"
   },
+  "cleanup": {
+    "title": "Toplu Yedek Temizliği",
+    "desc": "Saklama sınırı yalnızca ileriye dönük çalışır — geçmişte birikmiş yedekleri buradan tek hamlede silebilirsiniz. Silinen yedek geri getirilemez.",
+    "count_label": "yedek",
+    "nothing": "Bu ölçüte uyan silinecek yedek yok.",
+    "failed": "Temizlik yapılamadı",
+    "done": "{{count}} yedek silindi, {{size}} yer açıldı.",
+    "confirm_title": "Yedekleri sil",
+    "confirm_ok": "Kalıcı olarak sil",
+    "confirm_oto": "{{domains}} domainde {{count}} OTOMATİK yedek ({{size}}) kalıcı olarak silinecek. Manuel yedekler etkilenmez. Bu işlem geri alınamaz.",
+    "confirm_manuel": "{{domains}} domainde {{count}} MANUEL yedek ({{size}}) kalıcı olarak silinecek. Otomatik yedekler etkilenmez. Bu işlem geri alınamaz.",
+    "confirm_gun": "Son {{days}} günün dışında kalan {{count}} yedek ({{size}}), {{domains}} domainde kalıcı olarak silinecek. Otomatik ve manuel yedeklerin ikisi de kapsama girer. Bu işlem geri alınamaz.",
+    "auto": {
+      "title": "Tüm otomatik yedekler",
+      "desc": "Planlayıcının aldığı tüm yedekleri siler. Manuel yedekleriniz yerinde kalır.",
+      "button": "Tüm otomatik yedekleri sil"
+    },
+    "manual": {
+      "title": "Tüm manuel yedekler",
+      "desc": "Elle \"Yedek Al\" ile alınmış tüm yedekleri siler. Planlı yedekler yerinde kalır.",
+      "button": "Tüm manuel yedekleri sil"
+    },
+    "days": {
+      "title": "Belirli yaştan eski yedekler",
+      "desc": "Seçtiğiniz gün sayısından eski olan her yedeği siler — otomatik ve manuel ayrımı yapmadan.",
+      "keep_label": "Korunacak gün:",
+      "button": "Son {{days}} gün hariç tümünü sil"
+    }
+  },
   "info_note_before": "ℹ️ Yedekler ",
-  "info_note_after": " altında tutulur. Domain silinse bile yedekleri korunur (yanlış silme kurtarma). Tekil yedek indirme/geri yükleme/hedef ayarı için \"{{manage}}\"e girin."
+  "info_note_after": " altında tutulur. Domain silinse bile yedekleri korunur (yanlış silme kurtarma). Tekil yedek indirme/geri yükleme/hedef ayarı için \"{{manage}}\"e girin.",
+  "bulk": {
+    "started": "{{count}} domain için yedekleme başladı — ilerleme aşağıda.",
+    "no_domain": "Yedeklenecek domain yok.",
+    "running_button": "⏳ Yedekleniyor {{done}}/{{total}}",
+    "progress": "Yedekleniyor: {{done}} / {{total}} · şu an {{domain}}",
+    "progress_other": "Başka bir kullanıcının toplu yedeklemesi sürüyor: {{done}} / {{total}}",
+    "failed_count": "{{count}} başarısız",
+    "done": "Toplu yedekleme tamamlandı — {{ok}} domain yedeklendi.",
+    "done_partial": "Toplu yedekleme bitti — {{ok}} başarılı, {{failed}} başarısız.",
+    "errors_title": "Yedeklenemeyen domainler"
+  }
 }
