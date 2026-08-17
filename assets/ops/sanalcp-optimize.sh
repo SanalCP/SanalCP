@@ -13,6 +13,8 @@ for a in "$@"; do case "$a" in --no-restart) NO_RESTART=1;; --dry-run) DRY=1;; e
 
 log(){ printf '  %s\n' "$*"; }
 hata(){ printf '  ✗ %s\n' "$*" >&2; }
+# düşürme koruması: önerilen mevcuttan düşükse mevcudu koru (hiçbir tuning geriye gitmez)
+mx(){ [ "$1" -gt "$2" ] 2>/dev/null && echo "$1" || echo "$2"; }
 
 # Panelin kendi bakım işleri (Optimize düğmesi) bunu PANEL_LANG env'i ile çağırır;
 # SSH'ten elle çalıştırıldığında DB'den panel_ayarlari.varsayilan_dil okunur.
@@ -39,6 +41,10 @@ fi
 BP_MB=$(( RAM_MB * BP_PCT / 100 ))
 BP_MB=$(( (BP_MB / 256) * 256 ))          # 256M katına yuvarla (instance hizalama)
 [ "$BP_MB" -lt 256 ] && BP_MB=256
+# düşürme koruması: canlı MariaDB'den mevcut buffer_pool'u oku, hesaplanan bundan düşükse mevcudu koru
+CUR_BP_MB=$(mysql -N -e "SELECT ROUND(@@global.innodb_buffer_pool_size/1048576)" 2>/dev/null)
+[ -z "$CUR_BP_MB" ] && CUR_BP_MB=0
+BP_MB=$(mx "$BP_MB" "$CUR_BP_MB")
 BP_INST=$(( BP_MB / 1024 )); [ "$BP_INST" -lt 1 ] && BP_INST=1; [ "$BP_INST" -gt 8 ] && BP_INST=8
 # redo log: buffer pool'un ~1/3'ü, 128M–512M arası, 128M katı
 LOG_MB=$(( BP_MB / 3 )); LOG_MB=$(( (LOG_MB / 128) * 128 ))
@@ -47,15 +53,49 @@ THREAD_CACHE=$(( CPU * 16 )); [ "$THREAD_CACHE" -gt 100 ] && THREAD_CACHE=100
 IO_THREADS=$CPU; [ "$IO_THREADS" -gt 8 ] && IO_THREADS=8; [ "$IO_THREADS" -lt 4 ] && IO_THREADS=4
 
 # ---------- nginx değerleri ----------
+NGINX_CONF=/etc/nginx/nginx.conf
 NGX_CONN=4096; [ "$RAM_MB" -lt 2048 ] && NGX_CONN=2048
+# düşürme koruması: mevcut worker_connections hesaplanandan yüksekse dokunma
+CUR_NGX_CONN=$(grep -m1 -E '^[[:space:]]*worker_connections[[:space:]]+[0-9]+;' "$NGINX_CONF" 2>/dev/null | grep -oE '[0-9]+')
+[ -z "$CUR_NGX_CONN" ] && CUR_NGX_CONN=0
+NGX_CONN=$(mx "$NGX_CONN" "$CUR_NGX_CONN")
+
+# ---------- sysctl değerleri ----------
+FILEMAX=$(( RAM_MB * 256 )); [ "$FILEMAX" -lt 500000 ] && FILEMAX=500000
+CUR_FILEMAX=$(sysctl -n fs.file-max 2>/dev/null)
+[ -z "$CUR_FILEMAX" ] && CUR_FILEMAX=0
+FILEMAX=$(mx "$FILEMAX" "$CUR_FILEMAX")
+
+BACKLOG=$(( CPU * 2500 )); [ "$BACKLOG" -lt 5000 ] && BACKLOG=5000; [ "$BACKLOG" -gt 30000 ] && BACKLOG=30000
+CUR_BACKLOG=$(sysctl -n net.core.netdev_max_backlog 2>/dev/null)
+[ -z "$CUR_BACKLOG" ] && CUR_BACKLOG=0
+BACKLOG=$(mx "$BACKLOG" "$CUR_BACKLOG")
 
 echo "$(t "════════ Hesaplanan değerler (RAM=${RAM_MB}MB, CPU=${CPU}) ════════" "════════ Computed values (RAM=${RAM_MB}MB, CPU=${CPU}) ════════")"
 log "MariaDB: buffer_pool=${BP_MB}M (${BP_PCT}%, ${BP_INST} instance) · redo_log=${LOG_MB}M · thread_cache=${THREAD_CACHE} · io_threads=${IO_THREADS}"
 log "MariaDB: flush_log_at_trx_commit=2 (perf) · io_capacity=1000/2000 (SSD) · skip_name_resolve=ON · utf8mb4"
 log "nginx: worker_connections=${NGX_CONN} · worker_rlimit_nofile=65535 · multi_accept+epoll · http tuning"
+log "sysctl: fs.file-max=${FILEMAX} · net.core.netdev_max_backlog=${BACKLOG}"
 [ "$DRY" = 1 ] && { echo "  $(t "(dry-run — değişiklik yapılmadı)" "(dry run — no changes made)")"; exit 0; }
 
 TS=$(date +%s)
+
+# ================= SYSCTL =================
+echo "════════ sysctl ════════"
+SYSCTL_CONF=/etc/sysctl.d/99-sanalcp-optimize.conf
+SYSCTL_LINES=""
+[ "$FILEMAX" -gt "$CUR_FILEMAX" ] && SYSCTL_LINES="${SYSCTL_LINES}fs.file-max = ${FILEMAX}\n"
+[ "$BACKLOG" -gt "$CUR_BACKLOG" ] && SYSCTL_LINES="${SYSCTL_LINES}net.core.netdev_max_backlog = ${BACKLOG}\n"
+if [ -n "$SYSCTL_LINES" ]; then
+  { echo "# SanalCP sysctl tuning — otomatik üretildi. sanalcp-optimize ile yenile."; printf '%b' "$SYSCTL_LINES"; } > "$SYSCTL_CONF"
+  if sysctl -p "$SYSCTL_CONF" >/dev/null 2>&1; then
+    log "$(t "✓ sysctl uygulandı: $SYSCTL_CONF" "✓ sysctl applied: $SYSCTL_CONF")"
+  else
+    hata "$(t "sysctl uygulanamadı (dosya yazıldı, elle kontrol edin): $SYSCTL_CONF" "sysctl apply failed (file written, check manually): $SYSCTL_CONF")"
+  fi
+else
+  log "$(t "sysctl: mevcut değerler zaten optimal, değişiklik yok" "sysctl: current values already optimal, no change")"
+fi
 
 # ================= MARIADB =================
 echo "════════ MariaDB ════════"
@@ -161,7 +201,6 @@ fi
 
 # ================= NGINX =================
 echo "════════ nginx ════════"
-NGINX_CONF=/etc/nginx/nginx.conf
 NGX_PERF=/etc/nginx/conf.d/00-sanalcp-perf.conf
 cp -a "$NGINX_CONF" "${NGINX_CONF}.bak.${TS}"
 
