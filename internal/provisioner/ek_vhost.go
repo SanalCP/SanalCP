@@ -41,8 +41,7 @@ func EkVhostIcerik(alanAdi, docroot, socket, certPath, keyPath string) string {
 	adlar := alanAdi + " www." + alanAdi
 	log := "    access_log /var/log/nginx/" + alanAdi + ".access.log;\n" +
 		"    error_log  /var/log/nginx/" + alanAdi + ".error.log warn;\n"
-	basliklar := "    add_header X-Content-Type-Options \"nosniff\" always;\n" +
-		"    add_header X-XSS-Protection \"1; mode=block\" always;\n" +
+	basliklar := BaselineSecurityHeaders("    ", certPath != "") +
 		framePolicyHeader("    ", certPath != "")
 
 	govde := "    root " + docroot + ";\n" +

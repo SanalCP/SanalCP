@@ -37,12 +37,13 @@ const roundcubeKok = "/opt/roundcube/public_html"
 // PHP-FPM havuzu tenant'ın DEĞİL roundcube havuzudur (apache kullanıcısı):
 // webmail tüm domainler için ortak bir kurulumdur, müşteri kimliğiyle
 // çalıştırılamaz.
-const webmailNginx = `
+// var (const değil): BaselineSecurityHeaders çağrısı sabit ifade değildir.
+var webmailNginx = `
     # ---- Webmail (Roundcube) — tüm domainler için ortak kurulum ----
     location ^~ /webmail/ {
         alias ` + roundcubeKok + `/;
         index index.php;
-
+` + BaselineSecurityHeaders("        ", false) + `
         location ~ ^/webmail/static\.php(/.+)$ {
             fastcgi_pass unix:/run/php-fpm/roundcube.sock;
             fastcgi_param SCRIPT_FILENAME ` + roundcubeKok + `/static.php;
@@ -65,7 +66,7 @@ const webmailNginx = `
             alias ` + roundcubeKok + `/$1;
             expires 7d;
             add_header Cache-Control "public, immutable";
-            add_header X-Content-Type-Options "nosniff" always;
+` + BaselineSecurityHeaders("            ", false) + `
         }
 
         # Roundcube'un kendi hassas dizinleri — alias .htaccess uygulamaz, elle kapat.

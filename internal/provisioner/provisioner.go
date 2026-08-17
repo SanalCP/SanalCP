@@ -484,16 +484,16 @@ const denyBlocksNginx = `    # ---- Yurutme engeli: CGI / betik yorumlayicilari 
 func buildSecurityHeaders(o VhostOpts) string {
 	var b strings.Builder
 	if o.HdrXContentType {
-		b.WriteString("    add_header X-Content-Type-Options \"nosniff\" always;\n")
+		b.WriteString("    " + hdrXContentTypeOptions + "\n")
 	}
 	if o.HdrXXSS {
 		b.WriteString("    add_header X-XSS-Protection \"1; mode=block\" always;\n")
 	}
 	if o.HdrReferrer {
-		b.WriteString("    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n")
+		b.WriteString("    " + hdrReferrerPolicy + "\n")
 	}
 	if o.HdrPermissions {
-		b.WriteString("    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n")
+		b.WriteString("    " + hdrPermissionsPolicy + "\n")
 	}
 	// frame-ancestors ENFORCE edilir; default-src ise müşteri sitesini kırmamak için
 	// yalnız report-only kalır. X-Frame-Options farklı panel origin'ine güvenli izin
@@ -1977,6 +1977,14 @@ func HealPanelVhostOnStartup() {
 // header'lari eklendiginde konan isaret. Idempotency icin.
 const panelIndexNoCacheSentinel = "# SANAL-PANEL-NOCACHE v1"
 
+// panelHealCSP: bu heal bloğunun server-seviyesi CSP'yle (assets/nginx içinde
+// DEĞİL, tek kaynak internal/nginxconf/_panel.conf'taki SANAL-PANEL-SEC v3
+// bloğu) BİREBİR aynı olması gerekir — aksi halde bu heal, v3'ün kasıtlı
+// kaldırdığı 'unsafe-inline'/'unsafe-eval'i script-src'ye GERİ SOKAR (tam bu
+// bug canlı koddaydı: heal string'i v2'de kalmıştı). TestPanelHealCSPMatchesPanelConf
+// bunu artık otomatik doğruluyor — biri güncellenip diğeri unutulursa test kırılır.
+const panelHealCSP = `add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'" always;`
+
 // panelIndexLocRe: panel vhost'unun SPA fallback location'ini (index.html) yakalar.
 // Installer'in yazdigi kanonik bicim: `location / { try_files $uri $uri/ /index.html; }`.
 var panelIndexLocRe = regexp.MustCompile(`(?s)location / \{\s*try_files \$uri \$uri/ /index\.html;\s*\}`)
@@ -2007,12 +2015,12 @@ func HealPanelIndexNoCacheOnStartup() {
 		"        add_header Pragma \"no-cache\" always;\n" +
 		"        add_header Expires 0 always;\n" +
 		"        # Kendi add_header'i oldugu icin server-seviyesi guvenlik header'lari tekrar\n" +
-		"        add_header X-Content-Type-Options \"nosniff\" always;\n" +
+		"        " + hdrXContentTypeOptions + "\n" +
 		"        add_header X-Frame-Options \"SAMEORIGIN\" always;\n" +
-		"        add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;\n" +
-		"        add_header Permissions-Policy \"geolocation=(), microphone=(), camera=(), interest-cohort=()\" always;\n" +
-		"        add_header Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'\" always;\n" +
-		"        add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;\n" +
+		"        " + hdrReferrerPolicy + "\n" +
+		"        " + hdrPermissionsPolicy + "\n" +
+		"        " + panelHealCSP + "\n" +
+		"        " + hdrHSTS + "\n" +
 		"        try_files $uri $uri/ /index.html;\n" +
 		"    }"
 	newS := panelIndexLocRe.ReplaceAllLiteralString(s, yeniBlok)

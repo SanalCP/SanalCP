@@ -201,9 +201,7 @@ server {
     access_log /var/log/nginx/%[1]s.access.log;
     error_log  /var/log/nginx/%[1]s.error.log warn;
 
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
+%[6]s
     location / { try_files $uri $uri/ /index.php?$query_string; }
 
     location ~ \.php$ {
@@ -224,5 +222,5 @@ server {
 
     location ~ /\.(?!well-known) { deny all; }
 }
-`, tamAd, docroot, socket, crt, key)
+`, tamAd, docroot, socket, crt, key, strings.TrimRight(provisioner.BaselineSecurityHeaders("    ", true), "\n"))
 }

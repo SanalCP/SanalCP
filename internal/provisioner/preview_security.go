@@ -50,3 +50,28 @@ func framePolicyHeader(indent string, upgradeHTTPS bool) string {
 	}
 	return indent + `add_header Content-Security-Policy "` + policy + `" always;` + "\n"
 }
+
+// Tek kaynaktan üretilen temel güvenlik header değerleri — vhost üreten HER
+// yer (ana domain, subdomain, ek alan adı, webmail) burayı çağırmalı. Değer
+// buradan başka bir yerde elle kopyalanırsa politika değişikliği o kopyaya
+// ULAŞMAZ (bkz. panelHealSecurityHeaders'ın CSP'yi bir süre eskide bıraktığı
+// bug — aynı sınıf hatayı burada tekrarlamamak için tek fonksiyon).
+const (
+	hdrXContentTypeOptions = `add_header X-Content-Type-Options "nosniff" always;`
+	hdrReferrerPolicy      = `add_header Referrer-Policy "strict-origin-when-cross-origin" always;`
+	hdrPermissionsPolicy   = `add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), interest-cohort=()" always;`
+	hdrHSTS                = `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`
+)
+
+// BaselineSecurityHeaders: subdomain/ek-vhost/webmail gibi kendi header toggle
+// UI'ı olmayan yüzeyler için sabit temel set. includeHSTS yalnız SSL aktifken
+// true verilmeli (düz HTTP'de HSTS anlamsız/yanıltıcı).
+func BaselineSecurityHeaders(indent string, includeHSTS bool) string {
+	b := indent + hdrXContentTypeOptions + "\n" +
+		indent + hdrReferrerPolicy + "\n" +
+		indent + hdrPermissionsPolicy + "\n"
+	if includeHSTS {
+		b += indent + hdrHSTS + "\n"
+	}
+	return b
+}

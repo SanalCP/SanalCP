@@ -369,8 +369,7 @@ func vhost(tamAd, docroot, socket string) string {
     access_log /var/log/nginx/` + tamAd + `.access.log;
     error_log  /var/log/nginx/` + tamAd + `.error.log warn;
 
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+` + strings.TrimRight(provisioner.BaselineSecurityHeaders("    ", false), "\n") + `
 
     location /.well-known/acme-challenge/ {
         root /var/www/_acme;
