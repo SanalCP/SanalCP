@@ -1,0 +1,12 @@
+{
+  "label": "Boşta Oturum Zaman Aşımı",
+  "desc": "Bir hesap belirlenen süre boyunca hiç istek atmazsa, token süresi dolmamış olsa bile bir sonraki istekte oturum sona erdirilir. Varsayılan kapalıdır.",
+  "enable": "Etkinleştir",
+  "minutes": "dakika",
+  "load_failed": "Ayar okunamadı",
+  "save_failed": "Ayar kaydedilemedi",
+  "saved_on": "Boşta zaman aşımı {{dakika}} dakika olarak ayarlandı.",
+  "saved_off": "Boşta zaman aşımı kapatıldı.",
+  "saving": "Kaydediliyor…",
+  "submit": "Kaydet"
+}

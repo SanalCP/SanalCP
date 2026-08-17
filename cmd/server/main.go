@@ -364,6 +364,8 @@ func main() {
 			r.With(middleware.AdminOnly).Post("/system/panel-domain", panelAyarH.Kaydet)
 			r.With(middleware.AdminOnly).Delete("/system/panel-domain", panelAyarH.Kaldir)
 			r.With(middleware.AdminOnly).Put("/system/panel-dil", panelAyarH.DilKaydet)
+			r.With(middleware.AdminOnly).Get("/system/oturum-bosta", panelAyarH.OturumBosta)
+			r.With(middleware.AdminOnly).Put("/system/oturum-bosta", panelAyarH.OturumBostaKaydet)
 			eklentiH.Routes(r)
 			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
 			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.

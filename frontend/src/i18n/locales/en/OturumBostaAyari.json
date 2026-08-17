@@ -1,0 +1,12 @@
+{
+  "label": "Idle Session Timeout",
+  "desc": "If an account makes no requests for the chosen duration, the session is ended on the next request even if the token hasn't expired yet. Disabled by default.",
+  "enable": "Enable",
+  "minutes": "minutes",
+  "load_failed": "Could not read setting",
+  "save_failed": "Could not save setting",
+  "saved_on": "Idle timeout set to {{dakika}} minutes.",
+  "saved_off": "Idle timeout disabled.",
+  "saving": "Saving…",
+  "submit": "Save"
+}

@@ -12,6 +12,7 @@ import SunucuYenidenBaslat from '@/components/SunucuYenidenBaslat'
 import HostnameAyari from '@/components/HostnameAyari'
 import NameserverAyari from '@/components/NameserverAyari'
 import SSHPortUyarisi from '@/components/SSHPortUyarisi'
+import OturumBostaAyari from '@/components/OturumBostaAyari'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -222,6 +223,7 @@ export default function AraclarAyarlarPage() {
           <PanelDomain />
           <NameserverAyari />
           <SunucuOptimize />
+          <OturumBostaAyari />
         </div>
       </section>
 

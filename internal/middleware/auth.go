@@ -61,13 +61,33 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 			}
 			var durum, rol string
 			var surum uint64
-			err = scopeDB.QueryRowContext(r.Context(),
-				`SELECT status, role, auth_version FROM users WHERE id=?`, c.UserID).
-				Scan(&durum, &rol, &surum)
+			var bostaSaniye sql.NullInt64
+			var bostaLimitDakika int
+			err = scopeDB.QueryRowContext(r.Context(), `
+				SELECT u.status, u.role, u.auth_version,
+				       TIMESTAMPDIFF(SECOND, u.last_activity_at, NOW()),
+				       p.oturum_bosta_dakika
+				  FROM users u JOIN panel_ayarlari p ON p.id = 1
+				 WHERE u.id = ?`, c.UserID).
+				Scan(&durum, &rol, &surum, &bostaSaniye, &bostaLimitDakika)
 			if err != nil || durum != "active" || rol != c.Role || surum != c.Version {
 				httpx.WriteError(w, http.StatusUnauthorized, "oturum geçersiz veya sona erdirilmiş")
 				return
 			}
+			// oturum_bosta_dakika=0 (varsayılan) => kapalı. last_activity_at NULL'sa
+			// (hiç istek atılmamış) zaman aşımı UYGULANMAZ — aşağıdaki UPDATE zaten
+			// hemen set eder.
+			if bostaLimitDakika > 0 && bostaSaniye.Valid && bostaSaniye.Int64 > int64(bostaLimitDakika)*60 {
+				httpx.WriteError(w, http.StatusUnauthorized, "oturum boşta kaldığı için sona erdi")
+				return
+			}
+			// Throttle'lı güncelleme: her istekte yazmak yerine 30sn'de bir. Hata
+			// sessizce yutulur — aktivite takibi ek bir savunma katmanıdır, asıl
+			// yetki kararını (yukarıdaki alanlar) etkilemez.
+			_, _ = scopeDB.ExecContext(r.Context(), `
+				UPDATE users SET last_activity_at = NOW()
+				 WHERE id = ? AND (last_activity_at IS NULL OR last_activity_at < NOW() - INTERVAL 30 SECOND)`,
+				c.UserID)
 			ctx := context.WithValue(r.Context(), claimsKey, c)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
