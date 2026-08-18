@@ -1,6 +1,7 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-4b tamamlandı (2026-08-19). Sıradaki: Faz 5 — canlı test.
+**Durum:** Faz 0-4b tamamlandı; Faz 5a statik ön-uçuşu yapıldı (2026-08-19).
+Sıradaki: Faz 5a canlı kurulum (Debian 12 sunucu gerekiyor).
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -411,6 +412,105 @@ taşıyan bir betik, Debian portunun tam olarak gözden kaçtığı yerdi.
 > engelliyor. `scripts/` altında artık yalnız gerçekten oraya ait olanlar var:
 > `build-assets.sh`, `package-release.sh`, `seed_admin.go`, `yetki-testi.sh`.
 
+## 5c. Faz 5a statik ön-uçuş ✅ (2026-08-19)
+
+Canlı sunucu olmadan yapılabilecek her doğrulama önce yapıldı: **paket adları,
+dosya düzenleri ve sürümler gerçek Debian indekslerinden ve gerçek `.deb`
+içeriklerinden** okundu. Amaç, bir VPS'i yakmadan "paket yok / yol yanlış"
+sınıfı hataları elemekti.
+
+### Paket adı doğrulaması — 61 paket, iki dağıtım
+
+Installer + ops betiklerinin Debian'da kuracağı TÜM paket adları
+`deb.debian.org` `Packages.gz` indekslerine karşı tarandı:
+
+| | bookworm (12) | trixie (13) |
+|---|---|---|
+| doğrulanan paket | 61 | 61 |
+| **bulunamayan** | **1** (`valkey-server`) | 0 |
+
+Tek eksik, `osfam`'ın zaten bildiği ve `redis-server`'a düştüğü durum
+(§7.0.1) — yani soyutlama gerçek indeks karşısında doğrulandı.
+
+### Gerçek `.deb` içeriğinden doğrulanan düzenler
+
+`pure-ftpd-common` + `pure-ftpd-mysql` paketleri indirilip açıldı; §5b'deki
+varsayımların hepsi **paket içeriğiyle** doğrulandı:
+
+- `/etc/pure-ftpd/conf/` gerçekten direktif-başına-dosya (`NoAnonymous`,
+  `TLSCipherSuite`, `PAMAuthentication`… hepsi ayrı dosya olarak geliyor).
+- `/etc/pure-ftpd/db/mysql.conf` `pure-ftpd-mysql` ile geliyor.
+- `/etc/pure-ftpd/auth/30mysql` **paketin kendisi tarafından** kuruluyor
+  (bizim `ln -sf`'imiz gereksiz ama idempotent/zararsız).
+- `/etc/pure-ftpd/auth/65unix` ve `70pam` `pure-ftpd-common` ile geliyor →
+  bizim silme adımımız GEREKLİ (yoksa sistem kullanıcıları FTP'ye girebilirdi).
+- `pure-ftpd-wrapper` kaynağı okundu: `/etc/pure-ftpd/conf` dizinini tarıyor ve
+  `auth/` altında **yalnız sembolik linkleri** dikkate alıyor (`grep {-l ...}`).
+  Debian'ın da içerdiği `/etc/pure-ftpd/pure-ftpd.conf` dosyası wrapper
+  tarafından OKUNMUYOR — betiğin Debian kolunda ona yazmaması doğru.
+- systemd unit dosyası YOK: `/etc/init.d/pure-ftpd-mysql` (SysV) → systemd
+  jeneratörü `pure-ftpd-mysql.service` üretiyor; `osfam`'ın servis adı doğru.
+
+### 🔴 Düzeltme: OpenDKIM socket tuzağı §5b'de yanlış anlatılmıştı
+
+`opendkim` paketi açılıp birim dosyası okundu. Gerçek durum:
+
+- Stok birim yalnızca `ExecStart=/usr/sbin/opendkim` — argümansız, yani
+  `/etc/opendkim.conf` geçerli. `/etc/default/opendkim` dosyasının kendi notu:
+  *"This is a legacy configuration file. It is not used by the opendkim systemd
+  service."*
+- Socket'i EZEN şey `/etc/systemd/system/opendkim.service.d/override.conf`
+  drop-in'idir; onu `/lib/opendkim/opendkim.service.generate` üretir ve
+  `ExecStart=… -p $SOCKET` yazar. Üretici kaynağını `/etc/default`'tan alır.
+
+Betik buna göre düzeltildi: artık **önce drop-in'i** arıyor ve `-p` içeriyorsa
+devre dışı bırakıyor (`.sanal-devredisi` olarak yeniden adlandırıp
+`daemon-reload`), ayrıca üretici sonradan çalıştırılırsa aynı tuzağı kurmasın
+diye `/etc/default/opendkim`'deki `SOCKET=` satırını yorumluyor.
+
+### Sürüm matrisi (gerçek indekslerden)
+
+| Bileşen | AlmaLinux | Debian 12 | Debian 13 |
+|---|---|---|---|
+| MariaDB | 10.11 | **10.11.18** | **11.8.6** |
+| Dovecot | 2.3.x | **2.3.19** | **2.4.1** |
+| nginx | 1.20/1.26 | 1.22.1 | 1.26.3 |
+| rspamd | (rspamd.com deposu) | 3.4 | 3.12.1 |
+| valkey | 8.x | — (redis 7.0) | 8.1.1 |
+
+Faz 5a/5b ayrımının gerekçesi böylece sayıyla doğrulandı: **Debian 12, MariaDB
+tarafında AlmaLinux ile aynı** (10.11), Debian 13'te 11.8 devreye giriyor.
+
+### 🔴 Yeni bulgu — Dovecot 2.4, Faz 5b'yi bloke ediyor
+
+Plan yalnız MariaDB sürümünün değişeceğini öngörüyordu. Debian 13'te **Dovecot
+2.4** var ve 2.4 yapılandırma sözdizimini KIRDI. `dovecot-core` 2.4.1 paketi
+açılıp örnek konfigleri okundu:
+
+- `mail_location` KALKTI → yerine `mail_driver` + `mail_path`
+  (paketin `10-mail.conf`'u: `mail_driver = mbox`, `mail_path = %{home}/mail`).
+- `dovecot.conf` artık `dovecot_config_version = 2.4.0` bildirimi taşıyor.
+- `passdb { driver = sql; args = … }` biçimi 2.4'te adlandırılmış bloklara
+  taşındı; `auth-sql.conf.ext` örneği boşaltılmış.
+
+Bizim `assets/mail/dovecot/10-sanalcp-mail.conf.tmpl` şablonumuz **2.3
+sözdizimi** (`mail_location`, `passdb { driver = sql }`, `$mail_plugins`).
+Yani Debian 13 ve Ubuntu 26.04'te dovecot açılışta yapılandırma hatası verir →
+sanal posta kutuları hiç çalışmaz.
+
+**İyi haber:** `!include conf.d/*.conf` 2.4'te de duruyor, yani drop-in
+yaklaşımı geçerli — yalnız şablonun 2.4 varyantı ve `doveconf --version`'a göre
+seçim gerekiyor. Bu, Faz 5b'nin iş kalemi olarak eklendi.
+
+**Debian 12 (2.3.19) ETKİLENMİYOR** — Faz 5a bu bulgudan bağımsız ilerleyebilir.
+
+### Canlı sunucu olmadan doğrulanamayanlar
+
+Bunlar Faz 5a'nın asıl işi: kurulumun uçtan uca akması, `nginx -t`, migration'
+ların MariaDB 10.11'de uygulanması, panelin ayağa kalkması, BIND'in
+`/var/lib/bind`'e yazabilmesi (AppArmor), kota için GRUB + tek seferlik reboot,
+`quotacheck` oneshot'ı, per-tenant PHP-FPM izolasyonu ve sanal FTP girişi.
+
 ---
 
 ## 6. Sıralama
@@ -424,7 +524,7 @@ taşıyan bir betik, Debian portunun tam olarak gözden kaçtığı yerdi.
 | ~~**4**~~ | ✅ Installer soyutlaması + sury deposu (+ planda olmayan 3 Go boşluğu) | orta |
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
-| **5b** | Canlı test: **Debian 13** (MariaDB 11.8 devreye girer) | — |
+| **5b** | Canlı test: **Debian 13** — MariaDB 11.8 **+ 🔴 Dovecot 2.4 şablonu** (bkz. §5c) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 

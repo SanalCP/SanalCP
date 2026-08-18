@@ -155,13 +155,24 @@ chown -R opendkim:opendkim /etc/opendkim
 # yoksa exit 78/CONFIG) çalıştırmaya devam ettirir — sessiz başarısızlık.
 cp "$TMPL/opendkim/opendkim.conf.tmpl" /etc/opendkim.conf
 chown root:opendkim /etc/opendkim.conf
-# 🔴 Debian: /etc/default/opendkim'deki SOCKET= satırı systemd birimine
-# DAEMON_OPTS olarak geçer ve opendkim.conf'taki Socket satırını EZER. Etkinse
-# milter 127.0.0.1:8891 yerine bir unix sokete bağlanır; Postfix'in
-# smtpd_milters ayarı ise inet'i gösterdiği için DKIM imzalama sessizce hiç
-# çalışmaz. Yorumlanıp opendkim.conf tek yetkili bırakılıyor.
-if debian_mi && [ -f /etc/default/opendkim ]; then
-  if grep -qE '^[[:space:]]*SOCKET=' /etc/default/opendkim; then
+# 🔴 Debian: Socket ayarı iki yerden EZİLEBİLİR.
+#   1) /etc/systemd/system/opendkim.service.d/override.conf — varsa ExecStart'ı
+#      "-p <socket>" ile yeniden tanımlar ve opendkim.conf'taki Socket satırını
+#      GEÇERSİZ kılar. (Stok birim yalnız "ExecStart=/usr/sbin/opendkim"dir;
+#      bu drop-in'i /lib/opendkim/opendkim.service.generate üretir.)
+#   2) /etc/default/opendkim — systemd birimi bunu OKUMAZ (dosyanın kendi notu:
+#      "legacy configuration file"), ama yukarıdaki üretici onu KAYNAK alır.
+# Postfix smtpd_milters inet:127.0.0.1:8891'i beklediği için, socket unix'e
+# kayarsa DKIM imzalama hiçbir hata vermeden hiç çalışmaz.
+if debian_mi; then
+  ODK_DROPIN=/etc/systemd/system/opendkim.service.d/override.conf
+  if [ -f "$ODK_DROPIN" ] && grep -qE '^ExecStart=.*[[:space:]]-p[[:space:]]' "$ODK_DROPIN"; then
+    mv "$ODK_DROPIN" "${ODK_DROPIN}.sanal-devredisi"
+    systemctl daemon-reload >/dev/null 2>&1
+    log "opendkim systemd drop-in'i devre dışı bırakıldı (socket'i eziyordu) → ${ODK_DROPIN}.sanal-devredisi"
+  fi
+  # Üretici sonradan çalıştırılırsa aynı tuzağı kurmasın.
+  if [ -f /etc/default/opendkim ] && grep -qE '^[[:space:]]*SOCKET=' /etc/default/opendkim; then
     sed -i 's/^[[:space:]]*SOCKET=/#SOCKET=/' /etc/default/opendkim
     log "/etc/default/opendkim içindeki SOCKET= yorumlandı (opendkim.conf yetkili)"
   fi
