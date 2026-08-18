@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS api_tokenlari (
   -- yöneticinin hangi token olduğunu ayırt etmesi içindir.
   onek VARCHAR(24) NOT NULL DEFAULT '',
   -- Sahibi. Hesap silinince token'ları da silinir (yetim token kalmaz).
-  user_id BIGINT NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
   -- NULL = süresiz. Dolu ise bu andan sonra token kabul edilmez.
   bitis_at DATETIME NULL DEFAULT NULL,
   -- 0 = iptal edilmiş (silmeden devre dışı bırakma).
