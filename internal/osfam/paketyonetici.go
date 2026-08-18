@@ -14,6 +14,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // AptOrtam: apt komutlarına eklenen ortam değişkenleri. Etkileşimli soruları
@@ -87,6 +88,112 @@ func (b Bilgi) DepoTazeleArgs() []string {
 		return []string{"apt-get", "update"}
 	}
 	return []string{"dnf", "-q", "makecache"}
+}
+
+// YukseltArgs: paket yükseltme komutu. paket boşsa tüm sistem yükseltilir.
+//
+// Debian'da `apt-get upgrade` yeni bağımlılık gerektiren yükseltmeleri ATLAR;
+// panelin beklediği davranış için `dist-upgrade` kullanılır. Yapılandırma
+// dosyalarının korunması için Kur ile aynı Dpkg seçenekleri verilir.
+func (b Bilgi) YukseltArgs(paket string) []string {
+	if b.DebianMi() {
+		confKoru := []string{
+			"-o", "Dpkg::Options::=--force-confold",
+			"-o", "Dpkg::Options::=--force-confdef",
+		}
+		if paket == "" {
+			return append([]string{"apt-get", "dist-upgrade", "-y"}, confKoru...)
+		}
+		// Tek paketin apt karşılığı `install --only-upgrade`tir: kurulu değilse
+		// yeni paket KURMAZ, yalnız mevcut olanı yükseltir.
+		args := append([]string{"apt-get", "install", "-y", "--only-upgrade"}, confKoru...)
+		return append(args, paket)
+	}
+	args := []string{"dnf", "upgrade", "-y"}
+	if paket != "" {
+		args = append(args, paket)
+	}
+	return args
+}
+
+// KuruluListeArgs: kurulu paketleri "<ad>" satırları hâlinde döken komut.
+//
+// dpkg-query, KALDIRILMIŞ ama yapılandırma dosyaları duran paketleri de listeler;
+// bu yüzden durum alanı da istenir ve çağıran "installed" olmayanları eler
+// (bkz. KuruluListeAyristir). rpm'de böyle bir ara durum yoktur.
+func (b Bilgi) KuruluListeArgs() []string {
+	if b.DebianMi() {
+		return []string{"dpkg-query", "-W", "-f=${db:Status-Status}\t${Package}\n"}
+	}
+	return []string{"rpm", "-qa", "--qf", "installed\t%{NAME}\n"}
+}
+
+// KuruluDetayArgs: kurulu paketleri "<durum>\t<ad>|<sürüm>|<özet>" hâlinde döker.
+func (b Bilgi) KuruluDetayArgs() []string {
+	if b.DebianMi() {
+		return []string{"dpkg-query", "-W", "-f=${db:Status-Status}\t${Package}|${Version}|${binary:Summary}\n"}
+	}
+	return []string{"rpm", "-qa", "--qf", "installed\t%{NAME}|%{VERSION}|%{SUMMARY}\n"}
+}
+
+// KuruluListeAyristir: KuruluListeArgs/KuruluDetayArgs çıktısından yalnız GERÇEKTEN
+// kurulu satırların gövdesini döner (durum sütunu ayıklanır).
+//
+// SAF FONKSİYON — her iki paket yöneticisinin çıktısıyla test edilebilir.
+func KuruluListeAyristir(cikti string) []string {
+	var out []string
+	for _, ln := range strings.Split(cikti, "\n") {
+		ln = strings.TrimRight(ln, "\r")
+		sekme := strings.IndexByte(ln, '\t')
+		if sekme <= 0 {
+			continue
+		}
+		if strings.TrimSpace(ln[:sekme]) != "installed" {
+			continue // "config-files", "not-installed" vb. → kurulu sayılmaz
+		}
+		if govde := strings.TrimSpace(ln[sekme+1:]); govde != "" {
+			out = append(out, govde)
+		}
+	}
+	return out
+}
+
+// AramaSatiriAyristir: paket arama çıktısındaki tek satırdan (ad, açıklama) çıkarır.
+//
+// İki biçim desteklenir:
+//
+//	dnf search      -> "paket-adi.x86_64 : aciklama"
+//	apt-cache search-> "paket-adi - aciklama"
+//
+// Eşleşmeyen satırlarda ok=false döner. SAF FONKSİYON.
+func AramaSatiriAyristir(satir string) (ad, aciklama string, ok bool) {
+	satir = strings.TrimSpace(satir)
+	if satir == "" || strings.HasPrefix(satir, "===") || strings.HasPrefix(satir, "Last metadata") {
+		return "", "", false
+	}
+	var ayrac string
+	switch {
+	case strings.Contains(satir, " : "):
+		ayrac = " : "
+	case strings.Contains(satir, " - "):
+		ayrac = " - "
+	default:
+		return "", "", false
+	}
+	parca := strings.SplitN(satir, ayrac, 2)
+	ad = strings.TrimSpace(parca[0])
+	aciklama = strings.TrimSpace(parca[1])
+	if ad == "" {
+		return "", "", false
+	}
+	// dnf adın sonuna mimari ekler; apt eklemez.
+	if i := strings.LastIndex(ad, "."); i > 0 {
+		switch ad[i+1:] {
+		case "x86_64", "noarch", "i686", "src", "aarch64":
+			ad = ad[:i]
+		}
+	}
+	return ad, aciklama, true
 }
 
 // Komut: verilen arg-slice'tan çalıştırılabilir *exec.Cmd üretir; Debian ise

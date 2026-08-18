@@ -6,11 +6,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"os/exec"
 	"strings"
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 // Kritik paketler — kaldirilirsa sistem coker
@@ -67,30 +67,18 @@ func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	// dnf search "<q>" — Name & Summary Matched bolumlerini parse
-	out, _ := exec.CommandContext(ctx, "dnf", "search", "--quiet", q).CombinedOutput()
+	// Paket arama: dnf search / apt-cache search. Iki cikti bicimi de
+	// "<ad> : <aciklama>" veya "<ad> - <aciklama>" satirlari uretir; asagidaki
+	// ayristirici ikisini de tanir.
+	b := osfam.Mevcut()
+	out, _ := b.Komut(ctx, b.AraArgs(q)).CombinedOutput()
 	lines := strings.Split(string(out), "\n")
 	paketler := []Paket{}
 	kuruluSet := installedSet()
 	for _, ln := range lines {
-		ln = strings.TrimSpace(ln)
-		if ln == "" || strings.HasPrefix(ln, "===") || strings.HasPrefix(ln, "Last metadata") {
+		name, desc, ok := osfam.AramaSatiriAyristir(ln)
+		if !ok {
 			continue
-		}
-		// format: "paket-adi.x86_64 : aciklama"
-		if !strings.Contains(ln, " : ") {
-			continue
-		}
-		parts := strings.SplitN(ln, " : ", 2)
-		nameArch := strings.TrimSpace(parts[0])
-		desc := strings.TrimSpace(parts[1])
-		// arch suffix'i temizle
-		name := nameArch
-		if i := strings.LastIndex(name, "."); i > 0 {
-			suf := name[i+1:]
-			if suf == "x86_64" || suf == "noarch" || suf == "i686" || suf == "src" {
-				name = name[:i]
-			}
 		}
 		paketler = append(paketler, Paket{
 			Adi:      name,
@@ -111,13 +99,11 @@ func (h *Handlers) Ara(w http.ResponseWriter, r *http.Request) {
 
 // installedSet: tüm kurulu paket adlarini set olarak don
 func installedSet() map[string]bool {
-	out, _ := exec.Command("rpm", "-qa", "--qf", "%{NAME}\n").CombinedOutput()
+	b := osfam.Mevcut()
+	out, _ := b.Komut(context.Background(), b.KuruluListeArgs()).CombinedOutput()
 	set := make(map[string]bool, 600)
-	for _, ln := range strings.Split(string(out), "\n") {
-		ln = strings.TrimSpace(ln)
-		if ln != "" {
-			set[ln] = true
-		}
+	for _, ad := range osfam.KuruluListeAyristir(string(out)) {
+		set[ad] = true
 	}
 	return set
 }
@@ -125,10 +111,11 @@ func installedSet() map[string]bool {
 // Kurulu: tüm kurulu paketleri opsiyonel filtre ile listele
 func (h *Handlers) Kurulu(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
-	out, _ := exec.Command("rpm", "-qa", "--qf", "%{NAME}|%{VERSION}|%{SUMMARY}\n").CombinedOutput()
+	b := osfam.Mevcut()
+	out, _ := b.Komut(r.Context(), b.KuruluDetayArgs()).CombinedOutput()
 	paketler := []Paket{}
-	for _, ln := range strings.Split(string(out), "\n") {
-		parts := strings.SplitN(ln, "|", 3)
+	for _, satir := range osfam.KuruluListeAyristir(string(out)) {
+		parts := strings.SplitN(satir, "|", 3)
 		if len(parts) < 3 {
 			continue
 		}
@@ -170,11 +157,10 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "dnf", "install", "-y", req.Paket)
-	out, err := cmd.CombinedOutput()
+	out, err := osfam.PaketKur(ctx, req.Paket)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,
-			"dnf install fail: "+strings.TrimSpace(string(out)))
+			"paket kurulamadi: "+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -202,11 +188,10 @@ func (h *Handlers) Kaldir(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "dnf", "remove", "-y", req.Paket)
-	out, err := cmd.CombinedOutput()
+	out, err := osfam.PaketSil(ctx, req.Paket)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,
-			"dnf remove fail: "+strings.TrimSpace(string(out)))
+			"paket kaldirilamadi: "+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -229,15 +214,11 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 	defer cancel()
-	args := []string{"upgrade", "-y"}
-	if req.Paket != "" {
-		args = append(args, req.Paket)
-	}
-	cmd := exec.CommandContext(ctx, "dnf", args...)
-	out, err := cmd.CombinedOutput()
+	b := osfam.Mevcut()
+	out, err := b.Komut(ctx, b.YukseltArgs(req.Paket)).CombinedOutput()
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,
-			"dnf upgrade fail: "+strings.TrimSpace(string(out)))
+			"paket yukseltilemedi: "+strings.TrimSpace(string(out)))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -256,7 +237,8 @@ func (h *Handlers) Bilgi(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	out, _ := exec.CommandContext(ctx, "dnf", "info", ad).CombinedOutput()
+	b := osfam.Mevcut()
+	out, _ := b.Komut(ctx, b.BilgiArgs(ad)).CombinedOutput()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ad":     ad,
 		"output": string(out),
