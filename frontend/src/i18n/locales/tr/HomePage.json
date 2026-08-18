@@ -23,11 +23,6 @@
     "inactive_title": "Disk kotası aktif değil",
     "inactive_desc": "Disk kotası aktif değil — etkinleştirmek için tek seferlik sunucu yeniden başlatması gerekli."
   },
-  "surum_bildirim": {
-    "baslik": "Panelin yeni sürümü var, güncelleyin!",
-    "versiyon": "(kurulu: {{mevcut}} → yeni: {{son}})",
-    "dismiss_aria": "Bildirimi kapat"
-  },
   "widget_name": {
     "yuk-grafik": "Yük Grafiği",
     "wordpress": "WordPress Siteleri",

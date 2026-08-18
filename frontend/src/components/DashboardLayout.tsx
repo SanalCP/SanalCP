@@ -210,13 +210,16 @@ export default function DashboardLayout() {
   const [mobilAcik, setMobilAcik] = useState(false)
   const konum = useLocation()
 
-  // Kritik güvenlik duyurusu — günde bir kez sunucu tarafında kontrol edilen
-  // surum.json'dan gelir (bkz. internal/system/surumkontrol.go). Yalnız KRİTİK
-  // duyurular burada gösterilir; rutin sürüm bilgisi Araçlar → Panel Güncelleme
-  // kartında zaten var. Kapatma, aynı duyuru metni için kalıcıdır — yeni bir
-  // duyuru gelirse (anahtar değişir) otomatik tekrar gösterilir.
+  // Sürüm güncelleme çubuğu — günde bir kez sunucu tarafında kontrol edilen
+  // surum.json'dan gelir (bkz. internal/system/surumkontrol.go). Hem kritik
+  // güvenlik duyuruları hem sıradan güncellemeler burada, tek satırlık
+  // özetle gösterilir (detay sağdaki okla açılır); rutin sürüm bilgisi
+  // Araçlar → Panel Güncelleme kartında ayrıca var. Kapatma, aynı duyuru
+  // metni için kalıcıdır — yeni bir duyuru gelirse (anahtar değişir)
+  // otomatik tekrar gösterilir.
   const [surum, setSurum] = useState<SurumKontrol | null>(null)
   const [duyuruKapali, setDuyuruKapali] = useState(false)
+  const [duyuruGenis, setDuyuruGenis] = useState(false)
   useEffect(() => {
     api.get<SurumKontrol>('/system/surum-kontrol')
       .then((r) => {
@@ -461,28 +464,55 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar onMenuAc={() => setMobilAcik(true)} menuAcik={mobilAcik} />
 
-        {surum?.kritik && !duyuruKapali && (
-          <div className="flex items-start gap-3 bg-red-600 px-4 py-2.5 text-white sm:items-center">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 sm:mt-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.363 3.591 2.257 17.657a1.5 1.5 0 0 0 1.302 2.25h16.882a1.5 1.5 0 0 0 1.302-2.25L13.638 3.591a1.5 1.5 0 0 0-2.598 0Z" />
-            </svg>
-            <span className="min-w-0 flex-1 text-sm">
-              <strong className="font-semibold">{t('DashboardLayout:critical_announcement_prefix', { version: surum.son })}</strong>{' '}
-              {surum.duyuru || t('DashboardLayout:version_update_recommended')}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.setItem(SURUM_UYARI_KAPALI_KEY, `${surum.son}:${surum.duyuru}`)
-                setDuyuruKapali(true)
-              }}
-              className="shrink-0 -m-1 rounded-md p-1 hover:bg-red-700"
-              aria-label={t('DashboardLayout:close_announcement_aria')}
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+        {surum?.guncelleme_var && !duyuruKapali && (
+          <div className={`border-b px-4 py-2 text-sm ${
+            surum.kritik
+              ? 'border-red-700 bg-red-600 text-white'
+              : 'border-brand-200 bg-brand-50 text-brand-900 dark:border-brand-800/60 dark:bg-brand-900/20 dark:text-brand-100'
+          }`}>
+            <div className="flex items-start gap-3">
+              <svg className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                {surum.kritik
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.363 3.591 2.257 17.657a1.5 1.5 0 0 0 1.302 2.25h16.882a1.5 1.5 0 0 0 1.302-2.25L13.638 3.591a1.5 1.5 0 0 0-2.598 0Z" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M9 13.5 12 16.5 22 6.5M2 12a10 10 0 1 1 6.6 9.4" />}
               </svg>
-            </button>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold">
+                  {surum.kritik
+                    ? t('DashboardLayout:critical_announcement_prefix', { version: surum.son })
+                    : t('DashboardLayout:update_available_prefix', { version: surum.son })}
+                </div>
+                <div className={`text-xs ${surum.kritik ? 'text-red-100' : 'text-brand-700 dark:text-brand-300'} ${duyuruGenis ? '' : 'truncate'}`}>
+                  {surum.duyuru || t('DashboardLayout:version_update_recommended')}
+                </div>
+              </div>
+              {surum.duyuru && (
+                <button
+                  type="button"
+                  onClick={() => setDuyuruGenis((v) => !v)}
+                  aria-expanded={duyuruGenis}
+                  aria-label={duyuruGenis ? t('DashboardLayout:collapse_announcement_aria') : t('DashboardLayout:expand_announcement_aria')}
+                  className={`shrink-0 -m-1 rounded-md p-1 ${surum.kritik ? 'hover:bg-red-700' : 'hover:bg-brand-100 dark:hover:bg-brand-900/30'}`}
+                >
+                  <svg className={`h-4 w-4 transition-transform ${duyuruGenis ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem(SURUM_UYARI_KAPALI_KEY, `${surum.son}:${surum.duyuru}`)
+                  setDuyuruKapali(true)
+                }}
+                className={`shrink-0 -m-1 rounded-md p-1 ${surum.kritik ? 'hover:bg-red-700' : 'hover:bg-brand-100 dark:hover:bg-brand-900/30'}`}
+                aria-label={t('DashboardLayout:close_announcement_aria')}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 

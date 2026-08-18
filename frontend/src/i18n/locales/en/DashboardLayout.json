@@ -76,7 +76,10 @@
   "close_menu_aria": "Close menu",
   "profile_prefs": "Profile & Preferences",
   "critical_announcement_prefix": "Critical security announcement (v{{version}}):",
+  "update_available_prefix": "New version available (v{{version}}):",
   "version_update_recommended": "A version update is recommended.",
   "close_announcement_aria": "Dismiss announcement",
+  "expand_announcement_aria": "Expand announcement",
+  "collapse_announcement_aria": "Collapse announcement",
   "page_loading": "Loading page…"
 }

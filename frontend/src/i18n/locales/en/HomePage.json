@@ -23,11 +23,6 @@
     "inactive_title": "Disk quota is not active",
     "inactive_desc": "Disk quota is not active — a one-time server reboot is required to enable it."
   },
-  "surum_bildirim": {
-    "baslik": "A new panel version is available, please update!",
-    "versiyon": "(installed: {{mevcut}} → new: {{son}})",
-    "dismiss_aria": "Dismiss notification"
-  },
   "widget_name": {
     "yuk-grafik": "Load Chart",
     "wordpress": "WordPress Sites",

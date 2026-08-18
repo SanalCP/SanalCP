@@ -76,7 +76,10 @@
   "close_menu_aria": "Menüyü kapat",
   "profile_prefs": "Profil ve Tercihler",
   "critical_announcement_prefix": "Kritik güvenlik duyurusu (v{{version}}):",
+  "update_available_prefix": "Yeni sürüm mevcut (v{{version}}):",
   "version_update_recommended": "Sürüm güncellemesi önerilir.",
   "close_announcement_aria": "Duyuruyu kapat",
+  "expand_announcement_aria": "Duyuruyu genişlet",
+  "collapse_announcement_aria": "Duyuruyu daralt",
   "page_loading": "Sayfa yükleniyor…"
 }
