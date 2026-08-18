@@ -8,6 +8,22 @@
 
 Boş bir **AlmaLinux 10** sunucuyu tek komutla komple bir hosting kontrol paneline çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
 
+> ### ⚠️ Bu bir 0.x (beta) sürümüdür — okumadan kurmayın
+>
+> SanalCP genç bir projedir (ilk yayın: Temmuz 2026). Kod açık, testli ve güvenlik
+> tarafı ciddiye alınmıştır; ancak **cPanel/Plesk/DirectAdmin gibi yıllardır sahada
+> olan panellerin olgunluğunda değildir.**
+>
+> - **Önerilen kullanım:** test/geliştirme sunucuları, kendi projeleriniz, değerlendirme.
+> - **Önerilmeyen kullanım:** yedeği olmayan, gelir getiren müşteri yükünü doğrudan
+>   taşımak. Böyle bir kullanım için önce ayrı bir sunucuda deneyin.
+> - **Kurulum yıkıcıdır:** betik boş bir sunucu varsayar; üzerinde çalışan bir servis
+>   olan makinede çalıştırmayın.
+> - Şu an eksik olanlar: WHMCS modülü, kapsamlı REST API, Debian/Ubuntu desteği,
+>   fail2ban entegrasyonu, slave DNS. Yol haritasındalar — bkz. [CHANGELOG.md](CHANGELOG.md).
+>
+> Hata bildirimi ve eleştiri açıkça beklenir: [issue açın](https://github.com/sanalcp/sanalcp/issues).
+
 ## Tek satır kurulum
 
 Temiz bir AlmaLinux 10 (min. 2 GB RAM) sunucuda **root** olarak:
@@ -21,8 +37,57 @@ Kurulum ~5-10 dakika sürer (paket indirmeleri). Bittiğinde panel adresi + giri
 ## Kurulum sonrası
 
 - **Panel:** `https://SUNUCU_IP:8443` (self-signed sertifika — tarayıcı uyarısını geçin)
-- **Giriş:** kullanıcı **`root`** · parola = **sunucunun root parolası**
-  (panel yöneticisini işletim sistemi root'u üzerinden PAM ile doğrular; ayrı bir panel parolası yoktur)
+- **İlk giriş:** kullanıcı **`root`** · parola = **sunucunun root parolası**
+
+İlk girişten sonra **root ile çalışmaya devam etmeniz gerekmez** — aşağıdaki bölüme bakın.
+
+## Kimlik doğrulama ve hesap modeli
+
+Panelde **iki ayrı parola dünyası** vardır; bunu bilerek kullanmak güvenliğiniz açısından önemlidir.
+
+### 1. `root` — kurtarma yolu
+
+`root` kullanıcısının parolası panel veritabanında **tutulmaz**. Panel, giriş anında
+`/etc/shadow`'daki hash'i okuyup doğrular (yescrypt native Go ile; eski sha512/sha256/md5crypt
+formatları için yedek yol). Kilitli (`!`, `!!`, `*`) veya parolasız hesaplar **asla** kabul edilmez.
+
+Bu yol bilinçli olarak korunmuştur: panel veritabanı bozulsa veya tüm panel hesapları
+silinse bile sunucuya erişiminiz olduğu sürece panele girebilirsiniz — **kilitlenme riski yoktur.**
+
+> **Bunun anlamı:** panel oturumunuz `root` ile açıldığında, panel parolası = sunucu root
+> parolasıdır. Bu hesabı günlük kullanım için tercih etmeyin; aşağıdaki adımı uygulayın.
+
+### 2. Panel hesapları — günlük kullanım için önerilen yol
+
+**Root'tan tamamen bağımsız, kendi parolası olan yönetici hesabı açabilirsiniz.**
+Bu hesapların parolası panel veritabanında **bcrypt (cost 12)** ile saklanır ve sunucunun
+root parolasıyla hiçbir ilgisi yoktur.
+
+**Önerilen kurulum sonrası ilk adım:**
+
+1. `root` ile girin.
+2. **Kullanıcılar → Yeni hesap** → **Rol: Yönetici** seçip kendinize bir hesap açın.
+3. Çıkış yapıp yeni hesabınızla girin ve **Profil → İki Adımlı Doğrulama (2FA)** açın.
+4. Günlük yönetimi bu hesapla yapın; `root` girişini yalnızca kurtarma için saklayın.
+
+Roller:
+
+| Rol | Kapsam |
+|---|---|
+| **Yönetici (admin)** | Sunucunun tamamı. Birden fazla olabilir; son aktif yönetici rolünden düşürülemez. |
+| **Bayi (reseller)** | Yalnızca kendi müşterileri ve onların domainleri. Kendi kotaları vardır, yalnız müşteri hesabı açabilir. |
+| **Müşteri (user)** | Tek domain. Yönetim paneline giriş yapamaz; `/cp` üzerinden kendi domain paneline girer. |
+
+### Giriş güvenliği
+
+- **2FA (TOTP)** — tüm panel hesapları için; QR kod ile kurulur, kod tekrar kullanımına
+  (replay) karşı korumalıdır. 2FA durumu okunamazsa giriş **reddedilir** (fail-closed).
+- **Kaba kuvvet koruması** — IP başına kayan pencere + kademeli gecikme + kilit.
+  İstemci IP'si ters proxy başlıklarıyla spoof edilemez.
+- **Denetim kaydı (audit log)** — başarılı/başarısız girişler, hesap işlemleri ve
+  yetki değişiklikleri kaydedilir.
+- **Boşta oturum zaman aşımı** — `Araçlar ve Ayarlar → Sunucu Bakımı` (varsayılan kapalı).
+- Kullanıcı adı sızdırmamak için başarısız girişte her iki dal da aynı yanıtı döner.
 
 ## Ne kurar?
 
@@ -188,7 +253,7 @@ PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
 ./sanalcp-server
 ```
 
-Backend API `/api/v1` altında; sağlık kontrolü `/healthz`. Admin girişi işletim sistemi root'u üzerinden PAM ile doğrulanır (üretimde); geliştirmede `scripts/seed_admin.go` ile ayrı bir admin tohumlayabilirsin:
+Backend API `/api/v1` altında; sağlık kontrolü `/healthz`. `root` girişi `/etc/shadow`'a karşı doğrulanır (bkz. "Kimlik doğrulama ve hesap modeli"); geliştirmede `scripts/seed_admin.go` ile ayrı bir admin tohumlayabilirsin:
 
 ```bash
 go run scripts/seed_admin.go -dsn '<DSN>' -kullanici admin -parola 'SECELECEGIN_PAROLA'

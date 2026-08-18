@@ -59,6 +59,8 @@ type BayiLimit = {
 type BayiPaketOzet = { id: number; ad: string; max_customer: number; max_domain: number; disk_kota_mb: number; trafik_kota_mb: number; fazla_satis: boolean }
 type HizmetPlanOzet = { id: number; ad: string }
 
+const ROOT_ONERI_KAPALI_KEY = 'sanalcp.kullanicilar.root-oneri-kapali'
+
 export default function KullanicilarPage() {
   const { t } = useTranslation(['KullanicilarPage', 'common'])
   const ROL_ETIKET: Record<string, string> = {
@@ -69,7 +71,17 @@ export default function KullanicilarPage() {
   const [aramaParam] = useSearchParams()
   const benimRolum = useAuth((s) => s.kullanici?.rol)
   const benimID = useAuth((s) => s.kullanici?.id)
+  const benimAdim = useAuth((s) => s.kullanici?.adi)
   const adminMiyim = benimRolum === 'admin'
+
+  // root ile çalışan yöneticiye kendi panel hesabını açmasını öner. root'un
+  // parolası /etc/shadow'dadır (kurtarma yolu, bkz. internal/auth/parola.go);
+  // günlük kullanım için root'tan bağımsız, bcrypt parolalı bir yönetici
+  // hesabı daha güvenlidir. Kapatma kalıcıdır.
+  const [rootOneriKapali, setRootOneriKapali] = useState(
+    () => localStorage.getItem(ROOT_ONERI_KAPALI_KEY) === '1'
+  )
+  const rootOneriGoster = adminMiyim && benimAdim === 'root' && !rootOneriKapali
 
   const [liste, setListe] = useState<Kullanici[]>([])
   const [yukleniyor, setYukleniyor] = useState(true)
@@ -258,6 +270,42 @@ export default function KullanicilarPage() {
             : t('KullanicilarPage:subtitle_reseller')}
         </p>
       </div>
+
+      {rootOneriGoster && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800/60 dark:bg-brand-900/20">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-brand-900 dark:text-brand-100">
+              {t('KullanicilarPage:root_oneri.baslik')}
+            </p>
+            <p className="mt-0.5 text-xs text-brand-800 dark:text-brand-200/90">
+              {t('KullanicilarPage:root_oneri.aciklama')}
+            </p>
+            <button
+              type="button"
+              onClick={() => setYeni({ ...BOS, rol: 'admin' })}
+              className="mt-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-700"
+            >
+              {t('KullanicilarPage:root_oneri.buton')}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem(ROOT_ONERI_KAPALI_KEY, '1')
+              setRootOneriKapali(true)
+            }}
+            className="shrink-0 -m-1 rounded-md p-1 text-brand-500 transition hover:bg-brand-100 hover:text-brand-700 dark:hover:bg-brand-900/30"
+            aria-label={t('KullanicilarPage:root_oneri.kapat_aria')}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <ListToolbar
         birincil={{ etiket: adminMiyim ? t('KullanicilarPage:new_account') : t('KullanicilarPage:new_customer'), onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}

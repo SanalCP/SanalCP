@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.6.3",
-  "duyuru": "Dosya Yöneticisi'nde üstteki yol satırı klasör gezinirken güncellenmiyordu (hep sabit /home/kullanıcı yazıyordu); artık bulunduğunuz klasöre göre canlı güncelleniyor. Domain hesabı sayfasındaki \"Yapılandırma\" kartına varsayılan dosya yolu (/home/kullanıcı/public_html) eklendi. SSH Erişimi ekranına yeni anahtar çifti üretme özelliği geldi: panel sizin için bir ed25519 anahtarı üretir, genel anahtarı authorized_keys'e ekler; özel anahtar sunucuda saklanmaz, yalnızca bir kez indirmeniz/kopyalamanız için gösterilir. Domain hesabı sayfasındaki kullanışsız \"Pano / Barınma ve DNS / Başlarken\" sekme çubuğu kaldırıldı; yerine Bağlantı Bilgisi, DNS Yönetimi, E-posta Hesapları, Dosya Yöneticisi, Veritabanları ve Yedekleme/Geri Yükleme'ye tek tıkla giden bir \"Hızlı Linkler\" çubuğu eklendi. Ayrıca ana panoda eksik olan Apache & Nginx kartı eklendi.",
+  "son_surum": "0.6.4",
+  "duyuru": "Belgelendirme ve hesap güvenliği sürümü. README'ye kimlik doğrulama ve hesap modeli bölümü eklendi: root parolasının neden /etc/shadow'da tutulduğu (kurtarma yolu) ve günlük yönetim için root'tan bağımsız, kendi bcrypt parolası olan yönetici hesabı açmanın nasıl yapıldığı açıkça anlatılıyor. root ile giriş yapan yöneticiye Kullanıcılar ekranında kendi hesabını açmasını öneren kapatılabilir bir bilgi kutusu eklendi. Sürüm geçmişi artık CHANGELOG.md dosyasında. README'de yer alan hatalı \"PAM ile doğrulanır\" ifadesi düzeltildi — root girişi PAM değil, /etc/shadow hash'i üzerinden (yescrypt native) doğrulanıyor. Ayrıca panelin 0.x beta durumu ve eksik özellikleri (WHMCS modülü, kapsamlı REST API, Debian/Ubuntu desteği, fail2ban, slave DNS) README'de açıkça belirtildi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-18"
 }

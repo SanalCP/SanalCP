@@ -5,6 +5,12 @@
   "subtitle_reseller": "Customer accounts you have created.",
   "new_account": "New Account",
   "new_customer": "New Customer",
+  "root_oneri": {
+    "baslik": "You are working as root — create an administrator account for yourself",
+    "aciklama": "The root password is the server's system password and exists as a recovery path. For daily administration it is recommended to create an administrator account with its own password, independent of root, and enable 2FA on it.",
+    "buton": "Create administrator account",
+    "kapat_aria": "Dismiss suggestion"
+  },
   "error": {
     "load": "Failed to load accounts",
     "create": "Failed to create account",

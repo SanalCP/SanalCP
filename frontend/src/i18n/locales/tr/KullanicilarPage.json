@@ -5,6 +5,12 @@
   "subtitle_reseller": "Açtığınız müşteri hesapları.",
   "new_account": "Yeni Hesap",
   "new_customer": "Yeni Müşteri",
+  "root_oneri": {
+    "baslik": "root ile çalışıyorsunuz — kendinize bir yönetici hesabı açın",
+    "aciklama": "root'un parolası sunucunun sistem parolasıdır ve kurtarma yolu olarak durur. Günlük yönetim için root'tan bağımsız, kendi parolası olan bir yönetici hesabı açıp 2FA'yı etkinleştirmeniz önerilir.",
+    "buton": "Yönetici hesabı oluştur",
+    "kapat_aria": "Öneriyi kapat"
+  },
   "error": {
     "load": "Hesaplar alınamadı",
     "create": "Hesap oluşturulamadı",

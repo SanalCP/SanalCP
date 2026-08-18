@@ -8,6 +8,22 @@
 
 Turns a blank **AlmaLinux 10** server into a complete hosting control panel with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + phpMyAdmin + firewall, all installed and configured automatically.
 
+> ### ⚠️ This is a 0.x (beta) release — read before installing
+>
+> SanalCP is a young project (first release: July 2026). The code is open, tested, and
+> security has been taken seriously — but it **does not have the maturity of panels like
+> cPanel/Plesk/DirectAdmin that have been in the field for years.**
+>
+> - **Recommended:** test/development servers, your own projects, evaluation.
+> - **Not recommended:** carrying revenue-generating customer workloads without a backup.
+>   Try it on a separate server first.
+> - **The installer is destructive:** it assumes a blank server. Do not run it on a
+>   machine with services already running on it.
+> - Currently missing: WHMCS module, comprehensive REST API, Debian/Ubuntu support,
+>   fail2ban integration, slave DNS. These are on the roadmap — see [CHANGELOG.md](CHANGELOG.md).
+>
+> Bug reports and criticism are explicitly welcome: [open an issue](https://github.com/sanalcp/sanalcp/issues).
+
 ## One-line install
 
 On a clean AlmaLinux 10 server (min. 2 GB RAM), as **root**:
@@ -21,8 +37,57 @@ Installation takes ~5-10 minutes (package downloads). When it finishes, the pane
 ## After install
 
 - **Panel:** `https://SERVER_IP:8443` (self-signed certificate — click through the browser warning)
-- **Login:** user **`root`** · password = **the server's own root password**
-  (the panel admin is authenticated against the OS root account via PAM — there is no separate panel password)
+- **First login:** user **`root`** · password = **the server's own root password**
+
+After the first login you **do not have to keep using `root`** — see the section below.
+
+## Authentication and account model
+
+The panel has **two separate password worlds**. Understanding this matters for your security.
+
+### 1. `root` — the recovery path
+
+The `root` user's password is **not stored** in the panel database. At login the panel reads
+the hash from `/etc/shadow` and verifies it (yescrypt natively in Go; a fallback path handles
+legacy sha512/sha256/md5crypt). Locked (`!`, `!!`, `*`) or empty-password accounts are **never** accepted.
+
+This path is preserved deliberately: even if the panel database is corrupted or every panel
+account is deleted, you can still get in as long as you have server access — **there is no
+lockout risk.**
+
+> **What this means:** when you log in as `root`, the panel password *is* the server root
+> password. Don't use this account for day-to-day work — do the following instead.
+
+### 2. Panel accounts — the recommended path
+
+**You can create an administrator account that is completely independent of root, with its
+own password.** These passwords are stored in the panel database using **bcrypt (cost 12)**
+and have nothing to do with the server's root password.
+
+**Recommended first step after installation:**
+
+1. Log in as `root`.
+2. **Users → New account** → **Role: Administrator**, and create an account for yourself.
+3. Log out, log in with the new account, and enable **Profile → Two-Factor Authentication (2FA)**.
+4. Do daily administration with this account; keep `root` login for recovery only.
+
+Roles:
+
+| Role | Scope |
+|---|---|
+| **Administrator (admin)** | The whole server. There can be more than one; the last active admin cannot be demoted. |
+| **Reseller** | Only their own customers and their domains. Has its own quotas; can only create customer accounts. |
+| **Customer (user)** | A single domain. Cannot log in to the management panel; uses `/cp` for their own domain panel. |
+
+### Login security
+
+- **2FA (TOTP)** — for all panel accounts; set up via QR code, protected against code replay.
+  If 2FA state cannot be read, login is **denied** (fail-closed).
+- **Brute-force protection** — per-IP sliding window + progressive delay + lockout.
+  The client IP cannot be spoofed via reverse-proxy headers.
+- **Audit log** — successful/failed logins, account operations and permission changes are recorded.
+- **Idle session timeout** — `Tools & Settings → Server Maintenance` (off by default).
+- Failed logins return an identical response on both branches so usernames are not leaked.
 
 ## What it installs
 
@@ -187,7 +252,7 @@ PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
 ./sanalcp-server
 ```
 
-The backend API lives under `/api/v1`; health check at `/healthz`. Admin login is authenticated against the OS root account via PAM in production; in development you can seed a separate admin with `scripts/seed_admin.go`:
+The backend API lives under `/api/v1`; health check at `/healthz`. `root` login is verified against `/etc/shadow` (see "Authentication and account model"); in development you can seed a separate admin with `scripts/seed_admin.go`:
 
 ```bash
 go run scripts/seed_admin.go -dsn '<DSN>' -kullanici admin -parola 'YOUR_CHOSEN_PASSWORD'
