@@ -19,6 +19,11 @@ type CveOzet = {
   top_cve: CveKayit[] | null
   guncelleme_calisiyor: boolean
   reboot_gerekli: boolean
+  // Bu işletim sisteminde güvenlik açığı taraması yapılamıyor (bkz.
+  // internal/system/cve.go). Yanlış "0 açık" göstermemek için widget
+  // açıkça "desteklenmiyor" durumuna geçer.
+  desteklenmiyor?: boolean
+  destek_notu?: string
   kernelcare: {
     kurulu: boolean
     aktif: boolean
@@ -142,6 +147,25 @@ export default function CveWidget() {
 
   const temiz = veri !== null && veri.toplam_cve === 0
   const top = veri?.top_cve ?? []
+
+  // Desteklenmeyen işletim sisteminde sayıları hiç gösterme — "0 kritik açık"
+  // demek, taramanın hiç çalışmadığı bir sistemde yanıltıcı olurdu.
+  if (veri?.desteklenmiyor) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
+            className="h-5 w-5 text-slate-400 dark:text-slate-500">
+            <path d={SHIELD} />
+          </svg>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('CveWidget:title')}</h3>
+        </div>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          {veri.destek_notu || t('CveWidget:unsupported')}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60">

@@ -35,5 +35,6 @@
   "live_patch_applied": "Live kernel patch applied.",
   "confirm_update": "Security updates on the server (dnf --security) will be installed. If there is a kernel update, a reboot may be required for it to take effect. Continue?",
   "update_start_failed": "Could not start the update",
-  "live_patch_start_failed": "Could not start the live patch"
+  "live_patch_start_failed": "Could not start the live patch",
+  "unsupported": "Vulnerability scanning is not supported on this operating system."
 }

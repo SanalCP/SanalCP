@@ -1453,7 +1453,7 @@ func uidGid(u string) (int, int, error) {
 	return uid, gid, nil
 }
 
-// ensureArchiveToolsOnce: araç-heal'i süreç başına BİR KEZ koşturur (recursive/tekrar dnf yok).
+// ensureArchiveToolsOnce: araç-heal'i süreç başına BİR KEZ koşturur (tekrar kurulum yok).
 var ensureArchiveToolsOnce sync.Once
 
 // ensureArchiveTools: per-user ACL (`setfacl`, `acl` paketi) ve RAR açıcı (`bsdtar`, libarchive)
@@ -1461,24 +1461,29 @@ var ensureArchiveToolsOnce sync.Once
 // extract onlara güvenmeden ÖNCE.
 //
 // 🔴 Neden gerekli (chicken-egg): `sanalcp-update` önce KENDİNİ günceller; araç kuran
-// `dnf install acl bsdtar` adımı yalnız YENİ update-script'te vardır → İLK update'te çalışmaz.
+// `acl` + `bsdtar` kuran adım yalnız YENİ update-script'te vardır → İLK update'te çalışmaz.
 // Araçlar yoksa hardenHomePerms fail-safe grup=nginx modeline düşer (per-user ACL ancak 2.
 // update'te gelir) ve .rar açılamaz. Bu heal, araçları panelin kendi açılışında kurar → İLK
 // update + restart'ta bile per-user ACL izolasyonu ve RAR extract hazır olur.
 //
-// İdempotent + süreç başına bir kez (sync.Once). Araç zaten PATH'te ise dnf ÇAĞRILMAZ. dnf
-// yoksa (farklı dağıtım / minimal ortam) SESSİZCE atlanır → mevcut fail-safe dallar (grup=nginx,
-// RAR unar/unrar fallback) devrede kalır. Her kurulum loglanır.
+// İdempotent + süreç başına bir kez (sync.Once). Araç zaten PATH'te ise paket yöneticisi
+// ÇAĞRILMAZ; paket yöneticisi yoksa (minimal ortam) SESSİZCE atlanır → mevcut fail-safe
+// dallar (grup=web kullanıcısı, RAR unar/unrar fallback) devrede kalır. Her kurulum loglanır.
+//
+// Paket adları aileye göre çözülür: bsdtar RHEL'de kendi adıyla, Debian'da
+// libarchive-tools paketiyle gelir (bkz. internal/osfam).
 func ensureArchiveTools() {
 	ensureArchiveToolsOnce.Do(func() {
-		// dnf yoksa hiçbir şey kuramayız; fail-safe dallara bırak.
-		if _, err := exec.LookPath("dnf"); err != nil {
+		b := osfam.Mevcut()
+		// Paket yöneticisi yoksa hiçbir şey kuramayız; fail-safe dallara bırak.
+		if _, err := exec.LookPath(b.KurArgs("x")[0]); err != nil {
 			return
 		}
+		ctx := context.Background()
 		// (1) setfacl → per-user ACL izolasyon modeli (hardenHomePerms).
 		if _, err := exec.LookPath("setfacl"); err != nil {
-			if out, err := exec.Command("dnf", "install", "-y", "acl").CombinedOutput(); err != nil {
-				log.Printf("araç-heal: 'acl' kurulamadı (fail-safe grup=nginx devrede): %s", strings.TrimSpace(string(out)))
+			if out, err := osfam.PaketKur(ctx, osfam.Paket(osfam.PaketACL)); err != nil {
+				log.Printf("araç-heal: 'acl' kurulamadı (fail-safe grup=%s devrede): %s", osfam.WebKullanici(), strings.TrimSpace(string(out)))
 			} else {
 				log.Printf("araç-heal: 'acl' (setfacl) kuruldu → per-user ACL izolasyonu ilk update'te aktif")
 			}
@@ -1487,7 +1492,7 @@ func ensureArchiveTools() {
 		// bsdtar yoksa kur — böylece ilk update'te güvenilir açıcı hazır olur (unar/unrar
 		// mevcut olsa bile primer araç eksik kalmasın).
 		if _, err := exec.LookPath("bsdtar"); err != nil {
-			if out, err := exec.Command("dnf", "install", "-y", "bsdtar").CombinedOutput(); err != nil {
+			if out, err := osfam.PaketKur(ctx, osfam.Paket(osfam.PaketBsdtar)); err != nil {
 				log.Printf("araç-heal: 'bsdtar' kurulamadı (RAR için unar/unrar fallback denenebilir): %s", strings.TrimSpace(string(out)))
 			} else {
 				log.Printf("araç-heal: 'bsdtar' (libarchive) kuruldu → RAR extract ilk update'te hazır")

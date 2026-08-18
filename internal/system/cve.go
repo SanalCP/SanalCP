@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 const (
@@ -46,6 +47,21 @@ type CveOzet struct {
 	GuncellemeCalisiyor bool       `json:"guncelleme_calisiyor"`
 	RebootGerekli       bool       `json:"reboot_gerekli"`
 	KernelCare          KcDurum    `json:"kernelcare"`
+	// Desteklenmiyor: bu işletim sisteminde güvenlik açığı taraması yapılamıyor.
+	// RHEL'in `dnf updateinfo --security` verisinin Debian/Ubuntu'da doğrudan
+	// karşılığı yok; yanlışlıkla "0 açık" göstermektense ekran açıkça kapatılır.
+	Desteklenmiyor bool   `json:"desteklenmiyor,omitempty"`
+	DestekNotu     string `json:"destek_notu,omitempty"`
+}
+
+// cveDesteklenmiyorYanit: CVE taraması yapılamayan sistemlerde dönen tek yanıt.
+func cveDesteklenmiyorYanit() CveOzet {
+	return CveOzet{
+		Desteklenmiyor: true,
+		DestekNotu: "Güvenlik açığı taraması bu işletim sisteminde henüz desteklenmiyor " +
+			"(yalnızca AlmaLinux/RHEL ailesi). Güncellemeleri sisteminizin kendi paket " +
+			"yöneticisiyle takip edin.",
+	}
 }
 
 var (
@@ -171,6 +187,10 @@ func cveTara() *CveOzet {
 
 // CveDurum — GET /system/cve : cache'li özet (yenile=1 ile zorla tara).
 func CveDurum(w http.ResponseWriter, r *http.Request) {
+	if !osfam.GuvenlikGuncellemeDestekli() {
+		httpx.WriteJSON(w, http.StatusOK, cveDesteklenmiyorYanit())
+		return
+	}
 	cveMu.Lock()
 	defer cveMu.Unlock()
 	guncelleniyor := cveGuncellemeCalisiyor()
@@ -243,6 +263,12 @@ func cveWrapperYaz(dil string) error {
 
 // CveGuncelle — POST /system/cve/guncelle : güvenlik güncellemelerini arka planda kur.
 func CveGuncelle(w http.ResponseWriter, r *http.Request) {
+	if !osfam.GuvenlikGuncellemeDestekli() {
+		httpx.WriteError(w, http.StatusNotImplemented,
+			t("güvenlik güncellemesi bu işletim sisteminde desteklenmiyor",
+				"security updates are not supported on this operating system"))
+		return
+	}
 	if cveGuncellemeCalisiyor() {
 		httpx.WriteError(w, http.StatusConflict, t("güvenlik güncellemesi zaten çalışıyor", "security update already running"))
 		return
@@ -287,6 +313,12 @@ func CveGuncelle(w http.ResponseWriter, r *http.Request) {
 
 // CveLog — GET /system/cve/log : güncelleme log kuyruğu + durum.
 func CveLog(w http.ResponseWriter, r *http.Request) {
+	if !osfam.GuvenlikGuncellemeDestekli() {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{
+			"desteklenmiyor": true, "log": "", "calisiyor": false,
+		})
+		return
+	}
 	b, _ := os.ReadFile(cveLogYol)
 	s := string(b)
 	if len(s) > 60000 {

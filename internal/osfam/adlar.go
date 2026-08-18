@@ -27,6 +27,8 @@ const (
 	PaketKota      = "kota"
 	PaketApache    = "apache"
 	PaketApacheAra = "apache-araclari"
+	PaketACL       = "acl"
+	PaketBsdtar    = "bsdtar"
 )
 
 // paketAdlari: mantıksal ad -> aileye göre gerçek paket adı.
@@ -44,6 +46,9 @@ var paketAdlari = map[string]map[Aile]string{
 	PaketApache:    {RHEL: "httpd", Debian: "apache2"},
 	PaketApacheAra: {RHEL: "httpd-tools", Debian: "apache2-utils"},
 	PaketWebEkstra: {RHEL: "httpd-tools", Debian: "apache2-utils"},
+	PaketACL:       {RHEL: "acl", Debian: "acl"},
+	// bsdtar RHEL'de kendi adıyla, Debian'da libarchive-tools içinde gelir.
+	PaketBsdtar: {RHEL: "bsdtar", Debian: "libarchive-tools"},
 }
 
 // servisAdlari: mantıksal ad -> aileye göre systemd unit adı.
