@@ -330,6 +330,11 @@ func main() {
 			r.With(middleware.BayiVeUstu).Get("/me/2fa/setup", authH.TwoFASetup)
 			r.With(middleware.BayiVeUstu).Post("/me/2fa/enable", authH.TwoFAEnable)
 			r.With(middleware.BayiVeUstu).Post("/me/2fa/disable", authH.TwoFADisable)
+			// Kişisel API token'ları — herkes yalnız KENDİ token'larını yönetir.
+			// Token, sahibinin rolüyle çalışır (bkz. internal/auth/apitoken.go).
+			r.With(middleware.BayiVeUstu).Get("/me/api-tokenlari", usersH.APITokenListe)
+			r.With(middleware.BayiVeUstu).Post("/me/api-tokenlari", usersH.APITokenOlustur)
+			r.With(middleware.BayiVeUstu).Delete("/me/api-tokenlari/{id}", usersH.APITokenSil)
 			// Bayi özet paneli: yalnız bayinin KENDİ kaynak durumu (admin'in
 			// karşılığı yok — admin zaten tüm bayileri /users + /bayi-paketleri
 			// üzerinden görür).

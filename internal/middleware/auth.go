@@ -47,6 +47,31 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 				return
 			}
 
+			// API token'ı (scp_…): oturum değil, otomasyon kimliği. Sahibinin
+			// hesabından TAZE okunan rolle normal bir Claims üretilir ve istek
+			// bundan sonra tamamen aynı yetki katmanından geçer (AdminOnly /
+			// BayiVeUstu / MusteriScope / KapsamSQL). Ayrı bir izin sistemi yok.
+			//
+			// Boşta oturum zaman aşımı API token'ına UYGULANMAZ: o kural
+			// interaktif oturumlar içindir; bir yedekleme script'inin "boşta
+			// kaldığı için" kilitlenmesi anlamsız olurdu. Token'ın süresi
+			// kendi bitis_at alanıyla yönetilir.
+			if auth.APITokenMi(tokenRaw) {
+				if scopeDB == nil {
+					httpx.WriteError(w, http.StatusServiceUnavailable, "oturum doğrulanamadı")
+					return
+				}
+				c, tokenID, err := auth.APITokenSahibi(scopeDB, tokenRaw)
+				if err != nil {
+					httpx.WriteError(w, http.StatusUnauthorized, "geçersiz API token")
+					return
+				}
+				auth.APITokenKullanimIsle(scopeDB, tokenID, httpx.ClientIP(r))
+				ctx := context.WithValue(r.Context(), claimsKey, c)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
 			c, err := auth.Parse(secret, tokenRaw)
 			if err != nil {
 				httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")

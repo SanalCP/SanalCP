@@ -37,6 +37,9 @@ Bunun yanında:
 - **Otomatik saldırı engelleme** dahildir — SSH, e-posta ve FTP'ye yapılan kimlik
   doğrulama saldırıları izlenir, eşiği aşan IP nftables tarafında süreli engellenir
   (fail2ban muadili, ayrı bir servis kurmadan). Ayrıntı için aşağıya bakın.
+- **Tam yönetim API'si** — panelin yaptığı her şey HTTP üzerinden de yapılabilir;
+  arayüzün kullandığı API'nin aynısıdır, kısıtlı bir alt küme değil. Token sahibinin
+  rolüyle çalışır. Bkz. **[docs/API.md](docs/API.md)**.
 - **SELinux `Enforcing` ile çalışır** — kapatmanızı istemez.
 - **Tam e-posta yığını** dahildir (Postfix + Dovecot + OpenDKIM + Roundcube, otomatik DKIM/SPF/DMARC).
 - **Tek statik Go binary** + React arayüz; mobil uyumlu.
@@ -65,14 +68,13 @@ yol haritasındadırlar:
 | Eksik | Durum |
 |---|---|
 | **Debian / Ubuntu desteği** | Yalnızca AlmaLinux/RHEL ailesi (9.4+ / 10). Sıradaki en öncelikli iş. |
-| **Kapsamlı REST API** | Yalnızca site kullanıcısı için 3 uç var (`db:export`, `db:import`, `cache:purge`). Tam yönetim API'si yok. |
 | **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
 | **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
 | **WordPress dışı uygulama kurucu** | Tek tık kurulum yalnızca WordPress için. |
 
 > **WHMCS modülü yok ve planlanmıyor** — WHMCS ücretli bir üründür, biz ücretsiz kalmayı
-> tercih ediyoruz. Panel MIT lisanslı olduğu için isteyen kendi entegrasyonunu yazabilir;
-> bunu kolaylaştıracak yönetim API'si yol haritamızda.
+> tercih ediyoruz. Panel MIT lisanslı olduğu ve tam bir yönetim API'si sunduğu için
+> ([docs/API.md](docs/API.md)), bu entegrasyona ihtiyacı olan kendisi yazabilir.
 
 ## Tek satır kurulum
 
@@ -160,6 +162,7 @@ Roller:
 - **Özel vhost modu** (admin): şablonun tek-root sınırını aşan yönlendirme ihtiyaçları için domain başına tam nginx vhost düzenleme — ayrıntı için aşağıya bakın
 - **Güvenlik duvarı** arayüzü (IP ban / whitelist / port kapatma + hazır şablonlar)
 - **Otomatik saldırı engelleme** (fail2ban muadili) — aşağıya bakın
+- **Yönetim API'si** — otomasyon için kişisel erişim token'ları ([docs/API.md](docs/API.md))
 - Backup yöneticisi, izleme/loglar, istatistikler
 - Hizmet planları ve kaynak limitleri (domain oluştururken varsayılan **Başlangıç**)
 

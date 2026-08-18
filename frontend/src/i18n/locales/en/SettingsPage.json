@@ -68,5 +68,30 @@
     "migrate_confirm": "NS records and SOA primary NS of all domains will be updated to the current nameserver pair and zones rewritten. Continue?",
     "migrated": "{{g}} of {{n}} domains updated.",
     "suggested": "The values below were guessed from your panel domain and are NOT saved yet. Verify them and save."
+  },
+  "apitoken": {
+    "title": "API Tokens",
+    "desc": "Personal access tokens for automation and script access.",
+    "name": "Token name",
+    "name_placeholder": "e.g. backup script",
+    "expiry": "Validity",
+    "expiry_30": "30 days",
+    "expiry_90": "90 days",
+    "expiry_365": "1 year",
+    "expiry_never": "Never expires",
+    "create": "Create token",
+    "create_failed": "Token could not be created",
+    "created_warning": "⚠️ This token is shown only once. Copy it somewhere safe — you will not be able to retrieve it after closing this box.",
+    "copied": "Copied",
+    "saved_close": "Saved it, close",
+    "empty": "You have not created any tokens yet.",
+    "last_used": "Last used: {{tarih}} ({{ip}})",
+    "never_used": "Never used",
+    "expires": "expires: {{tarih}}",
+    "no_expiry": "no expiry",
+    "revoke": "Revoke",
+    "confirm_delete": "The token \"{{ad}}\" will be revoked. Scripts using it will stop working immediately. Continue?",
+    "delete_failed": "Token could not be revoked",
+    "scope_note": "A token acts with your account permissions — it can never do more than you can. If your account is suspended or your role changes, the token changes with it. Details: docs/API.md"
   }
 }

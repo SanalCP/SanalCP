@@ -37,6 +37,9 @@ On top of that:
 - **Automatic intrusion blocking** is included — authentication attacks against SSH, mail
   and FTP are watched and offending IPs are temporarily blocked in nftables (a fail2ban
   equivalent, with no extra service to install). See below.
+- **A full management API** — everything the panel does can be done over HTTP; it is the
+  very same API the UI uses, not a restricted subset. A token acts with its owner's role.
+  See **[docs/API.md](docs/API.md)**.
 - **Runs with SELinux `Enforcing`** — it never asks you to disable it.
 - **A full email stack** is included (Postfix + Dovecot + OpenDKIM + Roundcube, automatic DKIM/SPF/DMARC).
 - **A single static Go binary** plus a React UI; mobile friendly.
@@ -64,14 +67,13 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 | Missing | Status |
 |---|---|
 | **Debian / Ubuntu support** | AlmaLinux/RHEL family only (9.4+ / 10). The next priority. |
-| **Comprehensive REST API** | Only 3 site-user endpoints exist (`db:export`, `db:import`, `cache:purge`). There is no full management API. |
 | **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
 | **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
 | **App installer beyond WordPress** | One-click install is WordPress only. |
 
 > **There is no WHMCS module and none is planned** — WHMCS is a paid product and we prefer to
-> stay free. Since the panel is MIT licensed, anyone can write their own integration; the
-> management API that would make this easy is on our roadmap.
+> stay free. Since the panel is MIT licensed and ships a full management API
+> ([docs/API.md](docs/API.md)), anyone who needs that integration can write it.
 
 ## One-line install
 
@@ -159,6 +161,7 @@ Roles:
 - **Custom vhost mode** (admin only): full nginx vhost editing per domain, for routing needs the template's single-root model can't express — see below for details
 - **Firewall** UI (IP ban / whitelist / port closing + ready-made templates)
 - **Automatic intrusion blocking** (fail2ban equivalent) — see below
+- **Management API** — personal access tokens for automation ([docs/API.md](docs/API.md))
 - Backup manager, monitoring/logs, statistics
 - Service plans and resource limits (new domains default to the **Starter** plan)
 

@@ -10,6 +10,11 @@ type Ben = {
   durum: string; iki_fa: boolean; tercih_tema: string; tercih_dil: string
 }
 
+type ApiToken = {
+  id: number; ad: string; onek: string; aktif: boolean
+  bitis_at: string; son_kullanim_at: string; son_kullanim_ip: string; created_at: string
+}
+
 function Kart({ baslik, aciklama, ikon, cocuk }: { baslik: string; aciklama?: string; ikon: React.ReactNode; cocuk: React.ReactNode }) {
   return (
     <section className="ta-card p-6">
@@ -70,6 +75,42 @@ export default function SettingsPage() {
   const [tema, setTema] = useState('system'); const [dil, setDil] = useState('tr')
   const [tOk, setTOk] = useState(''); const [tYuk, setTYuk] = useState(false)
 
+  // API token'ları. Ham token yalnız oluşturma yanıtında döner ve bir daha
+  // elde edilemez — bu yüzden yeniUretilen ayrı state'te tutulup kullanıcı
+  // kapatana kadar ekranda bırakılır.
+  const [tokenlar, setTokenlar] = useState<ApiToken[] | null>(null)
+  const [tkAd, setTkAd] = useState(''); const [tkGun, setTkGun] = useState('0')
+  const [tkYuk, setTkYuk] = useState(false); const [tkErr, setTkErr] = useState('')
+  const [yeniUretilen, setYeniUretilen] = useState<{ ad: string; token: string } | null>(null)
+  const [kopyalandi, setKopyalandi] = useState(false)
+
+  function tokenlariYukle() {
+    api.get<{ tokenlar: ApiToken[] }>('/me/api-tokenlari')
+      .then(r => setTokenlar(r.data.tokenlar || []))
+      .catch(() => setTokenlar([]))
+  }
+
+  async function tokenOlustur(e: React.FormEvent) {
+    e.preventDefault()
+    setTkErr(''); setTkYuk(true); setKopyalandi(false)
+    try {
+      const { data } = await api.post('/me/api-tokenlari', {
+        ad: tkAd.trim(), gun_sonra: parseInt(tkGun, 10) || 0,
+      })
+      setYeniUretilen({ ad: data.ad, token: data.token })
+      setTkAd('')
+      tokenlariYukle()
+    } catch (err) { setTkErr(apiHata(err, t('SettingsPage:apitoken.create_failed'))) }
+    finally { setTkYuk(false) }
+  }
+
+  async function tokenSil(tk: ApiToken) {
+    if (!confirm(t('SettingsPage:apitoken.confirm_delete', { ad: tk.ad }))) return
+    setTkErr('')
+    try { await api.delete(`/me/api-tokenlari/${tk.id}`); tokenlariYukle() }
+    catch (err) { setTkErr(apiHata(err, t('SettingsPage:apitoken.delete_failed'))) }
+  }
+
   function yukle() {
     api.get<Ben>('/me').then(r => {
       setBen(r.data); setAd(r.data.ad_soyad || ''); setEposta(r.data.eposta || '')
@@ -77,6 +118,7 @@ export default function SettingsPage() {
     }).catch(e => setYukHata(apiHata(e)))
   }
   useEffect(yukle, [])
+  useEffect(tokenlariYukle, [])
 
   async function profilKaydet(e: React.FormEvent) {
     e.preventDefault(); setPOk(''); setPErr(''); setPYuk(true)
@@ -262,6 +304,92 @@ export default function SettingsPage() {
                   <Uyari tip="err" mesaj={f2Err} />
                 </form>
               )}
+            </div>
+          } />
+
+        {/* 3.4) API token'ları — otomasyon için. Token sahibinin ROLÜYLE çalışır
+            (bkz. internal/auth/apitoken.go), yani ayrı bir izin seti yoktur. */}
+        <Kart baslik={t('SettingsPage:apitoken.title')} aciklama={t('SettingsPage:apitoken.desc')}
+          ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>}
+          cocuk={
+            <div className="space-y-4">
+              {yeniUretilen && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 dark:border-amber-800 dark:bg-amber-900/20">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    {t('SettingsPage:apitoken.created_warning')}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] text-slate-100">
+                      {yeniUretilen.token}
+                    </code>
+                    <button type="button"
+                      onClick={() => { navigator.clipboard?.writeText(yeniUretilen.token); setKopyalandi(true) }}
+                      className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium hover:bg-white dark:border-slate-600 dark:hover:bg-slate-700">
+                      {kopyalandi ? t('SettingsPage:apitoken.copied') : t('common:copy')}
+                    </button>
+                    <button type="button" onClick={() => { setYeniUretilen(null); setKopyalandi(false) }}
+                      className="shrink-0 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700">
+                      {t('SettingsPage:apitoken.saved_close')}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={tokenOlustur} className="flex flex-wrap items-end gap-3">
+                <div className="min-w-[12rem] flex-1">
+                  <Girdi etiket={t('SettingsPage:apitoken.name')} value={tkAd}
+                    onChange={e => setTkAd(e.target.value)} maxLength={64}
+                    placeholder={t('SettingsPage:apitoken.name_placeholder')} />
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">{t('SettingsPage:apitoken.expiry')}</span>
+                  <select value={tkGun} onChange={e => setTkGun(e.target.value)} className="ta-input">
+                    <option value="30">{t('SettingsPage:apitoken.expiry_30')}</option>
+                    <option value="90">{t('SettingsPage:apitoken.expiry_90')}</option>
+                    <option value="365">{t('SettingsPage:apitoken.expiry_365')}</option>
+                    <option value="0">{t('SettingsPage:apitoken.expiry_never')}</option>
+                  </select>
+                </label>
+                <button type="submit" disabled={tkYuk || !tkAd.trim()} className={btn}>
+                  {tkYuk ? t('common:saving') : t('SettingsPage:apitoken.create')}
+                </button>
+              </form>
+              <Uyari tip="err" mesaj={tkErr} />
+
+              {tokenlar === null ? (
+                <p className="text-xs text-slate-400">{t('common:loading')}</p>
+              ) : tokenlar.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t('SettingsPage:apitoken.empty')}</p>
+              ) : (
+                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {tokenlar.map(tk => (
+                    <li key={tk.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{tk.ad}</span>
+                          <code className="font-mono text-[11px] text-slate-400">{tk.onek}…</code>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          {tk.son_kullanim_at
+                            ? t('SettingsPage:apitoken.last_used', { tarih: tk.son_kullanim_at, ip: tk.son_kullanim_ip || '—' })
+                            : t('SettingsPage:apitoken.never_used')}
+                          {tk.bitis_at
+                            ? ` · ${t('SettingsPage:apitoken.expires', { tarih: tk.bitis_at })}`
+                            : ` · ${t('SettingsPage:apitoken.no_expiry')}`}
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => tokenSil(tk)}
+                        className="shrink-0 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20">
+                        {t('SettingsPage:apitoken.revoke')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {t('SettingsPage:apitoken.scope_note')}
+              </p>
             </div>
           } />
 

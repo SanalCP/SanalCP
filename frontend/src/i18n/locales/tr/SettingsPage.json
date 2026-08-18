@@ -68,5 +68,30 @@
     "migrate_confirm": "Tüm domainlerin NS kayıtları ve SOA primary NS'i güncel nameserver çiftine güncellenecek, zone'lar yeniden yazılacak. Devam edilsin mi?",
     "migrated": "{{n}} domainden {{g}} tanesi güncellendi.",
     "suggested": "Aşağıdaki değerler panel alan adınızdan tahmin edildi ve henüz KAYDEDİLMEDİ. Doğruluğunu kontrol edip kaydedin."
+  },
+  "apitoken": {
+    "title": "API Tokenları",
+    "desc": "Otomasyon ve script erişimi için kişisel erişim tokenları.",
+    "name": "Token adı",
+    "name_placeholder": "ör. yedekleme scripti",
+    "expiry": "Geçerlilik",
+    "expiry_30": "30 gün",
+    "expiry_90": "90 gün",
+    "expiry_365": "1 yıl",
+    "expiry_never": "Süresiz",
+    "create": "Token oluştur",
+    "create_failed": "Token oluşturulamadı",
+    "created_warning": "⚠️ Bu token yalnızca şimdi gösteriliyor. Kopyalayıp güvenli bir yere kaydedin — pencereyi kapattıktan sonra bir daha erişemezsiniz.",
+    "copied": "Kopyalandı",
+    "saved_close": "Kaydettim, kapat",
+    "empty": "Henüz token oluşturmadınız.",
+    "last_used": "Son kullanım: {{tarih}} ({{ip}})",
+    "never_used": "Hiç kullanılmadı",
+    "expires": "bitiş: {{tarih}}",
+    "no_expiry": "süresiz",
+    "revoke": "İptal et",
+    "confirm_delete": "\"{{ad}}\" tokenı iptal edilecek. Bu tokenı kullanan scriptler anında çalışmayı durduracak. Devam edilsin mi?",
+    "delete_failed": "Token iptal edilemedi",
+    "scope_note": "Token, sizin hesabınızın yetkileriyle çalışır — sizden fazlasını yapamaz. Hesabınız askıya alınırsa veya rolünüz değişirse tokenın yetkisi de anında değişir. Ayrıntı: docs/API.md"
   }
 }

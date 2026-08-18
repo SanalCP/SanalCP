@@ -11,6 +11,42 @@ sayfa altbilgisinden görebilirsiniz.
 
 ---
 
+## 0.7.x — Otomatik saldırı engelleme ve yönetim API'si
+
+**0.7.0** (2026-08-18)
+
+**Otomatik saldırı engelleme (fail2ban muadili) — YENİ.** Panel, sistem servislerinin
+kimlik doğrulama hatalarını journald üzerinden izler; bir IP belirlenen pencerede eşiği
+aşarsa nftables tarafında süreli engellenir. Ayrı bir servis (fail2ban, Python) kurulmaz —
+izleyici panelin kendi binary'sindedir.
+
+- İzlenen: **sshd** (hatalı parola, geçersiz kullanıcı, azami deneme aşımı, preauth
+  kopmaları), **dovecot** (başarısız giriş), **postfix** (SASL / SMTP AUTH), **pure-ftpd**.
+- Varsayılan: 10 dakikada 5 başarısız deneme → 60 dakika ban. Üçü de ayarlanabilir.
+- **Varsayılan KAPALI** — açmadığınız sürece hiçbir davranış değişmez.
+- Otomatik banlar elle eklenen kurallarla aynı tabloda tutulur: güvenlik duvarı ekranında
+  "Otomatik" rozetiyle ve bitiş saatiyle görünür, tek tek veya topluca kaldırılabilir.
+- Kilitlenme korumaları: izin listesindeki IP/CIDR'ler, sunucunun kendi adresleri,
+  loopback ve link-local **asla** engellenmez; banlar sürelidir ve süresi dolan kural
+  anında etkisiz kalır; nftables'ta `established,related accept` en üstte olduğu için
+  açık SSH oturumları kopmaz.
+
+**Yönetim API'si — YENİ.** Panelin yaptığı her şey HTTP üzerinden de yapılabilir; arayüzün
+kullandığı API'nin aynısıdır, kısıtlı bir alt küme değil. Belgeler: **`docs/API.md`**.
+
+- Kişisel erişim token'ları: **Profil ve Tercihler → API Token'ları**. Ham token yalnız bir
+  kez gösterilir; sunucuda SHA-256 özeti saklanır.
+- **Token ayrı bir izin sistemi değildir, sahibinin kimliğidir.** İstek, sahibi oturum
+  açmış gibi işlenir ve mevcut yetki katmanından (AdminOnly / BayiVeUstu / MusteriScope /
+  KapsamSQL) geçer. Bayinin token'ı bayiden fazlasını yapamaz; rol değişince yetki de
+  değişir; hesap askıya alınırsa token çalışmaz; token iptal edilirse anında geçersizdir.
+- Token başına son kullanım zamanı ve IP kaydedilir; isteğe bağlı son kullanma tarihi
+  verilebilir. Hesap başına en fazla 20 token.
+- API token'larına 2FA ve boşta oturum zaman aşımı uygulanmaz (ikisi de interaktif oturum
+  kuralıdır) — bu, `docs/API.md` içinde açıkça belirtilmiştir.
+
+migrations: **0067** (otomatik ban), **0068** (api_tokenlari).
+
 ## 0.6.x — Yedekleme, oturum güvenliği ve arayüz sadeleştirme
 
 **0.6.5** (2026-08-18)
