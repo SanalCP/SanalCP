@@ -688,8 +688,8 @@ export default function HomePage() {
       {/* Kartlar köşedeki tutamaçtan sürüklenerek yeniden düzenlenir; değişiklik otomatik kaydedilir */}
 
       {/* Disk kotası uyarısı: iki ayrı durum —
-          1) kota_fs_uyumsuz: kök fs XFS DEĞİL → kalıcı, reboot çözmez, kullanıcı kapatabilir.
-          2) kota_reboot_gerekli (fs XFS ama enforcement kapalı): tek seferlik reboot bekliyor,
+          1) kota_fs_uyumsuz: kök fs kotayı DESTEKLEMİYOR (XFS/extN değil) → kalıcı, reboot çözmez, kullanıcı kapatabilir.
+          2) kota_reboot_gerekli (fs destekliyor ama enforcement kapalı): tek seferlik reboot bekliyor,
              reboot sonrası backend bayrağı kendiliğinden düşer → kapatma butonu gerekmez. */}
       {s?.kota_fs_uyumsuz ? (
         !kotaUyariKapali && (

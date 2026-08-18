@@ -18,7 +18,7 @@
   },
   "kota": {
     "unsupported_title": "Disk kotası desteklenmiyor",
-    "unsupported_desc": "Kök dosya sistemi XFS değil (ör. ext4) — disk kotası bu sunucuda kalıcı olarak devre dışı. Yeniden başlatma bunu çözmez; etkinleştirmek için sunucunun XFS kök dosya sistemiyle yeniden kurulması gerekir.",
+    "unsupported_desc": "Kök dosya sistemi disk kotasını desteklemiyor (ör. btrfs) — kota yalnız XFS ve ext2/3/4 üzerinde çalışır ve bu sunucuda kalıcı olarak devre dışı. Yeniden başlatma bunu çözmez; etkinleştirmek için sunucunun desteklenen bir kök dosya sistemiyle yeniden kurulması gerekir.",
     "dismiss_aria": "Uyarıyı kapat",
     "inactive_title": "Disk kotası aktif değil",
     "inactive_desc": "Disk kotası aktif değil — etkinleştirmek için tek seferlik sunucu yeniden başlatması gerekli."

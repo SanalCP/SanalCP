@@ -18,7 +18,7 @@
   },
   "kota": {
     "unsupported_title": "Disk quota is not supported",
-    "unsupported_desc": "The root filesystem is not XFS (e.g. ext4) — disk quota is permanently disabled on this server. A reboot will not fix it; to enable it, the server must be reinstalled with an XFS root filesystem.",
+    "unsupported_desc": "The root filesystem does not support disk quota (e.g. btrfs) — quota works only on XFS and ext2/3/4, and is permanently disabled on this server. A reboot will not fix it; to enable it, the server must be reinstalled with a supported root filesystem.",
     "dismiss_aria": "Dismiss warning",
     "inactive_title": "Disk quota is not active",
     "inactive_desc": "Disk quota is not active — a one-time server reboot is required to enable it."

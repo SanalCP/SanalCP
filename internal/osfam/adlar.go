@@ -24,7 +24,8 @@ const (
 	PaketAntivirus = "antivirus"
 	PaketAVGuncel  = "antivirus-guncelleme"
 	PaketCron      = "cron"
-	PaketKota      = "kota"
+	PaketKotaXFS   = "kota-xfs" // XFS kota araçları (xfs_quota)
+	PaketKotaExt   = "kota-ext" // ext2/3/4 kota araçları (setquota/repquota/quotaon)
 	PaketApache    = "apache"
 	PaketApacheAra = "apache-araclari"
 	PaketACL       = "acl"
@@ -42,7 +43,12 @@ var paketAdlari = map[string]map[Aile]string{
 	PaketAntivirus: {RHEL: "clamav", Debian: "clamav-daemon"},
 	PaketAVGuncel:  {RHEL: "clamav-update", Debian: "clamav-freshclam"},
 	PaketCron:      {RHEL: "cronie", Debian: "cron"},
-	PaketKota:      {RHEL: "xfsprogs", Debian: "quota"},
+	// Kota backend'i AİLEYE DEĞİL, kök dosya sisteminin tipine göre seçilir
+	// (bkz. internal/kaynaklimit/kota.go) — AlmaLinux ext4 köke de kurulabilir,
+	// Debian XFS köke de. Bu yüzden her iki araç seti de her iki ailede kurulur;
+	// paket adları zaten iki ailede de aynıdır.
+	PaketKotaXFS:   {RHEL: "xfsprogs", Debian: "xfsprogs"},
+	PaketKotaExt:   {RHEL: "quota", Debian: "quota"},
 	PaketApache:    {RHEL: "httpd", Debian: "apache2"},
 	PaketApacheAra: {RHEL: "httpd-tools", Debian: "apache2-utils"},
 	PaketWebEkstra: {RHEL: "httpd-tools", Debian: "apache2-utils"},

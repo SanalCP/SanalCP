@@ -1,6 +1,6 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** planlama. Kod yazılmadı.
+**Durum:** Faz 0-3 tamamlandı (2026-08-18). Sıradaki: Faz 4 — installer.
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -138,7 +138,7 @@ diye kapatılabilir** (dürüst ve düşük riskli).
 | antivirüs | `clamav`, `clamav-update` / `clamd` | `clamav-daemon`, `clamav-freshclam` | servis adları farklı |
 | cache | `valkey` | `valkey-server` (doğrulanacak) | Debian 13'te valkey var mı, yoksa `redis-server`'a mı düşülecek |
 | cron | `cronie` | `cron` | |
-| kota araçları | `xfsprogs`, `quota` | `quota`, `e2fsprogs` | |
+| kota araçları | `xfsprogs` + `quota` | `xfsprogs` + `quota` | Backend fs tipine göre seçilir (aileye göre DEĞİL) → her iki araç seti her iki ailede kurulur; `osfam.PaketKotaXFS` / `PaketKotaExt` |
 | certbot | `certbot`, `python3-certbot-nginx` | aynı | |
 | diğer | `policycoreutils-python-utils`, `setools-console` | **yok** (SELinux) | Debian'da hiç kurulmaz |
 
@@ -153,64 +153,97 @@ yüksek. UI'da "bu sunucuda kullanılamıyor" denir. Sonraki sürüme bırakıl�
 
 ---
 
-## 4. Disk kotası — işin tek gerçek zor kısmı
+## 4. Disk kotası — Faz 3 ✅ (2026-08-18)
 
-Kaynak izolasyonunun disk ayağı şu an **tamamen `xfs_quota`** üzerine kurulu
-(`internal/kaynaklimit/kaynaklimit.go`). Debian/Ubuntu bulut imajlarında kök dosya
-sistemi neredeyse her zaman **ext4**.
+Kaynak izolasyonunun disk ayağı XFS'e (`xfs_quota`) bağlıydı; Debian/Ubuntu bulut
+imajlarında kök dosya sistemi neredeyse her zaman **ext4**. Backend arayüzü yazıldı.
 
-### Mevcut yapı (iyi haber: temiz kapsüllenmiş)
+### Yapılan
 
-| Fonksiyon | Görev |
+`internal/kaynaklimit/kaynaklimit.go` içindeki kota bloğu üç dosyaya ayrıldı:
+
+| Dosya | İçerik |
 |---|---|
-| `mountKotaAktif()` | `xfs_quota -x -c 'state -u' /` → accounting/enforcement |
-| `kotaLimitArgs()` | **saf fonksiyon**, birim testli |
-| `KotaUygula()` | limiti yaz |
-| `kotaReportSatir()` | `xfs_quota report -u -N` → kullanım oku |
-| `KotaDurum()` | UI için durum |
-
-### Yapılacak: kota backend arayüzü
+| `kota.go` | Ortak katman: `kotaBackend` arayüzü, fs tespiti, sk allowlist, sentinel, plan çözümlemesi, `HealKotaOnStartup` |
+| `kota_xfs.go` | `xfsKota` — mevcut `xfs_quota` kodu olduğu gibi taşındı (regresyon riski sıfır) |
+| `kota_ext4.go` | `ext4Kota` — `setquota` / `repquota` / `quotaon` (`quota` paketi) |
 
 ```go
-type KotaBackend interface {
+type kotaBackend interface {
+    Ad() string            // "xfs" | "ext4" — log/teşhis
+    KernelBayragi() string // "rootflags=uquota" | "rootflags=usrquota"
     Aktif() (accounting, enforcement bool)
-    Uygula(sk string, diskMB, inode int) error
-    Durum(sk string) (kullanimMB, limitMB, kullanilanInode, limitInode int, err error)
+    Uygula(ctx context.Context, sk string, diskMB, inode int) error
+    Durum(sk string) (kullanilanMB, limitMB, kullanilanInode, limitInode int)
 }
 ```
 
-- **XFS backend:** mevcut kod, olduğu gibi taşınır (regresyon riski sıfır).
-- **ext4 backend:** `setquota` / `repquota` (`quota` paketi).
+Backend seçimi **aileye değil, kök fs'in `statfs(2)` magic'ine** bakar
+(`unix.XFS_SUPER_MAGIC` / `unix.EXT4_SUPER_MAGIC`; ext2/3/4 aynı magic'i paylaşır).
+Böylece AlmaLinux-üstü-ext4 ve Debian-üstü-XFS de doğru çalışır. Tanınmayan fs
+(btrfs, zfs, overlay) → backend **yok**, kota dürüstçe "desteklenmiyor" denir;
+panelin geri kalanı çalışır. `KotaFSUyumlu()` artık "XFS mi" değil, "backend var mı"
+sorusunu yanıtlıyor; UI metni de buna göre güncellendi.
 
-```bash
-setquota -u c_ornek <bsoft> <bhard> <isoft> <ihard> /
-repquota -u -O csv /
-```
+Dışa açık API (`KotaUygula`, `KotaDurum`, `KotaFSUyumlu`, `KotaRebootGerekli`,
+`DomainKotaUygula`, `HealKotaOnStartup`) **değişmedi** — çağıran paketlere dokunulmadı.
 
-### Etkinleştirme akışı — mevcut UX birebir örtüşüyor
+### Etkinleştirme akışı — mevcut UX birebir korundu
 
-XFS'te kota yalnız **mount anında** açılabildiği için panel `rootflags=uquota` yazıp
-tek seferlik reboot istiyor ve bunu bir "reboot gerekli" sentinel'iyle UI'da gösteriyor
-(`kotaRebootSentinel`).
-
-ext4'te de aynı mekanizma çalışıyor — yalnız flag ve GRUB komutu değişiyor:
+Kota her iki fs'te de yalnız mount anında açılabildiği için panel GRUB'a kernel
+bayrağı yazıp tek seferlik reboot istiyor ve bunu `kotaRebootSentinel` ile UI'da
+gösteriyor. Sentinel metni artık bayrağı **backend'den** alıyor:
 
 | | RHEL / XFS | Debian / ext4 |
 |---|---|---|
 | kernel flag | `rootflags=uquota` | `rootflags=usrquota` |
 | grub üret | `grub2-mkconfig -o /boot/grub2/grub.cfg` | `grub-mkconfig -o /boot/grub/grub.cfg` |
 | BLS güncelle | `grubby --update-kernel=ALL` | yok (gerekmez) |
-| reboot sonrası | otomatik aktif | `quotacheck -cum /` + `quotaon /` gerekebilir |
+| reboot sonrası | otomatik aktif | `quotacheck -cum /` + `quotaon /` gerekebilir (Faz 5) |
 
-**Sentinel + "reboot gerekli" arayüzü aynen kullanılır.** Yeni UX yazılmayacak.
+### Canlı doğrulanan komut sözleşmeleri
 
-### Canlı doğrulanacaklar
+Bu makine Debian 13 trixie / ext4 kök; **quota-tools 4.09** ile doğrulandı.
+Ayrıştırıcılar bu gözlemlere göre yazıldı ve birim testli:
+
+- **`quotaon -p -u /`** — kota KAPALIYKEN tanı mesajını **stderr**'e yazar ve yine
+  **rc=0** döner. → Çıkış koduna güvenilemez. Kota açıkken **stdout**'a tek satır
+  gelir: `user quota on / (/dev/vda1) is on`. Ayrıştırıcı yalnız bu satıra bakar.
+- **`repquota -u -O csv /`** — kota kapalıyken **rc=1** (quotaon'un aksine güvenilir).
+  Başlık (ikilinin format string'inden birebir):
+  `User,BlockStatus,FileStatus,BlockUsed,BlockSoftLimit,BlockHardLimit,BlockGrace,FileUsed,FileSoftLimit,FileHardLimit,FileGrace`.
+  Sütunlar **sabit indeksle değil, başlık adıyla** bulunur (blok sütunları sürüme
+  göre `Block*` yerine `Space*` adlanabilir; ikili her iki dizgeyi de taşıyor).
+  Değerler ham kalsın diye `-s`/human-readable **asla** verilmez; blok değerleri KiB.
+- **`setquota -u <ad> <bsoft> <bhard> <isoft> <ihard> <fs>`** — blok limitlerinde
+  `M` soneki kabul edilir (varsayılan birim KiB blok), `0M` dahil; inode limitleri
+  çıplak sayı (`k/m/g` sonekleri 10³ katları demek olduğu için kullanılmaz).
+  **0 = sınırsız** — XFS ile aynı semantik. Arg biçimi gerçek ikili ile doğrulandı.
+- **accounting / enforcement ayrımı**: ext4'te `quotaon` yalnız *enforcement*'ı
+  söyler. quotaon kapalı ama kök mount `usrquota` / `quota` / `usrjquota=` ile
+  bağlıysa kullanım sayılıyor ama limitler uygulanmıyor demektir — XFS'teki
+  `uqnoenforce` durumunun karşılığı. `/proc/self/mounts` okunarak ayırt edilir.
+
+### Testler
+
+`kota_ext4_test.go`: arg-slice, CSV ayrıştırıcı (karışık sütun sırası + `Space*`
+adlandırması dahil), quotaon/mount durum ayrıştırıcıları, ve sahte backend ile
+guard testleri (backend yok / enforcement kapalı / geçersiz sk → **asla hata,
+asla limit yazma**). Ayrıca **XFS-ext4 parite testi**: iki backend aynı disk/inode
+girdisi için aynı soft/hard sayılarını üretmeli — aksi halde dağıtım değişince
+tenant'ın efektif limiti sessizce kayardı.
+
+`KOTA_LIVE=1 go test` bu makinede (ext4, kota kapalı) çalıştırıldı: backend
+otomatik `ext4` seçildi, doğru kernel bayrağı loglandı, `KotaUygula` hata dönmeden
+graceful-skip yaptı.
+
+### Faz 5'e kalan canlı sorular
 
 - `tune2fs -O quota` bağlıyken çalışıyor mu, yoksa klasik `quotacheck` yolu mu gerekli?
+- Reboot sonrası `quotaon` kendiliğinden gelir mi (`quotaon.service`), yoksa
+  `quotacheck -cum /` şart mı?
 - Bulut imajlarında `/` gerçekten ext4 mi (bazıları btrfs olabilir → kota desteklenmez,
   dürüstçe "kota kapalı" denir; panelin geri kalanı çalışır).
-
----
 
 ## 5. Installer (`sanalcp-install.sh`, 587 satır)
 
@@ -236,14 +269,14 @@ Debian tarafında ek adımlar:
 | ~~**0**~~ | ✅ `internal/osfam` + tespit + birim testler | düşük |
 | ~~**1**~~ | ✅ phpMap/KurulSurumler ikinci tablo, web kullanıcısı, servis adı haritası | düşük |
 | ~~**2**~~ | ✅ 6 dosyadaki paket yöneticisi çağrıları soyutlamaya taşındı | düşük |
-| **3** | Kota backend arayüzü + ext4 uygulaması | **yüksek** |
+| ~~**3**~~ | ✅ Kota backend arayüzü + ext4 uygulaması | **yüksek** |
 | **4** | Installer soyutlaması + sury deposu | orta |
 | **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
 | **5b** | Canlı test: **Debian 13** (MariaDB 11.8 devreye girer) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
-**Faz 0-2 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
+**Faz 0-3 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
 çağrısı YOKTUR; hepsi `internal/osfam` üzerinden geçer. Kalan tek istisna
 `internal/system/cve.go` içindeki `cveRun`'dır ve o da yalnız RHEL'de erişilebilir
 (`GuvenlikGuncellemeDestekli` kapısı).
@@ -256,7 +289,7 @@ Faz 2'de ayrıca yapılanlar:
 - Hata özetleyici apt çıktısını da tanıyor (`E: Unable to locate package…`).
 - `sanalcp-optimize` sarmalayıcısı apt dalını içeriyor.
 
-Faz 3 ayrı ve dikkat isteyen iş.
+Faz 3'te disk kotası XFS/ext4 backend'lerine ayrıldı; ayrıntısı §4'te. Sıradaki iş **Faz 4** (installer soyutlaması + sury deposu).
 
 Faz 5 sırası bilinçlidir: **5a'da yalnız "dağıtım ailesi" değişkeni**, 5b'de üzerine
 "MariaDB sürümü" değişkeni biner. Tersi sırada bir hata çıksa hangisinden geldiği
