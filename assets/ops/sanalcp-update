@@ -80,6 +80,19 @@ NEWBIN="$A/sanalcp-server"
   die "$(t "release asset SHA-256 doğrulaması başarısız" "release asset SHA-256 verification failed")"
 ok "$(t "release asset bütünlüğü doğrulandı" "release asset integrity verified")"
 
+# Aile tespiti + paket adları: İNDİRİLEN release'ten source edilir, kurulu
+# kopyadan değil. Eski bir sunucuda /usr/local/bin/sanalcp-ortak henüz yoktur
+# (adım 9'da kurulacak), ama bu betiğin paket kurma adımları ondan ÖNCE geçer.
+if [ -f "$A/ops/sanalcp-ortak.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$A/ops/sanalcp-ortak.sh"
+else
+  # Çok eski bir release'e geri dönülüyorsa (ortak.sh yok) RHEL varsayımıyla devam et.
+  debian_mi(){ return 1; }; rhel_mi(){ return 0; }
+  pkg_kur(){ dnf install -y "$@" >/dev/null 2>&1; }
+  paket_ad(){ case "$1" in kota-ext) echo quota ;; kota-xfs) echo xfsprogs ;; *) echo "$1" ;; esac; }
+fi
+
 # 2) verify the new binary WITHOUT running it (ELF header) + detect changes.
 # IMPORTANT: hash the WHOLE release (binary + frontend-dist + migrations), not just the
 # binary. Otherwise a frontend-only / migration-only update would be wrongly SKIPPED
@@ -263,20 +276,20 @@ if command -v sanalcp-waf-setup >/dev/null 2>&1; then
 fi
 
 # 10) isolation + tool prerequisites (added if missing on old installs; idempotent) + SELinux context
-command -v bwrap >/dev/null 2>&1 || dnf install -y bubblewrap >/dev/null 2>&1 || true
+command -v bwrap >/dev/null 2>&1 || pkg_kur bubblewrap || true
 # acl (setfacl): REQUIRED for the per-user file permission model (nginx user-ACL) —
 # without it the panel falls back fail-safe to group=nginx mode. Idempotent.
-command -v setfacl >/dev/null 2>&1 || dnf install -y acl >/dev/null 2>&1 || true
+command -v setfacl >/dev/null 2>&1 || pkg_kur acl || true
 # lftp + sshpass: off-site yedek hedefleri (FTP/SFTP) için gerekli — eski
 # kurulumlarda eksikti (install script'te yoktu), backup destination özelliği
 # sessizce başarısız oluyordu. Idempotent.
-command -v lftp >/dev/null 2>&1 || dnf install -y lftp >/dev/null 2>&1 || true
-command -v sshpass >/dev/null 2>&1 || dnf install -y sshpass >/dev/null 2>&1 || true
+command -v lftp >/dev/null 2>&1 || pkg_kur lftp || true
+command -v sshpass >/dev/null 2>&1 || pkg_kur sshpass || true
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, reliably reads
 # RAR/RAR5 and itself rejects path-traversal). 7z (7-Zip 26.02) does NOT include the RAR
 # codec → unusable.
 if ! command -v bsdtar >/dev/null 2>&1 && ! command -v unar >/dev/null 2>&1 && ! command -v unrar >/dev/null 2>&1; then
-  dnf install -y bsdtar >/dev/null 2>&1 || dnf install -y unar >/dev/null 2>&1 || dnf install -y unrar >/dev/null 2>&1 || true
+  pkg_kur "$(paket_ad bsdtar)" || pkg_kur unar || pkg_kur unrar || true
 fi
 command -v restorecon >/dev/null && restorecon -R "$PREFIX/bin" "$FDIST" >/dev/null 2>&1 || true
 
@@ -319,7 +332,7 @@ fi
 # /etc/default/grub; the quota can only be enabled at MOUNT time (reboot). The operator
 # schedules the reboot → leave a sentinel file + a clear warning. HealKotaOnStartup (at
 # panel boot) applies limits itself once fs quota is active.
-command -v quota >/dev/null 2>&1 || dnf install -y quota xfsprogs >/dev/null 2>&1 || true
+command -v quota >/dev/null 2>&1 || pkg_kur "$(paket_ad kota-ext)" "$(paket_ad kota-xfs)" || true
 QROOTFS=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 QROOTOPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
 QSENTINEL=/etc/sanalcp/reboot-required-quota

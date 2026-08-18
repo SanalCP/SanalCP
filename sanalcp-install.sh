@@ -17,7 +17,9 @@
 #   migrations.tar.gz  nginx/*  php-fpm/*  phpmyadmin/*  systemd/*  ops/*  ssh/*
 set -uo pipefail
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+# BASH_SOURCE (not $0): when the parity test SOURCES this script, $0 is "bash"
+# and assets/ would be looked up in the caller's directory.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 A="$HERE/assets"
 ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""
 while [ $# -gt 0 ]; do case "$1" in
@@ -53,31 +55,17 @@ else
 fi
 fi
 # ============ 0) OS FAMILY + WRAPPERS ============
-# Mirrors internal/osfam (Go side). Keep the two in sync: the panel resolves
-# package/service names through osfam at runtime, this script does it at install
-# time — a disagreement means the installer sets up something the panel can't find.
-# SANALCP_OS_RELEASE: test-only seam — lets the parity test feed a fake
-# /etc/os-release (see internal/osfam/installer_paritesi_test.go).
-. "${SANALCP_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true
-OS_ID="${ID:-}"; OS_SURUM="${VERSION_ID:-}"; OS_KODADI="${VERSION_CODENAME:-}"
-case "$OS_ID" in
-  debian|ubuntu)                       OS_AILE=debian ;;
-  almalinux|rocky|rhel|centos|ol)      OS_AILE=rhel ;;
-  *) case " ${ID_LIKE:-} " in
-       *debian*)        OS_AILE=debian ;;
-       *rhel*|*fedora*) OS_AILE=rhel ;;
-       *) OS_AILE=rhel; warn "unrecognised OS '${OS_ID:-?}' — assuming RHEL family" ;;
-     esac ;;
-esac
-
-# EL major version — RHEL family only. PLATFORM_ID ("platform:el9"/"platform:el10")
-# is set consistently across every RHEL derivative, more reliable than VERSION_ID
-# (same pattern as assets/ops/sanalcp-mail-setup.sh). Newest supported major (10)
-# is the fallback.
-EL_MAJOR=""
-if [ "$OS_AILE" = rhel ]; then
-  EL_MAJOR=$(printf '%s' "${PLATFORM_ID:-platform:el10}" | sed 's/.*el//')
-  case "$EL_MAJOR" in ''|*[!0-9]*) EL_MAJOR=10 ;; esac
+# 🔴 The family detection and the whole package/service name table live in ONE
+# place: assets/ops/sanalcp-ortak.sh. The ops tools (redis-setup, mail-setup,
+# repair…) source the very same file from /usr/local/bin/sanalcp-ortak once
+# installed, so the installer and the tools can never disagree about what a
+# package is called. That single shell table is checked against the Go side
+# (internal/osfam) by internal/osfam/installer_paritesi_test.go.
+ORTAK="$A/ops/sanalcp-ortak.sh"
+[ -f "$ORTAK" ] || die "assets/ops/sanalcp-ortak.sh not found — incomplete release"
+# shellcheck source=assets/ops/sanalcp-ortak.sh
+. "$ORTAK"
+if rhel_mi; then
   ok "detected OS: ${PRETTY_NAME:-unknown} (RHEL family, EL${EL_MAJOR})"
 else
   # apt must never open a dialog (dpkg conffile prompts, needrestart's service
@@ -89,82 +77,6 @@ else
   case "$OS_ID/$OS_KODADI" in
     debian/bookworm) warn "Debian 12 is a secondary target (LTS security support until 30 Jun 2028) — Debian 13 is recommended for new installs" ;;
   esac
-fi
-debian_mi(){ [ "$OS_AILE" = debian ]; }
-rhel_mi(){   [ "$OS_AILE" = rhel ]; }
-
-# ---- package manager wrappers ----
-pkg_kur(){ # install, quiet; non-zero on failure
-  if debian_mi; then
-    apt-get install -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef "$@" >/dev/null 2>&1
-  else
-    dnf install -y "$@" >/dev/null 2>&1
-  fi
-}
-pkg_kurulu(){ # is package installed?
-  if debian_mi; then
-    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "^install ok installed"
-  else
-    rpm -q "$1" >/dev/null 2>&1
-  fi
-}
-depo_yenile(){
-  if debian_mi; then apt-get update -qq >/dev/null 2>&1; else dnf makecache -q >/dev/null 2>&1; fi
-}
-
-# ---- name resolution (mirror of internal/osfam/adlar.go) ----
-# Code uses LOGICAL names; the real package/unit name is resolved here only.
-paket_ad(){
-  case "$1" in
-    web)        echo nginx ;;
-    db)         echo mariadb-server ;;
-    dns)        debian_mi && echo bind9        || echo bind ;;
-    dns-arac)   debian_mi && echo bind9-utils  || echo bind-utils ;;
-    antivirus)  debian_mi && echo clamav-daemon    || echo clamav ;;
-    av-guncel)  debian_mi && echo clamav-freshclam || echo clamav-update ;;
-    cron)       debian_mi && echo cron         || echo cronie ;;
-    apache)     debian_mi && echo apache2      || echo httpd ;;
-    apache-ara) debian_mi && echo apache2-utils || echo httpd-tools ;;
-    bsdtar)     debian_mi && echo libarchive-tools || echo bsdtar ;;
-    kota-xfs)   echo xfsprogs ;;
-    kota-ext)   echo quota ;;
-    *)          echo "$1" ;;
-  esac
-}
-servis_ad(){
-  case "$1" in
-    web)    echo nginx ;;
-    db)     echo mariadb ;;
-    dns)    debian_mi && echo bind9  || echo named ;;
-    cron)   debian_mi && echo cron   || echo crond ;;
-    apache) debian_mi && echo apache2 || echo httpd ;;
-    ftp)    debian_mi && echo pure-ftpd-mysql || echo pure-ftpd ;;
-    *)      echo "$1" ;;
-  esac
-}
-# WEB_USER: the user nginx runs as — PHP-FPM pools' listen.owner/group. Wrong
-# value = nginx can't reach the FPM socket = every site 502s.
-WEB_USER=$(debian_mi && echo www-data || echo nginx)
-
-# ---- BIND layout (mirror of internal/dns/yollar.go) ----
-# Debian's bind9 ships an AppArmor profile: named can write under /var/lib/bind,
-# NOT under /var/named. The Go side resolves the same pair — keep them equal.
-if debian_mi; then
-  DNS_ZONE_DIR=/var/lib/bind;  DNS_CONF_DIR=/etc/bind;  DNS_USER=bind
-  DNS_MAIN_CONF=/etc/bind/named.conf
-else
-  DNS_ZONE_DIR=/var/named;     DNS_CONF_DIR=/etc/named; DNS_USER=named
-  DNS_MAIN_CONF=/etc/named.conf
-fi
-DNS_INCLUDE="$DNS_CONF_DIR/sanalcp-zones.conf"
-
-# ---- system PHP (phpMyAdmin + webmail run on it) — mirror of provisioner.SistemPHP* ----
-if debian_mi; then
-  SYS_PHP_POOL_DIR=/etc/php/8.3/fpm/pool.d; SYS_PHP_SVC=php8.3-fpm
-  MYSQL_SOCK=/run/mysqld/mysqld.sock
-else
-  SYS_PHP_POOL_DIR=/etc/php-fpm.d;          SYS_PHP_SVC=php-fpm
-  MYSQL_SOCK=/var/lib/mysql/mysql.sock
 fi
 
 # havuz_kur <source pool file> <target name>: installs a panel-internal FPM pool

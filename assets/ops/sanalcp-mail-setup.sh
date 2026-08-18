@@ -25,6 +25,12 @@ fi
 [ -d "$TMPL" ] || { log "✗ mail template dizini bulunamadı ($TMPL)"; exit 1; }
 ENV=/etc/sanalcp/env
 
+# Aile tespiti + paket adları (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || { log "✗ sanalcp-ortak bulunamadı"; exit 1; }
+
 echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # GERÇEK VPS'TE BULUNDU: postfix-mysql / dovecot-mysql AYRI paketler — temel postfix/dovecot
 # paketleri MySQL sorgu-harita desteğini İÇERMİYOR. Bunlar olmadan servisler "active" görünür
@@ -32,20 +38,29 @@ echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # "unsupported dictionary type: mysql" der, Dovecot auth süreci "Unknown database driver
 # 'mysql'" ile crash-loop'a girer (auth soketi var ama arkasındaki süreç sürekli ölür) —
 # yani TÜM sanal posta kutusu doğrulaması sessizce bozuk kalır, hiçbir hata dışarı sızmaz.
-dnf install -y postfix postfix-mysql dovecot dovecot-mysql dovecot-pigeonhole opendkim >/tmp/mail-setup.log 2>&1 \
+# Debian'da dovecot TEK paket değil: çekirdek + protokol paketleri ayrıdır
+# (dovecot-imapd/lmtpd olmadan IMAP ve LMTP teslimatı hiç yoktur) ve Sieve
+# desteği "pigeonhole" adıyla değil dovecot-sieve/managesieved olarak gelir.
+if debian_mi; then
+  MAIL_PKGS="postfix postfix-mysql dovecot-core dovecot-imapd dovecot-lmtpd \
+             dovecot-mysql dovecot-sieve dovecot-managesieved opendkim opendkim-tools"
+else
+  MAIL_PKGS="postfix postfix-mysql dovecot dovecot-mysql dovecot-pigeonhole opendkim"
+fi
+# shellcheck disable=SC2086
+pkg_kur $MAIL_PKGS \
   && log "postfix(+mysql) + dovecot(+mysql/Sieve) + opendkim kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
 
-# Rspamd'ın resmi deposu EL 8/9/10 paketlerini yayınlıyor. EPEL bazı çalışma
-# bağımlılıklarını sağlar; repo dosyası yalnız yoksa eklenir.
-if ! command -v rspamadm >/dev/null 2>&1; then
-  dnf install -y epel-release >/tmp/rspamd-setup.log 2>&1 || true
-  . /etc/os-release
-  EL_VERSION=$(printf '%s' "${PLATFORM_ID:-platform:el9}" | sed 's/.*el//')
+# Rspamd: Debian/Ubuntu'da dağıtımın kendi deposunda var (trixie: 3.12.1) —
+# üçüncü parti depoya GEREK YOK. RHEL'de yok; resmi rspamd deposu EL 8/9/10
+# paketlerini yayınlıyor ve EPEL bazı çalışma bağımlılıklarını sağlıyor.
+if ! command -v rspamadm >/dev/null 2>&1 && rhel_mi; then
+  pkg_kur epel-release || true
+  EL_VERSION="${EL_MAJOR:-9}"
   curl -fsSL -o /etc/yum.repos.d/rspamd.repo \
     "https://rspamd.com/rpm-stable/centos-${EL_VERSION}/rspamd.repo"
 fi
-dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
-  || { log "✗ rspamd kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+pkg_kur rspamd || { log "✗ rspamd kurulamadı"; exit 1; }
 # 🔴 rspamd, panelin per-tenant cache Redis/Valkey'iyle AYNI INSTANCE'I paylaşır
 # (ikisi de 127.0.0.1:6379) — sanalcp-redis-setup panelin cache sunucusunu bu
 # betikten ÖNCE (kurulumda bir adım önce) zaten kurup çalıştırdı. AlmaLinux
@@ -56,16 +71,15 @@ dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
 # Bu yüzden burada kurmuyoruz/restart etmiyoruz — hangisi ZATEN ÇALIŞIYORSA onu
 # kullanıyoruz; ikisi de çalışmıyorsa (redis-setup hiç koşmamışsa/başarısızsa)
 # ancak o zaman kendimiz kuruyoruz.
-if systemctl is-active --quiet valkey; then
-  KV_SERVICE=valkey
-elif systemctl is-active --quiet redis; then
-  KV_SERVICE=redis
-else
-  KV_SERVICE=valkey
-  if ! dnf install -y valkey >>/tmp/rspamd-setup.log 2>&1; then
-    KV_SERVICE=redis
-    dnf install -y redis >>/tmp/rspamd-setup.log 2>&1 \
-      || { log "✗ Redis/Valkey kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+KV_SERVICE=""
+for aday in $(paket_ad cache) $(debian_mi && echo redis-server || echo redis); do
+  systemctl is-active --quiet "$aday" && { KV_SERVICE="$aday"; break; }
+done
+if [ -z "$KV_SERVICE" ]; then
+  KV_SERVICE=$(paket_ad cache)
+  if ! pkg_kur "$KV_SERVICE"; then
+    KV_SERVICE=$(debian_mi && echo redis-server || echo redis)
+    pkg_kur "$KV_SERVICE" || { log "✗ Redis/Valkey kurulamadı"; exit 1; }
   fi
   systemctl enable --now "$KV_SERVICE" >/dev/null 2>&1
 fi
@@ -141,6 +155,17 @@ chown -R opendkim:opendkim /etc/opendkim
 # yoksa exit 78/CONFIG) çalıştırmaya devam ettirir — sessiz başarısızlık.
 cp "$TMPL/opendkim/opendkim.conf.tmpl" /etc/opendkim.conf
 chown root:opendkim /etc/opendkim.conf
+# 🔴 Debian: /etc/default/opendkim'deki SOCKET= satırı systemd birimine
+# DAEMON_OPTS olarak geçer ve opendkim.conf'taki Socket satırını EZER. Etkinse
+# milter 127.0.0.1:8891 yerine bir unix sokete bağlanır; Postfix'in
+# smtpd_milters ayarı ise inet'i gösterdiği için DKIM imzalama sessizce hiç
+# çalışmaz. Yorumlanıp opendkim.conf tek yetkili bırakılıyor.
+if debian_mi && [ -f /etc/default/opendkim ]; then
+  if grep -qE '^[[:space:]]*SOCKET=' /etc/default/opendkim; then
+    sed -i 's/^[[:space:]]*SOCKET=/#SOCKET=/' /etc/default/opendkim
+    log "/etc/default/opendkim içindeki SOCKET= yorumlandı (opendkim.conf yetkili)"
+  fi
+fi
 log "/etc/opendkim.conf + KeyTable/SigningTable/TrustedHosts (boş, panel DKIM ürettikçe dolar)"
 
 echo "════ Rspamd + Redis ════"
@@ -184,12 +209,14 @@ mysql -u root -N -e "SELECT sistem_kullanici FROM panel.mail_domains WHERE durum
   chown "${sk}:${sk}" "/home/${sk}/mail" 2>/dev/null
 done
 
+if selinux_var; then
 echo "════ SELinux ════"
 setsebool -P httpd_can_network_connect_db 1 2>/dev/null && log "httpd_can_network_connect_db=1"
-if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ]; then
+if true; then
   log "UYARI: SELinux enforcing — postfix_t/dovecot_t'nin /etc/pki/sanalcp ve /home/*/mail" \
       "okuma/yazmasında AVC red'i olabilir. 'ausearch -m avc -ts recent' ile kontrol et; gerekirse" \
       "'sanalcp-repair --only mail' veya elle semanage/setsebool ile düzelt."
+fi
 fi
 
 echo "════ postfix + dovecot + opendkim + rspamd enable + (re)start ════"
@@ -219,7 +246,8 @@ echo "════ Roundcube webmail (/webmail/) ════"
 # INTL_IDNA_VARIANT_UTS46" ile 500 verir (IDN alan adı dönüşümü intl eklentisini zorunlu
 # kılıyor). Bu, phpMyAdmin'in kullandığı TEMEL sistem PHP'sine ait, remi'nin per-domain
 # PHP paketlerinden BAĞIMSIZ.
-dnf install -y php-intl >/dev/null 2>&1
+# Sistem PHP'si: RHEL'de "php-intl", Debian'da sürüm adlı "php8.3-intl".
+pkg_kur "$(debian_mi && echo php8.3-intl || echo php-intl)" >/dev/null 2>&1
 RCVER=1.7.2
 mkdir -p /opt/roundcube
 if [ ! -f /opt/roundcube/index.php ]; then
@@ -269,8 +297,9 @@ SQL
   chown -R apache:apache /opt/roundcube /var/lib/roundcube
   restorecon -R /opt/roundcube /var/lib/roundcube >/dev/null 2>&1
   # php-fpm pool'u (assets/php-fpm/roundcube.conf) install.sh'ın "ARTIFACT DEPLOY" adımında
-  # zaten /etc/php-fpm.d/roundcube.conf'a kopyalanmış olmalı (phpmyadmin.conf ile aynı desen).
-  systemctl reload php-fpm >/dev/null 2>&1 || systemctl restart php-fpm >/dev/null 2>&1
+  # zaten $SYS_PHP_POOL_DIR/roundcube.conf'a kopyalanmış olmalı (phpmyadmin.conf ile aynı
+  # desen). Birim adı da aileye göre değişir: php-fpm ↔ php8.3-fpm.
+  systemctl reload "$SYS_PHP_SVC" >/dev/null 2>&1 || systemctl restart "$SYS_PHP_SVC" >/dev/null 2>&1
   log "✓ roundcube yapılandırıldı — https://<sunucu>:8443/webmail/"
 fi
 

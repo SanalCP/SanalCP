@@ -1,6 +1,6 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-4 tamamlandı (2026-08-18). Sıradaki: Faz 4b — ops betikleri, sonra Faz 5 canlı test.
+**Durum:** Faz 0-4b tamamlandı (2026-08-19). Sıradaki: Faz 5 — canlı test.
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -251,7 +251,9 @@ Tespit edilen RHEL bağımlılığı (başlangıç): 14 `dnf` çağrısı, 12 SE
 8 firewalld, 7 remi/epel.
 
 **Uygulanan yaklaşım (planlandığı gibi):** dosya ikiye BÖLÜNMEDİ. Üstte bir aile
-tespiti + ince sarmalayıcılar tanımlandı, gövde ortak kaldı:
+tespiti + ince sarmalayıcılar var, gövde ortak kaldı. (Faz 4b'de bu blok
+`assets/ops/sanalcp-ortak.sh`'a taşındı; installer artık onu source ediyor —
+ops betikleriyle tek tablo paylaşılıyor, bkz. §5b.)
 
 | Sarmalayıcı | İşi |
 |---|---|
@@ -343,6 +345,70 @@ panel başka bir adı arar — ve bu yalnız gerçek bir müşteri sunucusunda g
 Test, tablolardan biri değiştirilerek doğrulandı (mutasyon: `bind9` → `bind9x`;
 test beklendiği gibi kırmızıya döndü).
 
+## 5b. Ops betikleri — Faz 4b ✅ (2026-08-19)
+
+Kurulumun son adımları ops betiklerini çağırır; bunlar RHEL-özgü kaldığı sürece
+Debian'da kurulum "tamam" der ama posta, FTP ve cache kurulmamış olurdu.
+
+### Tek shell tablosu: `assets/ops/sanalcp-ortak.sh`
+
+Aile tespiti ve tüm paket/servis/yol çözümlemesi **tek dosyaya** taşındı. Hem
+installer (`. "$A/ops/sanalcp-ortak.sh"`) hem her ops betiği
+(`. /usr/local/bin/sanalcp-ortak`) onu source ediyor. Böylece shell tarafında
+tek bir tablo var ve `internal/osfam` ile paritesi test ediliyor.
+
+Kütüphane ayrıca şunları taşıyor: `php_kurulu_surumler` (kurulu PHP sürümlerini
+aileye uygun **token** biçiminde döner), `selinux_var` (Debian'da daima false),
+`WEB_USER`, `DNS_*`, `SYS_PHP_POOL_DIR` / `SYS_PHP_SVC` / `MYSQL_SOCK`.
+
+### Betik betik yapılanlar
+
+| Betik | Debian tarafında değişen |
+|---|---|
+| `sanalcp-redis-setup` | paket/birim `valkey-server`\|`redis-server`; php eklentisi `php8.3-redis` (Remi'de `php-pecl-redis6`); SELinux bloğu atlanıyor |
+| `sanalcp-mail-setup` | dovecot **tek paket değil**; rspamd deposu gerekmiyor; opendkim SOCKET tuzağı; `php8.3-intl`; FPM reload birimi |
+| `sanalcp-ftp-setup` | 🔴 tamamen ayrı yapılandırma düzeni (aşağıda) |
+| `sanalcp-repair` | phpMyAdmin havuz yolu + havuz grubu; SELinux zaten `SEL=0` ile no-op |
+| `sanalcp-waf-setup` | `-devel` → `-dev` derleme bağımlılıkları; nginx modül dizini `/usr/lib/nginx/modules` |
+| `sanalcp-optimize` | PHP ini drop-in dizini sürüm başına (`/etc/php/*/fpm/conf.d`); FPM birim adları |
+| `sanalcp-update` | paket kurulumları `pkg_kur`'a taşındı; kütüphaneyi **indirilen release'ten** source ediyor |
+
+### Yol boyunca çıkan dört tuzak
+
+1. 🔴 **Pure-FTPd düzeni.** Debian'da tek `pure-ftpd.conf` YOKTUR:
+   `/etc/pure-ftpd/conf/` altında **direktif başına bir dosya** (ad = direktif,
+   içerik = değer) ve `pure-ftpd-wrapper` bunları komut satırına çevirir. Dahası
+   MySQL doğrulaması conf dosyası yazmakla AÇILMAZ — `/etc/pure-ftpd/auth/`
+   altındaki sıralı sembolik link gerekir (`30mysql`). `CertFile` direktifi de
+   tanınmaz: sertifika sabit `/etc/ssl/private/pure-ftpd.pem` yolundan okunur.
+   Betik artık iki düzeni de yazıyor ve Debian'da unix/pam auth linklerini
+   kaldırıyor (yoksa sistem kullanıcıları da FTP'ye girebilirdi).
+2. 🔴 **OpenDKIM sessiz devre dışı kalması.** Debian'da `/etc/default/opendkim`
+   içindeki `SOCKET=` satırı systemd birimine `DAEMON_OPTS` olarak geçer ve
+   `opendkim.conf`'taki `Socket` satırını EZER. Postfix `smtpd_milters` inet'i
+   gösterdiği için DKIM imzalama hiç çalışmazdı; satır artık yorumlanıyor.
+3. **Dovecot Debian'da tek paket değil.** `dovecot-core` + `imapd` + `lmtpd` +
+   `mysql` + `sieve` + `managesieved` ayrı ayrı gerekiyor; `pigeonhole` adı
+   Debian'da yok. Eksik `dovecot-imapd` = IMAP hiç yok.
+4. **Rspamd Debian'da dağıtımın kendi deposunda** (trixie: 3.12.1) — üçüncü
+   parti depo eklemeye gerek yok, yalnız RHEL'de ekleniyor. Doğrulandı:
+   `apt-cache policy rspamd` → trixie/main.
+
+### Test
+
+`TestOpsBetikleriOrtakKutuphaneyiSourceEder`: paket yöneticisine dokunan her ops
+betiği ortak kütüphaneyi source etmek ZORUNDA. Kendi `dnf install` satırını
+taşıyan bir betik, Debian portunun tam olarak gözden kaçtığı yerdi.
+
+> ⚠️ **Açık kalan bakım tuzağı: `scripts/` ↔ `assets/ops/` ikilemesi.** Aynı
+> betiklerin iki kopyası var ve **yalnız `assets/ops/` sunuculara kuruluyor**.
+> Beşi zaten ayrışmış durumda (`mail-setup`, `optimize`, `redis-setup`,
+> `update`, `wp-redis` — `assets/` kopyaları iki dilli ve daha yeni). 0.7.0
+> kesintisinde rollback düzeltmesinin yanlış dosyaya yazılmasının sebebi tam
+> olarak buydu. Faz 4b yeni ayrışma EKLEMEDİ (aynı olan üç dosya elle
+> eşitlendi), ama kalıcı çözüm `scripts/` kopyalarının silinmesi ya da
+> `package-release.sh`'ın senkronu zorunlu kılmasıdır. Karar bekliyor.
+
 ---
 
 ## 6. Sıralama
@@ -354,13 +420,13 @@ test beklendiği gibi kırmızıya döndü).
 | ~~**2**~~ | ✅ 6 dosyadaki paket yöneticisi çağrıları soyutlamaya taşındı | düşük |
 | ~~**3**~~ | ✅ Kota backend arayüzü + ext4 uygulaması | **yüksek** |
 | ~~**4**~~ | ✅ Installer soyutlaması + sury deposu (+ planda olmayan 3 Go boşluğu) | orta |
-| **4b** | Kurulumun çağırdığı ops betikleri: ftp-setup · mail-setup · redis-setup · repair · waf-setup | orta |
+| ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
 | **5b** | Canlı test: **Debian 13** (MariaDB 11.8 devreye girer) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
-**Faz 0-4 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
+**Faz 0-4b tamamlandı (2026-08-19).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
 çağrısı YOKTUR; hepsi `internal/osfam` üzerinden geçer. Kalan tek istisna
 `internal/system/cve.go` içindeki `cveRun`'dır ve o da yalnız RHEL'de erişilebilir
 (`GuvenlikGuncellemeDestekli` kapısı).

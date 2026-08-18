@@ -12,6 +12,12 @@ die(){ echo -e "  ${c_r}✗${c_0} $*"; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "root gerekli"
 
+# Aile tespiti + paket/servis adları (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || die "sanalcp-ortak bulunamadı"
+
 ENVF=/etc/sanalcp/env
 PANEL_DB_PASS=$(grep -oP '^PANEL_DB_PASS=\K.*' "$ENVF" 2>/dev/null || true)
 # DSN'den de dene
@@ -20,9 +26,12 @@ PANEL_DB_PASS=$(grep -oP '^PANEL_DB_PASS=\K.*' "$ENVF" 2>/dev/null || true)
 echo "══ Pure-FTPd (MySQL backend) kurulumu ══"
 
 # 1) paket
-if ! rpm -q pure-ftpd >/dev/null 2>&1; then
-  dnf install -y pure-ftpd >/dev/null 2>&1 && ok "pure-ftpd kuruldu" || die "pure-ftpd kurulamadı (EPEL gerekli)"
-else ok "pure-ftpd zaten kurulu"; fi
+# 🔴 Debian'da MySQL desteği AYRI PAKETTEDİR (pure-ftpd-mysql); temel pure-ftpd
+# paketi kurulursa sanal kullanıcı doğrulaması hiç çalışmaz.
+FTP_PKG=$(paket_ad ftp); FTP_SVC=$(servis_ad ftp)
+if ! pkg_kurulu "$FTP_PKG"; then
+  pkg_kur "$FTP_PKG" && ok "$FTP_PKG kuruldu" || die "$FTP_PKG kurulamadı$(rhel_mi && echo ' (EPEL gerekli)')"
+else ok "$FTP_PKG zaten kurulu"; fi
 
 # 2) read-only MySQL kullanıcısı (ftp_accounts SELECT)
 PFPW_FILE=/etc/pure-ftpd/.pfsql_pass
@@ -42,8 +51,12 @@ umask 077; echo "$PFPW" > "$PFPW_FILE"; chmod 600 "$PFPW_FILE"
 # ürettiği yescrypt ($y$) hash'i tutuyor. Pure-FTPd bu değeri glibc crypt(3)
 # ile (AlmaLinux 10 libxcrypt $y$'yi destekler) doğrular — parola panel
 # DB'sinde hiçbir noktada düz metin olarak durmaz.
-SOCK=$(mysql -N -e "SHOW VARIABLES LIKE 'socket';" 2>/dev/null | awk '{print $2}'); [ -z "$SOCK" ] && SOCK=/var/lib/mysql/mysql.sock
-cat > /etc/pure-ftpd/pureftpd-mysql.conf <<EOF
+SOCK=$(mysql -N -e "SHOW VARIABLES LIKE 'socket';" 2>/dev/null | awk '{print $2}'); [ -z "$SOCK" ] && SOCK="$MYSQL_SOCK"
+# Dosya yolu da aileye göre: Debian paketi MySQL yapılandırmasını
+# /etc/pure-ftpd/db/mysql.conf altında bekler.
+if debian_mi; then MYSQLCONF=/etc/pure-ftpd/db/mysql.conf; else MYSQLCONF=/etc/pure-ftpd/pureftpd-mysql.conf; fi
+mkdir -p "$(dirname "$MYSQLCONF")"
+cat > "$MYSQLCONF" <<EOF
 MYSQLSocket     $SOCK
 MYSQLServer     localhost
 MYSQLPort       3306
@@ -56,46 +69,75 @@ MYSQLGetUID     SELECT uid_n FROM ftp_accounts WHERE username="\L" AND status='a
 MYSQLGetGID     SELECT gid_n FROM ftp_accounts WHERE username="\L" AND status='active'
 MYSQLGetDir     SELECT home_dir FROM ftp_accounts WHERE username="\L" AND status='active'
 EOF
-chmod 640 /etc/pure-ftpd/pureftpd-mysql.conf; chown root:root /etc/pure-ftpd/pureftpd-mysql.conf
-ok "pureftpd-mysql.conf (ftp_accounts sorguları)"
+chmod 640 "$MYSQLCONF"; chown root:root "$MYSQLCONF"
+ok "$(basename "$MYSQLCONF") (ftp_accounts sorguları)"
 
 # 4) TLS self-signed sertifika (explicit FTPS için)
-mkdir -p /etc/ssl/private
-if [ ! -s /etc/pki/pure-ftpd/pure-ftpd.pem ]; then
-  mkdir -p /etc/pki/pure-ftpd
+# 🔴 Sertifika yolu Debian'da YAPILANDIRILAMAZ: pure-ftpd-wrapper CertFile
+# direktifini tanımaz, sertifikayı sabit /etc/ssl/private/pure-ftpd.pem
+# yolundan okur. Yanlış yere yazmak TLS'i sessizce devre dışı bırakırdı.
+if debian_mi; then FTP_PEM=/etc/ssl/private/pure-ftpd.pem; else FTP_PEM=/etc/pki/pure-ftpd/pure-ftpd.pem; fi
+mkdir -p /etc/ssl/private "$(dirname "$FTP_PEM")"
+if [ ! -s "$FTP_PEM" ]; then
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
-    -keyout /etc/pki/pure-ftpd/pure-ftpd.pem -out /etc/pki/pure-ftpd/pure-ftpd.pem \
+    -keyout "$FTP_PEM" -out "$FTP_PEM" \
     -subj "/CN=$(hostname -f 2>/dev/null || hostname)" >/dev/null 2>&1
-  chmod 600 /etc/pki/pure-ftpd/pure-ftpd.pem
-  ok "TLS self-signed sertifika"
+  chmod 600 "$FTP_PEM"
+  ok "TLS self-signed sertifika ($FTP_PEM)"
 else ok "TLS sertifikası mevcut"; fi
 
-# 5) pure-ftpd.conf (MySQL auth + chroot + passive + TLS opsiyonel)
+# 5) yapılandırma (MySQL auth + chroot + passive + TLS)
+#
+# 🔴 İKİ AİLE İKİ TAMAMEN FARKLI DÜZEN — ad haritasıyla çözülmez:
+#   RHEL   : tek dosya /etc/pure-ftpd/pure-ftpd.conf, "Direktif değer" satırları.
+#   Debian : /etc/pure-ftpd/conf/ altında DİREKTİF BAŞINA BİR DOSYA; dosya adı
+#            direktif, içeriği değer. pure-ftpd-wrapper bunları komut satırı
+#            argümanına çevirip pure-ftpd'yi öyle çalıştırır. Ayrıca hangi
+#            doğrulama yönteminin kullanılacağı /etc/pure-ftpd/auth/ altındaki
+#            SIRALI SEMBOLİK LİNKLERLE belirlenir — conf dosyası yazmak tek
+#            başına MySQL doğrulamasını AÇMAZ.
 CONF=/etc/pure-ftpd/pure-ftpd.conf
-set_directive(){ # $1=directive $2=value
-  # Mevcut TÜM eşleşmeleri (yorumlu/yorumsuz, RHEL stock dahil) sil → sonra TEK satır ekle.
-  # Böylece tekrar çalıştırmada çift CertFile/TLS satırı oluşmaz (idempotent). Açıklama
-  # yorumları ("# Certificate file, for TLS" gibi) eşleşmez (ad+boşluk gerekir), korunur.
-  sed -i -E "/^[# ]*$1[[:space:]]/d" "$CONF"
-  echo "$1                  $2" >> "$CONF"
-}
-set_directive MySQLConfigFile /etc/pure-ftpd/pureftpd-mysql.conf
+if debian_mi; then
+  mkdir -p /etc/pure-ftpd/conf /etc/pure-ftpd/auth
+  set_directive(){ # $1=direktif $2=değer
+    printf '%s\n' "$2" > "/etc/pure-ftpd/conf/$1"
+    chmod 644 "/etc/pure-ftpd/conf/$1"
+  }
+else
+  set_directive(){ # $1=direktif $2=değer
+    # Mevcut TÜM eşleşmeleri (yorumlu/yorumsuz, RHEL stock dahil) sil → sonra TEK satır ekle.
+    # Böylece tekrar çalıştırmada çift CertFile/TLS satırı oluşmaz (idempotent). Açıklama
+    # yorumları ("# Certificate file, for TLS" gibi) eşleşmez (ad+boşluk gerekir), korunur.
+    sed -i -E "/^[# ]*$1[[:space:]]/d" "$CONF"
+    echo "$1                  $2" >> "$CONF"
+  }
+fi
+set_directive MySQLConfigFile "$MYSQLCONF"
 set_directive ChrootEveryone   yes
 set_directive NoAnonymous      yes
 set_directive PassivePortRange "30000 30100"
 set_directive CreateHomeDir    yes
 set_directive TLS              1
 set_directive TLSCipherSuite   HIGH
-set_directive CertFile         /etc/pki/pure-ftpd/pure-ftpd.pem
 set_directive DontResolve      yes
 set_directive MaxClientsNumber 50
 set_directive MaxClientsPerIP  8
-set_directive UnixAuthentication no
-set_directive PAMAuthentication  no
-ok "pure-ftpd.conf yapılandırıldı (MySQL auth, chroot, passive 30000-30100, TLS)"
+if debian_mi; then
+  # MySQL doğrulamasını ETKİNLEŞTİR + unix/pam kollarını kaldır: aksi halde
+  # sistem kullanıcıları da FTP ile giriş yapabilirdi (panelin sanal kullanıcı
+  # modelinin dışında bir yol).
+  ln -sf ../conf/MySQLConfigFile /etc/pure-ftpd/auth/30mysql
+  rm -f /etc/pure-ftpd/auth/*unix* /etc/pure-ftpd/auth/*pam* 2>/dev/null
+  ok "pure-ftpd conf/ dizini + auth/30mysql (MySQL auth, chroot, passive 30000-30100, TLS)"
+else
+  set_directive CertFile         "$FTP_PEM"
+  set_directive UnixAuthentication no
+  set_directive PAMAuthentication  no
+  ok "pure-ftpd.conf yapılandırıldı (MySQL auth, chroot, passive 30000-30100, TLS)"
+fi
 
-# 6) SELinux — pure-ftpd home + mysql erişimi + passive
-if command -v setsebool >/dev/null 2>&1; then
+# 6) SELinux — pure-ftpd home + mysql erişimi + passive (Debian'da yok)
+if selinux_var && command -v setsebool >/dev/null 2>&1; then
   setsebool -P ftpd_full_access 1 2>/dev/null
   setsebool -P ftpd_connect_db 1 2>/dev/null
   setsebool -P ftpd_use_passive_mode 1 2>/dev/null
@@ -112,9 +154,9 @@ if command -v nft >/dev/null 2>&1 && nft list table inet sanal_fw >/dev/null 2>&
 else warn "nft sanal_fw yok — firewall ACCEPT varsayıldı (21 + 30000-30100 açık olmalı)"; fi
 
 # 8) başlat
-systemctl enable --now pure-ftpd >/dev/null 2>&1
-systemctl restart pure-ftpd >/dev/null 2>&1; sleep 1
-if systemctl is-active --quiet pure-ftpd; then ok "pure-ftpd ACTIVE (port 21)"; else
-  journalctl -u pure-ftpd --no-pager -n 15; die "pure-ftpd başlamadı"; fi
+systemctl enable --now "$FTP_SVC" >/dev/null 2>&1
+systemctl restart "$FTP_SVC" >/dev/null 2>&1; sleep 1
+if systemctl is-active --quiet "$FTP_SVC"; then ok "$FTP_SVC ACTIVE (port 21)"; else
+  journalctl -u "$FTP_SVC" --no-pager -n 15; die "$FTP_SVC başlamadı"; fi
 
 echo -e "${c_g}══ FTP kurulumu tamamlandı — panel ftp_accounts virtual-user'ları çalışıyor ══${c_0}"

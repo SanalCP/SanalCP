@@ -10,17 +10,37 @@
 set -uo pipefail
 log(){ printf '  %s\n' "$*"; }
 
+# Aile tespiti + paket/servis adları (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || { echo "  ✗ sanalcp-ortak bulunamadı — panel güncellemesi eksik kalmış olabilir"; exit 1; }
+
 echo "════ Redis/Valkey + php-redis kurulumu ════"
+
+# Kurulu PHP sürümleri için redis eklentisi. Eklentinin paket adı ailelere göre
+# değişir: Remi'de "php83-php-pecl-redis6", sury'de "php8.3-redis".
+PHP_REDIS_EXT=$(debian_mi && echo redis || echo pecl-redis6)
 PHP_REDIS_PKGS=""
-for v in php74 php80 php81 php82 php83 php84 php85; do
-  [ -d "/etc/opt/remi/$v" ] && PHP_REDIS_PKGS="$PHP_REDIS_PKGS ${v}-php-pecl-redis6"
+for v in $(php_kurulu_surumler); do
+  PHP_REDIS_PKGS="$PHP_REDIS_PKGS $(php_pkg "$v" "$PHP_REDIS_EXT")"
 done
-KV=valkey
-if ! dnf install -y valkey >/tmp/redis-setup.log 2>&1; then
-  KV=redis
-  dnf install -y redis >>/tmp/redis-setup.log 2>&1 || { log "✗ redis/valkey kurulamadı"; cat /tmp/redis-setup.log; exit 1; }
+
+# 🔴 Paket adı üç değişkene birden bağlı: aile + dağıtım sürümü + kurulu olan.
+# valkey AlmaLinux 9'da ve Debian 12'de YOKTUR (bkz. internal/osfam) — ikisinde
+# de redis'e düşülür. paket_ad bunu bilir; yine de kurulum başarısız olursa
+# çalışma anında redis'e düşülüyor (örn. valkey'i sunmayan bir ara sürüm).
+KV_PKG=$(paket_ad cache)
+if ! pkg_kur "$KV_PKG"; then
+  KV_PKG=$(debian_mi && echo redis-server || echo redis)
+  pkg_kur "$KV_PKG" || { log "✗ redis/valkey kurulamadı"; exit 1; }
 fi
-dnf install -y php-pecl-redis6 $PHP_REDIS_PKGS >>/tmp/redis-setup.log 2>&1
+KV="${KV_PKG%-server}"        # valkey-server -> valkey · redis -> redis
+# Sistem PHP'sinin redis eklentisi: RHEL'de temel "php" paketinin eklentisi
+# (php-pecl-redis6), Debian'da sürüm adlı paket (php8.3-redis).
+SYS_REDIS_PKG=$(debian_mi && echo php8.3-redis || echo php-pecl-redis6)
+# shellcheck disable=SC2086
+pkg_kur "$SYS_REDIS_PKG" $PHP_REDIS_PKGS
 log "$KV + php-redis kuruldu"
 
 KV_BIN="${KV}-cli"
@@ -58,16 +78,23 @@ VK
 fi
 sed -i '/^requirepass /d' "$KV_CONF"   # aclfile ile çakışır
 
-echo "════ SELinux (php-fpm → redis TCP) ════"
-setsebool -P httpd_can_network_connect 1 2>/dev/null && log "httpd_can_network_connect=1"
+if selinux_var; then
+  echo "════ SELinux (php-fpm → redis TCP) ════"
+  setsebool -P httpd_can_network_connect 1 2>/dev/null && log "httpd_can_network_connect=1"
+fi
 
-echo "════ $KV enable + (re)start ════"
-systemctl enable "$KV" >/dev/null 2>&1
-systemctl restart "$KV"; sleep 2
-if systemctl is-active --quiet "$KV" && REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null | grep -q PONG; then
-  log "✓ $KV ACTIVE + admin auth OK"
+echo "════ $KV_PKG enable + (re)start ════"
+# Birim adı = paket adı (RHEL "valkey"/"redis", Debian "valkey-server"/
+# "redis-server"). servis_ad yerine KURULAN paketten türetiliyor: yukarıdaki
+# çalışma-anı fallback'i devreye girdiyse tablo hâlâ valkey der, sistemde ise
+# redis vardır.
+KV_SVC="$KV_PKG"
+systemctl enable "$KV_SVC" >/dev/null 2>&1
+systemctl restart "$KV_SVC"; sleep 2
+if systemctl is-active --quiet "$KV_SVC" && REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null | grep -q PONG; then
+  log "✓ $KV_SVC ACTIVE + admin auth OK"
 else
-  log "✗ $KV başlatılamadı — journalctl -u $KV"
+  log "✗ $KV_SVC başlatılamadı — journalctl -u $KV_SVC"
   exit 1
 fi
 echo "════════ ✓ Redis altyapısı hazır ($KV) ════════"

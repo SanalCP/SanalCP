@@ -34,6 +34,14 @@ func installerCoz(t *testing.T, osRelease string) installerCikti {
 	if _, err := os.Stat(betik); err != nil {
 		t.Skipf("installer bulunamadı: %v", err)
 	}
+	// 🔴 Ortak kütüphaneyi de STAT'la. Go'nun test önbelleği, test ikilisinin
+	// açtığı dosyaları izler; betiği `bash` okuduğu için ortak.sh dokunulmadan
+	// kalırsa değişiklik önbelleği geçersiz KILMAZ ve test eski sonucu döner
+	// (yani sessizce körelir).
+	ortak, _ := filepath.Abs("../../assets/ops/sanalcp-ortak.sh")
+	if _, err := os.Stat(ortak); err != nil {
+		t.Skipf("ortak kütüphane bulunamadı: %v", err)
+	}
 	sahte := filepath.Join(t.TempDir(), "os-release")
 	if err := os.WriteFile(sahte, []byte(osRelease), 0644); err != nil {
 		t.Fatal(err)
@@ -51,6 +59,9 @@ func installerCoz(t *testing.T, osRelease string) installerCikti {
 		{"paket:" + PaketApache, `paket_ad apache`},
 		{"paket:" + PaketApacheAra, `paket_ad apache-ara`},
 		{"paket:" + PaketBsdtar, `paket_ad bsdtar`},
+		{"paket:" + PaketCache, `paket_ad cache`},
+		{"paket:" + PaketFTP, `paket_ad ftp`},
+		{"paket:" + PaketSSH, `paket_ad ssh`},
 		{"paket:" + PaketKotaXFS, `paket_ad kota-xfs`},
 		{"paket:" + PaketKotaExt, `paket_ad kota-ext`},
 		{"servis:" + PaketWeb, `servis_ad web`},
@@ -59,6 +70,9 @@ func installerCoz(t *testing.T, osRelease string) installerCikti {
 		{"servis:" + PaketCron, `servis_ad cron`},
 		{"servis:" + PaketApache, `servis_ad apache`},
 		{"servis:" + PaketFTP, `servis_ad ftp`},
+		{"servis:" + PaketCache, `servis_ad cache`},
+		{"servis:" + PaketAntivirus, `servis_ad antivirus`},
+		{"servis:" + PaketSSH, `servis_ad ssh`},
 		{"webkullanici", `printf '%s' "$WEB_USER"`},
 	}
 	var sb strings.Builder
@@ -151,5 +165,47 @@ func TestInstallerAileTespitiOsfamIleAyni(t *testing.T) {
 					betikten["webkullanici"], beklenenKullanici)
 			}
 		})
+	}
+}
+
+// Ops betikleri de aynı tabloyu kullanmalı.
+//
+// NEDEN: her betiğin kendi "dnf install" satırını taşıması, Debian portunun
+// gözden kaçtığı yerlerin tam olarak nerede biriktiğiydi. Paket yöneticisine
+// dokunan bir ops betiği ortak kütüphaneyi source ETMİYORSA, sessizce yalnız
+// RHEL'de çalışır.
+func TestOpsBetikleriOrtakKutuphaneyiSourceEder(t *testing.T) {
+	dizin, err := filepath.Abs("../../assets/ops")
+	if err != nil {
+		t.Fatal(err)
+	}
+	girdiler, err := os.ReadDir(dizin)
+	if err != nil {
+		t.Skipf("assets/ops okunamadı: %v", err)
+	}
+	var bakilan int
+	for _, g := range girdiler {
+		if g.IsDir() || g.Name() == "sanalcp-ortak.sh" {
+			continue
+		}
+		ham, err := os.ReadFile(filepath.Join(dizin, g.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		icerik := string(ham)
+		paketYoneticisiKullaniyor := strings.Contains(icerik, "dnf install") ||
+			strings.Contains(icerik, "apt-get install") ||
+			strings.Contains(icerik, "pkg_kur")
+		if !paketYoneticisiKullaniyor {
+			continue
+		}
+		bakilan++
+		if !strings.Contains(icerik, "sanalcp-ortak") {
+			t.Errorf("%s: paket yöneticisi çağırıyor ama sanalcp-ortak source etmiyor — Debian'da sessizce çalışmaz",
+				g.Name())
+		}
+	}
+	if bakilan == 0 {
+		t.Fatal("hiçbir ops betiği paket yöneticisi kullanmıyor görünüyor — test yanlış dizine bakıyor olabilir")
 	}
 }

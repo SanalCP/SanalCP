@@ -8,6 +8,12 @@
 #   sanalcp-optimize --dry-run      # sadece hesaplanan değerleri göster
 set -uo pipefail
 
+# Aile tespiti + yollar (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || { echo "  ✗ sanalcp-ortak bulunamadı"; exit 1; }
+
 NO_RESTART=0; DRY=0
 for a in "$@"; do case "$a" in --no-restart) NO_RESTART=1;; --dry-run) DRY=1;; esac; done
 
@@ -289,13 +295,21 @@ for d in /etc/opt/remi/php*/php.d; do
   PHP_RESTART=1
 done
 # base php (phpMyAdmin base php-fpm)
+# PHP ini drop-in dizini: RHEL /etc/php.d, Debian /etc/php/<sürüm>/fpm/conf.d
+# (sury'de "sistem geneli" tek bir dizin YOKTUR — her sürümün kendi conf.d'si var).
+PHP_INI_DIRS=""
 if [ -d /etc/php.d ]; then
-  printf '%s\n' "$PHP_DROPIN" > /etc/php.d/99-sanalcp-input.ini
-  printf '%s\n' "$OPC_COMMON" > /etc/php.d/99-sanalcp-opcache.ini
-  PHP_RESTART=1
+  PHP_INI_DIRS=/etc/php.d
+else
+  PHP_INI_DIRS=$(ls -d /etc/php/*/fpm/conf.d 2>/dev/null)
 fi
+for d in $PHP_INI_DIRS; do
+  printf '%s\n' "$PHP_DROPIN" > "$d/99-sanalcp-input.ini"
+  printf '%s\n' "$OPC_COMMON" > "$d/99-sanalcp-opcache.ini"
+  PHP_RESTART=1
+done
 # phpMyAdmin pool açık satır (php_value)
-PMA_POOL=/etc/php-fpm.d/phpmyadmin.conf
+PMA_POOL="$SYS_PHP_POOL_DIR/phpmyadmin.conf"
 if [ -f "$PMA_POOL" ] && ! grep -q 'max_input_vars' "$PMA_POOL"; then
   cp -a "$PMA_POOL" "${PMA_POOL}.bak.${TS}"
   if grep -q 'php_value\[memory_limit\]' "$PMA_POOL"; then
@@ -306,7 +320,10 @@ if [ -f "$PMA_POOL" ] && ! grep -q 'max_input_vars' "$PMA_POOL"; then
 fi
 # FPM servislerini reload (çalışan olanları)
 if [ "$PHP_RESTART" = 1 ]; then
-  for svc in php-fpm php74-php-fpm php80-php-fpm php81-php-fpm php82-php-fpm php83-php-fpm php84-php-fpm php85-php-fpm; do
+  # Birim adları aileye göre: php-fpm/php83-php-fpm ↔ php8.3-fpm
+  if debian_mi; then FPM_SVCS=$(for v in $(php_kurulu_surumler); do echo "php$v-fpm"; done)
+  else               FPM_SVCS="php-fpm php74-php-fpm php80-php-fpm php81-php-fpm php82-php-fpm php83-php-fpm php84-php-fpm php85-php-fpm"; fi
+  for svc in $FPM_SVCS; do
     systemctl is-active --quiet "$svc" 2>/dev/null && systemctl reload-or-restart "$svc" 2>/dev/null
   done
   log "$(t "✓ PHP max_input_vars=10000 tüm sürümlere + phpMyAdmin'e uygulandı" "✓ PHP max_input_vars=10000 applied to all versions + phpMyAdmin")"
