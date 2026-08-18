@@ -80,12 +80,19 @@ type Kural struct {
 	Aciklama  string `json:"aciklama"`
 	Aktif     bool   `json:"aktif"`
 	CreatedAt string `json:"created_at"`
+	// Kaynak: "elle" (yönetici ekledi) | "otomatik" (saldırı izleyicisi ekledi).
+	Kaynak string `json:"kaynak"`
+	// Servis: otomatik banı tetikleyen servis ("ssh"|"mail"|"ftp"); elle kurallarda boş.
+	Servis string `json:"servis"`
+	// BitisAt: süreli banın bitiş anı; süresiz kurallarda boş string.
+	BitisAt string `json:"bitis_at"`
 }
 
 // GET /firewall — kural listesi + kapatılamaz portlar
 func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT id, tip, ip, port, protokol, aciklama, aktif, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i')
+		`SELECT id, tip, ip, port, protokol, aciklama, aktif, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i'),
+		        kaynak, servis, COALESCE(DATE_FORMAT(bitis_at,'%Y-%m-%d %H:%i'),'')
 		 FROM firewall_kurallari ORDER BY id DESC`)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
@@ -96,7 +103,8 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var k Kural
 		var ak int
-		if err := rows.Scan(&k.ID, &k.Tip, &k.IP, &k.Port, &k.Protokol, &k.Aciklama, &ak, &k.CreatedAt); err == nil {
+		if err := rows.Scan(&k.ID, &k.Tip, &k.IP, &k.Port, &k.Protokol, &k.Aciklama, &ak, &k.CreatedAt,
+			&k.Kaynak, &k.Servis, &k.BitisAt); err == nil {
 			k.Aktif = ak == 1
 			out = append(out, k)
 		}
@@ -256,8 +264,17 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 }
 
 // rebuild: aktif kurallardan nft ruleset üret, önce "nft -c" ile doğrula, sonra uygula + kalıcı yaz.
-func (h *Handlers) rebuild() error {
-	rows, err := h.DB.Query(`SELECT tip, ip, port, protokol FROM firewall_kurallari WHERE aktif=1 ORDER BY
+func (h *Handlers) rebuild() error { return rebuildDB(h.DB) }
+
+// rebuildDB: rebuild'in paket düzeyi hali — otomatik ban izleyicisi de (Handlers
+// örneği olmadan) aynı tek ruleset üreticisini kullanır.
+//
+// Süresi dolmuş otomatik banlar (bitis_at <= NOW()) ruleset'e ALINMAZ; satırın
+// kendisini temizlik döngüsü siler. Böylece temizlik gecikse bile süresi dolmuş
+// bir ban engellemeye devam etmez.
+func rebuildDB(db *sql.DB) error {
+	rows, err := db.Query(`SELECT tip, ip, port, protokol FROM firewall_kurallari
+		WHERE aktif=1 AND (bitis_at IS NULL OR bitis_at > NOW()) ORDER BY
 		FIELD(tip,'whitelist','kapat','ban'), id`)
 	if err != nil {
 		return err
@@ -343,10 +360,7 @@ func (h *Handlers) rebuild() error {
 }
 
 // Reapply: panel başlangıcında çağrılır — reboot sonrası kuralları DB'den yeniden uygular.
-func Reapply(db *sql.DB) error {
-	h := &Handlers{DB: db}
-	return h.rebuild()
-}
+func Reapply(db *sql.DB) error { return rebuildDB(db) }
 
 // --- yardımcılar ---
 

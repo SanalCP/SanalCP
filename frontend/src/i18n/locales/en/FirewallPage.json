@@ -74,5 +74,32 @@
   "mode_close_example": "Example: close database port 3306 to the outside world.",
   "badge_ban": "🚫 Blocked",
   "badge_whitelist": "✅ Allowed",
-  "badge_close": "🔒 Closed"
+  "badge_close": "🔒 Closed",
+  "autoban": {
+    "title": "Automatic Intrusion Blocking",
+    "desc": "Watches authentication attacks against SSH, mail and FTP services and temporarily blocks IPs that cross the threshold. Disabled by default.",
+    "on": "On",
+    "off": "Off",
+    "turn_on": "Enable",
+    "turn_off": "Disable",
+    "save": "Save settings",
+    "saved_on": "✓ Automatic intrusion blocking is enabled.",
+    "saved_off": "✓ Automatic intrusion blocking is disabled.",
+    "save_failed": "Settings could not be saved",
+    "threshold": "Threshold (attempts)",
+    "threshold_hint": "How many failed attempts before blocking (minimum 3).",
+    "window": "Window (minutes)",
+    "window_hint": "The period over which attempts are counted.",
+    "duration": "Ban duration (minutes)",
+    "duration_hint": "How long the block lasts.",
+    "active_count": "{{count}} automatic bans currently in effect.",
+    "whitelist_note": "Allow-listed IPs and the server's own addresses are never blocked.",
+    "clear_all": "Clear automatic bans",
+    "confirm_clear": "All automatic bans currently in effect will be removed. Rules you added manually are left untouched. Continue?",
+    "cleared": "✓ {{count}} automatic bans removed.",
+    "clear_failed": "Automatic bans could not be cleared",
+    "badge": "Automatic",
+    "badge_title": "This rule was added by the intrusion watcher; it lifts itself when it expires.",
+    "expires_at": "· expires: {{tarih}}"
+  }
 }

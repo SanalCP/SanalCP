@@ -34,6 +34,9 @@ kiracılara yeniden uygular. **Kernel modülü, yamalı kernel veya ek lisans ge
 
 Bunun yanında:
 
+- **Otomatik saldırı engelleme** dahildir — SSH, e-posta ve FTP'ye yapılan kimlik
+  doğrulama saldırıları izlenir, eşiği aşan IP nftables tarafında süreli engellenir
+  (fail2ban muadili, ayrı bir servis kurmadan). Ayrıntı için aşağıya bakın.
 - **SELinux `Enforcing` ile çalışır** — kapatmanızı istemez.
 - **Tam e-posta yığını** dahildir (Postfix + Dovecot + OpenDKIM + Roundcube, otomatik DKIM/SPF/DMARC).
 - **Tek statik Go binary** + React arayüz; mobil uyumlu.
@@ -62,7 +65,6 @@ yol haritasındadırlar:
 | Eksik | Durum |
 |---|---|
 | **Debian / Ubuntu desteği** | Yalnızca AlmaLinux/RHEL ailesi (9.4+ / 10). Sıradaki en öncelikli iş. |
-| **Otomatik saldırı engelleme (fail2ban muadili)** | Güvenlik duvarında **elle** IP ban/whitelist var; panel girişinde kaba kuvvet koruması var. Sistem geneli (SSH/mail/FTP) otomatik ban **yok**. |
 | **Kapsamlı REST API** | Yalnızca site kullanıcısı için 3 uç var (`db:export`, `db:import`, `cache:purge`). Tam yönetim API'si yok. |
 | **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
 | **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
@@ -157,8 +159,46 @@ Roller:
 - **E-posta barındırma**: domain başına posta kutusu, SMTP AUTH ile kimlik doğrulamalı gönderim (PHPMailer/uygulama entegrasyonu için), DKIM/SPF/DMARC otomatik DNS kaydı, webmail arayüzü — ayrıntı için aşağıya bakın
 - **Özel vhost modu** (admin): şablonun tek-root sınırını aşan yönlendirme ihtiyaçları için domain başına tam nginx vhost düzenleme — ayrıntı için aşağıya bakın
 - **Güvenlik duvarı** arayüzü (IP ban / whitelist / port kapatma + hazır şablonlar)
+- **Otomatik saldırı engelleme** (fail2ban muadili) — aşağıya bakın
 - Backup yöneticisi, izleme/loglar, istatistikler
 - Hizmet planları ve kaynak limitleri (domain oluştururken varsayılan **Başlangıç**)
+
+## Otomatik Saldırı Engelleme
+
+**Araçlar ve Ayarlar → Güvenlik Duvarı → Otomatik Saldırı Engelleme.**
+**Varsayılan olarak KAPALIDIR** — açmadığınız sürece hiçbir davranış değişmez.
+
+Panel, sistem servislerinin kimlik doğrulama hatalarını journald üzerinden izler.
+Bir IP belirlediğiniz pencere içinde eşiği aşarsa, nftables tarafında belirlediğiniz
+süre boyunca engellenir. Ayrı bir servis (fail2ban, Python) kurulmaz — izleyici panelin
+kendi binary'sinin içindedir.
+
+| İzlenen | Yakalanan |
+|---|---|
+| **sshd** | hatalı parola, geçersiz kullanıcı, azami deneme aşımı, preauth kopmaları |
+| **dovecot** (IMAP/POP3) | başarısız giriş denemeleri |
+| **postfix** | SASL (SMTP AUTH) kimlik doğrulama hataları |
+| **pure-ftpd** | başarısız FTP girişleri |
+
+Varsayılan: **10 dakika içinde 5 başarısız deneme → 60 dakika ban.** Üçü de ayarlanabilir.
+
+### Kilitlenmeye karşı korumalar
+
+Yanlış bir kural sizi kendi sunucunuzdan atabilir; bu yüzden şu güvenceler vardır:
+
+- **İzin listesindeki (whitelist) IP ve CIDR'ler asla engellenmez.** Kendi sabit IP'nizi
+  izin listesine eklemeniz önerilir.
+- **Sunucunun kendi adresleri, loopback ve link-local asla engellenmez.**
+- **Banlar süreldir** ve süresi dolan kural anında etkisiz kalır; panel kapalı olsa bile
+  bir ban sonsuza kadar sürmez.
+- **Açık oturumlar kopmaz**: nftables kural setinde `ct state established,related accept`
+  en üstte olduğu için ban yalnızca **yeni** bağlantıları etkiler. Kendi IP'niz engellense
+  bile o an açık olan SSH oturumunuz düşmez.
+- Otomatik banlar güvenlik duvarı ekranında **"Otomatik"** rozetiyle ve bitiş saatiyle
+  listelenir; tek tek ya da **"Otomatik banları temizle"** ile topluca kaldırılabilir.
+
+> Sayaçlar bellekte tutulur: panel yeniden başlarsa sıfırlanır. Bu bilinçli bir tercihtir —
+> hata durumunda fazladan ban yerine eksik ban yönünde davranır.
 
 ## E-posta (Mail Hosting)
 

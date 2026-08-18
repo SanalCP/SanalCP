@@ -449,6 +449,9 @@ func main() {
 				r.With(middleware.AdminOnly).Get("/firewall", fwH.Liste)
 				r.With(middleware.AdminOnly).Post("/firewall", fwH.Ekle)
 				r.With(middleware.AdminOnly).Post("/firewall/sablon", fwH.Sablon)
+				r.With(middleware.AdminOnly).Get("/firewall/otoban", fwH.OtoBanAyar)
+				r.With(middleware.AdminOnly).Put("/firewall/otoban", fwH.OtoBanKaydet)
+				r.With(middleware.AdminOnly).Post("/firewall/otoban/temizle", fwH.OtoBanTemizle)
 				r.With(middleware.AdminOnly).Delete("/firewall/{id}", fwH.Sil)
 				r.With(middleware.AdminOnly).Post("/firewall/{id}/durum", fwH.Durum)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/subdomain", subH.Liste)
@@ -700,6 +703,10 @@ func main() {
 	if err := guvenlikduvari.Reapply(d); err != nil {
 		log.Printf("firewall reapply warn: %v", err)
 	}
+	// Otomatik saldırı engelleme izleyicisi. Ayar KAPALIYKEN de başlatılır —
+	// ayarları döngü içinde periyodik okur, böylece yönetici özelliği açtığında
+	// panelin yeniden başlatılması gerekmez (bkz. internal/guvenlikduvari/otoban.go).
+	guvenlikduvari.OtoBanBaslat(context.Background(), d)
 
 	// Sürüm kontrolü + güvenlik duyuru kanalı. PANEL_SURUM_KONTROL=0 ile kapalı;
 	// kapalıyken hiç ağ isteği atılmaz (bkz. internal/system/surumkontrol.go).

@@ -34,6 +34,9 @@ to the affected tenants. **No kernel module, no patched kernel, no extra license
 
 On top of that:
 
+- **Automatic intrusion blocking** is included — authentication attacks against SSH, mail
+  and FTP are watched and offending IPs are temporarily blocked in nftables (a fail2ban
+  equivalent, with no extra service to install). See below.
 - **Runs with SELinux `Enforcing`** — it never asks you to disable it.
 - **A full email stack** is included (Postfix + Dovecot + OpenDKIM + Roundcube, automatic DKIM/SPF/DMARC).
 - **A single static Go binary** plus a React UI; mobile friendly.
@@ -61,7 +64,6 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 | Missing | Status |
 |---|---|
 | **Debian / Ubuntu support** | AlmaLinux/RHEL family only (9.4+ / 10). The next priority. |
-| **Automatic intrusion banning (fail2ban equivalent)** | The firewall has **manual** IP ban/allow lists, and panel login has brute-force protection. There is **no** system-wide automatic banning (SSH/mail/FTP). |
 | **Comprehensive REST API** | Only 3 site-user endpoints exist (`db:export`, `db:import`, `cache:purge`). There is no full management API. |
 | **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
 | **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
@@ -156,8 +158,46 @@ Roles:
 - **Email hosting**: a mailbox per domain, authenticated SMTP sending (for PHPMailer / application integrations), automatic DKIM/SPF/DMARC DNS records, webmail — see below for details
 - **Custom vhost mode** (admin only): full nginx vhost editing per domain, for routing needs the template's single-root model can't express — see below for details
 - **Firewall** UI (IP ban / whitelist / port closing + ready-made templates)
+- **Automatic intrusion blocking** (fail2ban equivalent) — see below
 - Backup manager, monitoring/logs, statistics
 - Service plans and resource limits (new domains default to the **Starter** plan)
+
+## Automatic Intrusion Blocking
+
+**Tools & Settings → Firewall → Automatic Intrusion Blocking.**
+**It is OFF by default** — nothing changes in your setup unless you turn it on.
+
+The panel watches authentication failures from system services via journald. When an IP
+crosses your threshold within your window, it is blocked in nftables for the duration you
+choose. No extra service (fail2ban, Python) is installed — the watcher lives inside the
+panel's own binary.
+
+| Watched | What is caught |
+|---|---|
+| **sshd** | wrong password, invalid user, max auth attempts exceeded, preauth disconnects |
+| **dovecot** (IMAP/POP3) | failed login attempts |
+| **postfix** | SASL (SMTP AUTH) authentication failures |
+| **pure-ftpd** | failed FTP logins |
+
+Defaults: **5 failures within 10 minutes → a 60 minute ban.** All three are configurable.
+
+### Lockout protections
+
+A wrong rule can lock you out of your own server, so the following guarantees apply:
+
+- **Allow-listed (whitelist) IPs and CIDRs are never blocked.** Adding your own static IP
+  to the allow list is recommended.
+- **The server's own addresses, loopback and link-local are never blocked.**
+- **Bans expire**, and an expired rule stops taking effect immediately — a ban never becomes
+  permanent, even if the panel is down.
+- **Open sessions are not dropped**: because `ct state established,related accept` sits at the
+  top of the nftables ruleset, a ban only affects **new** connections. Even if your own IP is
+  blocked, your currently open SSH session stays up.
+- Automatic bans are listed in the firewall screen with an **"Automatic"** badge and their
+  expiry time, and can be removed individually or all at once via **"Clear automatic bans"**.
+
+> Counters are kept in memory and reset when the panel restarts. This is deliberate — on
+> failure it errs toward under-banning rather than over-banning.
 
 ## Email (Mail Hosting)
 

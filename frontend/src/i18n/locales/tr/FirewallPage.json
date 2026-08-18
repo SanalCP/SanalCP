@@ -74,5 +74,32 @@
   "mode_close_example": "Örnek: Veritabanı portu 3306'yı dışarıya kapat.",
   "badge_ban": "🚫 Yasak",
   "badge_whitelist": "✅ İzin",
-  "badge_close": "🔒 Kapalı"
+  "badge_close": "🔒 Kapalı",
+  "autoban": {
+    "title": "Otomatik Saldırı Engelleme",
+    "desc": "SSH, e-posta ve FTP servislerine yapılan kimlik doğrulama saldırılarını izler; eşiği aşan IP'leri geçici olarak engeller. Varsayılan olarak kapalıdır.",
+    "on": "Açık",
+    "off": "Kapalı",
+    "turn_on": "Etkinleştir",
+    "turn_off": "Devre dışı bırak",
+    "save": "Ayarları kaydet",
+    "saved_on": "✓ Otomatik saldırı engelleme etkin.",
+    "saved_off": "✓ Otomatik saldırı engelleme kapatıldı.",
+    "save_failed": "Ayar kaydedilemedi",
+    "threshold": "Eşik (deneme)",
+    "threshold_hint": "Kaç başarısız denemeden sonra engellensin (en az 3).",
+    "window": "Pencere (dakika)",
+    "window_hint": "Denemelerin sayıldığı süre.",
+    "duration": "Ban süresi (dakika)",
+    "duration_hint": "Engelin ne kadar süreceği.",
+    "active_count": "Yürürlükte {{count}} otomatik ban var.",
+    "whitelist_note": "İzin listesindeki IP'ler ve sunucunun kendi adresleri asla engellenmez.",
+    "clear_all": "Otomatik banları temizle",
+    "confirm_clear": "Yürürlükteki tüm otomatik banlar kaldırılacak. Elle eklediğiniz kurallara dokunulmaz. Devam edilsin mi?",
+    "cleared": "✓ {{count}} otomatik ban kaldırıldı.",
+    "clear_failed": "Otomatik banlar temizlenemedi",
+    "badge": "Otomatik",
+    "badge_title": "Bu kuralı saldırı izleyicisi ekledi; süresi dolunca kendiliğinden kalkar.",
+    "expires_at": "· bitiş: {{tarih}}"
+  }
 }

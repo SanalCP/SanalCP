@@ -8,8 +8,10 @@ import { T } from '@/lib/tablo'
 type Kural = {
   id: number; tip: 'ban' | 'whitelist' | 'kapat'; ip: string; port: number
   protokol: string; aciklama: string; aktif: boolean; created_at: string
+  kaynak: 'elle' | 'otomatik'; servis: string; bitis_at: string
 }
 type ListeResp = { kurallar: Kural[]; korumali_portlar: number[] }
+type OtoBan = { aktif: boolean; esik: number; pencere_dk: number; sure_dk: number; aktif_ban_sayisi: number }
 
 function sablonlar(t: TFunction) {
   return [
@@ -55,14 +57,46 @@ export default function FirewallPage() {
   const [protokol, setProtokol] = useState<'tcp' | 'udp'>('tcp')
   const [aciklama, setAciklama] = useState('')
 
+  // Otomatik saldırı engelleme ayarları (varsayılan KAPALI — bkz. migrations/0067).
+  const [otoban, setOtoban] = useState<OtoBan | null>(null)
+
+  function otobanYukle() {
+    api.get<OtoBan>('/firewall/otoban').then(r => setOtoban(r.data)).catch(() => {})
+  }
+
   function yukle() {
     setYuk(true)
     api.get<ListeResp>('/firewall')
       .then(r => { setKurallar(r.data.kurallar || []); setKorumali(r.data.korumali_portlar || []) })
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
+    otobanYukle()
   }
   useEffect(yukle, [])
+
+  async function otobanKaydet(yeni: OtoBan) {
+    setHata(null); setBasari(null); setMesgul('otoban')
+    try {
+      await api.put('/firewall/otoban', {
+        aktif: yeni.aktif, esik: yeni.esik, pencere_dk: yeni.pencere_dk, sure_dk: yeni.sure_dk,
+      })
+      setOtoban(yeni)
+      setBasari(yeni.aktif ? t('FirewallPage:autoban.saved_on') : t('FirewallPage:autoban.saved_off'))
+      otobanYukle()
+    } catch (err) { setHata(apiHata(err, t('FirewallPage:autoban.save_failed'))); otobanYukle() }
+    finally { setMesgul(null) }
+  }
+
+  async function otobanTemizle() {
+    if (!confirm(t('FirewallPage:autoban.confirm_clear'))) return
+    setHata(null); setBasari(null); setMesgul('otoban-temizle')
+    try {
+      const { data } = await api.post('/firewall/otoban/temizle')
+      setBasari(t('FirewallPage:autoban.cleared', { count: data.silinen }))
+      yukle()
+    } catch (err) { setHata(apiHata(err, t('FirewallPage:autoban.clear_failed'))) }
+    finally { setMesgul(null) }
+  }
 
   async function sablonUygula(s: typeof SABLONLAR[number]) {
     if (!confirm(t('FirewallPage:confirm_apply', { ad: s.ad, portlar: s.portlar }))) return
@@ -133,6 +167,75 @@ export default function FirewallPage() {
       <div className="mb-5 px-4 py-2.5 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-xs text-sky-800 dark:text-sky-200">
         {t('FirewallPage:protected_ports_notice', { ports: protectedPorts })}
       </div>
+
+      {/* ---------- OTOMATİK SALDIRI ENGELLEME ---------- */}
+      {otoban && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700/60 dark:bg-slate-800/60">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🛰️</span>
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('FirewallPage:autoban.title')}</h2>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  otoban.aktif
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
+                }`}>
+                  {otoban.aktif ? t('FirewallPage:autoban.on') : t('FirewallPage:autoban.off')}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('FirewallPage:autoban.desc')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => otobanKaydet({ ...otoban, aktif: !otoban.aktif })}
+              disabled={!!mesgul}
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${
+                otoban.aktif
+                  ? 'border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20'
+                  : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100'
+              }`}
+            >
+              {mesgul === 'otoban' ? '…' : otoban.aktif ? t('FirewallPage:autoban.turn_off') : t('FirewallPage:autoban.turn_on')}
+            </button>
+          </div>
+
+          {otoban.aktif && (
+            <>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <SayiAlan etiket={t('FirewallPage:autoban.threshold')} ipucu={t('FirewallPage:autoban.threshold_hint')}
+                  deger={otoban.esik} min={3} max={100}
+                  degistir={v => setOtoban({ ...otoban, esik: v })} />
+                <SayiAlan etiket={t('FirewallPage:autoban.window')} ipucu={t('FirewallPage:autoban.window_hint')}
+                  deger={otoban.pencere_dk} min={1} max={1440}
+                  degistir={v => setOtoban({ ...otoban, pencere_dk: v })} />
+                <SayiAlan etiket={t('FirewallPage:autoban.duration')} ipucu={t('FirewallPage:autoban.duration_hint')}
+                  deger={otoban.sure_dk} min={1} max={43200}
+                  degistir={v => setOtoban({ ...otoban, sure_dk: v })} />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('FirewallPage:autoban.active_count', { count: otoban.aktif_ban_sayisi })}
+                  {' · '}
+                  {t('FirewallPage:autoban.whitelist_note')}
+                </p>
+                <div className="flex gap-2">
+                  {otoban.aktif_ban_sayisi > 0 && (
+                    <button type="button" onClick={otobanTemizle} disabled={!!mesgul}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
+                      {mesgul === 'otoban-temizle' ? '…' : t('FirewallPage:autoban.clear_all')}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => otobanKaydet(otoban)} disabled={!!mesgul}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100">
+                    {mesgul === 'otoban' ? '…' : t('FirewallPage:autoban.save')}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ---------- HAZIR ŞABLONLAR ---------- */}
       <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-2">{t('FirewallPage:templates_title')} <span className="text-xs font-normal text-slate-400">{t('FirewallPage:templates_subtitle')}</span></h2>
@@ -250,11 +353,28 @@ export default function FirewallPage() {
               ) : (
                 kurallar.map(k => (
                   <tr key={k.id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/40`}>
-                    <td className={T.hucreBaslik}><TurRozet tip={k.tip} t={t} /></td>
+                    <td className={T.hucreBaslik}>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <TurRozet tip={k.tip} t={t} />
+                        {k.kaynak === 'otomatik' && (
+                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300"
+                            title={t('FirewallPage:autoban.badge_title')}>
+                            {t('FirewallPage:autoban.badge')}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className={T.hucre} data-etiket={t('FirewallPage:col_ip')}><span className="font-mono text-xs text-slate-700 dark:text-slate-200">{k.ip || <span className="text-slate-400">{t('FirewallPage:everyone')}</span>}</span></td>
                     <td className={T.hucre} data-etiket={t('FirewallPage:col_port')}><span className="font-mono text-xs text-slate-600 dark:text-slate-300">{k.port || <span className="text-slate-400">{t('FirewallPage:all_ports')}</span>}</span></td>
                     <td className={T.hucre} data-etiket={t('FirewallPage:col_proto')}><span className="font-mono text-[11px] text-slate-500 uppercase">{k.protokol}</span></td>
-                    <td className={T.hucre} data-etiket={t('FirewallPage:col_note')}><span className="text-xs text-slate-500 dark:text-slate-400">{k.aciklama || t('FirewallPage:empty_note')}</span></td>
+                    <td className={T.hucre} data-etiket={t('FirewallPage:col_note')}>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{k.aciklama || t('FirewallPage:empty_note')}</span>
+                      {k.bitis_at && (
+                        <span className="ml-2 whitespace-nowrap text-[11px] text-slate-400">
+                          {t('FirewallPage:autoban.expires_at', { tarih: k.bitis_at })}
+                        </span>
+                      )}
+                    </td>
                     <td className={T.hucreAksiyon}>
                       <button disabled={!!mesgul} onClick={() => sil(k)} className="text-xs px-2.5 py-1 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">{mesgul === 'sil:' + k.id ? '…' : t('FirewallPage:delete')}</button>
                     </td>
@@ -265,6 +385,30 @@ export default function FirewallPage() {
           </table>
         </div>
       </div>
+    </div>
+  )
+}
+
+// SayiAlan: otomatik ban eşik/pencere/süre girdileri. Boş bırakılırsa min'e
+// düşer — sunucu tarafı da aynı sınırları doğrular (bkz. otoban_handlers.go).
+function SayiAlan({ etiket, ipucu, deger, min, max, degistir }: {
+  etiket: string; ipucu: string; deger: number; min: number; max: number; degistir: (v: number) => void
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">{etiket}</label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={deger}
+        onChange={e => {
+          const v = parseInt(e.target.value, 10)
+          degistir(Number.isNaN(v) ? min : Math.min(max, Math.max(min, v)))
+        }}
+        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+      />
+      <p className="mt-1 text-[11px] text-slate-400">{ipucu}</p>
     </div>
   )
 }
