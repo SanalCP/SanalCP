@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"sanalcp/internal/osfam"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -301,8 +303,12 @@ func renderTenantPool(db *sql.DB, sk string, domainID int64) string {
 	fmt.Fprintf(&b, "user = %s\n", sk)
 	fmt.Fprintf(&b, "group = %s\n", sk)
 	fmt.Fprintf(&b, "listen = %s\n", tenantSocket(sk))
-	fmt.Fprintf(&b, "listen.owner = nginx\n")
-	fmt.Fprintf(&b, "listen.group = nginx\n")
+	// Soketin sahibi, nginx'in çalıştığı kullanıcı olmalı: RHEL'de "nginx",
+	// Debian/Ubuntu'da "www-data". Yanlış olursa nginx sokete bağlanamaz ve
+	// o sunucudaki TÜM siteler 502 döner.
+	webKul := osfam.WebKullanici()
+	fmt.Fprintf(&b, "listen.owner = %s\n", webKul)
+	fmt.Fprintf(&b, "listen.group = %s\n", webKul)
 	fmt.Fprintf(&b, "listen.mode = 0660\n")
 	fmt.Fprintf(&b, "pm = %s\n", ps.PMStrategy)
 	fmt.Fprintf(&b, "pm.max_children = %d\n", maxCh)

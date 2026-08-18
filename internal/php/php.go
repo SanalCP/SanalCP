@@ -20,6 +20,7 @@ import (
 	"text/template"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 	"sanalcp/internal/phpsurum"
 	"sanalcp/internal/provisioner"
 
@@ -34,10 +35,27 @@ type Surum struct {
 	Aciklama string `json:"aciklama"`
 }
 
-var KurulSurumler = []Surum{
-	{Surum: "8.3", PoolDir: "/etc/php-fpm.d", SockDir: "/run/php-fpm", Service: "php-fpm", Aciklama: "AppStream · OPcache"},
-	{Surum: "8.2", PoolDir: "/etc/opt/remi/php82/php-fpm.d", SockDir: "/var/opt/remi/php82/run/php-fpm", Service: "php82-php-fpm", Aciklama: "Remi · Stable"},
-	{Surum: "7.4", PoolDir: "/etc/opt/remi/php74/php-fpm.d", SockDir: "/var/opt/remi/php74/run/php-fpm", Service: "php74-php-fpm", Aciklama: "Remi · Legacy"},
+// KurulSurumler: surumBilgi'nin ilk baktığı sabit liste (geriye uyum). Burada
+// bulunmayan sürümler phpsurum.TumSurumler() ile dinamik çözülür.
+//
+// İşletim sistemi ailesine göre açılışta seçilir; asıl yol tablosu
+// provisioner.phpMap'tir, bu liste onun bir alt kümesidir.
+var KurulSurumler = kurulSurumlerSec()
+
+func kurulSurumlerSec() []Surum {
+	if osfam.Mevcut().DebianMi() {
+		// deb.sury.org düzeni: hepsi aynı kalıp, ayrıcalıklı "sistem PHP'si" yok.
+		return []Surum{
+			{Surum: "8.3", PoolDir: "/etc/php/8.3/fpm/pool.d", SockDir: "/run/php", Service: "php8.3-fpm", Aciklama: "sury · Stable"},
+			{Surum: "8.2", PoolDir: "/etc/php/8.2/fpm/pool.d", SockDir: "/run/php", Service: "php8.2-fpm", Aciklama: "sury · Stable"},
+			{Surum: "7.4", PoolDir: "/etc/php/7.4/fpm/pool.d", SockDir: "/run/php", Service: "php7.4-fpm", Aciklama: "sury · Legacy"},
+		}
+	}
+	return []Surum{
+		{Surum: "8.3", PoolDir: "/etc/php-fpm.d", SockDir: "/run/php-fpm", Service: "php-fpm", Aciklama: "AppStream · OPcache"},
+		{Surum: "8.2", PoolDir: "/etc/opt/remi/php82/php-fpm.d", SockDir: "/var/opt/remi/php82/run/php-fpm", Service: "php82-php-fpm", Aciklama: "Remi · Stable"},
+		{Surum: "7.4", PoolDir: "/etc/opt/remi/php74/php-fpm.d", SockDir: "/var/opt/remi/php74/run/php-fpm", Service: "php74-php-fpm", Aciklama: "Remi · Legacy"},
+	}
 }
 
 func surumBilgi(surum string) (Surum, bool) {
@@ -212,8 +230,8 @@ var poolTmpl = template.Must(template.New("pool").Funcs(template.FuncMap{"onoff"
 user = {{.SK}}
 group = {{.SK}}
 listen = {{.SockDir}}/{{.SK}}.sock
-listen.owner = nginx
-listen.group = nginx
+listen.owner = {{.WebKullanici}}
+listen.group = {{.WebKullanici}}
 listen.mode = 0660
 
 pm = {{.S.PMStrategy}}
@@ -255,9 +273,16 @@ catch_workers_output = yes
 `))
 
 // RenderPool: pool conf icerigini settings + sk + sockdir ile uretir.
+//
+// listen.owner/listen.group, nginx'in çalıştığı kullanıcıdan gelir (RHEL "nginx",
+// Debian/Ubuntu "www-data"). Yanlış olursa nginx FPM soketine bağlanamaz ve o
+// sunucudaki TÜM siteler 502 döner.
 func RenderPool(sk string, sockDir string, s Settings) (string, error) {
 	var buf bytes.Buffer
-	err := poolTmpl.Execute(&buf, map[string]any{"SK": sk, "SockDir": sockDir, "S": s})
+	err := poolTmpl.Execute(&buf, map[string]any{
+		"SK": sk, "SockDir": sockDir, "S": s,
+		"WebKullanici": osfam.WebKullanici(),
+	})
 	return buf.String(), err
 }
 

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"sanalcp/internal/nginxconf"
+	"sanalcp/internal/osfam"
 )
 
 var (
@@ -196,9 +197,27 @@ type phpAyar struct {
 
 // phpMap: panelin YÖNETTİĞİ (pool yaz/sil, SetPHP döngüsü, socket çöz) PHP sürümleri.
 // 🔴 phpsurum.DesteklenenSurumler ile TUTARLI olmalı — eksik sürüm = split-brain: pool
-// relative-path'e yazılır / SetPHP/Deprovision o sürümü temizleyemez. AlmaLinux 10 Remi:
-// 7.4, 8.0-8.6 (5.6/7.0-7.3 EOL, Remi'de YOK). AppStream native = 8.3.
-var phpMap = map[string]phpAyar{
+// relative-path'e yazılır / SetPHP/Deprovision o sürümü temizleyemez.
+//
+// İşletim sistemi ailesine göre açılışta bir kez seçilir (bkz. phpTabloSec).
+// Çağrı yerleri değişmez: hepsi eskisi gibi phpMap[surum] okur.
+var phpMap = phpTabloSec()
+
+// phpTabloSec: çalışan sistemin ailesine uygun PHP yol tablosunu döner.
+//
+// Paket init sırasında çağrılır; osfam.Mevcut() /etc/os-release'i tembel okur ve
+// önbelleğe alır, bu aşamada güvenlidir.
+func phpTabloSec() map[string]phpAyar {
+	if osfam.Mevcut().DebianMi() {
+		return phpMapDebian
+	}
+	return phpMapRHEL
+}
+
+// phpMapRHEL: AlmaLinux/RHEL + Remi düzeni.
+// AlmaLinux 10 Remi: 7.4, 8.0-8.6 (5.6/7.0-7.3 EOL, Remi'de YOK). AppStream native = 8.3
+// — bu yüzden 8.3 diğerlerinden FARKLI yollara sahiptir.
+var phpMapRHEL = map[string]phpAyar{
 	"7.4": {PoolDir: "/etc/opt/remi/php74/php-fpm.d", SockDir: "/var/opt/remi/php74/run/php-fpm", Service: "php74-php-fpm", FpmBin: "/opt/remi/php74/root/usr/sbin/php-fpm"},
 	"8.0": {PoolDir: "/etc/opt/remi/php80/php-fpm.d", SockDir: "/var/opt/remi/php80/run/php-fpm", Service: "php80-php-fpm", FpmBin: "/opt/remi/php80/root/usr/sbin/php-fpm"},
 	"8.1": {PoolDir: "/etc/opt/remi/php81/php-fpm.d", SockDir: "/var/opt/remi/php81/run/php-fpm", Service: "php81-php-fpm", FpmBin: "/opt/remi/php81/root/usr/sbin/php-fpm"},
@@ -207,6 +226,25 @@ var phpMap = map[string]phpAyar{
 	"8.4": {PoolDir: "/etc/opt/remi/php84/php-fpm.d", SockDir: "/var/opt/remi/php84/run/php-fpm", Service: "php84-php-fpm", FpmBin: "/opt/remi/php84/root/usr/sbin/php-fpm"},
 	"8.5": {PoolDir: "/etc/opt/remi/php85/php-fpm.d", SockDir: "/var/opt/remi/php85/run/php-fpm", Service: "php85-php-fpm", FpmBin: "/opt/remi/php85/root/usr/sbin/php-fpm"},
 	"8.6": {PoolDir: "/etc/opt/remi/php86/php-fpm.d", SockDir: "/var/opt/remi/php86/run/php-fpm", Service: "php86-php-fpm", FpmBin: "/opt/remi/php86/root/usr/sbin/php-fpm"},
+}
+
+// phpMapDebian: Debian/Ubuntu + deb.sury.org düzeni.
+//
+// Remi'nin aksine TAMAMEN DÜZENLİ: her sürüm aynı kalıbı izler, "sistem PHP'si"
+// diye ayrıcalıklı bir sürüm yoktur.
+//
+// SockDir tüm sürümlerde /run/php'dir (sury sözleşmesi). Soket adı sürüme değil
+// KİRACIYA göre verildiği için (SockDir/<sk>.sock) çakışma olmaz; havuz dosyaları
+// ise sürüme özel dizinlerde durduğundan sürümler arası temizlik de doğru çalışır.
+var phpMapDebian = map[string]phpAyar{
+	"7.4": {PoolDir: "/etc/php/7.4/fpm/pool.d", SockDir: "/run/php", Service: "php7.4-fpm", FpmBin: "/usr/sbin/php-fpm7.4"},
+	"8.0": {PoolDir: "/etc/php/8.0/fpm/pool.d", SockDir: "/run/php", Service: "php8.0-fpm", FpmBin: "/usr/sbin/php-fpm8.0"},
+	"8.1": {PoolDir: "/etc/php/8.1/fpm/pool.d", SockDir: "/run/php", Service: "php8.1-fpm", FpmBin: "/usr/sbin/php-fpm8.1"},
+	"8.2": {PoolDir: "/etc/php/8.2/fpm/pool.d", SockDir: "/run/php", Service: "php8.2-fpm", FpmBin: "/usr/sbin/php-fpm8.2"},
+	"8.3": {PoolDir: "/etc/php/8.3/fpm/pool.d", SockDir: "/run/php", Service: "php8.3-fpm", FpmBin: "/usr/sbin/php-fpm8.3"},
+	"8.4": {PoolDir: "/etc/php/8.4/fpm/pool.d", SockDir: "/run/php", Service: "php8.4-fpm", FpmBin: "/usr/sbin/php-fpm8.4"},
+	"8.5": {PoolDir: "/etc/php/8.5/fpm/pool.d", SockDir: "/run/php", Service: "php8.5-fpm", FpmBin: "/usr/sbin/php-fpm8.5"},
+	"8.6": {PoolDir: "/etc/php/8.6/fpm/pool.d", SockDir: "/run/php", Service: "php8.6-fpm", FpmBin: "/usr/sbin/php-fpm8.6"},
 }
 
 func ValidateDomain(d string) error {
@@ -1934,11 +1972,12 @@ const panelVhostPath = nginxconf.PanelConfYol
 // geregi dogru yapar.
 //
 // GUVENLIK AGLARI:
-//   1. Hash kapisi — dosya yalnizca BILINEN bir yayin surumuyle birebir aynıysa
-//      degistirilir. Admin elle duzenlemisse dokunulmaz, yalnizca log dusulur:
-//      yonetici emegini sessizce silmek, guncel olmayan bir CSP'den daha kotudur.
-//   2. nginx -t kapisi — yeni conf parse edilmezse ESKISI geri yazilir.
-//   3. reload kapisi — reload basarisiz olursa yine eskisi geri yazilir.
+//  1. Hash kapisi — dosya yalnizca BILINEN bir yayin surumuyle birebir aynıysa
+//     degistirilir. Admin elle duzenlemisse dokunulmaz, yalnizca log dusulur:
+//     yonetici emegini sessizce silmek, guncel olmayan bir CSP'den daha kotudur.
+//  2. nginx -t kapisi — yeni conf parse edilmezse ESKISI geri yazilir.
+//  3. reload kapisi — reload basarisiz olursa yine eskisi geri yazilir.
+//
 // Bu ucu birlikte "panel guncellemesi admini disari kilitledi" senaryosunu kapatir.
 func HealPanelVhostOnStartup() {
 	mevcut, err := os.ReadFile(panelVhostPath)
