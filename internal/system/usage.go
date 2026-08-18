@@ -95,11 +95,13 @@ type Usage struct {
 	Servisler []ServiceStat `json:"servisler"`
 	UptimeSn  int64         `json:"uptime_sn"`
 
-	// KotaRebootGerekli: disk kotası enforcement AKTİF DEĞİL (fs noquota / uqnoenforce) →
-	// tek seferlik reboot bekliyor. UI'da sarı uyarı banner'ı bunu okur.
+	// KotaRebootGerekli: disk kotası enforcement AKTİF DEĞİL (fs'te kota kapalı /
+	// accounting açık-enforce kapalı) → tek seferlik reboot bekliyor. UI'da sarı uyarı
+	// banner'ı bunu okur.
 	KotaRebootGerekli bool `json:"kota_reboot_gerekli"`
-	// KotaFSUyumsuz: kök dosya sistemi XFS DEĞİL → disk kotası bu sunucuda KALICI olarak
-	// desteklenmiyor, reboot bunu çözmez (yalnız XFS root ile yeniden kurulum çözer).
+	// KotaFSUyumsuz: kök dosya sistemi kotayı DESTEKLEMİYOR (XFS de extN de değil; ör.
+	// btrfs) → disk kotası bu sunucuda KALICI olarak yok, reboot bunu çözmez (yalnız
+	// desteklenen bir kök fs ile yeniden kurulum çözer).
 	// true iken UI, KotaRebootGerekli'nin "reboot bekleniyor" mesajı yerine kalıcı bir
 	// açıklama gösterip banner'ı kapatılabilir kılar.
 	KotaFSUyumsuz bool `json:"kota_fs_uyumsuz"`

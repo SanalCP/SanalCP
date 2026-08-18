@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestKotaLimitArgs: xfs_quota arg-slice'ının doğru kurulduğunu (soft=hard*0.95, 0=sınırsız,
+// TestKotaLimitArgs: XFS backend'inin xfs_quota arg-slice'ının doğru kurulduğunu (soft=hard*0.95, 0=sınırsız,
 // -u user quota, kök mount) DOĞRULAR. Shell yok — arg-slice bütünlüğü kritiktir.
 func TestKotaLimitArgs(t *testing.T) {
 	cases := []struct {
@@ -79,8 +79,9 @@ func TestEfektifKota(t *testing.T) {
 	}
 }
 
-// TestKotaUygulaNoquotaGracefulLive: 181 gibi noquota fs'te KotaUygula HATA DÖNMEMELİ
-// (log + return nil = graceful skip). Yalnız KOTA_LIVE=1 ile çalışır (gerçek xfs_quota çağırır).
+// TestKotaUygulaNoquotaGracefulLive: kotası KAPALI bir fs'te KotaUygula HATA DÖNMEMELİ
+// (log + return nil = graceful skip). Yalnız KOTA_LIVE=1 ile çalışır; kök fs'in tipine göre
+// seçilen backend'in GERÇEK durum komutunu çağırır (XFS: xfs_quota, ext4: quotaon).
 func TestKotaUygulaNoquotaGracefulLive(t *testing.T) {
 	if os.Getenv("KOTA_LIVE") != "1" {
 		t.Skip("KOTA_LIVE=1 ile gerçek (noquota) fs üstünde çalıştır")
