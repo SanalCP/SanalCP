@@ -748,8 +748,14 @@ func main() {
 	}
 }
 
+// migrationsDir: migration .sql dosyalarının bulunduğu dizin. Üretimde sabittir;
+// yalnız birim testi (migrations_test.go) depodaki migrations/ dizinini göstermek
+// için geçici olarak değiştirir. Test, çalıştırıcının kendi mantığını kopyalamak
+// yerine bu fonksiyonun TA KENDİSİNİ çağırabilsin diye değişken.
+var migrationsDir = "/opt/sanalcp/src/migrations"
+
 func runMigrations(d *sql.DB) error {
-	dir := "/opt/sanalcp/src/migrations"
+	dir := migrationsDir
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("dizin okunamadı: %w", err)
