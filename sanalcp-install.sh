@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# sanalcp-install — turns a blank AlmaLinux 9.4+/10 (or Rocky/RHEL equivalent) server into a full SanalCP install.
+# sanalcp-install — turns a blank server into a full SanalCP install.
+#
+# Supported: AlmaLinux 9.4+/10 (Rocky/RHEL equivalent)  ·  Debian 13/12, Ubuntu 26.04/24.04
+#
+# The body is SHARED between both OS families. Everything that differs is resolved
+# by the thin wrappers defined in step 0 (pkg_kur / paket_ad / servis_ad / repo_php_ekle).
+# 🔴 Do NOT fork this file per distribution: two installers always drift apart, and
+# the drift is only discovered on a customer's server.
+#
 # Designed to be idempotent (safe to re-run). Run as root.
 #
 #   ./sanalcp-install.sh [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
@@ -33,6 +41,7 @@ download(){
     curl -4fsSL --retry 3 --connect-timeout 15 -o "$out" "$url"
 }
 
+if [ -z "${SANALCP_TANIM_TESTI:-}" ]; then
 [ "$(id -u)" = 0 ] || die "root required"
 [ -d "$A" ] || die "assets/ not found ($A)"
 if [ -f "$A/SHA256SUMS" ]; then
@@ -42,18 +51,186 @@ if [ -f "$A/SHA256SUMS" ]; then
 else
   die "assets/SHA256SUMS not found — missing or hand-assembled release"
 fi
-grep -qiE "AlmaLinux|Rocky|Red Hat|CentOS" /etc/os-release || warn "expected an AlmaLinux/RHEL-family OS — continuing anyway"
+fi
+# ============ 0) OS FAMILY + WRAPPERS ============
+# Mirrors internal/osfam (Go side). Keep the two in sync: the panel resolves
+# package/service names through osfam at runtime, this script does it at install
+# time — a disagreement means the installer sets up something the panel can't find.
+# SANALCP_OS_RELEASE: test-only seam — lets the parity test feed a fake
+# /etc/os-release (see internal/osfam/installer_paritesi_test.go).
+. "${SANALCP_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true
+OS_ID="${ID:-}"; OS_SURUM="${VERSION_ID:-}"; OS_KODADI="${VERSION_CODENAME:-}"
+case "$OS_ID" in
+  debian|ubuntu)                       OS_AILE=debian ;;
+  almalinux|rocky|rhel|centos|ol)      OS_AILE=rhel ;;
+  *) case " ${ID_LIKE:-} " in
+       *debian*)        OS_AILE=debian ;;
+       *rhel*|*fedora*) OS_AILE=rhel ;;
+       *) OS_AILE=rhel; warn "unrecognised OS '${OS_ID:-?}' — assuming RHEL family" ;;
+     esac ;;
+esac
 
-# ============ 0) OS MAJOR VERSION ============
-# PLATFORM_ID (e.g. "platform:el9", "platform:el10") is set consistently
-# across every RHEL-family derivative (AlmaLinux/Rocky/RHEL) — more reliable
-# than parsing VERSION_ID (same pattern already used in
-# assets/ops/sanalcp-mail-setup.sh). Falls back to the newest supported
-# major (10) if it can't be determined.
-. /etc/os-release 2>/dev/null || true
-EL_MAJOR=$(printf '%s' "${PLATFORM_ID:-platform:el10}" | sed 's/.*el//')
-case "$EL_MAJOR" in ''|*[!0-9]*) EL_MAJOR=10 ;; esac
-ok "detected OS: ${PRETTY_NAME:-unknown} (EL${EL_MAJOR})"
+# EL major version — RHEL family only. PLATFORM_ID ("platform:el9"/"platform:el10")
+# is set consistently across every RHEL derivative, more reliable than VERSION_ID
+# (same pattern as assets/ops/sanalcp-mail-setup.sh). Newest supported major (10)
+# is the fallback.
+EL_MAJOR=""
+if [ "$OS_AILE" = rhel ]; then
+  EL_MAJOR=$(printf '%s' "${PLATFORM_ID:-platform:el10}" | sed 's/.*el//')
+  case "$EL_MAJOR" in ''|*[!0-9]*) EL_MAJOR=10 ;; esac
+  ok "detected OS: ${PRETTY_NAME:-unknown} (RHEL family, EL${EL_MAJOR})"
+else
+  # apt must never open a dialog (dpkg conffile prompts, needrestart's service
+  # picker) — an unattended `curl | bash` install would hang forever there.
+  export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a NEEDRESTART_SUSPEND=1
+  ok "detected OS: ${PRETTY_NAME:-unknown} (Debian family, ${OS_KODADI:-?})"
+  # Debian 12 is a SECONDARY target: supported, but its security updates come from
+  # the LTS team (narrower scope than normal stable) — say so once, up front.
+  case "$OS_ID/$OS_KODADI" in
+    debian/bookworm) warn "Debian 12 is a secondary target (LTS security support until 30 Jun 2028) — Debian 13 is recommended for new installs" ;;
+  esac
+fi
+debian_mi(){ [ "$OS_AILE" = debian ]; }
+rhel_mi(){   [ "$OS_AILE" = rhel ]; }
+
+# ---- package manager wrappers ----
+pkg_kur(){ # install, quiet; non-zero on failure
+  if debian_mi; then
+    apt-get install -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef "$@" >/dev/null 2>&1
+  else
+    dnf install -y "$@" >/dev/null 2>&1
+  fi
+}
+pkg_kurulu(){ # is package installed?
+  if debian_mi; then
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "^install ok installed"
+  else
+    rpm -q "$1" >/dev/null 2>&1
+  fi
+}
+depo_yenile(){
+  if debian_mi; then apt-get update -qq >/dev/null 2>&1; else dnf makecache -q >/dev/null 2>&1; fi
+}
+
+# ---- name resolution (mirror of internal/osfam/adlar.go) ----
+# Code uses LOGICAL names; the real package/unit name is resolved here only.
+paket_ad(){
+  case "$1" in
+    web)        echo nginx ;;
+    db)         echo mariadb-server ;;
+    dns)        debian_mi && echo bind9        || echo bind ;;
+    dns-arac)   debian_mi && echo bind9-utils  || echo bind-utils ;;
+    antivirus)  debian_mi && echo clamav-daemon    || echo clamav ;;
+    av-guncel)  debian_mi && echo clamav-freshclam || echo clamav-update ;;
+    cron)       debian_mi && echo cron         || echo cronie ;;
+    apache)     debian_mi && echo apache2      || echo httpd ;;
+    apache-ara) debian_mi && echo apache2-utils || echo httpd-tools ;;
+    bsdtar)     debian_mi && echo libarchive-tools || echo bsdtar ;;
+    kota-xfs)   echo xfsprogs ;;
+    kota-ext)   echo quota ;;
+    *)          echo "$1" ;;
+  esac
+}
+servis_ad(){
+  case "$1" in
+    web)    echo nginx ;;
+    db)     echo mariadb ;;
+    dns)    debian_mi && echo bind9  || echo named ;;
+    cron)   debian_mi && echo cron   || echo crond ;;
+    apache) debian_mi && echo apache2 || echo httpd ;;
+    ftp)    debian_mi && echo pure-ftpd-mysql || echo pure-ftpd ;;
+    *)      echo "$1" ;;
+  esac
+}
+# WEB_USER: the user nginx runs as — PHP-FPM pools' listen.owner/group. Wrong
+# value = nginx can't reach the FPM socket = every site 502s.
+WEB_USER=$(debian_mi && echo www-data || echo nginx)
+
+# ---- BIND layout (mirror of internal/dns/yollar.go) ----
+# Debian's bind9 ships an AppArmor profile: named can write under /var/lib/bind,
+# NOT under /var/named. The Go side resolves the same pair — keep them equal.
+if debian_mi; then
+  DNS_ZONE_DIR=/var/lib/bind;  DNS_CONF_DIR=/etc/bind;  DNS_USER=bind
+  DNS_MAIN_CONF=/etc/bind/named.conf
+else
+  DNS_ZONE_DIR=/var/named;     DNS_CONF_DIR=/etc/named; DNS_USER=named
+  DNS_MAIN_CONF=/etc/named.conf
+fi
+DNS_INCLUDE="$DNS_CONF_DIR/sanalcp-zones.conf"
+
+# ---- system PHP (phpMyAdmin + webmail run on it) — mirror of provisioner.SistemPHP* ----
+if debian_mi; then
+  SYS_PHP_POOL_DIR=/etc/php/8.3/fpm/pool.d; SYS_PHP_SVC=php8.3-fpm
+  MYSQL_SOCK=/run/mysqld/mysqld.sock
+else
+  SYS_PHP_POOL_DIR=/etc/php-fpm.d;          SYS_PHP_SVC=php-fpm
+  MYSQL_SOCK=/var/lib/mysql/mysql.sock
+fi
+
+# havuz_kur <source pool file> <target name>: installs a panel-internal FPM pool
+# (phpMyAdmin, Roundcube) into the system PHP's pool directory.
+#
+# The shipped pool files are written for RHEL. On Debian three things differ and
+# all three are silent failures if missed:
+#   user/group      apache -> www-data   (the user doesn't exist -> FPM won't start)
+#   listen.owner    nginx  -> www-data   (wrong owner -> nginx can't open the socket -> 502)
+#   mysql socket    /var/lib/mysql/mysql.sock -> /run/mysqld/mysqld.sock
+#
+# 🔴 The socket PATH itself (/run/php-fpm/<name>.sock) is deliberately NOT changed:
+# it is baked into the canonical panel vhost (internal/nginxconf/_panel.conf), which
+# the panel re-writes from the embedded copy at every startup. Rewriting the path
+# here would either be reverted on the next start, or make the file count as
+# "admin-customised" and permanently cut it off from security updates. The
+# directory is created by tmpfiles.d instead (see below).
+havuz_kur(){
+  local src="$1" ad="$2"
+  mkdir -p "$SYS_PHP_POOL_DIR"
+  if debian_mi; then
+    sed -e "s/^user = apache/user = $WEB_USER/" \
+        -e "s/^group = apache/group = $WEB_USER/" \
+        -e "s/^listen.owner = nginx/listen.owner = $WEB_USER/" \
+        -e "s/^listen.group = nginx/listen.group = $WEB_USER/" \
+        -e "s#/var/lib/mysql/mysql.sock#$MYSQL_SOCK#g" \
+        "$src" > "$SYS_PHP_POOL_DIR/$ad"
+    chmod 0644 "$SYS_PHP_POOL_DIR/$ad"
+  else
+    install -m 0644 "$src" "$SYS_PHP_POOL_DIR/$ad"
+  fi
+}
+if debian_mi; then
+  # /run/php-fpm doesn't exist on Debian (sury's own pools use /run/php), but the
+  # panel vhost expects the phpMyAdmin/Roundcube sockets there. tmpfiles recreates
+  # it on every boot, before any service starts.
+  printf 'd /run/php-fpm 0755 root root -\n' > /etc/tmpfiles.d/sanalcp-php-fpm.conf
+  systemd-tmpfiles --create /etc/tmpfiles.d/sanalcp-php-fpm.conf >/dev/null 2>&1 || mkdir -p /run/php-fpm
+fi
+
+# ---- PHP version + extension naming ----
+# Remi: version token is "83", package is "php83-php-fpm".
+# sury:  version token is "8.3", package is "php8.3-fpm".
+# The extension bundles are NOT a 1:1 translation either: on sury `pdo` and `json`
+# are built in (no separate package) and mysqlnd is called `mysql`, while `curl`
+# IS a separate package there (on RHEL it comes with the base php rpm).
+if debian_mi; then
+  PHP_VERS="7.4 8.0 8.1 8.2 8.3 8.4 8.5"
+  PHP_EXT="fpm cli mysql mbstring bcmath intl gd soap opcache xml zip pgsql ldap curl"
+  PHP_REDIS_EXT="redis"
+  BASE_PKGS="php8.3 php8.3-fpm php8.3-cli php8.3-mysql php8.3-mbstring php8.3-xml php8.3-zip php8.3-curl php8.3-redis"
+else
+  PHP_VERS="74 80 81 82 83 84 85"
+  PHP_EXT="fpm cli mysqlnd mbstring bcmath intl gd soap opcache pdo xml zip pgsql ldap"
+  PHP_REDIS_EXT="pecl-redis6"
+  BASE_PKGS="php php-fpm php-cli php-mysqlnd php-mbstring php-json php-pecl-zip php-pecl-redis6"
+fi
+php_pkg(){ # <version token> <extension> -> real package name
+  if debian_mi; then echo "php$1-$2"; else echo "php$1-php-$2"; fi
+}
+
+# TEST HOOK: `SANALCP_TANIM_TESTI=1 . ./sanalcp-install.sh` defines the name
+# resolution above and returns WITHOUT touching the system, so the mapping can be
+# tested against internal/osfam (scripts/installer-adlar-testi.sh). A wrong package
+# or unit name is only discovered on a real server otherwise.
+if [ -n "${SANALCP_TANIM_TESTI:-}" ]; then return 0 2>/dev/null || exit 0; fi
 
 # ============ 0) PANEL LANGUAGE ============
 # curl | bash pipes the SCRIPT into stdin, not the user's keystrokes — so `read`
@@ -82,32 +259,68 @@ if [ -z "$PANEL_LANG" ]; then
 fi
 ok "panel default language: $PANEL_LANG"
 
-PHP_VERS="74 80 81 82 83 84 85"
-PHP_EXT="fpm cli mysqlnd mbstring bcmath intl gd soap opcache pdo xml zip pgsql ldap"
-
 # ============ 1) REPOSITORIES ============
-step "1) Repositories (EPEL + Remi + CRB)"
-dnf install -y epel-release >/dev/null 2>&1 && ok "EPEL"
-rpm -q remi-release >/dev/null 2>&1 || dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-${EL_MAJOR}.rpm" >/dev/null 2>&1
-rpm -q remi-release >/dev/null 2>&1 && ok "Remi (EL${EL_MAJOR})" || die "could not add Remi"
-# `config-manager` is a plugin (dnf-plugins-core on EL9 / dnf5-plugins on EL10)
-# that isn't guaranteed to be preinstalled on a minimal cloud image — the
-# virtual provide resolves to the right package on either dnf4 or dnf5.
-dnf install -y 'dnf-command(config-manager)' >/dev/null 2>&1
-dnf config-manager --set-enabled crb >/dev/null 2>&1 && ok "CRB"
+# Multi-version PHP comes from a third-party repo on BOTH families: Remi on RHEL,
+# deb.sury.org on Debian/Ubuntu. Neither distro ships more than one PHP version.
+if rhel_mi; then
+  step "1) Repositories (EPEL + Remi + CRB)"
+  dnf install -y epel-release >/dev/null 2>&1 && ok "EPEL"
+  rpm -q remi-release >/dev/null 2>&1 || dnf install -y "https://rpms.remirepo.net/enterprise/remi-release-${EL_MAJOR}.rpm" >/dev/null 2>&1
+  rpm -q remi-release >/dev/null 2>&1 && ok "Remi (EL${EL_MAJOR})" || die "could not add Remi"
+  # `config-manager` is a plugin (dnf-plugins-core on EL9 / dnf5-plugins on EL10)
+  # that isn't guaranteed to be preinstalled on a minimal cloud image — the
+  # virtual provide resolves to the right package on either dnf4 or dnf5.
+  dnf install -y 'dnf-command(config-manager)' >/dev/null 2>&1
+  dnf config-manager --set-enabled crb >/dev/null 2>&1 && ok "CRB"
+else
+  step "1) Repositories (deb.sury.org PHP)"
+  depo_yenile
+  pkg_kur ca-certificates curl gnupg apt-transport-https lsb-release >/dev/null 2>&1
+  # 🔴 The key goes to /usr/share/keyrings + signed-by, NOT apt-key: apt-key is
+  # deprecated and, worse, a key added there is trusted for EVERY repo on the
+  # system — a compromised sury key could then sign a replacement for any distro
+  # package. signed-by scopes the trust to this one repo.
+  SURY_KEY=/usr/share/keyrings/deb.sury.org-php.gpg
+  if [ ! -s "$SURY_KEY" ]; then
+    TMPKEY=$(mktemp)
+    if download https://packages.sury.org/php/apt.gpg "$TMPKEY" && [ -s "$TMPKEY" ]; then
+      install -m 0644 "$TMPKEY" "$SURY_KEY"
+    fi
+    rm -f "$TMPKEY"
+  fi
+  [ -s "$SURY_KEY" ] || die "could not fetch the deb.sury.org signing key — multi-version PHP would be unavailable"
+  # sury publishes: bullseye bookworm trixie | jammy noble resolute. If this
+  # release isn't among them the repo would 404 on every apt update, so fail loudly.
+  case "$OS_KODADI" in
+    bullseye|bookworm|trixie|jammy|noble|resolute) : ;;
+    *) die "deb.sury.org has no PHP repo for '${OS_KODADI:-unknown}' — supported: Debian 12/13, Ubuntu 22.04/24.04/26.04" ;;
+  esac
+  echo "deb [signed-by=$SURY_KEY] https://packages.sury.org/php/ $OS_KODADI main" > /etc/apt/sources.list.d/sanalcp-sury-php.list
+  depo_yenile
+  apt-cache policy php8.3-fpm 2>/dev/null | grep -q sury.org \
+    && ok "deb.sury.org PHP ($OS_KODADI)" \
+    || die "deb.sury.org repo added but php8.3-fpm doesn't resolve to it — check /etc/apt/sources.list.d/sanalcp-sury-php.list"
+fi
 
 # ============ 2) BASE PACKAGES ============
 step "2) Base packages"
 # 🔴 valkey is intentionally NOT in this batch: it doesn't exist on EL9 (package
-# is still "redis" there — see step 11's sanalcp-redis-setup, which installs
-# whichever one is available). A single missing package name in a batch `dnf
-# install` can abort the WHOLE transaction, so this would have taken down nginx/
-# mariadb/httpd install too, not just Redis.
-dnf install -y nginx httpd mariadb-server certbot python3-certbot-nginx \
-  clamav clamav-update httpd-tools mod_proxy_html tar openssl policycoreutils-python-utils \
-  setools-console jq bind bind-utils nftables unzip zip cronie xfsprogs sudo \
-  bubblewrap rsync git curl acl lftp sshpass >/dev/null 2>&1 \
-  && ok "nginx, httpd, mariadb, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" || die "base package install"
+# is still "redis" there) and not on Debian 12 either (see internal/osfam —
+# redis-server is used there). Step 11's sanalcp-redis-setup installs whichever
+# one is available. A single missing package name in a batch install can abort
+# the WHOLE transaction, so this would have taken down nginx/mariadb too.
+BASE_SYS="$(paket_ad web) $(paket_ad db) certbot python3-certbot-nginx \
+  $(paket_ad antivirus) $(paket_ad av-guncel) $(paket_ad apache-ara) tar openssl \
+  jq $(paket_ad dns) $(paket_ad dns-arac) nftables unzip zip $(paket_ad cron) \
+  $(paket_ad kota-xfs) $(paket_ad kota-ext) sudo bubblewrap rsync git curl acl lftp sshpass"
+if rhel_mi; then
+  # httpd = the optional Apache backend (RHEL only, see osfam.ApacheBackendDestekli).
+  # policycoreutils-python-utils/setools-console are SELinux tooling — Debian has none.
+  BASE_SYS="$BASE_SYS $(paket_ad apache) mod_proxy_html policycoreutils-python-utils setools-console"
+fi
+pkg_kur $BASE_SYS \
+  && ok "nginx, mariadb, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" \
+  || die "base package install"
 
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, in the
 # base repo, reliably reads RAR/RAR5 and itself rejects path-traversal). 🔴 NOTE:
@@ -115,44 +328,89 @@ dnf install -y nginx httpd mariadb-server certbot python3-certbot-nginx \
 # unusable here. Fall back to unar/unrar if bsdtar is unavailable.
 if command -v bsdtar >/dev/null 2>&1 || command -v unar >/dev/null 2>&1 || command -v unrar >/dev/null 2>&1; then
   ok "RAR extractor available ($(command -v bsdtar unar unrar 2>/dev/null | head -1))"
-elif dnf install -y bsdtar >/dev/null 2>&1; then
+elif pkg_kur "$(paket_ad bsdtar)"; then
   ok "bsdtar (libarchive — rar/rar5/zip/7z extract)"
-elif dnf install -y unar >/dev/null 2>&1 || dnf install -y unrar >/dev/null 2>&1; then
+elif pkg_kur unar || pkg_kur unrar; then
   ok "unar/unrar (rar extract)"
 else
   warn "could not install a RAR extractor — file manager .rar extract disabled (zip/tar still work)"
 fi
 
-# ============ 2b) DISK QUOTA (XFS user quota — CloudLinux parity) ============
-# Per-tenant disk + inode quota is enforced via XFS *user* quota (files are owned
-# c_<sk>:c_<sk> → user quota maps 1:1 + escape-proof). If root fs is XFS with
-# `noquota`, the quota can only be turned on at MOUNT time (no live remount) → write
-# `rootflags=uquota` to GRUB. On a fresh install the quota comes up active after the
-# post-install reboot.
-step "2b) Disk quota (XFS user quota)"
-dnf install -y quota xfsprogs >/dev/null 2>&1 && ok "quota + xfsprogs" || warn "quota packages skipped"
+# ============ 2b) DISK QUOTA (per-tenant disk + inode — CloudLinux parity) ============
+# Files are owned c_<sk>:c_<sk>, so USER quota maps 1:1 onto a tenant and can't be
+# escaped. Which backend is used depends on the ROOT FILESYSTEM, not on the distro
+# (AlmaLinux installs on ext4 too, Debian on XFS) — the panel picks it by statfs
+# magic in internal/kaynaklimit/kota.go. Keep the kernel flags below identical to
+# the ones that file reports, otherwise the panel asks for a reboot that fixes nothing.
+#
+#   XFS  -> rootflags=uquota     · grub2-mkconfig · grubby --update-kernel=ALL (BLS)
+#   extN -> rootflags=usrquota   · grub-mkconfig
+#
+# Quota can only be turned on at MOUNT time (no live remount for the root fs) →
+# the flag is written to GRUB and takes effect after a ONE-TIME reboot.
+step "2b) Disk quota"
+pkg_kur "$(paket_ad kota-xfs)" "$(paket_ad kota-ext)" && ok "quota tools (xfsprogs + quota)" || warn "quota packages skipped"
 ROOTFS_TYPE=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 ROOTFS_OPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
-if [ "$ROOTFS_TYPE" != "xfs" ]; then
-  warn "root fs is not XFS ($ROOTFS_TYPE) — XFS disk quota skipped"
+case "$ROOTFS_TYPE" in
+  xfs)              KOTA_FLAG="rootflags=uquota" ;;
+  ext2|ext3|ext4)   KOTA_FLAG="rootflags=usrquota" ;;
+  *)                KOTA_FLAG="" ;;
+esac
+if [ -z "$KOTA_FLAG" ]; then
+  warn "root fs is '$ROOTFS_TYPE' — disk quota is not supported there (only XFS and ext2/3/4); the panel will report quota as unavailable"
 elif echo "$ROOTFS_OPTS" | grep -qwE 'usrquota|uquota|quota'; then
-  ok "root XFS user quota already active"
+  ok "root fs user quota already active ($ROOTFS_TYPE)"
 else
-  if grep -q 'rootflags=uquota' /etc/default/grub 2>/dev/null; then
-    ok "GRUB rootflags=uquota already present"
+  if grep -q "$KOTA_FLAG" /etc/default/grub 2>/dev/null; then
+    ok "GRUB $KOTA_FLAG already present"
   else
     if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub 2>/dev/null; then
-      sed -i 's/^\(GRUB_CMDLINE_LINUX="[^"]*\)"/\1 rootflags=uquota"/' /etc/default/grub
+      sed -i "s/^\(GRUB_CMDLINE_LINUX=\"[^\"]*\)\"/\1 $KOTA_FLAG\"/" /etc/default/grub
     else
-      echo 'GRUB_CMDLINE_LINUX="rootflags=uquota"' >> /etc/default/grub
+      echo "GRUB_CMDLINE_LINUX=\"$KOTA_FLAG\"" >> /etc/default/grub
     fi
-    # Also update existing boot entries (BLS) + regenerate grub.cfg (BIOS + EFI).
-    command -v grubby >/dev/null 2>&1 && grubby --update-kernel=ALL --args="rootflags=uquota" >/dev/null 2>&1 || true
-    grub2-mkconfig -o /boot/grub2/grub.cfg >/dev/null 2>&1 || true
-    for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
-    ok "GRUB rootflags=uquota added (root is XFS)"
+    if rhel_mi; then
+      # Also update existing boot entries (BLS) + regenerate grub.cfg (BIOS + EFI).
+      command -v grubby >/dev/null 2>&1 && grubby --update-kernel=ALL --args="$KOTA_FLAG" >/dev/null 2>&1 || true
+      grub2-mkconfig -o /boot/grub2/grub.cfg >/dev/null 2>&1 || true
+      for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
+    else
+      # Debian has no BLS entries; update-grub is a thin wrapper over grub-mkconfig.
+      if command -v update-grub >/dev/null 2>&1; then update-grub >/dev/null 2>&1 || true
+      else grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || true; fi
+    fi
+    ok "GRUB $KOTA_FLAG added (root is $ROOTFS_TYPE)"
   fi
   warn "Disk quota needs a ONE-TIME reboot to take effect (root fs quota can't be enabled via remount)."
+  # ext2/3/4 only: after the reboot the accounting files have to exist and quota
+  # has to be switched on. quotaon.service does this on a mount that already
+  # carries usrquota, but the FIRST boot after the flag is added has no aquota.*
+  # yet — quotacheck builds it. Both are no-ops if already done.
+  if [ "$ROOTFS_TYPE" != "xfs" ] && command -v quotacheck >/dev/null 2>&1; then
+    systemctl enable quotaon.service >/dev/null 2>&1 || true
+    cat > /etc/systemd/system/sanalcp-quotacheck.service <<'QC'
+[Unit]
+Description=SanalCP — build ext quota accounting files on first boot after rootflags=usrquota
+DefaultDependencies=no
+After=local-fs.target
+Before=quotaon.service
+ConditionPathExists=!/aquota.user
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/quotacheck -cum /
+ExecStart=/usr/sbin/quotaon -u /
+
+[Install]
+WantedBy=local-fs.target
+QC
+    systemctl daemon-reload >/dev/null 2>&1
+    systemctl enable sanalcp-quotacheck.service >/dev/null 2>&1 \
+      && ok "quotacheck oneshot armed for the next boot (ext quota accounting files)" \
+      || warn "could not arm quotacheck — after the reboot run: quotacheck -cum / && quotaon -u /"
+  fi
 fi
 
 # ============ 2c) FIREWALLD ============
@@ -166,48 +424,64 @@ fi
 # test VPS: the panel worked over localhost right after install, but was
 # completely unreachable from outside after a reboot — firewalld was silently
 # doing this the whole time. SanalCP should be the only firewall in play.
-step "2c) Firewalld"
-if systemctl is-active --quiet firewalld 2>/dev/null; then
-  systemctl disable --now firewalld >/dev/null 2>&1 && ok "firewalld disabled (SanalCP manages its own nftables firewall)" || warn "could not disable firewalld — it may block panel/site access"
-else
-  ok "firewalld not active"
-fi
+# On Debian/Ubuntu the same trap has a different name: ufw. Ubuntu cloud images
+# ship it installed and some providers enable it — its default deny-incoming
+# policy blocks 8443/80/443/53/21/25/587/993 exactly like firewalld does.
+step "2c) Distro firewall (firewalld / ufw)"
+KAPATILDI=0
+for fw in firewalld ufw; do
+  if systemctl is-active --quiet "$fw" 2>/dev/null; then
+    systemctl disable --now "$fw" >/dev/null 2>&1 \
+      && { ok "$fw disabled (SanalCP manages its own nftables firewall)"; KAPATILDI=1; } \
+      || warn "could not disable $fw — it may block panel/site access"
+  fi
+done
+[ "$KAPATILDI" = 0 ] && ok "no distro firewall active"
 
-# ============ 3) PHP (5 versions + base + wp-cli) ============
-step "3) PHP versions (5 Remi + base) + wp-cli"
-BASE_PKGS="php php-fpm php-cli php-mysqlnd php-mbstring php-json php-pecl-zip php-pecl-redis6"
-# 🔴 BEFORE the PHP batch install: disable dnf's auto-lock sources (if
-#    dnf-automatic/makecache timers are on, a bulk "dnf install" can hit lock
-#    contention / false negatives). Managed panel updates handle this themselves;
-#    auto-update stays OFF (avoids lock contention + surprise patches).
-systemctl disable --now dnf-automatic.timer dnf-makecache.timer >/dev/null 2>&1 || true
-# 🔴 On AlmaLinux 10 the AppStream `php` package IS 8.3 natively — no module
-# selection needed (RHEL 10 dropped PHP modularity). AlmaLinux 9 (and older)
-# still distributes PHP via module streams whose DEFAULT stream is an older
-# version, not 8.3. The panel's phpMap (internal/provisioner/provisioner.go)
-# hardcodes "system php = 8.3" for every OS — so on EL9 we explicitly pin
-# Remi's own php:remi-8.3 module stream to make the base `php` package
-# resolve to 8.3 there too, keeping that invariant true across both OSes
-# without any Go-side change.
-if [ "$EL_MAJOR" -lt 10 ]; then
-  dnf module reset -y php >/dev/null 2>&1
-  dnf module enable -y php:remi-8.3 >/dev/null 2>&1 \
-    && ok "PHP module stream pinned to remi-8.3 (EL${EL_MAJOR})" \
-    || warn "could not pin PHP module stream to 8.3 — base php version may not match what the panel expects"
+# ============ 3) PHP (multi-version + base + wp-cli) ============
+step "3) PHP versions ($( debian_mi && echo sury || echo Remi ) + base) + wp-cli"
+if rhel_mi; then
+  # 🔴 BEFORE the PHP batch install: disable dnf's auto-lock sources (if
+  #    dnf-automatic/makecache timers are on, a bulk "dnf install" can hit lock
+  #    contention / false negatives). Managed panel updates handle this themselves;
+  #    auto-update stays OFF (avoids lock contention + surprise patches).
+  systemctl disable --now dnf-automatic.timer dnf-makecache.timer >/dev/null 2>&1 || true
+  # 🔴 On AlmaLinux 10 the AppStream `php` package IS 8.3 natively — no module
+  # selection needed (RHEL 10 dropped PHP modularity). AlmaLinux 9 (and older)
+  # still distributes PHP via module streams whose DEFAULT stream is an older
+  # version, not 8.3. The panel's phpMap (internal/provisioner/provisioner.go)
+  # hardcodes "system php = 8.3" for every OS — so on EL9 we explicitly pin
+  # Remi's own php:remi-8.3 module stream to make the base `php` package
+  # resolve to 8.3 there too, keeping that invariant true across both OSes
+  # without any Go-side change.
+  if [ "$EL_MAJOR" -lt 10 ]; then
+    dnf module reset -y php >/dev/null 2>&1
+    dnf module enable -y php:remi-8.3 >/dev/null 2>&1 \
+      && ok "PHP module stream pinned to remi-8.3 (EL${EL_MAJOR})" \
+      || warn "could not pin PHP module stream to 8.3 — base php version may not match what the panel expects"
+  fi
+else
+  # Debian's own unattended-upgrades would fight the installer for the dpkg lock
+  # mid-run; the panel manages its own updates. Same reasoning as the dnf timers.
+  systemctl disable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
 fi
-dnf install -y $BASE_PKGS >/dev/null 2>&1 && ok "base php + php-redis"
+pkg_kur $BASE_PKGS && ok "base php + php-redis"
 # Turn a silent mismatch into a visible one: the panel assumes system php=8.3
 # unconditionally (webmail, phpMyAdmin, and any domain set to PHP "8.3" use
-# the base php-fpm pool, not a Remi per-version one).
+# the base php-fpm pool, not a per-version one).
 BASE_PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "?")
 if [ "$BASE_PHP_VER" = "8.3" ]; then
   ok "system PHP is 8.3 (what webmail/phpMyAdmin/'8.3' domains expect)"
-else
+elif rhel_mi; then
   warn "system PHP is $BASE_PHP_VER, expected 8.3 — webmail, phpMyAdmin and any domain set to PHP '8.3' may not work. Fix manually: dnf module reset php -y && dnf module enable php:remi-8.3 -y && dnf install -y $BASE_PKGS"
+else
+  # On Debian `php` is an alternatives symlink; the panel only ever addresses
+  # php8.3-fpm by name, so a different default CLI is cosmetic — but say it.
+  warn "the default 'php' CLI is $BASE_PHP_VER, not 8.3 — harmless (the panel addresses php8.3-fpm directly), set with: update-alternatives --set php /usr/bin/php8.3"
 fi
 for v in $PHP_VERS; do
-  pkgs=""; for e in $PHP_EXT; do pkgs="$pkgs php$v-php-$e"; done
-  dnf install -y $pkgs php$v-php-pecl-redis6 >/dev/null 2>&1 && ok "php$v (+redis)" || warn "php$v — some packages skipped"
+  pkgs=""; for e in $PHP_EXT; do pkgs="$pkgs $(php_pkg "$v" "$e")"; done
+  pkg_kur $pkgs "$(php_pkg "$v" "$PHP_REDIS_EXT")" && ok "php$v (+redis)" || warn "php$v — some packages skipped"
 done
 if [ ! -x /usr/local/bin/wp ]; then
   curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar 2>/dev/null \
@@ -269,7 +543,7 @@ install -m 0755 "$A/sanalcp-server" /opt/sanalcp/bin/sanalcp-server
 tar xzf "$A/frontend-dist.tar.gz" -C /opt/sanalcp/frontend-dist && ok "frontend-dist"
 tar xzf "$A/migrations.tar.gz" -C /opt/sanalcp/src/migrations && ok "migrations ($(ls /opt/sanalcp/src/migrations/*.sql 2>/dev/null | wc -l) sql)"
 [ -d "$A/mail" ] && cp -r "$A/mail/"* /opt/sanalcp/src/mail-templates/ && ok "mail config templates (postfix/dovecot/opendkim/roundcube)"
-[ -f "$A/php-fpm/roundcube.conf" ] && install -m 0644 "$A/php-fpm/roundcube.conf" /etc/php-fpm.d/roundcube.conf
+[ -f "$A/php-fpm/roundcube.conf" ] && havuz_kur "$A/php-fpm/roundcube.conf" roundcube.conf
 # ops tools + signon
 for t in "$A"/ops/*; do
   bn=$(basename "$t"); nm="${bn%.sh}"
@@ -301,6 +575,11 @@ step "8) nginx (panel vhost + phpMyAdmin + perf)"
 # a "duplicate directive" error.
 grep -q "client_max_body_size 10240m" /etc/nginx/nginx.conf || \
   sed -i '/^http {/a\    client_max_body_size 10240m;' /etc/nginx/nginx.conf
+# 🔴 Debian ships an enabled default site that also claims `default_server` on
+# :80 — nginx -t then fails with "duplicate default server" and NOTHING starts.
+if debian_mi && [ -e /etc/nginx/sites-enabled/default ]; then
+  rm -f /etc/nginx/sites-enabled/default && ok "Debian default site removed (it would collide with _default80.conf)"
+fi
 cp "$A/nginx/_panel.conf"     /etc/nginx/conf.d/_panel.conf
 cp "$A/nginx/_default80.conf" /etc/nginx/conf.d/_default80.conf
 cp "$A/nginx/_default443.conf" /etc/nginx/conf.d/_default443.conf
@@ -341,14 +620,18 @@ fi
 # pool [apache] can read it, no one else can). Never touch an existing one.
 if [ ! -s /etc/sanalcp/pma-internal.token ]; then
   openssl rand -hex 32 > /etc/sanalcp/pma-internal.token
-  chown root:apache /etc/sanalcp/pma-internal.token 2>/dev/null || true
+  # 🔴 group = the user the pma FPM pool runs as (apache on RHEL, www-data on
+  # Debian) — the pool reads this file; nobody else may.
+  chown "root:$(rhel_mi && echo apache || echo "$WEB_USER")" /etc/sanalcp/pma-internal.token 2>/dev/null || true
   chmod 640 /etc/sanalcp/pma-internal.token
 fi
-cp "$A/php-fpm/phpmyadmin.conf" /etc/php-fpm.d/phpmyadmin.conf
+havuz_kur "$A/php-fpm/phpmyadmin.conf" phpmyadmin.conf
 mkdir -p /var/lib/phpmyadmin/{tmp,sessions}
-chown -R nginx:nginx /opt/phpmyadmin /var/lib/phpmyadmin 2>/dev/null
-restorecon -R /opt/phpmyadmin /var/lib/phpmyadmin >/dev/null 2>&1
-setsebool -P httpd_can_network_connect_db 1 >/dev/null 2>&1
+chown -R "$WEB_USER:$WEB_USER" /opt/phpmyadmin /var/lib/phpmyadmin 2>/dev/null
+if rhel_mi; then
+  restorecon -R /opt/phpmyadmin /var/lib/phpmyadmin >/dev/null 2>&1
+  setsebool -P httpd_can_network_connect_db 1 >/dev/null 2>&1
+fi
 ok "phpMyAdmin pool + config + permissions"
 
 # ============ 10) systemd + services ============
@@ -367,33 +650,58 @@ if [ -f /etc/systemd/system/sanalcp-db-backup.timer ]; then
     && ok "daily panel DB backup ACTIVE (03:30 → /var/backups/sanalcp/db, 14 days)" \
     || warn "DB backup timer failed to start — daily panel DB backup may not run"
 fi
-systemctl enable --now php-fpm >/dev/null 2>&1
-for v in $PHP_VERS; do systemctl enable --now php$v-php-fpm >/dev/null 2>&1; done
-ok "php-fpm (base + 5 versions)"
+systemctl enable --now "$SYS_PHP_SVC" >/dev/null 2>&1
+for v in $PHP_VERS; do
+  systemctl enable --now "$(debian_mi && echo "php$v-fpm" || echo "php$v-php-fpm")" >/dev/null 2>&1
+done
+ok "php-fpm (system 8.3 + per-version pools)"
 
 # ---- named (DNS server) — nameserver for tenant domains ----
-NC=/etc/named.conf
-if [ -f "$NC" ]; then
-  cp -a "$NC" "$NC.sanal-bak" 2>/dev/null || true
-  # allow external queries: listen on all interfaces (default is 127.0.0.1 only)
-  sed -i -E 's/listen-on port 53 \{[^}]*\}/listen-on port 53 { any; }/' "$NC"
-  sed -i -E 's/listen-on-v6 port 53 \{[^}]*\}/listen-on-v6 port 53 { any; }/' "$NC"
-  # don't be an open resolver (DNS amplification) — authoritative only
-  sed -i -E 's/recursion yes/recursion no/' "$NC"
-  # panel zone include (WriteZone fills this in) — idempotent
-  grep -q 'sanalcp-zones.conf' "$NC" || \
-    echo 'include "/etc/named/sanalcp-zones.conf";' >> "$NC"
+# 🔴 Paths and the service name differ per family; they MUST match
+# internal/dns/yollar.go, otherwise the panel writes zone files somewhere named
+# never reads and DNS silently does nothing.
+#   RHEL:   /etc/named.conf · /var/named       · user named · unit named
+#   Debian: /etc/bind/*     · /var/lib/bind    · user bind  · unit bind9
+# /var/lib/bind is not an arbitrary choice on Debian: bind9 ships an AppArmor
+# profile and that is one of the few directories named is allowed to write.
+mkdir -p "$DNS_CONF_DIR" "$DNS_ZONE_DIR"
+if rhel_mi; then
+  NC=/etc/named.conf
+  if [ -f "$NC" ]; then
+    cp -a "$NC" "$NC.sanal-bak" 2>/dev/null || true
+    # allow external queries: listen on all interfaces (default is 127.0.0.1 only)
+    sed -i -E 's/listen-on port 53 \{[^}]*\}/listen-on port 53 { any; }/' "$NC"
+    sed -i -E 's/listen-on-v6 port 53 \{[^}]*\}/listen-on-v6 port 53 { any; }/' "$NC"
+    # don't be an open resolver (DNS amplification) — authoritative only
+    sed -i -E 's/recursion yes/recursion no/' "$NC"
+    # panel zone include (WriteZone fills this in) — idempotent
+    grep -q 'sanalcp-zones.conf' "$NC" || \
+      echo "include \"$DNS_INCLUDE\";" >> "$NC"
+  fi
+else
+  # Debian keeps the options in a separate file that named.conf already includes.
+  NCO=/etc/bind/named.conf.options
+  if [ -f "$NCO" ]; then
+    cp -a "$NCO" "$NCO.sanal-bak" 2>/dev/null || true
+    if grep -qE '^\s*recursion\s' "$NCO"; then
+      sed -i -E 's/^\s*recursion\s+yes\s*;/\trecursion no;/' "$NCO"
+    else
+      # insert right after the opening "options {" line — authoritative only.
+      sed -i '0,/^options[[:space:]]*{/s//options {\n\trecursion no;\n\tallow-query { any; };/' "$NCO"
+    fi
+  fi
+  grep -q 'sanalcp-zones.conf' "$DNS_MAIN_CONF" 2>/dev/null || \
+    echo "include \"$DNS_INCLUDE\";" >> "$DNS_MAIN_CONF"
 fi
 # panel zone include file (starts empty; fills up as domains are added)
-mkdir -p /etc/named
-[ -f /etc/named/sanalcp-zones.conf ] || \
-  printf '// sanalcp — auto-generated\n' > /etc/named/sanalcp-zones.conf
-chown root:named /etc/named/sanalcp-zones.conf 2>/dev/null || true
-chmod 640 /etc/named/sanalcp-zones.conf 2>/dev/null || true
-# zone files live under /var/named (SELinux named_zone_t context is REQUIRED)
-restorecon -R /var/named /etc/named >/dev/null 2>&1 || true
+[ -f "$DNS_INCLUDE" ] || printf '// sanalcp — auto-generated\n' > "$DNS_INCLUDE"
+chown "root:$DNS_USER" "$DNS_INCLUDE" 2>/dev/null || true
+chmod 640 "$DNS_INCLUDE" 2>/dev/null || true
+chown "$DNS_USER:$DNS_USER" "$DNS_ZONE_DIR" 2>/dev/null || true
+# zone files live under $DNS_ZONE_DIR (SELinux named_zone_t context is REQUIRED on RHEL)
+rhel_mi && restorecon -R "$DNS_ZONE_DIR" "$DNS_CONF_DIR" >/dev/null 2>&1 || true
 if named-checkconf >/dev/null 2>&1; then
-  systemctl enable --now named >/dev/null 2>&1 && ok "named (authoritative DNS, :53 open, recursion off)" || warn "named failed to start"
+  systemctl enable --now "$(servis_ad dns)" >/dev/null 2>&1 && ok "named (authoritative DNS, :53 open, recursion off)" || warn "named failed to start"
 else
   warn "named-checkconf error — check DNS config manually"
 fi
@@ -436,8 +744,12 @@ else
 fi
 
 # ---- httpd (Apache backend — for the web_backend=apache option, behind nginx) ----
-# nginx listens on :80, so Apache listens on 127.0.0.1:10080 (mod_proxy_fcgi → php-fpm)
-if [ -f /etc/httpd/conf/httpd.conf ]; then
+# 🔴 RHEL only. On Debian the Apache layout is completely different
+# (sites-available + a2ensite, different module names) and the panel disables the
+# backend there (osfam.ApacheBackendDestekli) — installing it would leave a
+# service running that nothing can use.
+if rhel_mi && [ -f /etc/httpd/conf/httpd.conf ]; then
+  # nginx listens on :80, so Apache listens on 127.0.0.1:10080 (mod_proxy_fcgi → php-fpm)
   if grep -qE "^Listen 80$" /etc/httpd/conf/httpd.conf; then
     sed -i "s/^Listen 80$/Listen 127.0.0.1:10080/" /etc/httpd/conf/httpd.conf
   elif ! grep -qE "^Listen 127.0.0.1:10080" /etc/httpd/conf/httpd.conf; then
@@ -449,6 +761,8 @@ if [ -f /etc/httpd/conf/httpd.conf ]; then
   if apachectl configtest >/dev/null 2>&1; then
     systemctl enable --now httpd >/dev/null 2>&1 && ok "httpd (Apache backend :10080, mod_proxy_fcgi)" || warn "httpd failed to start"
   else warn "httpd configtest failed — check the Apache backend manually"; fi
+elif debian_mi; then
+  ok "Apache backend not installed (unsupported on Debian in v1 — nginx handles every site)"
 fi
 
 # ---- composer (per-domain PHP dependency management) ----
@@ -480,29 +794,31 @@ SHELL=/bin/bash
 PATH=/usr/local/bin:/usr/bin:/bin
 0 3 * * * root /usr/local/bin/sanalcp-backup-all
 CRON
-# Start crond NOW + enable it (AlmaLinux's preset only enables it, doesn't start it
+# Start cron NOW + enable it (AlmaLinux's preset only enables it, doesn't start it
 # until reboot → the backup cron wouldn't run until the first reboot). enable --now
-# is idempotent.
-systemctl enable --now crond >/dev/null 2>&1
-systemctl is-active --quiet crond && ok "daily backup cron + crond ACTIVE (03:00 UTC)" || warn "crond failed to start — the backup cron may not run"
+# is idempotent. Unit name: crond on RHEL, cron on Debian.
+systemctl enable --now "$(servis_ad cron)" >/dev/null 2>&1
+systemctl is-active --quiet "$(servis_ad cron)" && ok "daily backup cron + cron ACTIVE (03:00 UTC)" || warn "cron failed to start — the backup cron may not run"
 
-# SELinux
-setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 && ok "SELinux httpd_can_network_connect"
-# Batch5A: nginx (httpd_t) needs to read tenant home content (public_html) — with
-# these booleans OFF, try_files thinks the file doesn't exist → every site 404s.
-# (Also guaranteed at panel startup by ensureHTTPDHomeBooleans; this line is for
-# first boot.)
-setsebool -P httpd_enable_homedirs=on httpd_read_user_content=on >/dev/null 2>&1 && ok "SELinux httpd home read (homedirs + user_content)"
-restorecon -R /opt/sanalcp/bin /opt/sanalcp/frontend-dist >/dev/null 2>&1
-# Batch5A: SELinux fcontext (httpd_var_run_t) for per-tenant php-fpm socket dirs
-# under /run/php-fpm-<sk>/. The existing /run/php-fpm(/.*)? rule doesn't cover the
-# hyphenated path → nginx→FPM 500s. Idempotent.
-# (Also guaranteed at panel startup by ensureFPMSELinuxFcontext; this line covers
-# the state before first boot.)
-if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ] && command -v semanage >/dev/null 2>&1; then
-  semanage fcontext -l 2>/dev/null | grep -q "/run/php-fpm-\[" || \
-    semanage fcontext -a -t httpd_var_run_t "/run/php-fpm-[^/]+(/.*)?" 2>/dev/null || true
-  ok "SELinux fcontext: per-tenant php-fpm socket (httpd_var_run_t)"
+# SELinux — RHEL only; Debian has no SELinux (AppArmor doesn't need any of this).
+if rhel_mi; then
+  setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 && ok "SELinux httpd_can_network_connect"
+  # Batch5A: nginx (httpd_t) needs to read tenant home content (public_html) — with
+  # these booleans OFF, try_files thinks the file doesn't exist → every site 404s.
+  # (Also guaranteed at panel startup by ensureHTTPDHomeBooleans; this line is for
+  # first boot.)
+  setsebool -P httpd_enable_homedirs=on httpd_read_user_content=on >/dev/null 2>&1 && ok "SELinux httpd home read (homedirs + user_content)"
+  restorecon -R /opt/sanalcp/bin /opt/sanalcp/frontend-dist >/dev/null 2>&1
+  # Batch5A: SELinux fcontext (httpd_var_run_t) for per-tenant php-fpm socket dirs
+  # under /run/php-fpm-<sk>/. The existing /run/php-fpm(/.*)? rule doesn't cover the
+  # hyphenated path → nginx→FPM 500s. Idempotent.
+  # (Also guaranteed at panel startup by ensureFPMSELinuxFcontext; this line covers
+  # the state before first boot.)
+  if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ] && command -v semanage >/dev/null 2>&1; then
+    semanage fcontext -l 2>/dev/null | grep -q "/run/php-fpm-\[" || \
+      semanage fcontext -a -t httpd_var_run_t "/run/php-fpm-[^/]+(/.*)?" 2>/dev/null || true
+    ok "SELinux fcontext: per-tenant php-fpm socket (httpd_var_run_t)"
+  fi
 fi
 
 # ============ 11) Valkey + tuning ============
@@ -570,10 +886,13 @@ if [ -n "$IP" ]; then
     warn "panel is NOT reachable from outside (https://${IP}:8443/ → '${EXT_CODE:-no response}') — check your cloud provider's firewall/security group; SanalCP's own firewall (nftables) and firewalld were already handled by this installer"
   fi
 fi
-KV_SVC=valkey; systemctl list-unit-files --no-legend valkey.service 2>/dev/null | grep -q valkey || KV_SVC=redis
-echo -e "  services: $(systemctl is-active mariadb nginx "$KV_SVC" php-fpm named pure-ftpd sanalcp crond | tr '\n' ' ')"
-echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active named)   ·   FTP :21 → $(systemctl is-active pure-ftpd)"
-echo -e "  tools: SSL/acme.sh $([ -x /root/.acme.sh/acme.sh ] && echo ✓ || echo ✗)   ·   firewall/nft $(command -v nft >/dev/null && echo ✓ || echo ✗)   ·   unzip/zip $(command -v unzip >/dev/null && command -v zip >/dev/null && echo ✓ || echo ✗)   ·   composer $(command -v composer >/dev/null && echo ✓ || echo ✗)   ·   apache/httpd $(systemctl is-active httpd)"
+# valkey vs redis: EL9 and Debian 12 still ship redis (see internal/osfam).
+KV_SVC=$(debian_mi && echo valkey-server || echo valkey)
+systemctl list-unit-files --no-legend "$KV_SVC.service" 2>/dev/null | grep -q "$KV_SVC" || \
+  KV_SVC=$(debian_mi && echo redis-server || echo redis)
+echo -e "  services: $(systemctl is-active "$(servis_ad db)" "$(servis_ad web)" "$KV_SVC" "$SYS_PHP_SVC" "$(servis_ad dns)" "$(servis_ad ftp)" sanalcp "$(servis_ad cron)" | tr '\n' ' ')"
+echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active "$(servis_ad dns)")   ·   FTP :21 → $(systemctl is-active "$(servis_ad ftp)")"
+echo -e "  tools: SSL/acme.sh $([ -x /root/.acme.sh/acme.sh ] && echo ✓ || echo ✗)   ·   firewall/nft $(command -v nft >/dev/null && echo ✓ || echo ✗)   ·   unzip/zip $(command -v unzip >/dev/null && command -v zip >/dev/null && echo ✓ || echo ✗)   ·   composer $(command -v composer >/dev/null && echo ✓ || echo ✗)   ·   apache backend $(rhel_mi && systemctl is-active httpd || echo "n/a (Debian)")"
 echo -e "  isolation: plan-driven resource limits (cgroup slice) + per-tenant PHP-FPM (CageFS equivalent) READY   ·   bubblewrap $(command -v bwrap >/dev/null && echo ✓ || echo ✗)"
 echo
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"
@@ -581,7 +900,7 @@ echo -e "${c_g} ✓ SanalCP installation complete${c_0}"
 echo -e "   Panel:    ${c_b}https://${IP:-SERVER_IP}:8443${c_0}"
 echo -e "   Username: ${c_b}root${c_0}   Password: ${c_b}this server's root password${c_0}"
 echo -e "   (panel admin login verifies against the server's root account via PAM)"
-if [ "$(findmnt -no FSTYPE / 2>/dev/null)" = "xfs" ] && ! findmnt -no OPTIONS / 2>/dev/null | grep -qwE 'usrquota|uquota|quota'; then
-  echo -e "   ${c_y}Disk quota: rootflags=uquota was written to GRUB — takes effect after a ONE-TIME reboot.${c_0}"
+if [ -n "${KOTA_FLAG:-}" ] && ! findmnt -no OPTIONS / 2>/dev/null | grep -qwE 'usrquota|uquota|quota'; then
+  echo -e "   ${c_y}Disk quota: $KOTA_FLAG was written to GRUB — takes effect after a ONE-TIME reboot.${c_0}"
 fi
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"

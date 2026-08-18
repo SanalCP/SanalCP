@@ -7,16 +7,23 @@ import (
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 // logKaynaklari: kaynak anahtarı → systemd unit. Allowlist — komut enjeksiyonu YOK
 // (kullanıcı girdisi doğrudan komuta gitmez, sadece bu haritadan geçer).
-var logKaynaklari = map[string]string{
-	"panel":   "sanalcp.service",
-	"mariadb": "mariadb.service",
-	"named":   "named.service",
-	"sshd":    "sshd.service",
-	"cron":    "crond.service",
+// Unit adları aileye göre değişir (named/bind9, crond/cron) — sabit RHEL adıyla
+// bırakılırsa Debian'da o kaynak boş log döner.
+var logKaynaklari = logKaynaklariSec(osfam.Mevcut())
+
+func logKaynaklariSec(b osfam.Bilgi) map[string]string {
+	return map[string]string{
+		"panel":   "sanalcp.service",
+		"mariadb": b.Servis(osfam.PaketDB) + ".service",
+		"named":   b.Servis(osfam.PaketDNS) + ".service",
+		"sshd":    b.Servis(osfam.PaketSSH) + ".service",
+		"cron":    b.Servis(osfam.PaketCron) + ".service",
+	}
 }
 
 // nginx journald'a yazmaz (dosyaya loglar) → dosya-tabanlı kaynak.

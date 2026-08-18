@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 // Servis yönetimi: Genel Ayarlar'dan izin verilen servisleri restart/reload etme.
@@ -19,17 +20,46 @@ type servisTanim struct {
 	Reload bool   `json:"reload"` // reload destekliyor mu
 }
 
-var servisAllow = []servisTanim{
-	{"nginx", "Nginx", "Web Sunucusu", true},
-	{"httpd", "Apache (Backend)", "Web Sunucusu", true},
-	{"mariadb", "MariaDB", "Veritabanı & Önbellek", false},
-	{"valkey", "Valkey (Redis)", "Veritabanı & Önbellek", false},
-	{"named", "BIND", "DNS", true},
-	{"php-fpm", "PHP-FPM 8.3", "PHP-FPM", true},
-	{"php82-php-fpm", "PHP-FPM 8.2", "PHP-FPM", true},
-	{"php74-php-fpm", "PHP-FPM 7.4", "PHP-FPM", true},
-	{"pure-ftpd", "Pure-FTPd (FTP)", "Diğer", false},
-	{"crond", "Cron (Zamanlayıcı)", "Diğer", false},
+// servisAllow: açılışta bir kez, çalışan dağıtımın unit adlarıyla kurulur.
+//
+// 🔴 Unit adları aileye göre değişir (named/bind9, crond/cron, httpd/apache2,
+// php-fpm/php8.3-fpm). Sabit RHEL adlarıyla bırakılırsa Debian'da her satır
+// "absent" görünür ve UI'dan hiçbir servis yeniden başlatılamaz.
+var servisAllow = servisAllowSec(osfam.Mevcut())
+
+func servisAllowSec(b osfam.Bilgi) []servisTanim {
+	l := []servisTanim{
+		{b.Servis(osfam.PaketWeb), "Nginx", "Web Sunucusu", true},
+	}
+	// Apache backend Debian'da v1'de kapalı (osfam.ApacheBackendDestekli) —
+	// yeniden başlatılabilir servisler listesinde de görünmemeli.
+	if b.RHELMi() {
+		l = append(l, servisTanim{b.Servis(osfam.PaketApache), "Apache (Backend)", "Web Sunucusu", true})
+	}
+	l = append(l,
+		servisTanim{b.Servis(osfam.PaketDB), "MariaDB", "Veritabanı & Önbellek", false},
+		servisTanim{b.Servis(osfam.PaketCache), "Valkey (Redis)", "Veritabanı & Önbellek", false},
+		servisTanim{b.Servis(osfam.PaketDNS), "BIND", "DNS", true},
+	)
+	// PHP-FPM birimleri: sury'de "php8.3-fpm", Remi/AppStream'de "php-fpm" +
+	// "php82-php-fpm" kalıbı (bkz. provisioner.phpMap).
+	if b.DebianMi() {
+		l = append(l,
+			servisTanim{"php8.3-fpm", "PHP-FPM 8.3", "PHP-FPM", true},
+			servisTanim{"php8.2-fpm", "PHP-FPM 8.2", "PHP-FPM", true},
+			servisTanim{"php7.4-fpm", "PHP-FPM 7.4", "PHP-FPM", true},
+		)
+	} else {
+		l = append(l,
+			servisTanim{"php-fpm", "PHP-FPM 8.3", "PHP-FPM", true},
+			servisTanim{"php82-php-fpm", "PHP-FPM 8.2", "PHP-FPM", true},
+			servisTanim{"php74-php-fpm", "PHP-FPM 7.4", "PHP-FPM", true},
+		)
+	}
+	return append(l,
+		servisTanim{b.Servis(osfam.PaketFTP), "Pure-FTPd (FTP)", "Diğer", false},
+		servisTanim{b.Servis(osfam.PaketCron), "Cron (Zamanlayıcı)", "Diğer", false},
+	)
 }
 
 func tanimBul(birim string) (servisTanim, bool) {

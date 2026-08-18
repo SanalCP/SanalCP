@@ -247,6 +247,22 @@ var phpMapDebian = map[string]phpAyar{
 	"8.6": {PoolDir: "/etc/php/8.6/fpm/pool.d", SockDir: "/run/php", Service: "php8.6-fpm", FpmBin: "/usr/sbin/php-fpm8.6"},
 }
 
+// SistemPHPSurum: panelin KENDİ bileşenlerinin (phpMyAdmin, Roundcube/webmail)
+// koştuğu PHP sürümü. Her iki ailede de 8.3 varsayılır — installer bunu garanti
+// eder (RHEL'de remi-8.3 modül akışı, Debian'da sury php8.3).
+const SistemPHPSurum = "8.3"
+
+// SistemPHPHavuzDizin / SistemPHPServis: sistem PHP'sinin FPM havuz dizini ve
+// systemd unit adı.
+//
+// NEDEN FONKSİYON: RHEL'de "/etc/php-fpm.d" + "php-fpm", Debian'da
+// "/etc/php/8.3/fpm/pool.d" + "php8.3-fpm". Bu iki değer panelin phpMyAdmin ve
+// webmail onarımlarında sabit yazılıydı; Debian'da havuz yanlış dizine yazılır
+// ve `systemctl reload php-fpm` var olmayan bir birime giderdi → phpMyAdmin ve
+// webmail sessizce çalışmazdı.
+func SistemPHPHavuzDizin() string { return phpMap[SistemPHPSurum].PoolDir }
+func SistemPHPServis() string     { return phpMap[SistemPHPSurum].Service }
+
 func ValidateDomain(d string) error {
 	d = strings.ToLower(strings.TrimSpace(d))
 	if d == "" {

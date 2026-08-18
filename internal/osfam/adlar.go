@@ -29,6 +29,7 @@ const (
 	PaketApache    = "apache"
 	PaketApacheAra = "apache-araclari"
 	PaketACL       = "acl"
+	PaketSSH       = "ssh"
 	PaketBsdtar    = "bsdtar"
 )
 
@@ -53,6 +54,7 @@ var paketAdlari = map[string]map[Aile]string{
 	PaketApacheAra: {RHEL: "httpd-tools", Debian: "apache2-utils"},
 	PaketWebEkstra: {RHEL: "httpd-tools", Debian: "apache2-utils"},
 	PaketACL:       {RHEL: "acl", Debian: "acl"},
+	PaketSSH:       {RHEL: "openssh-server", Debian: "openssh-server"},
 	// bsdtar RHEL'de kendi adıyla, Debian'da libarchive-tools içinde gelir.
 	PaketBsdtar: {RHEL: "bsdtar", Debian: "libarchive-tools"},
 }
@@ -71,6 +73,10 @@ var servisAdlari = map[string]map[Aile]string{
 	PaketAVGuncel:  {RHEL: "clamav-freshclam", Debian: "clamav-freshclam"},
 	PaketCron:      {RHEL: "crond", Debian: "cron"},
 	PaketApache:    {RHEL: "httpd", Debian: "apache2"},
+	// 🔴 SSH birimi Debian'da "ssh.service"tir. "sshd.service" yalnız bir
+	// ALIAS'tır ve journald kayıtları gerçek unit adıyla tutulduğu için
+	// `journalctl -u sshd.service` Debian'da BOŞ döner.
+	PaketSSH: {RHEL: "sshd", Debian: "ssh"},
 }
 
 // ozelPaket: aile tablosunun yetmediği, dağıtım SÜRÜMÜNE bağlı durumlar.

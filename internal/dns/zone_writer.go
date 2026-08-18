@@ -15,14 +15,6 @@ import (
 	"time"
 )
 
-const (
-	ZoneDir          = "/var/named"
-	NamedConfInclude = "/etc/named/sanalcp-zones.conf"
-	// DNSSECKeyDir: dnssec-policy anahtar dizini. /var/named/dynamic zaten named_cache_t
-	// SELinux etiketli ve named'e yazılabilir (ekstra SELinux ayarı gerektirmez).
-	DNSSECKeyDir = "/var/named/dynamic"
-)
-
 // fqdn: hedef alan adi (NS/MX/CNAME/SRV) trailing nokta ile bitmeliki BIND
 // "relative" yorumlamasın (yoksa zone adi append eder ve "host.X.Y.X.Y" gibi olur).
 func fqdn(tip, deger string) string {
@@ -211,7 +203,7 @@ func WriteZone(ctx context.Context, db *sql.DB, domainID int64) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	_, _ = exec.Command("chown", "named:named", zonePath).CombinedOutput()
+	_, _ = exec.Command("chown", dnsKullanici+":"+dnsKullanici, zonePath).CombinedOutput()
 	_, _ = exec.Command("restorecon", zonePath).CombinedOutput()
 
 	if err := updateZoneIncludes(ctx, db); err != nil {
@@ -234,14 +226,14 @@ func reloadNamed() {
 	if err := exec.Command("rndc", "reload").Run(); err == nil {
 		return
 	}
-	if err := exec.Command("systemctl", "reload", "named").Run(); err == nil {
+	if err := exec.Command("systemctl", "reload", dnsServis).Run(); err == nil {
 		return
 	}
 	if err := exec.Command("named-checkconf").Run(); err != nil {
 		log.Printf("dns reloadNamed: named-checkconf başarısız → 'systemctl restart named' ATLANDI (çalışan named korunuyor): %v", err)
 		return
 	}
-	_ = exec.Command("systemctl", "restart", "named").Run()
+	_ = exec.Command("systemctl", "restart", dnsServis).Run()
 }
 
 // buildZoneIncludes: aktif kaydı olan tüm zone'lar için named include içeriğini üretir.

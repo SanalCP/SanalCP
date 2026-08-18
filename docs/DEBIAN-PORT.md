@@ -1,6 +1,6 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-3 tamamlandı (2026-08-18). Sıradaki: Faz 4 — installer.
+**Durum:** Faz 0-4 tamamlandı (2026-08-18). Sıradaki: Faz 4b — ops betikleri, sonra Faz 5 canlı test.
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -245,20 +245,103 @@ graceful-skip yaptı.
 - Bulut imajlarında `/` gerçekten ext4 mi (bazıları btrfs olabilir → kota desteklenmez,
   dürüstçe "kota kapalı" denir; panelin geri kalanı çalışır).
 
-## 5. Installer (`sanalcp-install.sh`, 587 satır)
+## 5. Installer — Faz 4 ✅ (2026-08-18)
 
-Tespit edilen RHEL bağımlılığı: 14 `dnf` çağrısı, 12 SELinux çağrısı, 8 firewalld,
-7 remi/epel.
+Tespit edilen RHEL bağımlılığı (başlangıç): 14 `dnf` çağrısı, 12 SELinux çağrısı,
+8 firewalld, 7 remi/epel.
 
-**Yaklaşım:** tek dosyayı ikiye bölmek yerine, üstte bir `OS_AILE` tespiti + ince
-sarmalayıcı fonksiyonlar (`pkg_install`, `svc_enable`, `repo_php_ekle`) tanımlanacak;
-gövde ortak kalacak. Böylece iki ayrı installer'ın zamanla birbirinden ayrışması
-(en sık görülen bakım hatası) önlenir.
+**Uygulanan yaklaşım (planlandığı gibi):** dosya ikiye BÖLÜNMEDİ. Üstte bir aile
+tespiti + ince sarmalayıcılar tanımlandı, gövde ortak kaldı:
 
-Debian tarafında ek adımlar:
-- `apt-get update` + `DEBIAN_FRONTEND=noninteractive`
-- sury deposu: anahtar + `deb https://packages.sury.org/php/ <codename> main`
-- `firewalld` yok → doğrudan `nftables` (panel zaten nftables kullanıyor, kolaylaşıyor)
+| Sarmalayıcı | İşi |
+|---|---|
+| `pkg_kur` / `pkg_kurulu` / `depo_yenile` | `dnf` ↔ `apt-get` |
+| `paket_ad` / `servis_ad` | mantıksal ad → gerçek paket / systemd unit |
+| `php_pkg <sürüm> <eklenti>` | `php83-php-fpm` ↔ `php8.3-fpm` |
+| `havuz_kur` | panel-içi FPM havuzunu doğru dizine + doğru kullanıcıyla kurar |
+| `debian_mi` / `rhel_mi` | okunabilirlik |
+
+Artık betikte `dnf`/`rpm` çağrısı YALNIZCA `rhel_mi` kolunda ya da sarmalayıcının
+içinde geçiyor.
+
+### Debian tarafında eklenen adımlar
+
+- `apt-get update` + `DEBIAN_FRONTEND=noninteractive` **ve** `NEEDRESTART_MODE=a`
+  — needrestart'ın servis seçici ekranı gözetimsiz kurulumu sonsuza kadar
+  bekletirdi.
+- **sury deposu:** anahtar `/usr/share/keyrings/deb.sury.org-php.gpg` +
+  `signed-by`. 🔴 `apt-key` KULLANILMADI: oraya eklenen anahtar sistemdeki HER
+  depo için güvenilir olur; `signed-by` güveni tek depoya hapseder.
+- `firewalld` yoksa da iş bitmiyor: Ubuntu imajlarında aynı tuzağın adı **ufw**.
+  İkisi de kapatılıyor (panel kendi nftables'ını yönetir).
+- Debian'ın **etkin varsayılan nginx sitesi** siliniyor — `default_server`
+  talebi `_default80.conf` ile çakışır ve `nginx -t` "duplicate default server"
+  ile patlar, hiçbir şey ayağa kalkmaz.
+- `unattended-upgrades` + `apt-daily*.timer` kapatılıyor (dnf-automatic'in
+  karşılığı; kurulum ortasında dpkg kilidi için yarışırdı).
+
+### Canlı doğrulanan depo sözleşmeleri
+
+Bu makinede (Debian 13 trixie) ağ üzerinden doğrulandı:
+
+- `https://packages.sury.org/php/apt.gpg` → HTTP 200, 3182 bayt, **ikili** OpenPGP
+  anahtarı (`DEB.SURY.ORG Automatic Signing Key <deb@sury.org>`, RSA 3072).
+  `signed-by` ikili keyring'i doğrudan kabul eder.
+- Dört hedefin de dist'i var: `bookworm` · `trixie` · `noble` · `resolute` →
+  `Release` ve `main/binary-amd64/Packages.gz` hepsi HTTP 200.
+- trixie'de sury'nin sunduğu FPM sürümleri: **5.6 → 8.6**. Bizim kurduğumuz
+  aralık 7.4–8.5 (Remi listesiyle parite).
+- 8.3 için ihtiyaç duyulan 15 paketin tamamı mevcut (`fpm cli mysql mbstring
+  bcmath intl gd soap opcache xml zip pgsql ldap curl redis`).
+
+### Planda olmayan, kurulumu sessizce bozan üç boşluk
+
+Bunlar Faz 4 sırasında ortaya çıktı ve **Go tarafında** düzeltildi — installer tek
+başına çözemezdi:
+
+1. **BIND yolları (`internal/dns/yollar.go` — yeni).** `zone_writer.go`
+   `/var/named`, `/etc/named/…`, `chown named:named` ve `systemctl reload named`
+   değerlerini sabit tutuyordu. Debian'da servis `bind9`, kullanıcı `bind` ve
+   🔴 **bind9 bir AppArmor profiliyle gelir**: named `/var/named`'e YAZAMAZ.
+   Zone dizini bu yüzden `/var/lib/bind` (profilde yazılabilir tanımlı), include
+   `/etc/bind/sanalcp-zones.conf`. Yanlış bırakılsa DNS hatasız ama tamamen
+   işlevsiz olurdu.
+2. **Sistem PHP'si (`provisioner.SistemPHPHavuzDizin/Servis`).** phpMyAdmin ve
+   webmail onarımları `/etc/php-fpm.d/…` ve `systemctl reload php-fpm` diyordu;
+   Debian'da havuz yanlış dizine yazılır, reload var olmayan bir birime giderdi.
+3. **UI servis listeleri.** `system/servis.go` (yeniden başlat düğmeleri) ve
+   `monitor/sunucu_log.go` (journal kaynakları) RHEL unit adlarıyla sabitti.
+   Debian'da her satır "absent" görünür, log ekranı boş dönerdi. Ayrıca
+   `sshd.service` Debian'da yalnız bir ALIAS'tır — journald kayıtları gerçek
+   unit adıyla (`ssh.service`) tutulduğu için `journalctl -u sshd` BOŞ döner.
+
+### Kota bölümü artık iki backend'i de kuruyor
+
+Faz 3'ün ayrımına uygun olarak seçim **aileye değil kök fs'e** bakıyor:
+
+| kök fs | kernel bayrağı | grub üretimi |
+|---|---|---|
+| xfs | `rootflags=uquota` | `grub2-mkconfig` + `grubby --update-kernel=ALL` (BLS) |
+| ext2/3/4 | `rootflags=usrquota` | `update-grub` / `grub-mkconfig` |
+| diğer (btrfs…) | — | kota desteklenmiyor, dürüstçe söyleniyor |
+
+ext tarafında reboot sonrası muhasebe dosyası gerektiği için bir kerelik
+`sanalcp-quotacheck.service` (oneshot, `ConditionPathExists=!/aquota.user`,
+`Before=quotaon.service`) kuruluyor. §4'teki "Faz 5'e kalan canlı sorular" hâlâ
+geçerli; bu servis klasik `quotacheck` yolunu kapsıyor.
+
+### Parite testi (installer ↔ osfam)
+
+`internal/osfam/installer_paritesi_test.go`: betik `SANALCP_TANIM_TESTI=1` ile
+source edilip (sisteme dokunmadan) **sahte bir `/etc/os-release`** verilir; ürettiği
+her paket/servis/kullanıcı adı `osfam`'ın aynı girdi için ürettiğiyle karşılaştırılır.
+Altı dağıtım kapsanıyor: AlmaLinux 9/10, Debian 12/13, Ubuntu 24.04/26.04.
+
+**Neden gerekli:** installer adları kurulum anında kendi tablosundan, panel ise
+çalışma anında `osfam`'dan çözüyor. İki tablo ayrışırsa installer bir şeyi kurar,
+panel başka bir adı arar — ve bu yalnız gerçek bir müşteri sunucusunda görülür.
+Test, tablolardan biri değiştirilerek doğrulandı (mutasyon: `bind9` → `bind9x`;
+test beklendiği gibi kırmızıya döndü).
 
 ---
 
@@ -270,13 +353,14 @@ Debian tarafında ek adımlar:
 | ~~**1**~~ | ✅ phpMap/KurulSurumler ikinci tablo, web kullanıcısı, servis adı haritası | düşük |
 | ~~**2**~~ | ✅ 6 dosyadaki paket yöneticisi çağrıları soyutlamaya taşındı | düşük |
 | ~~**3**~~ | ✅ Kota backend arayüzü + ext4 uygulaması | **yüksek** |
-| **4** | Installer soyutlaması + sury deposu | orta |
+| ~~**4**~~ | ✅ Installer soyutlaması + sury deposu (+ planda olmayan 3 Go boşluğu) | orta |
+| **4b** | Kurulumun çağırdığı ops betikleri: ftp-setup · mail-setup · redis-setup · repair · waf-setup | orta |
 | **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
 | **5b** | Canlı test: **Debian 13** (MariaDB 11.8 devreye girer) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
-**Faz 0-3 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
+**Faz 0-4 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
 çağrısı YOKTUR; hepsi `internal/osfam` üzerinden geçer. Kalan tek istisna
 `internal/system/cve.go` içindeki `cveRun`'dır ve o da yalnız RHEL'de erişilebilir
 (`GuvenlikGuncellemeDestekli` kapısı).
@@ -289,7 +373,28 @@ Faz 2'de ayrıca yapılanlar:
 - Hata özetleyici apt çıktısını da tanıyor (`E: Unable to locate package…`).
 - `sanalcp-optimize` sarmalayıcısı apt dalını içeriyor.
 
-Faz 3'te disk kotası XFS/ext4 backend'lerine ayrıldı; ayrıntısı §4'te. Sıradaki iş **Faz 4** (installer soyutlaması + sury deposu).
+Faz 3'te disk kotası XFS/ext4 backend'lerine ayrıldı; ayrıntısı §4'te.
+Faz 4'te installer soyutlandı ve sury deposu eklendi; ayrıntısı §5'te.
+
+**Sıradaki iş Faz 4b: ops betikleri.** Installer bittiğinde kurulum Debian'da
+sonuna kadar akıyor, ama son adımlarda çağırdığı ops betikleri hâlâ RHEL-özgü.
+Denetim sonucu (RHEL-özgü çağrı sayısı / satır):
+
+| Betik | RHEL-özgü | Zorluk |
+|---|---|---|
+| `sanalcp-repair` | 16 / 275 | orta — çoğu SELinux, Debian'da atlanacak |
+| `sanalcp-mail-setup.sh` | 13 / 277 | orta — postfix/dovecot yolları büyük ölçüde ortak |
+| `sanalcp-update` | 9 / 402 | düşük |
+| `sanalcp-ftp-setup` | 6 / 120 | 🔴 **yüksek** — ad değişimi YETMEZ |
+| `sanalcp-redis-setup.sh` | 4 / 73 | düşük — paket/birim/conf dizini adı |
+| `sanalcp-waf-setup` | 3 / 261 | düşük |
+
+> 🔴 **Pure-FTPd tuzağı.** Debian'da `pure-ftpd-mysql` yapılandırması RHEL'deki
+> tek `pure-ftpd.conf` dosyasıyla DEĞİL, `/etc/pure-ftpd/conf/` altında **direktif
+> başına bir dosya** düzeniyle çalışır (`pure-ftpd-wrapper` bunları komut satırı
+> argümanına çevirir) ve MySQL yapılandırması `/etc/pure-ftpd/db/mysql.conf`
+> yolundadır. Bu, isim haritasıyla çözülecek bir fark değil; ayrı bir kol gerekir.
+> FTP olmadan panelin geri kalanı çalışır, bu yüzden Faz 4b'nin son maddesi olabilir.
 
 Faz 5 sırası bilinçlidir: **5a'da yalnız "dağıtım ailesi" değişkeni**, 5b'de üzerine
 "MariaDB sürümü" değişkeni biner. Tersi sırada bir hata çıksa hangisinden geldiği

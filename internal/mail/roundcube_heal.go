@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"sanalcp/internal/provisioner"
 )
 
 // roundcubeConfig: Roundcube ana yapılandırması (paket değişkeni — testler
@@ -80,8 +82,9 @@ func HealRoundcubeSMTP(ctx context.Context) {
 	// php-fpm opcache'i eski config'i tutabilir; reload en iyi çabadır.
 	rctx, iptal := context.WithTimeout(ctx, 15*time.Second)
 	defer iptal()
-	if out, err := exec.CommandContext(rctx, "systemctl", "reload", "php-fpm").CombinedOutput(); err != nil {
-		_, _ = exec.CommandContext(rctx, "systemctl", "restart", "php-fpm").CombinedOutput()
+	fpm := provisioner.SistemPHPServis() // RHEL "php-fpm" · Debian "php8.3-fpm"
+	if out, err := exec.CommandContext(rctx, "systemctl", "reload", fpm).CombinedOutput(); err != nil {
+		_, _ = exec.CommandContext(rctx, "systemctl", "restart", fpm).CombinedOutput()
 		_ = out
 	}
 	log.Printf("roundcube smtp onarımı uygulandı (%s) — webmail giden e-posta kimlik doğrulaması düzeltildi", roundcubeConfig)

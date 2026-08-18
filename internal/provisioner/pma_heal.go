@@ -33,9 +33,14 @@ const (
 	pmaSignonDir  = "/opt/sanalcp/pma-signon"
 	pmaSignonPath = "/opt/sanalcp/pma-signon/pma-signon.php"
 	pmaTokenPath  = "/etc/sanalcp/pma-internal.token"
-	pmaPoolPath   = "/etc/php-fpm.d/phpmyadmin.conf"
 	pmaConfigPath = "/opt/phpmyadmin/config.inc.php"
 )
+
+// pmaPoolPath: phpMyAdmin FPM havuzu — dizin aileye göre değişir (RHEL
+// /etc/php-fpm.d, Debian /etc/php/8.3/fpm/pool.d).
+func pmaPoolPath() string {
+	return filepath.Join(SistemPHPHavuzDizin(), "phpmyadmin.conf")
+}
 
 // pmaSignonPHP: signon endpoint'in KANONİK içeriği. 🔴 PMA_single_signon_host = 'localhost'
 // (DAİMA socket — web-host'tan TÜRETME). Bu içerik assets/phpmyadmin/pma-signon.php ile
@@ -120,7 +125,7 @@ func mariadbSocket() string {
 // ensurePMAStartup: phpMyAdmin cloud/socket düzeltmelerini idempotent uygular. Panel host'unda
 // pma kurulu değilse (hiçbir pma dosyası yok) sessiz gecer.
 func ensurePMAStartup() {
-	pmaKurulu := dirVar(pmaSignonDir) || dosyaVar(pmaPoolPath) || dirVar("/opt/phpmyadmin")
+	pmaKurulu := dirVar(pmaSignonDir) || dosyaVar(pmaPoolPath()) || dirVar("/opt/phpmyadmin")
 	if !pmaKurulu {
 		return // bu host'ta phpMyAdmin yok
 	}
@@ -189,7 +194,7 @@ var pmaSocketLineRe = regexp.MustCompile(`(?m)^\s*php_value\[(?:mysqli|pdo_mysql
 // (GCP'de TCP dış-IP yerine socket → @localhost user'a bağlanır). Idempotent; eklenirse
 // base php-fpm reload edilir (pool bu master'da dinler).
 func ensurePMAPoolSocket(sock string) {
-	cur, err := os.ReadFile(pmaPoolPath)
+	cur, err := os.ReadFile(pmaPoolPath())
 	if err != nil {
 		return // pool yok
 	}
@@ -203,11 +208,11 @@ func ensurePMAPoolSocket(sock string) {
 		yeni = append(yeni, '\n')
 	}
 	yeni = append(yeni, []byte(add)...)
-	if err := os.WriteFile(pmaPoolPath, yeni, 0644); err != nil {
+	if err := os.WriteFile(pmaPoolPath(), yeni, 0644); err != nil {
 		log.Printf("pma heal: pool socket yazılamadı: %v", err)
 		return
 	}
-	_, _ = exec.Command("systemctl", "reload-or-restart", "php-fpm").CombinedOutput()
+	_, _ = exec.Command("systemctl", "reload-or-restart", SistemPHPServis()).CombinedOutput()
 	log.Printf("pma heal: phpmyadmin pool socket eklendi (%s) + php-fpm reload", sock)
 }
 
