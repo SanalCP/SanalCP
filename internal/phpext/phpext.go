@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 	"sanalcp/internal/phpsurum"
 
 	"github.com/go-chi/chi/v5"
@@ -39,9 +40,17 @@ func Surumler() []Surum {
 		gorulen[ds.Surum] = true
 		iniDir := "/etc/php.d"
 		peclBin := "/usr/bin/pecl"
-		if ds.Kaynak == "remi" {
+		switch ds.Kaynak {
+		case "remi":
 			iniDir = "/etc/opt/remi/php" + ds.Kod + "/php.d"
 			peclBin = "/opt/remi/php" + ds.Kod + "/root/usr/bin/pecl"
+		case "sury":
+			// Debian'da eklenti ini'leri mods-available'da tutulur ve
+			// phpenmod/phpdismod ile fpm/cli conf.d'sine sembolik bağlanır.
+			// Panel doğrudan fpm conf.d'ye yazar — tek sürüm için yeterli ve
+			// phpenmod bağımlılığı getirmez.
+			iniDir = "/etc/php/" + ds.Kod + "/fpm/conf.d"
+			peclBin = "/usr/bin/pecl"
 		}
 		out = append(out, Surum{
 			Surum:   ds.Surum,
@@ -264,22 +273,26 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 			"php-pecl-" + req.Paket + "3",
 		}
 	}
+	// Debian/Ubuntu (sury): eklentiler "php<sürüm>-<ad>" biçiminde paketlenir;
+	// Remi'nin "-php-pecl-" ara eki ve sürüm son ekleri YOKTUR.
+	if osfam.Mevcut().DebianMi() {
+		adaylar = []string{"php" + req.Surum + "-" + req.Paket}
+	}
 
 	dnfPkg := ""
 	for _, ad := range adaylar {
-		if exec.CommandContext(ctx, "dnf", "info", "--quiet", ad).Run() == nil {
+		if osfam.PaketMevcut(ctx, ad) {
 			dnfPkg = ad
 			break
 		}
 	}
 
 	if dnfPkg != "" {
-		// Prebuild paket var, dnf ile kur
-		cmd := exec.CommandContext(ctx, "dnf", "install", "-y", dnfPkg)
-		out, err := cmd.CombinedOutput()
+		// Hazır paket var, paket yöneticisiyle kur (PECL derlemesine gerek yok).
+		out, err := osfam.PaketKur(ctx, dnfPkg)
 		if err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError,
-				"dnf install fail: "+strings.TrimSpace(string(out)))
+				"paket kurulamadi: "+strings.TrimSpace(string(out)))
 			return
 		}
 		// FPM reload
@@ -288,7 +301,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 			"ok":      true,
 			"paket":   req.Paket,
 			"surum":   req.Surum,
-			"yontem":  "dnf",
+			"yontem":  "paket",
 			"dnf_pkg": dnfPkg,
 			"output":  string(out),
 		})

@@ -42,13 +42,17 @@ func optimizeWrapperIcerik(dil string) string {
 set -uo pipefail
 echo "════════ Server Optimization — $(date "+%Y-%m-%d %H:%M:%S") ════════"
 echo
-echo "▶ 1/2 · System package update (AlmaLinux)"
+echo "▶ 1/2 · System package update"
 if command -v dnf >/dev/null 2>&1; then
   dnf -y update
+elif command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef dist-upgrade
 elif command -v yum >/dev/null 2>&1; then
   yum -y update
 else
-  echo "  (dnf/yum not found — package update skipped)"
+  echo "  (no supported package manager found — package update skipped)"
 fi
 echo
 echo "▶ 2/2 · MariaDB / nginx / PHP performance tuning"
@@ -65,13 +69,17 @@ echo "════════ ✓ Optimization complete ═══════�
 set -uo pipefail
 echo "════════ Sunucu Optimizasyonu — $(date "+%Y-%m-%d %H:%M:%S") ════════"
 echo
-echo "▶ 1/2 · Sistem paket güncellemesi (AlmaLinux)"
+echo "▶ 1/2 · Sistem paket güncellemesi"
 if command -v dnf >/dev/null 2>&1; then
   dnf -y update
+elif command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef dist-upgrade
 elif command -v yum >/dev/null 2>&1; then
   yum -y update
 else
-  echo "  (dnf/yum bulunamadı — paket güncellemesi atlandı)"
+  echo "  (desteklenen paket yöneticisi bulunamadı — paket güncellemesi atlandı)"
 fi
 echo
 echo "▶ 2/2 · MariaDB / nginx / PHP performans ayarı"

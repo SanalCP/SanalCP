@@ -233,9 +233,9 @@ Debian tarafında ek adımlar:
 
 | Faz | İş | Risk |
 |---|---|---|
-| **0** | `internal/osfam` + tespit + birim testler | düşük |
-| **1** | phpMap/PHPSurumler ikinci tablo, nginx kullanıcısı, servis adı haritası | düşük |
-| **2** | 6 dosyadaki paket yöneticisi çağrılarını soyutlamaya taşı | düşük |
+| ~~**0**~~ | ✅ `internal/osfam` + tespit + birim testler | düşük |
+| ~~**1**~~ | ✅ phpMap/KurulSurumler ikinci tablo, web kullanıcısı, servis adı haritası | düşük |
+| ~~**2**~~ | ✅ 6 dosyadaki paket yöneticisi çağrıları soyutlamaya taşındı | düşük |
 | **3** | Kota backend arayüzü + ext4 uygulaması | **yüksek** |
 | **4** | Installer soyutlaması + sury deposu | orta |
 | **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
@@ -243,7 +243,20 @@ Debian tarafında ek adımlar:
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
-Faz 0-2 birbirini besliyor ve tek oturumda bitebilir. Faz 3 ayrı ve dikkat isteyen iş.
+**Faz 0-2 tamamlandı (2026-08-18).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
+çağrısı YOKTUR; hepsi `internal/osfam` üzerinden geçer. Kalan tek istisna
+`internal/system/cve.go` içindeki `cveRun`'dır ve o da yalnız RHEL'de erişilebilir
+(`GuvenlikGuncellemeDestekli` kapısı).
+
+Faz 2'de ayrıca yapılanlar:
+- PHP sürüm yönetimi (`phpsurum`) üçüncü kaynağı tanıyor: `remi` · `appstream` · **`sury`**.
+  sury'de paket adları `php<sürüm>-<eklenti>`; eklenti demeti Remi'nin birebir çevirisi
+  değil (`mysqlnd`→`mysql`, `pdo` ve `json` ayrı paket değil).
+- PHP eklenti kurulumu (`phpext`) sury paket adlarını ve `conf.d` ini dizinini tanıyor.
+- Hata özetleyici apt çıktısını da tanıyor (`E: Unable to locate package…`).
+- `sanalcp-optimize` sarmalayıcısı apt dalını içeriyor.
+
+Faz 3 ayrı ve dikkat isteyen iş.
 
 Faz 5 sırası bilinçlidir: **5a'da yalnız "dağıtım ailesi" değişkeni**, 5b'de üzerine
 "MariaDB sürümü" değişkeni biner. Tersi sırada bir hata çıksa hangisinden geldiği

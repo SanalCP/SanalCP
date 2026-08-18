@@ -13,6 +13,18 @@ func TestPaketMevcutCacheOnly(t *testing.T) {
 	// Gerçek arka-plan goroutine'ini başlatMA: sweeperOnce'ı boş fonk. ile tüket → deterministik.
 	sweeperOnce.Do(func() {})
 
+	// DesteklenenSurumler artık işletim sistemi ailesine göre seçiliyor
+	// (RHEL: remi, Debian: sury). Bu test paket ADLANDIRMASINI değil, "istek
+	// yolu asla paket yöneticisine gitmez" sözleşmesini doğrular; bu yüzden
+	// listeyi sabitleyip testi çalıştığı dağıtımdan bağımsız kılıyoruz.
+	eskiListe := DesteklenenSurumler
+	DesteklenenSurumler = []SurumMeta{
+		{"8.1", "81", "remi"},
+		{"8.2", "82", "remi"},
+		{"8.3", "", "appstream"},
+	}
+	defer func() { DesteklenenSurumler = eskiListe }()
+
 	var probeCalls int64
 	old := dnfProbe
 	dnfProbe = func(pkg string) bool { // dnf'e ASLA gitmeyen sahte prob

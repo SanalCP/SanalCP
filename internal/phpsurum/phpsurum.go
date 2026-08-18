@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 // DesteklenenSurumler: panelin sunduğu PHP sürümleri. 🔴 5.6/7.0-7.3 EOL ve AlmaLinux 10
@@ -23,22 +24,44 @@ import (
 // AlmaLinux 10 Remi'nin gerçekten sağladığı: 7.4, 8.0-8.6 (8.6 alpha) + AppStream native 8.3.
 // Gerçek kurulabilirlik ayrıca RUNTIME'da dnf ile doğrulanır (Kurulabilir alanı, cache'li) →
 // bir sürüm OS'tan kalkarsa panel zarif biçimde "kurulamaz" gösterir, ham dnf hatası patlamaz.
-var DesteklenenSurumler = []SurumMeta{
-	{"7.4", "74", "remi"},
-	{"8.0", "80", "remi"},
-	{"8.1", "81", "remi"},
-	{"8.2", "82", "remi"},
-	{"8.3", "", "appstream"}, // AppStream native
-	{"8.3", "83", "remi"},
-	{"8.4", "84", "remi"},
-	{"8.5", "85", "remi"},
-	{"8.6", "86", "remi"},
+var DesteklenenSurumler = desteklenenSurumlerSec()
+
+func desteklenenSurumlerSec() []SurumMeta {
+	if osfam.Mevcut().DebianMi() {
+		// deb.sury.org: her sürüm aynı kalıp, "sistem PHP'si" ayrıcalığı yok.
+		// Kod alanı Debian'da sürümün kendisidir ("8.3"), Remi'deki gibi
+		// sıkıştırılmış biçim ("83") DEĞİL — paket adları php8.3-fpm şeklindedir.
+		return []SurumMeta{
+			{"7.4", "7.4", "sury"},
+			{"8.0", "8.0", "sury"},
+			{"8.1", "8.1", "sury"},
+			{"8.2", "8.2", "sury"},
+			{"8.3", "8.3", "sury"},
+			{"8.4", "8.4", "sury"},
+			{"8.5", "8.5", "sury"},
+			{"8.6", "8.6", "sury"},
+		}
+	}
+	return []SurumMeta{
+		{"7.4", "74", "remi"},
+		{"8.0", "80", "remi"},
+		{"8.1", "81", "remi"},
+		{"8.2", "82", "remi"},
+		{"8.3", "", "appstream"}, // AppStream native
+		{"8.3", "83", "remi"},
+		{"8.4", "84", "remi"},
+		{"8.5", "85", "remi"},
+		{"8.6", "86", "remi"},
+	}
 }
 
 type SurumMeta struct {
-	Surum  string `json:"surum"`
-	Kod    string `json:"kod"`    // "74", "82" — Remi paket prefix
-	Kaynak string `json:"kaynak"` // "remi" | "appstream"
+	Surum string `json:"surum"`
+	// Kod: paket adı eki. Remi'de sıkıştırılmış ("74", "82"), sury'de
+	// sürümün kendisi ("7.4", "8.2") — paket adları buna göre kurulur.
+	Kod string `json:"kod"`
+	// Kaynak: "remi" | "appstream" (RHEL) · "sury" (Debian/Ubuntu)
+	Kaynak string `json:"kaynak"`
 }
 
 type Surum struct {
@@ -93,10 +116,10 @@ func sweepLoop() {
 func sweepOnce() {
 	yeni := map[string]bool{}
 	for _, m := range DesteklenenSurumler {
-		if m.Kaynak != "remi" {
-			continue // appstream daima mevcut; dnf'e sormaya gerek yok
+		if m.Kaynak == "appstream" {
+			continue // sistem PHP'si daima mevcut; paket yöneticisine sormaya gerek yok
 		}
-		pkg := "php" + m.Kod + "-php-fpm"
+		pkg := fpmPaketAdi(m)
 		if _, done := yeni[pkg]; done {
 			continue
 		}
@@ -113,12 +136,12 @@ func sweepOnce() {
 func dnfPaketVar(pkg string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), dnfTimeout)
 	defer cancel()
-	if exec.CommandContext(ctx, "dnf", "-q", "list", "--installed", pkg).Run() == nil {
+	if osfam.PaketKurulu(ctx, pkg) {
 		return true
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), dnfTimeout)
 	defer cancel2()
-	return exec.CommandContext(ctx2, "dnf", "-q", "list", "--available", pkg).Run() == nil
+	return osfam.PaketMevcut(ctx2, pkg)
 }
 
 // paketMevcut: phpXX-php-fpm paketi bu OS'ta (Remi) kurulabilir/kurulu mu?
@@ -131,7 +154,7 @@ func paketMevcut(m SurumMeta) bool {
 		return true // sistem default her zaman mevcut
 	}
 	StartAvailabilitySweeper() // idempotent; boot'ta main zaten başlatır, burada güvence
-	pkg := "php" + m.Kod + "-php-fpm"
+	pkg := fpmPaketAdi(m)
 	availMu.Lock()
 	v, ok := availCache[pkg]
 	availMu.Unlock()
@@ -144,7 +167,16 @@ func paketMevcut(m SurumMeta) bool {
 
 // Yollar(meta): yuklenmis olsa olsa nerede olur
 func yollar(m SurumMeta) (poolDir, sockDir, service, phpBin string) {
-	if m.Kaynak == "appstream" {
+	switch m.Kaynak {
+	case "sury":
+		// deb.sury.org düzeni. Soketler tüm sürümlerde /run/php altındadır;
+		// soket adı kiracıya göre verildiği için çakışma olmaz
+		// (bkz. provisioner.phpMapDebian).
+		return "/etc/php/" + m.Kod + "/fpm/pool.d",
+			"/run/php",
+			"php" + m.Kod + "-fpm",
+			"/usr/bin/php" + m.Kod
+	case "appstream":
 		return "/etc/php-fpm.d", "/run/php-fpm", "php-fpm", "/usr/bin/php"
 	}
 	pre := "/opt/remi/php" + m.Kod + "/root"
@@ -152,6 +184,28 @@ func yollar(m SurumMeta) (poolDir, sockDir, service, phpBin string) {
 		"/var/opt/remi/php" + m.Kod + "/run/php-fpm",
 		"php" + m.Kod + "-php-fpm",
 		pre + "/usr/bin/php"
+}
+
+// kaldirDeseni: bir PHP sürümünün TÜM paketlerini eşleyen kaldırma deseni.
+//
+// 🔴 Aile farkı önemlidir. dnf glob'u shell tarzı yorumlar ("php74-*" beklendiği
+// gibi eşleşir). apt ise özel karakter içeren argümanı REGEX sayar; "php8.3-*"
+// regex olarak "php8" + herhangi bir karakter + "3-" (sıfır veya daha fazla '-')
+// demektir ve istenmeyen paketleri eşleyebilir. Bu yüzden Debian'da nokta
+// kaçırılmış, başa çapa konmuş açık bir regex üretilir.
+func kaldirDeseni(m SurumMeta) string {
+	if m.Kaynak == "sury" {
+		return "^php" + strings.ReplaceAll(m.Kod, ".", `\.`) + "-"
+	}
+	return "php" + m.Kod + "-*"
+}
+
+// fpmPaketAdi: bir sürümün PHP-FPM paket adı (kurulum/kaldırma ve varlık sınama).
+func fpmPaketAdi(m SurumMeta) string {
+	if m.Kaynak == "sury" {
+		return "php" + m.Kod + "-fpm"
+	}
+	return "php" + m.Kod + "-php-fpm"
 }
 
 // Discover: tek bir sürümün dolu metadata'sini doldur
@@ -251,8 +305,43 @@ var DefaultBundle = []string{
 	"php-ldap",
 }
 
+// suryBundle: Debian/Ubuntu (deb.sury.org) eklenti paketleri.
+//
+// 🔴 DefaultBundle'ın birebir çevirisi DEĞİLDİR; bazı eklentiler Debian'da
+// başka adla paketlenir ya da hiç ayrı paket değildir:
+//
+//	php-mysqlnd -> mysql      (sürücü adı farklı)
+//	php-pdo     -> (yok)      PDO çekirdekte, ayrı paket değil
+//	php-opcache -> opcache    (php-cli/fpm ile birlikte gelir ama ayrı da vardır)
+//	php-json    -> (yok)      PHP 8+'da çekirdekte
+//
+// Sürüm eki başa eklenerek "php<sürüm>-<eklenti>" üretilir.
+var suryBundle = []string{
+	"fpm",
+	"cli",
+	"mysql",
+	"mbstring",
+	"bcmath",
+	"intl",
+	"gd",
+	"soap",
+	"opcache",
+	"xml",
+	"zip",
+	"pgsql",
+	"ldap",
+	"curl",
+}
+
 // PaketAdlari: bir sürüm için tüm paket isimlerini hazırla
 func PaketAdlari(m SurumMeta) []string {
+	if m.Kaynak == "sury" {
+		out := make([]string, 0, len(suryBundle))
+		for _, ek := range suryBundle {
+			out = append(out, "php"+m.Kod+"-"+ek)
+		}
+		return out
+	}
 	pre := "php"
 	if m.Kaynak == "remi" {
 		pre = "php" + m.Kod + "-php"
@@ -276,12 +365,21 @@ func dnfHataOzet(out string) string {
 		}
 		son = ln
 		low := strings.ToLower(ln)
-		if strings.Contains(low, "no match") || strings.HasPrefix(low, "error") || strings.Contains(low, "nothing provides") {
+		switch {
+		// dnf
+		case strings.Contains(low, "no match"),
+			strings.HasPrefix(low, "error"),
+			strings.Contains(low, "nothing provides"),
+			// apt: "E: Unable to locate package php8.9-fpm",
+			//      "E: Package 'x' has no installation candidate"
+			strings.HasPrefix(ln, "E: "),
+			strings.Contains(low, "unable to locate package"),
+			strings.Contains(low, "no installation candidate"):
 			return ln
 		}
 	}
 	if son == "" {
-		return "bilinmeyen dnf hatası"
+		return "bilinmeyen paket yöneticisi hatası"
 	}
 	return son
 }
@@ -331,9 +429,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 	defer cancel()
-	args := append([]string{"install", "-y"}, PaketAdlari(m)...)
-	cmd := exec.CommandContext(ctx, "dnf", args...)
-	out, err := cmd.CombinedOutput()
+	out, err := osfam.PaketKur(ctx, PaketAdlari(m)...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,
 			"PHP "+req.Surum+" kurulamadı: "+dnfHataOzet(string(out)))
@@ -415,9 +511,7 @@ func (h *Handlers) Kaldir(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
-	args := append([]string{"remove", "-y"}, "php"+m.Kod+"-*")
-	cmd := exec.CommandContext(ctx, "dnf", args...)
-	out, err := cmd.CombinedOutput()
+	out, err := osfam.PaketSil(ctx, kaldirDeseni(m))
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,
 			"PHP "+req.Surum+" kaldırılamadı: "+dnfHataOzet(string(out)))
