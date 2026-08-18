@@ -112,7 +112,7 @@ if [ "$DRY" = 1 ]; then
   step "$(t "DRY-RUN — değişecekler (uygulanmadı)" "DRY RUN — what would change (nothing applied)")"
   echo "  • $BIN  $(t "(binary değişmişse swap + yedek $BIN.bak)" "(swapped if changed + backed up to $BIN.bak)")"
   echo "  • $FDIST/  $(t "(frontend-dist yeniden yazılır)" "(frontend-dist rewritten)")"
-  echo "  • $MIGR/  $(t "(yeni .sql eklenir, mevcutlar korunur)" "(new .sql files added, existing ones kept)")"
+  echo "  • $MIGR/  $(t "(yeni .sql eklenir; mevcut dizin ${MIGR}.bak olarak yedeklenir → rollback geri yükler)" "(new .sql files added; current directory backed up as ${MIGR}.bak → restored on rollback)")"
   echo "  • $(t "/usr/local/bin ops-tool'lar" "/usr/local/bin ops tools")" "+ $SCRIPTS"
   echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} $(t "(timer enable --now)" "(timer enable --now)")"
   echo "  • $(t "migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)" "panel DB dump BEFORE migrations → $DBDIR  (no dump is taken in DRY RUN)")"
@@ -204,7 +204,16 @@ if [ -f "$A/frontend-dist.tar.gz" ]; then
 fi
 
 # 8) migrations (idempotent — applied at startup). We already took the dump in step 4.
+# A FULL COPY IS TAKEN BEFORE EXTRACTION. If a rollback restores the binary and the DB but
+# NOT the migration FILES, the panel CANNOT COME UP: runMigrations stores the sha256 of every
+# applied migration in schema_migrations; restoring the DB rewinds that ledger, but if the
+# NEW files are still on disk the runner reports "content changed" and log.Fatalf's — so the
+# OLD binary hits the same wall. This is exactly what happened in 0.7.0: a recoverable
+# rollback turned into a full outage. tar -C MERGES files (it never deletes), so the restore
+# must REPLACE the whole directory.
 if [ -f "$A/migrations.tar.gz" ]; then
+  rm -rf "${MIGR}.bak"
+  [ -d "$MIGR" ] && cp -a "$MIGR" "${MIGR}.bak"
   mkdir -p "$MIGR"; tar xzf "$A/migrations.tar.gz" -C "$MIGR"
   ok "$(t "migration'lar senkron ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)" "migrations in sync ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)")"
 fi
@@ -353,6 +362,18 @@ else
   install -m 0755 "$BIN.bak" "$BIN"
   [ -f "$SEED.bak" ] && install -m 0755 "$SEED.bak" "$SEED" 2>/dev/null || true
   command -v restorecon >/dev/null && restorecon "$BIN" >/dev/null 2>&1 || true
+
+  # Restore the migration FILES too (see step 8). The DB is about to be rewound to its
+  # pre-update state; the migrations on disk must belong to that same moment, otherwise the
+  # checksum ledger and the disk disagree and the OLD binary won't start either.
+  if [ -d "${MIGR}.bak" ]; then
+    rm -rf "${MIGR:?}"
+    cp -a "${MIGR}.bak" "$MIGR"
+    sync
+    ok "$(t "migration dosyaları güncelleme öncesine döndürüldü ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)" "migration files restored to their pre-update state ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)")"
+  else
+    warn "$(t "migration yedeği yok — diskteki migration'lar YENİ sürümden kalma olabilir" "no migration backup — the migrations on disk may be left over from the NEW version")"
+  fi
 
   # Restore the DB too: the new version's migration may have changed the schema, and the
   # OLD binary can't run against that schema → a binary-only rollback isn't enough. The

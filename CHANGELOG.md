@@ -13,6 +13,33 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.7.x — Otomatik saldırı engelleme ve yönetim API'si
 
+**0.7.1** (2026-08-18) — **acil yama, 0.7.0 kullanılmamalıdır**
+
+0.7.0 ile gelen `0068_api_tokenlari.sql`, `api_tokenlari.user_id` kolonunu `BIGINT`
+(signed) tanımlıyordu; oysa referans verdiği `users.id` panelin ilk sürümünden beri
+`BIGINT UNSIGNED`. InnoDB, foreign key'de imza uyuşmazlığını reddeder:
+
+```
+ERROR 1005 (HY000): Can't create table `panel`.`api_tokenlari`
+(errno: 150 "Foreign key constraint is incorrectly formed")
+```
+
+Migration başarısız olunca panel açılışta duruyor ve **hiç ayağa kalkmıyordu**. Bu,
+0.7.0'a güncelleyen ve sıfırdan kuran tüm sunucuları etkiliyordu. 0.7.1 yalnızca bu
+kolonu `BIGINT UNSIGNED` yapar; başka davranış değişikliği yoktur.
+
+- **Geri dönüş (rollback) güçlendirildi.** `sanalcp-update` başarısız bir güncellemede
+  binary'yi ve veritabanını güncelleme öncesine döndürüyor, ancak migration
+  **dosyalarını** diskte yeni sürümden bırakıyordu. Migration çalıştırıcısı uygulanmış
+  her dosyanın sha256'sını tuttuğu için, veritabanı geri alınıp diskteki dosya yeni
+  kalınca eski binary de açılamıyor ve kurtarılabilir bir geri dönüş tam kesintiye
+  dönüşüyordu. Artık migration dizininin tam kopyası güncelleme öncesinde alınıyor ve
+  geri dönüşte yerine konuyor. Bu iyileştirme, sunucudaki güncelleme aracı yenilendiği
+  için **bir sonraki** güncellemeden itibaren geçerlidir.
+- **Migration smoke testi eklendi.** Depodaki tüm migration'lar boş bir veritabanına
+  baştan sona uygulanıp idempotentlikleri doğrulanıyor. Bu hata hiçbir teste
+  takılmamıştı çünkü migration'lar test sırasında hiç çalıştırılmıyordu.
+
 **0.7.0** (2026-08-18)
 
 **Otomatik saldırı engelleme (fail2ban muadili) — YENİ.** Panel, sistem servislerinin
