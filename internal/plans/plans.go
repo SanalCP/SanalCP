@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/kaynaklimit"
 	"sanalcp/internal/middleware"
 	"sanalcp/internal/provisioner"
 
@@ -298,6 +299,11 @@ func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 	// domainlerin vhost'unu arka planda yeniden render et ki WAF direktifi guncellensin.
 	// (nginx -t gate + rollback her render'da korur; hata log'lanir, panel bloklanmaz.)
 	go h.wafPlanReapply(id)
+	// Kaynak limitleri (CPU/RAM/görev, disk G/Ç, XFS kota, MySQL Governor) de plandan
+	// gelir. Bunlar eskiden YALNIZ panel yeniden başlarken (HealTenantFPM) mevcut
+	// tenant'lara iniyordu — yönetici planın CPU limitini değiştirip "hiçbir şey olmadı"
+	// görüyordu. Artık WAF ile aynı desende, kaydeder kaydetmez arka planda uygulanır.
+	go h.kaynakPlanReapply(id)
 	row := h.DB.QueryRowContext(r.Context(), selectAll+" WHERE id=?", id)
 	saved, _ := scan(row)
 	httpx.WriteJSON(w, http.StatusOK, saved)
@@ -321,6 +327,32 @@ func (h *Handlers) wafPlanReapply(planID int64) {
 	for _, did := range ids {
 		if err := provisioner.WAFUygula(h.DB, did); err != nil {
 			log.Printf("waf plan reapply domain=%d: %v", did, err)
+		}
+	}
+}
+
+// kaynakPlanReapply: bu plana bagli tum domainlere plan kaynak limitlerini yeniden
+// uygular. LimitleriReAssert kullanilir — slice'a `systemctl set-property --runtime`
+// ile CANLI yazar, calisan surecleri OLDURMEZ ve idempotenttir; plani olmayan
+// domainlerde sessizce hicbir sey yapmaz. Arka plan goroutine: panel yanitini
+// bloklamaz, hata log'lanir.
+func (h *Handlers) kaynakPlanReapply(planID int64) {
+	rows, err := h.DB.Query(`SELECT id FROM domains WHERE plan_id=?`, planID)
+	if err != nil {
+		log.Printf("kaynak plan reapply plan=%d: domain listesi okunamadi: %v", planID, err)
+		return
+	}
+	var ids []int64
+	for rows.Next() {
+		var did int64
+		if rows.Scan(&did) == nil {
+			ids = append(ids, did)
+		}
+	}
+	rows.Close()
+	for _, did := range ids {
+		if err := kaynaklimit.LimitleriReAssert(context.Background(), h.DB, did); err != nil {
+			log.Printf("kaynak plan reapply domain=%d: %v", did, err)
 		}
 	}
 }

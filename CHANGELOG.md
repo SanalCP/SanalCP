@@ -13,6 +13,24 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.6.x — Yedekleme, oturum güvenliği ve arayüz sadeleştirme
 
+**0.6.5** (2026-08-18)
+- **Düzeltme — plan kaynak limitleri artık anında uygulanıyor.** Bir hizmet planının
+  CPU/RAM/görev, disk G/Ç, XFS kota veya MySQL Governor limitlerini değiştirdiğinizde bu
+  değerler o plandaki mevcut domainlere **yalnızca panel yeniden başlarken** iniyordu
+  (`HealTenantFPM`); yönetici planı kaydedip "hiçbir şey değişmedi" görüyordu. Artık plan
+  kaydedilir kaydedilmez arka planda uygulanıyor — WAF ayarında zaten var olan desenin aynısı.
+  Uygulama `LimitleriReAssert` üzerinden yapılır: slice'a `systemctl set-property --runtime`
+  ile canlı yazar, **çalışan süreçleri öldürmez**, idempotenttir.
+- README (tr+en) yeniden konumlandırıldı: **ücretsiz paneller arasındaki yeri** ve asıl
+  farklılaştırıcısı olan **kaynak izolasyonu katmanı** (CloudLinux CageFS/LVE/MySQL Governor
+  muadilleri) en üste taşındı; hangi katmanın hangi çekirdek aracıyla kurulduğu tabloya döküldü.
+- README'ye **"Şu an yapmadıklarımız"** bölümü eklendi: Debian/Ubuntu, otomatik saldırı
+  engelleme, kapsamlı REST API, Node.js/Python, slave DNS, WordPress dışı uygulama kurucu.
+- **"Her zaman ücretsiz"** taahhüdü yazıldı: pro sürüm, özellik kilidi, lisans anahtarı ve
+  kullanıcı/domain sınırı yok; MIT. WHMCS modülünün neden planlanmadığı açıklandı.
+- AlmaLinux 9.4+ desteği README'de görünür hâle getirildi (0.5.24'ten beri vardı, yalnız
+  "AlmaLinux 10" yazıyordu). Disk kotası için XFS gereksinimi sistem gereksinimlerine eklendi.
+
 **0.6.4** (2026-08-18)
 - README'ye **"Kimlik doğrulama ve hesap modeli"** bölümü eklendi: `root` parolasının neden
   `/etc/shadow`'da tutulduğu (kilitlenmeye karşı kurtarma yolu) ve günlük yönetim için

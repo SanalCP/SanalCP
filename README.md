@@ -6,27 +6,75 @@
 
 # SanalCP
 
-Boş bir **AlmaLinux 10** sunucuyu tek komutla komple bir hosting kontrol paneline çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
+**Ücretsiz ve açık kaynak hosting kontrol paneli.** Boş bir **AlmaLinux** sunucuyu tek komutla komple bir barındırma sistemine çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + e-posta + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
+
+> **Her zaman ücretsiz.** Pro sürüm, özellik kilidi, lisans anahtarı, kullanıcı/domain
+> sınırı yoktur. Panelin tamamı **MIT** lisanslıdır — ticari kullanım dahil, kısıtsız.
+> Ücretli bir sürüm çıkarmayı planlamıyoruz.
+
+## Neden bir panel daha?
+
+Ücretsiz paneller (HestiaCP, CloudPanel, CWP, FastPanel) barındırma işini büyük ölçüde
+çözüyor. Ama paylaşımlı barındırmanın asıl derdi olan **kaynak izolasyonunu** çözmüyorlar:
+tek bir müşterinin sitesi CPU'yu, diski veya veritabanını tüketince sunucudaki herkes
+etkileniyor. Bunun ticari çözümü CloudLinux (CageFS + LVE + MySQL Governor) ve ücretli.
+
+SanalCP bu katmanı **çekirdeğin kendi araçlarıyla, ücretsiz** kuruyor:
+
+| Katman | Nasıl | CloudLinux muadili |
+|---|---|---|
+| **CPU / RAM / görev limiti** | domain başına systemd slice — `CPUQuota`, `MemoryMax`, `TasksMax` | LVE |
+| **Disk G/Ç limiti** | slice içinde mutlak okuma/yazma MB/s + IOPS throttle | LVE (io/iops) |
+| **Veritabanı limiti** | native MariaDB `MAX_USER_CONNECTIONS`, `MAX_QUERIES_PER_HOUR`, `MAX_UPDATES_PER_HOUR` | MySQL Governor |
+| **Disk kotası** | per-tenant XFS disk + inode kotası | — |
+| **Dosya sistemi izolasyonu** | domain başına ayrı Linux kullanıcısı + ayrı PHP-FPM havuzu + `open_basedir` + kiracıya ait `session.save_path` / `upload_tmp_dir` | CageFS |
+
+Limitler hizmet planına bağlıdır: plan üzerinde değeri değiştirirsiniz, panel ilgili
+kiracılara yeniden uygular. **Kernel modülü, yamalı kernel veya ek lisans gerekmez.**
+
+Bunun yanında:
+
+- **SELinux `Enforcing` ile çalışır** — kapatmanızı istemez.
+- **Tam e-posta yığını** dahildir (Postfix + Dovecot + OpenDKIM + Roundcube, otomatik DKIM/SPF/DMARC).
+- **Tek statik Go binary** + React arayüz; mobil uyumlu.
+- **Güncelleme geri alınabilir**: migration öncesi zorunlu veritabanı yedeği, sağlıksız
+  başlarsa binary **ve** veritabanı otomatik eski hâline döner.
 
 > ### ⚠️ Bu bir 0.x (beta) sürümüdür — okumadan kurmayın
 >
-> SanalCP genç bir projedir (ilk yayın: Temmuz 2026). Kod açık, testli ve güvenlik
-> tarafı ciddiye alınmıştır; ancak **cPanel/Plesk/DirectAdmin gibi yıllardır sahada
-> olan panellerin olgunluğunda değildir.**
+> SanalCP genç bir projedir (ilk yayın: Temmuz 2026) ve iki kişilik bir ekiple geliştirilir.
+> Kod açık, testli ve güvenlik tarafı ciddiye alınmıştır; ancak yıllardır sahada olan
+> panellerin saha tecrübesine **henüz** sahip değildir.
 >
 > - **Önerilen kullanım:** test/geliştirme sunucuları, kendi projeleriniz, değerlendirme.
 > - **Önerilmeyen kullanım:** yedeği olmayan, gelir getiren müşteri yükünü doğrudan
 >   taşımak. Böyle bir kullanım için önce ayrı bir sunucuda deneyin.
 > - **Kurulum yıkıcıdır:** betik boş bir sunucu varsayar; üzerinde çalışan bir servis
 >   olan makinede çalıştırmayın.
-> - Şu an eksik olanlar: WHMCS modülü, kapsamlı REST API, Debian/Ubuntu desteği,
->   fail2ban entegrasyonu, slave DNS. Yol haritasındalar — bkz. [CHANGELOG.md](CHANGELOG.md).
 >
 > Hata bildirimi ve eleştiri açıkça beklenir: [issue açın](https://github.com/sanalcp/sanalcp/issues).
 
+## Şu an yapmadıklarımız
+
+Dürüst olmak, sonradan hayal kırıklığı yaşatmaktan iyidir. Bu maddeler bugün **yoktur**;
+yol haritasındadırlar:
+
+| Eksik | Durum |
+|---|---|
+| **Debian / Ubuntu desteği** | Yalnızca AlmaLinux/RHEL ailesi (9.4+ / 10). Sıradaki en öncelikli iş. |
+| **Otomatik saldırı engelleme (fail2ban muadili)** | Güvenlik duvarında **elle** IP ban/whitelist var; panel girişinde kaba kuvvet koruması var. Sistem geneli (SSH/mail/FTP) otomatik ban **yok**. |
+| **Kapsamlı REST API** | Yalnızca site kullanıcısı için 3 uç var (`db:export`, `db:import`, `cache:purge`). Tam yönetim API'si yok. |
+| **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
+| **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
+| **WordPress dışı uygulama kurucu** | Tek tık kurulum yalnızca WordPress için. |
+
+> **WHMCS modülü yok ve planlanmıyor** — WHMCS ücretli bir üründür, biz ücretsiz kalmayı
+> tercih ediyoruz. Panel MIT lisanslı olduğu için isteyen kendi entegrasyonunu yazabilir;
+> bunu kolaylaştıracak yönetim API'si yol haritamızda.
+
 ## Tek satır kurulum
 
-Temiz bir AlmaLinux 10 (min. 2 GB RAM) sunucuda **root** olarak:
+Temiz bir AlmaLinux 9.4+ / 10 (min. 2 GB RAM) sunucuda **root** olarak:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
@@ -137,9 +185,11 @@ Panelin standart ayarları (güvenlik başlıkları, cache, "ek direktifler" ala
 
 ## Sistem gereksinimleri
 
-- **AlmaLinux 10** (RHEL 10 / Rocky 10 de çalışır)
+- **AlmaLinux 10** veya **AlmaLinux 9.4+** (aynı sürümdeki RHEL / Rocky de çalışır)
 - En az **2 GB RAM**, 2 vCPU (5 PHP sürümü + MariaDB + Valkey için)
 - Root erişimi + internet bağlantısı
+- Disk kotasının çalışması için kök dosya sistemi **XFS** olmalıdır (AlmaLinux varsayılanı).
+  ext4'te panel çalışır, yalnız per-tenant disk kotası devre dışı kalır.
 
 ## Kurulum sonrası yardımcı araçlar
 

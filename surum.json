@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.6.4",
-  "duyuru": "Belgelendirme ve hesap güvenliği sürümü. README'ye kimlik doğrulama ve hesap modeli bölümü eklendi: root parolasının neden /etc/shadow'da tutulduğu (kurtarma yolu) ve günlük yönetim için root'tan bağımsız, kendi bcrypt parolası olan yönetici hesabı açmanın nasıl yapıldığı açıkça anlatılıyor. root ile giriş yapan yöneticiye Kullanıcılar ekranında kendi hesabını açmasını öneren kapatılabilir bir bilgi kutusu eklendi. Sürüm geçmişi artık CHANGELOG.md dosyasında. README'de yer alan hatalı \"PAM ile doğrulanır\" ifadesi düzeltildi — root girişi PAM değil, /etc/shadow hash'i üzerinden (yescrypt native) doğrulanıyor. Ayrıca panelin 0.x beta durumu ve eksik özellikleri (WHMCS modülü, kapsamlı REST API, Debian/Ubuntu desteği, fail2ban, slave DNS) README'de açıkça belirtildi.",
+  "son_surum": "0.6.5",
+  "duyuru": "DÜZELTME: Hizmet planının kaynak limitlerini (CPU/RAM/görev, disk G/Ç, XFS kota, MySQL Governor) değiştirdiğinizde bu değerler o plandaki mevcut domainlere yalnızca panel yeniden başlarken uygulanıyordu — planı kaydedip hiçbir şey değişmemiş gibi görünüyordu. Artık kaydeder kaydetmez arka planda uygulanıyor; slice'a canlı yazılır, çalışan siteler etkilenmez. BELGELENDİRME: README yeniden yazıldı — panelin ücretsiz paneller arasındaki yeri, CloudLinux muadili kaynak izolasyon katmanının hangi çekirdek araçlarıyla kurulduğu, 'her zaman ücretsiz' taahhüdü (pro sürüm/özellik kilidi/lisans anahtarı yok, MIT) ve dürüst bir 'şu an yapmadıklarımız' listesi eklendi. AlmaLinux 9.4+ desteği README'de görünür hale getirildi; disk kotası için XFS gereksinimi belirtildi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-18"
 }

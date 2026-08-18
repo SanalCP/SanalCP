@@ -6,27 +6,74 @@
 
 # SanalCP
 
-Turns a blank **AlmaLinux 10** server into a complete hosting control panel with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + phpMyAdmin + firewall, all installed and configured automatically.
+**A free and open source hosting control panel.** Turns a blank **AlmaLinux** server into a complete hosting stack with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + email + phpMyAdmin + firewall, all installed and configured automatically.
+
+> **Free forever.** There is no pro edition, no feature gating, no license key, and no
+> user/domain limit. The entire panel is **MIT** licensed — commercial use included,
+> without restriction. We do not plan to release a paid edition.
+
+## Why another panel?
+
+Free panels (HestiaCP, CloudPanel, CWP, FastPanel) largely solve the hosting problem. What
+they don't solve is the core problem of shared hosting: **resource isolation.** When one
+customer's site consumes the CPU, the disk or the database, everyone on the server suffers.
+The commercial answer to this is CloudLinux (CageFS + LVE + MySQL Governor), and it costs money.
+
+SanalCP builds that layer **using the kernel's own facilities, for free**:
+
+| Layer | How | CloudLinux equivalent |
+|---|---|---|
+| **CPU / RAM / task limits** | a systemd slice per domain — `CPUQuota`, `MemoryMax`, `TasksMax` | LVE |
+| **Disk I/O limits** | absolute read/write MB/s + IOPS throttling inside the slice | LVE (io/iops) |
+| **Database limits** | native MariaDB `MAX_USER_CONNECTIONS`, `MAX_QUERIES_PER_HOUR`, `MAX_UPDATES_PER_HOUR` | MySQL Governor |
+| **Disk quota** | per-tenant XFS disk + inode quota | — |
+| **Filesystem isolation** | a separate Linux user per domain + a separate PHP-FPM pool + `open_basedir` + tenant-owned `session.save_path` / `upload_tmp_dir` | CageFS |
+
+Limits are attached to service plans: change a value on the plan and the panel re-applies it
+to the affected tenants. **No kernel module, no patched kernel, no extra license.**
+
+On top of that:
+
+- **Runs with SELinux `Enforcing`** — it never asks you to disable it.
+- **A full email stack** is included (Postfix + Dovecot + OpenDKIM + Roundcube, automatic DKIM/SPF/DMARC).
+- **A single static Go binary** plus a React UI; mobile friendly.
+- **Updates are reversible**: a database dump is mandatory before migrations, and if the new
+  version doesn't come up healthy, both the binary **and** the database roll back automatically.
 
 > ### ⚠️ This is a 0.x (beta) release — read before installing
 >
-> SanalCP is a young project (first release: July 2026). The code is open, tested, and
-> security has been taken seriously — but it **does not have the maturity of panels like
-> cPanel/Plesk/DirectAdmin that have been in the field for years.**
+> SanalCP is a young project (first release: July 2026), built by a two-person team. The code
+> is open, tested, and security has been taken seriously — but it does **not yet** have the
+> field experience of panels that have been around for years.
 >
 > - **Recommended:** test/development servers, your own projects, evaluation.
 > - **Not recommended:** carrying revenue-generating customer workloads without a backup.
 >   Try it on a separate server first.
 > - **The installer is destructive:** it assumes a blank server. Do not run it on a
 >   machine with services already running on it.
-> - Currently missing: WHMCS module, comprehensive REST API, Debian/Ubuntu support,
->   fail2ban integration, slave DNS. These are on the roadmap — see [CHANGELOG.md](CHANGELOG.md).
 >
 > Bug reports and criticism are explicitly welcome: [open an issue](https://github.com/sanalcp/sanalcp/issues).
 
+## What we don't do (yet)
+
+Being honest beats disappointing you later. These do **not** exist today; they are on the roadmap:
+
+| Missing | Status |
+|---|---|
+| **Debian / Ubuntu support** | AlmaLinux/RHEL family only (9.4+ / 10). The next priority. |
+| **Automatic intrusion banning (fail2ban equivalent)** | The firewall has **manual** IP ban/allow lists, and panel login has brute-force protection. There is **no** system-wide automatic banning (SSH/mail/FTP). |
+| **Comprehensive REST API** | Only 3 site-user endpoints exist (`db:export`, `db:import`, `cache:purge`). There is no full management API. |
+| **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
+| **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
+| **App installer beyond WordPress** | One-click install is WordPress only. |
+
+> **There is no WHMCS module and none is planned** — WHMCS is a paid product and we prefer to
+> stay free. Since the panel is MIT licensed, anyone can write their own integration; the
+> management API that would make this easy is on our roadmap.
+
 ## One-line install
 
-On a clean AlmaLinux 10 server (min. 2 GB RAM), as **root**:
+On a clean AlmaLinux 9.4+ / 10 server (min. 2 GB RAM), as **root**:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
@@ -137,9 +184,11 @@ The panel's standard settings (security headers, caching, the "extra directives"
 
 ## System requirements
 
-- **AlmaLinux 10** (RHEL 10 / Rocky 10 also work)
+- **AlmaLinux 10** or **AlmaLinux 9.4+** (matching RHEL / Rocky releases also work)
 - At least **2 GB RAM**, 2 vCPUs (for 5 PHP versions + MariaDB + Valkey)
 - Root access + an internet connection
+- For disk quotas the root filesystem must be **XFS** (the AlmaLinux default). On ext4 the
+  panel still runs, only per-tenant disk quotas are disabled.
 
 ## Post-install helper tools
 
