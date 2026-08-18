@@ -102,7 +102,7 @@ if [ "$DRY" = 1 ]; then
   step "DRY-RUN — değişecekler (uygulanmadı)"
   echo "  • $BIN  (binary değişmişse swap + yedek $BIN.bak)"
   echo "  • $FDIST/  (frontend-dist yeniden yazılır)"
-  echo "  • $MIGR/  (yeni .sql eklenir, mevcutlar korunur)"
+  echo "  • $MIGR/  (yeni .sql eklenir; mevcut dizin ${MIGR}.bak olarak yedeklenir → rollback geri yükler)"
   echo "  • /usr/local/bin ops-tool'lar + $SCRIPTS"
   echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} (timer enable --now)"
   echo "  • migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)"
@@ -189,7 +189,17 @@ if [ -f "$A/frontend-dist.tar.gz" ]; then
 fi
 
 # 8) migration'lar (idempotent — startup'ta uygulanır). Adım 4'te dump'ı ALDIK.
+# 🔴 EXTRACTION ÖNCESİ TAM KOPYA ALINIR. Rollback binary'yi ve DB'yi geri alıyor ama
+# migration DOSYALARINI geri almazsa panel AYAĞA KALKAMAZ: runMigrations uygulanmış
+# her migration'ın sha256'sını schema_migrations'ta tutar; DB güncelleme öncesine
+# döndürülünce defter de eskiye döner, ama diskte YENİ dosyalar kalırsa çalıştırıcı
+# "içeriği değiştirilmiş" deyip log.Fatalf atar — ESKİ binary de aynı duvara çarpar.
+# 0.7.0'da tam olarak bu yaşandı: kurtarılabilir bir rollback tam kesintiye döndü.
+# tar -C ile extraction dosyaları BİRLEŞTİRİR (silinenleri temizlemez) → geri yükleme
+# dizini komple değiştirmelidir.
 if [ -f "$A/migrations.tar.gz" ]; then
+  rm -rf "${MIGR}.bak"
+  [ -d "$MIGR" ] && cp -a "$MIGR" "${MIGR}.bak"
   mkdir -p "$MIGR"; tar xzf "$A/migrations.tar.gz" -C "$MIGR"
   ok "migration'lar senkron ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)"
 fi
@@ -267,6 +277,18 @@ else
   install -m 0755 "$BIN.bak" "$BIN"
   [ -f "$SEED.bak" ] && install -m 0755 "$SEED.bak" "$SEED" 2>/dev/null || true
   command -v restorecon >/dev/null && restorecon "$BIN" >/dev/null 2>&1 || true
+
+  # Migration DOSYALARINI da geri al (bkz. adım 8). DB birazdan güncelleme öncesine
+  # döndürülecek; diskteki migration'lar da o ana ait olmalı, yoksa checksum defteri
+  # ile disk çelişir ve ESKİ binary de açılmaz.
+  if [ -d "${MIGR}.bak" ]; then
+    rm -rf "${MIGR:?}"
+    cp -a "${MIGR}.bak" "$MIGR"
+    sync
+    ok "migration dosyaları güncelleme öncesine döndürüldü ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql)"
+  else
+    warn "migration yedeği yok — diskteki migration'lar YENİ sürümden kalma olabilir"
+  fi
 
   # DB'yi de geri yükle: yeni sürümün migration'ı şemayı değiştirmiş olabilir ve ESKİ
   # binary o şemayla çalışamaz → binary-only rollback yetmez. Panel şu an DURMUŞ
