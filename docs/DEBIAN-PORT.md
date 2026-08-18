@@ -253,7 +253,38 @@ Faz 5 olmadan **hiçbir şey "destekleniyor" diye ilan edilmeyecek.**
 
 ---
 
-## 7. Karara bağlanacaklar
+## 7. Kararlar
+
+**Hepsi karara bağlandı (2026-08-18).** Aşağıdaki maddeler geçmiş kaydı olarak duruyor.
+
+### 7.0 Verilen kararlar — özet
+
+| # | Karar | Sonuç |
+|---|---|---|
+| 1 | MariaDB 11.8 doğrulaması | **Faz 5b'de.** Önce Debian 12 (10.11) ile soyutlama doğrulanır |
+| 2 | Valkey mi Redis mi | **Çözüldü, aşağıya bakın** — sürüm bazlı |
+| 3 | Apache backend Debian'da | **v1'de kapalı.** UI "bu sunucuda kullanılamıyor" der |
+| 4 | CVE ekranı Debian'da | **v1'de kapalı.** Yarım çalışan ekran yerine dürüst kapatma |
+| 5 | Ubuntu 24.04 + Debian 12 | **İkincil hedef olarak dahil** |
+
+### 7.0.1 Valkey/Redis — doğrulandı, tasarımı etkiledi
+
+Paket arşivleri denetlendi:
+
+| Dağıtım | `valkey-server` |
+|---|---|
+| Debian 13 (trixie) | ✅ 8.1.1 |
+| Ubuntu 24.04 / 25.10 / 26.04 | ✅ var |
+| **Debian 12 (bookworm)** | ❌ **yok** → `redis-server`'a düşülecek |
+
+> **Tasarım sonucu:** paket adı çözümlemesi **yalnız aileye bakarak yapılamaz.**
+> Valkey örneği gösteriyor ki bazı paketler dağıtım *sürümüne* bağlı. `osfam` bu yüzden
+> yalnız `Aile` değil, `ID` + `Surum` + `KodAdi` de tutacak ve çözümleyici bu üçünü
+> görebilecek. Bu, ileride çıkacak benzer durumlar için de tek doğru yer olacak.
+
+---
+
+## 7.1 Kararların ayrıntısı
 
 1. **MariaDB 10.11 → 11.8.** 67 migration'ın 11.8'de sorunsuz çalıştığı doğrulanmalı.
    Kullanılan özellikler (`CREATE INDEX IF NOT EXISTS`, `ALTER USER ... MAX_QUERIES_PER_HOUR`)
