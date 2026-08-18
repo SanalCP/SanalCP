@@ -1,21 +1,42 @@
 # Debian / Ubuntu desteği — teknik plan
 
 **Durum:** planlama. Kod yazılmadı.
-**Hedef:** Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute), ikincil olarak Ubuntu 24.04 (noble).
+**Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
+ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
 
 ---
 
 ## 1. Hedef sürümler ve gerekçe
 
-| Dağıtım | Durum | Not |
+### Birincil
+
+| Dağıtım | Durum | MariaDB |
 |---|---|---|
-| **Debian 13 "trixie"** | Ağustos 2025'ten beri stable, şu an 13.6 | Debian 12'nin tam desteği Haziran 2026'da bitti — oldstable, hedeflenmez |
-| **Ubuntu 26.04 LTS "resolute"** | 23 Nisan 2026, destek Nisan 2031 | Güncel LTS |
-| **Ubuntu 24.04 LTS "noble"** | destek Nisan 2029 | İkincil hedef: 26.04 henüz yeni, birçok VPS sağlayıcısı varsayılan imaj olarak hâlâ 24.04 veriyor |
+| **Debian 13 "trixie"** | Ağustos 2025'ten beri stable, şu an 13.6 | 11.8 |
+| **Ubuntu 26.04 LTS "resolute"** | 23 Nisan 2026, destek Nisan 2031 | doğrulanacak |
+
+### İkincil
+
+| Dağıtım | Durum | MariaDB | Neden dahil |
+|---|---|---|---|
+| **Ubuntu 24.04 LTS "noble"** | destek Nisan 2029 | 10.11 | 26.04 henüz 4 aylık; birçok VPS sağlayıcısı varsayılan imaj olarak hâlâ 24.04 veriyor |
+| **Debian 12 "bookworm"** | tam destek 11 Tem 2026'da bitti, **LTS ile 30 Haz 2028'e kadar** güvenlik desteği | **10.11** | Kurulu tabanı hâlâ çok geniş; ayrıca aşağıdaki teşhis avantajı |
+
+> **Debian 12'nin gizli faydası — değişken izolasyonu.** Debian 12 ve Ubuntu 24.04,
+> panelin bugün AlmaLinux'ta kullandığı **MariaDB 10.11**'i getiriyor. Debian 13 ise
+> 11.8'e atlıyor. Yani port sırasında bir şey bozulduğunda "dağıtım farkı mı, MariaDB
+> sürüm farkı mı?" sorusunu **aynı ailede iki sürümü karşılaştırarak** yanıtlayabiliriz.
+> Bu, MariaDB 11.8 doğrulamasının (§7.1) riskini gözle görülür biçimde düşürür.
+
+> **LTS uyarısı.** Debian LTS, normal stable ile birebir aynı kapsamda değildir: bazı
+> paketler LTS kapsamı dışında kalabilir ve yalnız belirli mimariler desteklenir.
+> Debian 12 bu yüzden **ikincil** hedeftir — kurulum çalışır ve desteklenir, ama yeni
+> kurulumlar için Debian 13 önerilir. Kurulum betiği Debian 12'de bunu bir kez uyarır.
 
 Çok sürümlü PHP tamamen **`deb.sury.org`**'a bağlı. Depo indeksi doğrulandı — mevcut
-dağıtımlar: `bullseye bookworm trixie | jammy noble resolute`. **Üç hedefimiz de var.**
+dağıtımlar: `bullseye bookworm trixie | jammy noble resolute`. **Dört hedefimiz de var**
+(`bookworm`, `trixie`, `noble`, `resolute`).
 
 ---
 
@@ -217,10 +238,17 @@ Debian tarafında ek adımlar:
 | **2** | 6 dosyadaki paket yöneticisi çağrılarını soyutlamaya taşı | düşük |
 | **3** | Kota backend arayüzü + ext4 uygulaması | **yüksek** |
 | **4** | Installer soyutlaması + sury deposu | orta |
-| **5** | Canlı test: Debian 13 + Ubuntu 26.04 VM | — |
+| **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
+| **5b** | Canlı test: **Debian 13** (MariaDB 11.8 devreye girer) | — |
+| **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
 Faz 0-2 birbirini besliyor ve tek oturumda bitebilir. Faz 3 ayrı ve dikkat isteyen iş.
+
+Faz 5 sırası bilinçlidir: **5a'da yalnız "dağıtım ailesi" değişkeni**, 5b'de üzerine
+"MariaDB sürümü" değişkeni biner. Tersi sırada bir hata çıksa hangisinden geldiği
+belirsiz kalırdı.
+
 Faz 5 olmadan **hiçbir şey "destekleniyor" diye ilan edilmeyecek.**
 
 ---
@@ -230,16 +258,22 @@ Faz 5 olmadan **hiçbir şey "destekleniyor" diye ilan edilmeyecek.**
 1. **MariaDB 10.11 → 11.8.** 67 migration'ın 11.8'de sorunsuz çalıştığı doğrulanmalı.
    Kullanılan özellikler (`CREATE INDEX IF NOT EXISTS`, `ALTER USER ... MAX_QUERIES_PER_HOUR`)
    standart ve uzun süredir mevcut; yine de canlı doğrulama şart.
+   **Sıralama önerisi:** önce Debian 12 (MariaDB 10.11 — bilinen değer) üzerinde soyutlamayı
+   doğrula, sonra Debian 13'e (11.8) geç. Böylece dağıtım farkı ile DB sürüm farkı aynı anda
+   devreye girmez; bir sorun çıktığında hangisinden geldiği tek testle ayrılır.
 2. **Valkey mi Redis mi?** Debian 13'te `valkey-server` var mı, yoksa `redis-server`'a mı
    düşülecek — paket adı ve servis adı buna göre.
 3. **Apache backend** Debian'da v1'de kapatılsın mı? (öneri: evet)
 4. **CVE/güvenlik güncellemesi ekranı** Debian'da v1'de kapatılsın mı? (öneri: evet)
-5. **Ubuntu 24.04** ilk turda mı, sonra mı? (öneri: soyutlama bitince neredeyse bedava)
+5. ~~**Ubuntu 24.04** ilk turda mı?~~ **Karar verildi:** Ubuntu 24.04 ve Debian 12 ikincil
+   hedef olarak dahil. Soyutlama bittikten sonra ikisi de neredeyse bedava; Debian 12
+   ayrıca §7.1'deki MariaDB doğrulamasında teşhis aracı olarak kullanılacak.
 
 ---
 
 ## 8. Doğrulama kaynakları
 
 - Debian sürüm durumu: <https://www.debian.org/releases/>
+- Debian 12 güvenlik desteğinin LTS ekibine devri: <https://www.debian.org/News/2026/20260712>
 - Ubuntu 26.04 duyurusu: <https://canonical.com/blog/canonical-releases-ubuntu-26-04-lts-resolute-raccoon>
 - sury dist listesi: <https://packages.sury.org/php/dists/>
