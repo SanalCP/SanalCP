@@ -8,8 +8,11 @@ package sshaccess
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +26,7 @@ import (
 	"sanalcp/internal/system"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -217,6 +221,73 @@ func (h *Handlers) AnahtarKaydet(w http.ResponseWriter, r *http.Request) {
 	_ = exec.Command("chown", "-R", sk+":"+sk, dir).Run()
 	_ = exec.Command("restorecon", "-R", dir).Run()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "anahtar_var": anahtar != ""})
+}
+
+// POST /domains/{id}/ssh/anahtar-uret — yeni bir ed25519 anahtar çifti üretir,
+// genel anahtarı authorized_keys'e EKLER (mevcutları silmez); özel anahtar
+// sunucuda hiçbir yerde saklanmaz, yalnızca bu yanıtla bir kez döner —
+// müşteri kaydetmezse bir daha elde edilemez.
+func (h *Handlers) AnahtarUret(w http.ResponseWriter, r *http.Request) {
+	_, sk, alanAdi, demo, ok := h.yukle(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin SSH anahtarı değiştirilemez")
+		return
+	}
+	if !gecerliSK(sk) {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz sistem kullanıcısı")
+		return
+	}
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "anahtar üretilemedi: "+err.Error())
+		return
+	}
+	sshPub, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "genel anahtar dönüştürülemedi: "+err.Error())
+		return
+	}
+	yorum := sk + "@" + alanAdi
+	genelSatir := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(sshPub)), "\n") + " " + yorum
+	blok, err := ssh.MarshalPrivateKey(priv, yorum)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "özel anahtar üretilemedi: "+err.Error())
+		return
+	}
+	ozelPEM := pem.EncodeToMemory(blok)
+
+	dir := filepath.Join("/home", sk, ".ssh")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, ".ssh dizini: "+err.Error())
+		return
+	}
+	ak := filepath.Join(dir, "authorized_keys")
+	f, err := os.OpenFile(ak, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "authorized_keys açılamadı: "+err.Error())
+		return
+	}
+	_, werr := f.WriteString(genelSatir + "\n")
+	cerr := f.Close()
+	if werr != nil || cerr != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "authorized_keys yazılamadı")
+		return
+	}
+	_ = exec.Command("chown", "-R", sk+":"+sk, dir).Run()
+	_ = exec.Command("restorecon", "-R", dir).Run()
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"ok":            true,
+		"anahtar_var":   true,
+		"genel_anahtar": genelSatir,
+		"ozel_anahtar":  string(ozelPEM),
+		"dosya_adi":     "id_ed25519_" + sk,
+	})
 }
 
 // ilkSSHPort: sshd'nin dinlediği ilk port; tespit edilemezse 22.

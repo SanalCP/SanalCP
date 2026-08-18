@@ -24,6 +24,8 @@ export default function DomainSSHPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
   const [anahtar, setAnahtar] = useState('')
+  const [uretiliyor, setUretiliyor] = useState(false)
+  const [uretilenAnahtar, setUretilenAnahtar] = useState<{ genel: string; ozel: string; dosyaAdi: string } | null>(null)
 
   function yukle() {
     if (!id) return
@@ -58,6 +60,27 @@ export default function DomainSSHPage() {
     } catch (e) {
       setHata(apiHata(e, t('DomainSSHPage:key_save_failed')))
     } finally { setIsleniyor(false) }
+  }
+
+  async function anahtarUret() {
+    setUretiliyor(true); setHata(null); setBasari(null)
+    try {
+      const { data } = await api.post(`/domains/${id}/ssh/anahtar-uret`)
+      setUretilenAnahtar({ genel: data.genel_anahtar, ozel: data.ozel_anahtar, dosyaAdi: data.dosya_adi })
+      yukle()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainSSHPage:key_generate_failed')))
+    } finally { setUretiliyor(false) }
+  }
+
+  function ozelAnahtarIndir() {
+    if (!uretilenAnahtar) return
+    const blob = new Blob([uretilenAnahtar.ozel], { type: 'application/x-pem-file' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = uretilenAnahtar.dosyaAdi
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
   }
 
   if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
@@ -158,6 +181,46 @@ export default function DomainSSHPage() {
               {t('DomainSSHPage:save_key')}
             </button>
           </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('DomainSSHPage:generate_key_title')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('DomainSSHPage:generate_key_desc')}</p>
+            </div>
+            <button onClick={anahtarUret} disabled={uretiliyor || d.is_demo}
+              className="shrink-0 px-4 py-2 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60 text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200">
+              {uretiliyor ? t('DomainSSHPage:generating') : t('DomainSSHPage:generate_key')}
+            </button>
+          </div>
+
+          {uretilenAnahtar && (
+            <div className="mt-4 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{t('DomainSSHPage:generated_warning')}</p>
+              <div className="mt-3">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainSSHPage:generated_private_label')}</label>
+                <textarea readOnly value={uretilenAnahtar.ozel} rows={6} spellCheck={false}
+                  className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-[11px] font-mono outline-none" />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button onClick={ozelAnahtarIndir}
+                    className="text-xs px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-lg font-medium">
+                    {t('DomainSSHPage:download_private')}
+                  </button>
+                  <button onClick={() => navigator.clipboard?.writeText(uretilenAnahtar.ozel)}
+                    className="text-xs px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">
+                    {t('common:copy')}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainSSHPage:generated_public_label')}</label>
+                <code className="mt-1 block px-3 py-2 bg-slate-900 text-slate-100 rounded-lg text-[11px] font-mono overflow-x-auto">{uretilenAnahtar.genel}</code>
+              </div>
+              <button onClick={() => setUretilenAnahtar(null)}
+                className="mt-3 text-xs px-3 py-1.5 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 font-medium">
+                {t('DomainSSHPage:generated_dismiss')}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mt-4">

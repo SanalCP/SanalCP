@@ -35,5 +35,15 @@
   "key_placeholder": "ssh-ed25519 AAAA... kullanici@makine",
   "key_clear_hint": "Boş bırakıp kaydederseniz tüm anahtarlar silinir.",
   "save_key": "Anahtarı Kaydet",
+  "generate_key_title": "Anahtar çiftiniz yok mu?",
+  "generate_key_desc": "Panel sizin için bir ed25519 anahtar çifti üretsin; genel anahtar otomatik eklenir.",
+  "generate_key": "Yeni Anahtar Oluştur",
+  "generating": "Üretiliyor…",
+  "key_generate_failed": "Anahtar üretilemedi",
+  "generated_warning": "⚠️ Özel anahtarı şimdi indirin veya kopyalayın — güvenlik nedeniyle sunucuda saklanmaz, bu pencere kapanınca bir daha gösterilemez.",
+  "generated_private_label": "Özel anahtar (id_ed25519 — bilgisayarınızda saklayın, kimseyle paylaşmayın)",
+  "generated_public_label": "Genel anahtar (authorized_keys'e eklendi)",
+  "download_private": "Özel Anahtarı İndir",
+  "generated_dismiss": "Kaydettim, kapat",
   "back_to_subscription": "← Aboneliğe dön"
 }

@@ -384,6 +384,7 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssh", sshH.Goster)
 				r.With(middleware.AdminOnly).Put("/domains/{id}/ssh", sshH.Ayarla)
 				r.With(middleware.AdminOnly).Put("/domains/{id}/ssh/anahtar", sshH.AnahtarKaydet)
+				r.With(middleware.AdminOnly).Post("/domains/{id}/ssh/anahtar-uret", sshH.AnahtarUret)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/istatistik", statH.Goster)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/performans", perfH.Goster)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/composer", compH.Durum)

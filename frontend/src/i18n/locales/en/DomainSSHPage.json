@@ -35,5 +35,15 @@
   "key_placeholder": "ssh-ed25519 AAAA... user@machine",
   "key_clear_hint": "Leave blank and save to remove all keys.",
   "save_key": "Save Key",
+  "generate_key_title": "Don't have a key pair?",
+  "generate_key_desc": "Let the panel generate an ed25519 key pair for you; the public key is added automatically.",
+  "generate_key": "Generate New Key",
+  "generating": "Generating…",
+  "key_generate_failed": "Key could not be generated",
+  "generated_warning": "⚠️ Download or copy the private key now — for security it is never stored on the server, and won't be shown again once this closes.",
+  "generated_private_label": "Private key (id_ed25519 — keep it on your computer, never share it)",
+  "generated_public_label": "Public key (added to authorized_keys)",
+  "download_private": "Download Private Key",
+  "generated_dismiss": "Saved it, close",
   "back_to_subscription": "← Back to subscription"
 }

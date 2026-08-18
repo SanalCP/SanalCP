@@ -13,6 +13,7 @@
   "configuration": "Yapılandırma",
   "ip_address": "IP Adresi",
   "system_user": "Sistem Kullanıcısı",
+  "file_path": "Dosya Yolu",
   "php_version": "PHP Sürümü",
   "ssl_tls": "SSL/TLS",
   "active": "Aktif",

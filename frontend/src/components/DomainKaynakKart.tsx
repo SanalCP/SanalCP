@@ -73,6 +73,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainKaynakKart:configuration')}</h3>
         <Sat e={t('DomainKaynakKart:ip_address')} d={ozet.ipv4 || '—'} mono />
         <Sat e={t('DomainKaynakKart:system_user')} d={ozet.sk} mono />
+        <Sat e={t('DomainKaynakKart:file_path')} d={`/home/${ozet.sk}/public_html`} mono />
         <Sat e={t('DomainKaynakKart:php_version')}
           d={<span><span className="font-mono font-medium text-slate-800 dark:text-slate-200">PHP {ozet.php_surum}</span></span>}
         />

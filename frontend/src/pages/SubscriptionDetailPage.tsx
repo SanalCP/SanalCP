@@ -8,31 +8,15 @@ import Breadcrumb from '@/components/Breadcrumb'
 import ResourceCard from '@/components/ResourceCard'
 import DomainKaynakKart from '@/components/DomainKaynakKart'
 import DomainPano from "@/components/DomainPano"
-import ToolCard from '@/components/ToolCard'
 import type { Domain } from '@/components/DomainList'
-
-type Tab = 'dashboard' | 'hosting' | 'baslangic'
 
 const ICONS = {
   baglanti:  'M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m.172-5.172a4 4 0 00-5.656 5.656l-3 3a4 4 0 005.656 5.656',
   dosyalar:  'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
   db:        'M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zm0 0v10c0 1.657 3.582 3 8 3s8-1.343 8-3V7M4 12c0 1.657 3.582 3 8 3s8-1.343 8-3',
-  ftp:       'M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2zM9 12l3-3 3 3M12 9v6',
   yedek:     'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M16 12l-4 4-4-4M12 16V4',
-  kopya:     'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
-  php:       'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z',
-  log:       'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-  cron:      'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-  git:       'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1',
-  composer:  'M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3v6M9 12h6',
-  hizmet:    'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
-  ssl:       'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
-  kilit:     'M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17',
-  istatistik:'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-  imunify:   'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
   posta:     'M3 8l9 6 9-6m-9 6V4m0 0v16',
   dns:       'M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18',
-  apache:    'M13 10V3L4 14h7v7l9-11h-7z',
 }
 
 export default function SubscriptionDetailPage() {
@@ -41,7 +25,6 @@ export default function SubscriptionDetailPage() {
   const navigate = useNavigate()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [hata, setHata] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('dashboard')
   const [diskMB, setDiskMB] = useState<number | null>(null)
   const [menuAcik, setMenuAcik] = useState(false)
   const [isleniyor, setIsleniyor] = useState(false)
@@ -161,10 +144,16 @@ export default function SubscriptionDetailPage() {
       {bildirim && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{bildirim}</div>}
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
-      <div role="tablist" aria-label={domain.alan_adi} className="mb-6 flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <TabBtn aktif={tab === 'dashboard'} onClick={() => setTab('dashboard')}>{t('SubscriptionDetailPage:dashboard')}</TabBtn>
-        <TabBtn aktif={tab === 'hosting'}   onClick={() => setTab('hosting')}>{t('SubscriptionDetailPage:hosting_dns')}</TabBtn>
-        <TabBtn aktif={tab === 'baslangic'} onClick={() => setTab('baslangic')}>{t('SubscriptionDetailPage:getting_started')}</TabBtn>
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500">{t('SubscriptionDetailPage:quick_links')}</h2>
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <QuickLink to={`/abonelikler/${domain.id}/baglanti`} ikon={ICONS.baglanti}>{t('SubscriptionDetailPage:quick_link_connection')}</QuickLink>
+          <QuickLink to={`/abonelikler/${domain.id}/dns`} ikon={ICONS.dns}>{t('SubscriptionDetailPage:quick_link_dns')}</QuickLink>
+          <QuickLink to={`/abonelikler/${domain.id}/mail`} ikon={ICONS.posta}>{t('SubscriptionDetailPage:quick_link_mail')}</QuickLink>
+          <QuickLink to={`/abonelikler/${domain.id}/dosyalar`} ikon={ICONS.dosyalar}>{t('SubscriptionDetailPage:quick_link_files')}</QuickLink>
+          <QuickLink to={`/abonelikler/${domain.id}/veritabanlari`} ikon={ICONS.db}>{t('SubscriptionDetailPage:quick_link_databases')}</QuickLink>
+          <QuickLink to={`/abonelikler/${domain.id}/yedekler`} ikon={ICONS.yedek}>{t('SubscriptionDetailPage:quick_link_backup')}</QuickLink>
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-5">
@@ -190,9 +179,7 @@ export default function SubscriptionDetailPage() {
         </aside>
 
         <section className="order-1 col-span-12 xl:order-2 xl:col-span-6">
-          {tab === 'dashboard' && <DomainPano domain={domain} />}
-          {tab === 'hosting'   && <HostingTab domain={domain} />}
-          {tab === 'baslangic' && <BaslangicTab />}
+          <DomainPano domain={domain} />
 
           <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-500 flex-wrap gap-2">
             <div className="flex items-center gap-4">
@@ -276,22 +263,6 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
   )
 }
 
-function TabBtn({ aktif, onClick, children }: { aktif: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={aktif}
-      onClick={onClick}
-      className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium transition ${
-        aktif ? 'bg-brand-50 text-brand-600 shadow-sm dark:bg-brand-900/30 dark:text-brand-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
 function Stat({ e, d }: { e: string; d: string }) {
   return (
     <div className="flex items-center justify-between">
@@ -301,70 +272,16 @@ function Stat({ e, d }: { e: string; d: string }) {
   )
 }
 
-function Grup({ baslik, children }: { baslik: string; children: React.ReactNode }) {
+function QuickLink({ to, ikon, children }: { to: string; ikon: string; children: React.ReactNode }) {
   return (
-    <section className="mb-5 last:mb-0">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500 mb-2">{baslik}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">{children}</div>
-    </section>
-  )
-}
-
-function DashboardTabIcerik({ domain }: { domain: Domain }) {
-  const { t } = useTranslation('SubscriptionDetailPage')
-  return (
-    <div>
-      <Grup baslik={t('SubscriptionDetailPage:files_databases')}>
-        <ToolCard etiket={t('SubscriptionDetailPage:connection_info')}     aciklama={t('SubscriptionDetailPage:ftp_database')}     ikon={ICONS.baglanti} renk="emerald" />
-        <ToolCard etiket={t('SubscriptionDetailPage:files')}              aciklama={t('SubscriptionDetailPage:file_manager')}     ikon={ICONS.dosyalar} renk="amber"  faz="F6" />
-        <ToolCard etiket={t('SubscriptionDetailPage:databases')}         aciklama={domain.db_adi}         ikon={ICONS.db}       renk="violet" faz="F5" />
-        <ToolCard etiket="FTP"                   aciklama={t('SubscriptionDetailPage:ftp_accounts')}        ikon={ICONS.ftp}      renk="sky"    faz="F4" />
-        <ToolCard etiket={t('SubscriptionDetailPage:backup_restore')} aciklama={t('SubscriptionDetailPage:backup_management')}        ikon={ICONS.yedek}    renk="rose"   faz="F12" />
-        <ToolCard etiket={t('SubscriptionDetailPage:copy_website')}  aciklama={t('SubscriptionDetailPage:cloning')}              ikon={ICONS.kopya}    renk="sky" />
-      </Grup>
-
-      <Grup baslik={t('SubscriptionDetailPage:development_tools')}>
-        <ToolCard etiket={t('SubscriptionDetailPage:php_version')}                   aciklama={`Sürüm ${domain.php_surum}`} ikon={ICONS.php}      renk="indigo" faz="F3" />
-        <ToolCard etiket={t('SubscriptionDetailPage:logs')}             aciklama="access, error"        ikon={ICONS.log}      renk="slate"  faz="F10" />
-        <ToolCard etiket={t('SubscriptionDetailPage:scheduled_tasks')}  aciklama="Cron"                  ikon={ICONS.cron}     renk="teal"   faz="F8" />
-        <ToolCard etiket="Git"                   aciklama={t('SubscriptionDetailPage:repository_integration')}     ikon={ICONS.git}      renk="orange" faz="F9" />
-        <ToolCard etiket="PHP Composer"          aciklama={t('SubscriptionDetailPage:package_manager')}      ikon={ICONS.composer} renk="amber" />
-        <ToolCard etiket={t('SubscriptionDetailPage:performance')}            aciklama={t('SubscriptionDetailPage:accelerators')}       ikon={ICONS.hizmet}   renk="emerald" />
-      </Grup>
-
-      <Grup baslik={t('SubscriptionDetailPage:security')}>
-        <ToolCard
-          etiket={t('SubscriptionDetailPage:ssl_certificates')}
-          aciklama={domain.ssl ? `Bitiş: ${domain.ssl_bitis || '—'}` : t('SubscriptionDetailPage:letsencrypt')}
-          ikon={ICONS.ssl}
-          renk={domain.ssl ? 'emerald' : 'rose'}
-          faz="F7"
-          uyari={!domain.ssl ? t('SubscriptionDetailPage:domain_unprotected') : undefined}
-        />
-        <ToolCard etiket={t('SubscriptionDetailPage:password_directories')} aciklama=".htpasswd" ikon={ICONS.kilit} renk="amber" faz="F7" />
-        <ToolCard etiket={t('SubscriptionDetailPage:statistics')}            aciklama={t('SubscriptionDetailPage:traffic_analysis')} ikon={ICONS.istatistik} renk="indigo" faz="F10" />
-        <ToolCard etiket="Imunify"                  aciklama={t('SubscriptionDetailPage:antivirus')}      ikon={ICONS.imunify}    renk="emerald" />
-      </Grup>
-    </div>
-  )
-}
-
-function HostingTab({ domain }: { domain: Domain }) {
-  const { t } = useTranslation('SubscriptionDetailPage')
-  return (
-    <Grup baslik={t('SubscriptionDetailPage:hosting_services')}>
-      <ToolCard etiket={t('SubscriptionDetailPage:hosting_settings')} aciklama="Document root, options" ikon={ICONS.hizmet} renk="indigo" to={`/abonelikler/${domain.id}/web-sunucu`} />
-      <ToolCard etiket={t('SubscriptionDetailPage:apache_nginx')}     aciklama={t('SubscriptionDetailPage:security_headers')}  ikon={ICONS.apache} renk="orange" to={`/abonelikler/${domain.id}/web-sunucu`} />
-      <ToolCard etiket={t('SubscriptionDetailPage:dns_settings')}        aciklama={t('SubscriptionDetailPage:dns_records')}            ikon={ICONS.dns}    renk="emerald" to={`/abonelikler/${domain.id}/dns`} />
-    </Grup>
-  )
-}
-
-function BaslangicTab() {
-  const { t } = useTranslation('SubscriptionDetailPage')
-  return (
-    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-200">
-      <strong>{t('SubscriptionDetailPage:getting_started')}</strong> — {t('SubscriptionDetailPage:wizard_note')}
-    </div>
+    <Link
+      to={to}
+      className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-brand-700 dark:hover:bg-brand-900/20 dark:hover:text-brand-300"
+    >
+      <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={ikon} />
+      </svg>
+      {children}
+    </Link>
   )
 }

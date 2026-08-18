@@ -13,6 +13,7 @@
   "configuration": "Configuration",
   "ip_address": "IP Address",
   "system_user": "System User",
+  "file_path": "File Path",
   "php_version": "PHP Version",
   "ssl_tls": "SSL/TLS",
   "active": "Active",

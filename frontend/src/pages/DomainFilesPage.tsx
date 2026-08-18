@@ -497,7 +497,7 @@ export default function DomainFilesPage() {
         <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
           <Link to={`/abonelikler/${id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{domain.alan_adi}</Link>
           {' · '}
-          <span className="font-mono text-slate-600 dark:text-slate-400">/home/{domain.sistem_kullanici}</span>
+          <span className="font-mono text-slate-600 dark:text-slate-400">/home/{domain.sistem_kullanici}{yol}</span>
         </p>
       )}
 

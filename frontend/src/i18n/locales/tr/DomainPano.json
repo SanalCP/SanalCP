@@ -29,6 +29,8 @@
     "backup_restore_desc": "Yedek yönetimi",
     "clone_site": "Web Sitesini Kopyala",
     "clone_site_desc": "Klonlama",
+    "apache_nginx": "Apache & Nginx",
+    "apache_nginx_desc": "Document root, güvenlik header'ları",
     "php": "PHP",
     "php_version": "Sürüm {{version}}",
     "logs": "Günlükler",
