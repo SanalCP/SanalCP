@@ -400,14 +400,16 @@ aileye uygun **token** biçiminde döner), `selinux_var` (Debian'da daima false)
 betiği ortak kütüphaneyi source etmek ZORUNDA. Kendi `dnf install` satırını
 taşıyan bir betik, Debian portunun tam olarak gözden kaçtığı yerdi.
 
-> ⚠️ **Açık kalan bakım tuzağı: `scripts/` ↔ `assets/ops/` ikilemesi.** Aynı
-> betiklerin iki kopyası var ve **yalnız `assets/ops/` sunuculara kuruluyor**.
-> Beşi zaten ayrışmış durumda (`mail-setup`, `optimize`, `redis-setup`,
-> `update`, `wp-redis` — `assets/` kopyaları iki dilli ve daha yeni). 0.7.0
-> kesintisinde rollback düzeltmesinin yanlış dosyaya yazılmasının sebebi tam
-> olarak buydu. Faz 4b yeni ayrışma EKLEMEDİ (aynı olan üç dosya elle
-> eşitlendi), ama kalıcı çözüm `scripts/` kopyalarının silinmesi ya da
-> `package-release.sh`'ın senkronu zorunlu kılmasıdır. Karar bekliyor.
+> ✅ **Çözüldü (2026-08-19): `scripts/` ↔ `assets/ops/` ikilemesi kaldırıldı.**
+> Aynı betiklerin iki kopyası vardı ve sunuculara **yalnız `assets/ops/`**
+> kuruluyordu; 0.7.0 kesintisinde rollback düzeltmesinin hiçbir sunucuya
+> inmemesinin sebebi buydu. `scripts/` altındaki 12 kopya silindi (11 ops betiği
+> + `50-sanal-jail.conf`); tek kaynak artık `assets/`. Silmeden önce ayrışmış
+> beş dosya karşılaştırıldı: `scripts/` tarafındaki her fark, `assets/`
+> kopyasının daha yeni/iki dilli sürümünde zaten karşılanıyordu — kaybolan
+> içerik yok. `TestScriptsAltindaAssetKopyasiYok` kopyaların geri gelmesini
+> engelliyor. `scripts/` altında artık yalnız gerçekten oraya ait olanlar var:
+> `build-assets.sh`, `package-release.sh`, `seed_admin.go`, `yetki-testi.sh`.
 
 ---
 

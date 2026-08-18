@@ -1,7 +1,7 @@
 // Package nginxconf, panel nginx vhost'unun KANONİK kaynağıdır.
 //
 // NEDEN BURADA: _panel.conf eskiden yalnız assets/nginx/ altında duruyordu ve
-// sunucuya SADECE kurulum sırasında (scripts/sanalcp-install.sh) kopyalanıyordu.
+// sunucuya SADECE kurulum sırasında (sanalcp-install.sh) kopyalanıyordu.
 // sanalcp-update nginx conf'larına hiç dokunmadığı için, conf'ta yapılan her
 // güvenlik değişikliği (gövde sınırları, CSP sertleştirmesi) mevcut kurulumlara
 // ASLA inmiyordu — yalnız yeni kurulumlar alıyordu. Dosya artık binary'ye gömülü

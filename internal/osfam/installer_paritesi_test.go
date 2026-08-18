@@ -209,3 +209,43 @@ func TestOpsBetikleriOrtakKutuphaneyiSourceEder(t *testing.T) {
 		t.Fatal("hiçbir ops betiği paket yöneticisi kullanmıyor görünüyor — test yanlış dizine bakıyor olabilir")
 	}
 }
+
+// scripts/ altında assets/ops veya assets/ssh ile AYNI ADLI dosya olmamalı.
+//
+// NEDEN: bu dosyaların ikili kopyası uzun süre elle senkronize edildi ve
+// sunuculara YALNIZ assets/ kopyası kuruluyor. 0.7.0 kesintisinde rollback
+// düzeltmesi scripts/ kopyasına yazıldı, yayına giren assets/ kopyasına
+// yazılmadı — düzeltme hiçbir sunucuya inmedi. Kopyalar 2026-08-19'da silindi;
+// bu test geri gelmelerini engelliyor.
+func TestScriptsAltindaAssetKopyasiYok(t *testing.T) {
+	kok, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetAdlari := map[string]string{}
+	for _, d := range []string{"assets/ops", "assets/ssh"} {
+		girdiler, err := os.ReadDir(filepath.Join(kok, d))
+		if err != nil {
+			t.Skipf("%s okunamadı: %v", d, err)
+		}
+		for _, g := range girdiler {
+			if !g.IsDir() {
+				assetAdlari[g.Name()] = d
+			}
+		}
+	}
+	girdiler, err := os.ReadDir(filepath.Join(kok, "scripts"))
+	if err != nil {
+		t.Skipf("scripts okunamadı: %v", err)
+	}
+	for _, g := range girdiler {
+		if g.IsDir() {
+			continue
+		}
+		if d, kopya := assetAdlari[g.Name()]; kopya {
+			t.Errorf("scripts/%s ile %s/%s aynı adı taşıyor — sunuculara yalnız %s kuruluyor, "+
+				"scripts/ kopyasına yazılan düzeltme hiçbir sunucuya inmez. Tek kaynak: %s",
+				g.Name(), d, g.Name(), d, d)
+		}
+	}
+}
