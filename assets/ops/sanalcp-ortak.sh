@@ -89,9 +89,16 @@ valkey_yok(){
 rakip_onbellek_kapat(){
   local benim rakip
   benim=$(servis_ad cache)
+  # 🔴 Rakip servisin adı AİLEYE göre değişir: Debian'da valkey-server/redis-server,
+  # RHEL'de valkey/redis. Eşleme tek listede yapılırsa RHEL'de var olmayan bir birim
+  # (redis-server) aranır, `systemctl cat` başarısız olur ve fonksiyon sessizce
+  # erken döner — yani RHEL'de koruma HİÇ ÇALIŞMAZ. dnf zayıf bağımlılıkları
+  # varsayılan olarak kurduğu için oradaki senaryo da teorik değil.
   case "$benim" in
-    valkey-server|valkey) rakip=redis-server ;;
-    redis-server|redis)   rakip=valkey-server ;;
+    valkey-server) rakip=redis-server ;;   # Debian ailesi
+    valkey)        rakip=redis ;;          # RHEL ailesi
+    redis-server)  rakip=valkey-server ;;
+    redis)         rakip=valkey ;;
     *) return 0 ;;
   esac
   systemctl cat "$rakip" >/dev/null 2>&1 || return 0   # kurulu değil: yapacak iş yok
