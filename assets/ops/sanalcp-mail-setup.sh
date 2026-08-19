@@ -130,10 +130,30 @@ if ! grep -qE '^submission\s+inet' /etc/postfix/master.cf; then
 fi
 
 echo "════ Dovecot: SQL auth + drop-in config ════"
-sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
-chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
-chmod 640 /etc/dovecot/dovecot-sql.conf.ext
-cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+# 🔴 Dovecot 2.4 YAPILANDIRMA DİLİNİ KIRDI. 2.3 dosyası 2.4'te açılmaz:
+#   mail_location kalktı (mail_driver + mail_path)
+#   passdb { driver = sql }  →  passdb sql { }  (adlandırılmış blok)
+#   SQL bağlantısı ayrı dosyadan (dovecot-sql.conf.ext) değil conf'un içinden
+#   ssl_cert/ssl_key  →  ssl_server_cert_file / ssl_server_key_file
+#   %u  →  %{user}
+# AlmaLinux ve Debian 12 → 2.3 · Debian 13 ve Ubuntu 26.04 → 2.4.
+# Sürüm okunamazsa 2.3'e düşülür (mevcut kurulu tabanın tamamı 2.3).
+DVSURUM=$(dovecot --version 2>/dev/null | awk '{print $1}')
+DVANA=${DVSURUM%%.*}; DVIKI=$(printf '%s' "$DVSURUM" | cut -d. -f2)
+if [ "${DVANA:-2}" -gt 2 ] 2>/dev/null || { [ "${DVANA:-2}" = 2 ] && [ "${DVIKI:-3}" -ge 4 ] 2>/dev/null; }; then
+  sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/10-sanalcp-mail-2.4.conf.tmpl" > /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  chown root:dovecot /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  chmod 640 /etc/dovecot/conf.d/10-sanalcp-mail.conf   # DB parolası İÇERİR
+  # 2.3'ten kalan SQL dosyası varsa artık okunmuyor; yanıltmasın diye kaldırılır.
+  [ -f /etc/dovecot/dovecot-sql.conf.ext ] && mv /etc/dovecot/dovecot-sql.conf.ext /etc/dovecot/dovecot-sql.conf.ext.2.3-devredisi
+  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde)"
+else
+  sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
+  chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
+  chmod 640 /etc/dovecot/dovecot-sql.conf.ext
+  cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  log "dovecot ${DVSURUM:-2.3.x} → 2.3 şablonu kuruldu"
+fi
 # Stok PAM passdb'sini kapat: kutular sanaldır (SQL passdb). Açık kalırsa her
 # girişte önce PAM denenir, kullanıcı sistemde olmadığı için pam_unix gecikme
 # uygular (ölçüldü: ~1.4-2.1 sn/giriş) ve IMAP'ten sistem hesaplarına parola

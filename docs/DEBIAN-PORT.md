@@ -1,7 +1,8 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-4b ve **Faz 5a (canlı Debian 12 testi) tamamlandı** (2026-08-19).
-Sıradaki: Faz 5b — Debian 13 (MariaDB 11.8 + Dovecot 2.4 şablonu).
+**Durum:** Faz 0-5a tamamlandı; **Faz 5b hazırlığı bitti** (2026-08-19) — MariaDB
+11.8 ve Dovecot 2.4 riskleri kapatıldı. Sıradaki: Faz 5b canlı kurulum
+(Debian 13 sunucu gerekiyor).
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -598,6 +599,70 @@ repquota: User,BlockStatus,FileStatus,BlockUsed,BlockSoftLimit,...
 `sanalcp-quotacheck.service` oneshot'ı `/aquota.user`'ı üretti ve `quotaon`'u
 açtı. §4'teki "Faz 5'e kalan canlı sorular" böylece yanıtlandı: **klasik
 `quotacheck` yolu gerekli ve yeterli**, `tune2fs -O quota` denenmedi.
+
+## 5e. Faz 5b hazırlığı — iki risk de sunucusuz kapatıldı ✅ (2026-08-19)
+
+Geliştirme makinesi zaten Debian 13 trixie olduğu için Faz 5b'nin iki bilinen
+riski canlı sunucu beklemeden **gerçek ikililerle** sınandı.
+
+### Risk 1 — MariaDB 11.8: KAPANDI
+
+Tek kullanımlık bir **MariaDB 11.8.6** örneği (Debian 13'ün birebir sürümü)
+ayrı datadir + soketle kaldırıldı ve migration smoke testi ona karşı koşuldu:
+
+- `TestMigrationlarSifirDBdeUygulanir` → **69 migration temiz uygulandı**
+- `TestMigrationlarIdempotent` → **geçti**
+
+§7.1'deki "67 migration'ın 11.8'de çalıştığı doğrulanmalı" maddesi böylece
+yanıtlandı. Canlı testte tekrar doğrulanacak ama artık sürpriz beklenmiyor.
+
+### Risk 2 — Dovecot 2.4: ŞABLON YAZILDI ve GERÇEK AYRIŞTIRICIYLA DOĞRULANDI
+
+`dovecot-core` 2.4.1 + `dovecot-mysql` + `dovecot-sieve` paketleri **kurulmadan**
+açıldı ve `doveconf` doğrudan çalıştırıldı; şablon hata hata düzeltilerek
+yazıldı. Tespit edilen kırılmalar:
+
+| 2.3 | 2.4 |
+|---|---|
+| `mail_location = maildir:~/` | `mail_driver = maildir` + `mail_path = %{home}` |
+| `passdb { driver = sql; args = <dosya> }` | `passdb sql { query = … }` (adlandırılmış blok) |
+| `userdb { driver = sql; args = <dosya> }` | `userdb sql { query = … }` |
+| SQL bağlantısı `dovecot-sql.conf.ext` dosyasında | `sql_driver` + `mysql <host> { … }` conf'un İÇİNDE |
+| `%u` | `%{user}` |
+| `ssl_cert = </yol` | `ssl_server_cert_file = /yol` (`<` öneki kalktı) |
+| `plugin { sieve = file:~/sieve;active=… }` | `sieve_script personal { driver = file; path; active_path }` |
+| `mail_plugins = $mail_plugins sieve` | `mail_plugins { sieve = yes }` |
+
+Yeni dosya: **`assets/mail/dovecot/10-sanalcp-mail-2.4.conf.tmpl`**.
+`doveconf -n` ile doğrulandı — tek kalan hata `dovenull` sistem kullanıcısının
+bu makinede olmaması (gerçek kurulumda paket onu oluşturur); ayar hatası YOK.
+Ayrıştırılmış çıktı da gözle kontrol edildi (passdb/userdb sorguları, mysql
+bloğu, service blokları yerinde).
+
+**Seçim:** `sanalcp-mail-setup` artık `dovecot --version` okuyup şablonu seçiyor
+(≥2.4 → yeni, aksi hâlde 2.3). Sürüm okunamazsa 2.3'e düşer — kurulu tabanın
+tamamı 2.3. Karşılaştırma sayısal: `2.10` da doğru şekilde 2.4'ten büyük sayılır.
+2.4 şablonu DB parolası içerdiği için `root:dovecot 0640` yazılıyor ve 2.3'ten
+kalan `dovecot-sql.conf.ext` (artık okunmuyor) yanıltmasın diye
+`.2.3-devredisi` olarak yeniden adlandırılıyor.
+
+> ⚠️ `doveconf --version` diye bir seçenek YOK — 2.4 "invalid option" der.
+> Sürüm `dovecot --version`'dan okunur. Kabul testi betiği de düzeltildi.
+
+**Değişmeyen:** 2.4 hâlâ `/etc/dovecot/conf.d/10-auth.conf` içinde
+`!include auth-system.conf.ext` satırını taşıyor → PAM kapatma kodu
+(`HealDovecotAuth` + kurulum betiği) 2.4'te de olduğu gibi çalışır.
+
+**Testler:** `internal/mail/dovecot_sablon_test.go` iki şablonun birbirine
+karışmasını engelliyor (2.3'te `mail_driver` olmamalı, 2.4'te `mail_location`
+olmamalı, `%u` kalmamalı vb.). Bu, `doveconf` doğrulamasının yerini tutmaz —
+yalnız geriye kaymayı yakalar.
+
+### Canlı testte hâlâ görülecekler
+
+Kurulumun uçtan uca akışı, dovecot 2.4'ün gerçekten AÇILMASI (parse ≠ çalışma),
+sanal kutuya IMAP girişi, LMTP teslimatı, MariaDB 11.8'de panelin çalışma-anı
+sorguları ve Faz 5a'daki 39 kontrolün trixie'de tekrarı.
 
 ---
 

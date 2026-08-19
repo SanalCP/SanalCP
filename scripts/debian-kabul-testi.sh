@@ -129,9 +129,23 @@ if command -v postconf >/dev/null 2>&1; then
   ss -lntp 2>/dev/null | grep -q '127.0.0.1:11332' && gecti "rspamd milter 11332 dinliyor" || kaldi "rspamd 11332 dinlemiyor"
   # Dovecot 2.4 sözdizimi kırılması burada yakalanır.
   if command -v doveconf >/dev/null 2>&1; then
-    DVER=$(doveconf --version 2>/dev/null | awk '{print $1}')
-    if doveconf -n >/dev/null 2>&1; then gecti "doveconf -n temiz (dovecot $DVER)"
-    else kaldi "doveconf -n BAŞARISIZ (dovecot $DVER — 2.4 sözdizimi farkı olabilir)"; fi
+    # `doveconf --version` diye bir seçenek YOK (2.4'te "invalid option" der);
+    # sürüm dovecot ikilisinden okunur.
+    DVER=$(dovecot --version 2>/dev/null | awk '{print $1}')
+    if doveconf -n >/dev/null 2>&1; then
+      gecti "doveconf -n temiz (dovecot ${DVER:-?})"
+      # 🔴 Kurulan şablon dovecot sürümüyle EŞLEŞMELİ: 2.4'te 2.3 şablonu
+      # (mail_location) hiç açılmaz, 2.3'te 2.4 şablonu da öyle.
+      if printf '%s' "$DVER" | grep -qE '^(2\.[4-9]|[3-9])'; then
+        grep -q 'mail_driver' /etc/dovecot/conf.d/10-sanalcp-mail.conf 2>/dev/null \
+          && gecti "dovecot 2.4 şablonu kurulu (sürümle eşleşiyor)" \
+          || kaldi "dovecot $DVER ama 2.3 şablonu kurulu (mail_driver yok)"
+      else
+        grep -q 'mail_location' /etc/dovecot/conf.d/10-sanalcp-mail.conf 2>/dev/null \
+          && gecti "dovecot 2.3 şablonu kurulu (sürümle eşleşiyor)" \
+          || kaldi "dovecot $DVER ama 2.3 şablonu değil (mail_location yok)"
+      fi
+    else kaldi "doveconf -n BAŞARISIZ (dovecot ${DVER:-?} — 2.4 sözdizimi farkı olabilir)"; fi
   fi
 else atla "posta kurulu değil"; fi
 
