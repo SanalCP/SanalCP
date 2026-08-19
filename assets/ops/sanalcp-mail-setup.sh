@@ -114,13 +114,20 @@ log "5 mysql-virtual-*.cf dosyası yazıldı (root:postfix 0640)"
 
 echo "════ Postfix: main.cf / master.cf ════"
 if ! grep -q 'sanalcp-mail' /etc/postfix/main.cf; then
-  # Alma/RHEL stok main.cf bu dört anahtarı zaten tanımlar. Aynı anahtarları alta
-  # eklemek çalışsa da her postconf/postfix çağrısında "overriding earlier entry"
-  # üretir; önce stok tanımları kaldırıp tek bir kanonik blok yaz.
-  postconf -X inet_interfaces
-  postconf -X mydestination
-  postconf -X smtpd_tls_cert_file
-  postconf -X smtpd_tls_key_file
+  # Stok main.cf'te de tanımlı olan anahtarları alta tekrar eklemek çalışır
+  # (sonuncusu kazanır) ama her postconf/postfix/sendmail çağrısında
+  # "overriding earlier entry" uyarısı bastırır — gerçek uyarılar bu gürültünün
+  # içinde kaybolur. Önce stok tanımları kaldırıp tek kanonik blok yazıyoruz.
+  #
+  # 🔴 Anahtar listesi ŞABLONDAN TÜRETİLİR, elle sayılmaz. Eskiden dört anahtar
+  # sabit yazılıydı (RHEL stok main.cf'ine bakılarak); Debian'ın stok dosyası
+  # smtpd_relay_restrictions'ı da tanımladığı için Faz 5b canlı testinde uyarı
+  # geri geldi. Şablona yeni bir anahtar eklendiğinde burasının unutulmaması
+  # için liste artık şablonun kendisinden okunuyor.
+  awk '/^[a-z_0-9]+[[:space:]]*=/{sub(/[[:space:]]*=.*/,"");print}' \
+    "$TMPL/postfix/main.cf.append" | sort -u | while read -r anahtar; do
+    [ -n "$anahtar" ] && postconf -X "$anahtar" 2>/dev/null || true
+  done
   cat "$TMPL/postfix/main.cf.append" >> /etc/postfix/main.cf
   log "main.cf'e sanalcp-mail bloğu eklendi"
 fi
@@ -146,12 +153,18 @@ if [ "${DVANA:-2}" -gt 2 ] 2>/dev/null || { [ "${DVANA:-2}" = 2 ] && [ "${DVIKI:
   chmod 640 /etc/dovecot/conf.d/10-sanalcp-mail.conf   # DB parolası İÇERİR
   # 2.3'ten kalan SQL dosyası varsa artık okunmuyor; yanıltmasın diye kaldırılır.
   [ -f /etc/dovecot/dovecot-sql.conf.ext ] && mv /etc/dovecot/dovecot-sql.conf.ext /etc/dovecot/dovecot-sql.conf.ext.2.3-devredisi
-  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde)"
+  # 🔴 LMTP kullanıcı adı biçimi: stok 20-lmtp.conf alan adını kırpar ve bizim
+  # 10- dosyamızdan SONRA yüklenir; override 99- önekiyle en sona konmalı.
+  # Ayrıntı için şablonun kendi başlığına bakın.
+  cp "$TMPL/dovecot/99-sanalcp-lmtp-2.4.conf.tmpl" /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
+  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde, LMTP override yazıldı)"
 else
   sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
   chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
   chmod 640 /etc/dovecot/dovecot-sql.conf.ext
   cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  # 2.4'ten geri düşülen kurulumda kalmasın: 2.3 bu ayarı tanımaz, dovecot açılmaz.
+  rm -f /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
   log "dovecot ${DVSURUM:-2.3.x} → 2.3 şablonu kuruldu"
 fi
 # Stok PAM passdb'sini kapat: kutular sanaldır (SQL passdb). Açık kalırsa her

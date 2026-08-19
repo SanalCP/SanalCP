@@ -1,8 +1,9 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-5a tamamlandı; **Faz 5b hazırlığı bitti** (2026-08-19) — MariaDB
-11.8 ve Dovecot 2.4 riskleri kapatıldı. Sıradaki: Faz 5b canlı kurulum
-(Debian 13 sunucu gerekiyor).
+**Durum:** Faz 0-5b tamamlandı (2026-08-19). Debian 13 (trixie) canlı testten
+43 kontrol / 0 hata ile geçti; testte bulunan 5 hata düzeltildi (§5f) — biri
+(kotanın ikinci reboot'ta kaybolması) Debian 12'yi de etkiliyordu.
+Sıradaki: Faz 5c — Ubuntu 26.04.
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -664,6 +665,181 @@ Kurulumun uçtan uca akışı, dovecot 2.4'ün gerçekten AÇILMASI (parse ≠ �
 sanal kutuya IMAP girişi, LMTP teslimatı, MariaDB 11.8'de panelin çalışma-anı
 sorguları ve Faz 5a'daki 39 kontrolün trixie'de tekrarı.
 
+
+---
+
+## 5f. Faz 5b — canlı Debian 13 (trixie) testi ✅ (2026-08-19)
+
+Sunucu: Hetzner Debian 13.6, 2 vCPU / 3.8 GB / 38 GB ext4, çekirdek 6.12
+(`6.12.101+deb13-cloud-amd64`). Kurulum sıfırdan, `--lang tr`.
+
+### Sonuç
+
+Kurulum **ilk denemede uçtan uca aktı** ve o günkü 40 kabul kontrolünün
+tamamı geçti (kontrol sayısı bu fazda eklenenlerle 44'e çıktı).
+Faz 5a'nın (Debian 12) aksine servis düzeyinde hiçbir şey kırılmadı: MariaDB
+11.8, Dovecot 2.4, PHP 7.4-8.5 (sury), bind9, pure-ftpd, rspamd hepsi ilk
+açılışta ayağa kalktı. §5e'deki iki büyük risk gerçekten kapanmıştı.
+
+Buna rağmen **beş hata** çıktı ve hepsi aynı sınıftandı: *servis ayakta,
+yapılandırma ayrıştırılıyor, ama iş görmüyor.* Statik kontrol ve `doveconf -n`
+beşini de yeşil gösteriyordu.
+
+### Bulunan beş hata
+
+**1. Dovecot 2.4: INBOX mbox yolunda kaldı — teslimat hiç olmuyor**
+
+Şablon `mail_driver = maildir` + `mail_path = %{home}` yazıyor ve Debian'ın stok
+`conf.d/10-mail.conf` dosyasındaki `mail_driver = mbox` / `mail_path` satırlarını
+eziyor. Ama 2.4'te INBOX'ın yeri **AYRI** bir ayar: `mail_inbox_path`. Stok
+dosya onu `/var/mail/%{user}` yapıyor, biz hiç yazmadığımız için ayakta kalıyor.
+2.3'te böyle bir ayar yoktu (`mail_location` tek başına her şeyi tarif ediyordu),
+o yüzden 2.3 şablonundan çeviri yaparken görünmez kaldı.
+
+Sonuç: dovecot açılır, `doveconf -n` temizdir, IMAP girişi çalışır — ama INBOX
+`/var/mail` altında mbox olarak açılmaya çalışıldığı için sanal kutunun oraya
+yazma izni yoktur ve teslimat `Failed to autocreate mailbox: Permission denied`
+ile düşer.
+
+Düzeltme: 2.4 şablonuna `mail_inbox_path = %{home}`. Bu değer 2.3'teki
+`mail_location = maildir:~/` yerleşimini birebir tekrarlar (cur/new/tmp doğrudan
+kutu kökünde) — `%{home}` yerine boş bırakmak da çalışıyor ama INBOX'ı
+`~/.INBOX/` altına alır ve 2.3 sunucusundan göç ile yedek/geri yükleme
+dağıtıma göre farklılaşırdı.
+
+**2. Dovecot 2.4: LMTP alan adını kırpıyor — `550 User doesn't exist`**
+
+Debian'ın stok `conf.d/20-lmtp.conf` dosyası şunu yazar:
+
+```
+protocol lmtp {
+  auth_username_format = %{user | username | lower}
+}
+```
+
+`username` filtresi adresin alan adını atar. Tek alan adlı klasik kurulumda
+doğru, sanal alan adlarında yıkıcı: userdb sorgusu `email='test'` olarak koşar,
+hiçbir satır dönmez, postfix `550 5.1.1 User doesn't exist` ile **bounce** eder.
+IMAP girişi çalıştığı için hata ilk bakışta görünmez — kutuya girilir, posta hiç
+düşmez.
+
+🔴 Ayarı ana şablona yazmak İŞE YARAMAZ: dovecot `conf.d/*.conf` dosyalarını
+alfabetik yükler ve `20-lmtp.conf`, bizim `10-sanalcp-mail.conf`'umuzdan SONRA
+gelip değeri geri ezer. Bu yüzden override ayrı bir dosyada, `99-` önekiyle:
+`assets/mail/dovecot/99-sanalcp-lmtp-2.4.conf.tmpl`. 2.3'e geri düşülürse
+kaldırılıyor (2.3 bu ayarı tanımaz).
+
+**3. `main.cf`'te tekrar eden anahtar — her postfix çağrısında uyarı**
+
+`sanalcp-mail-setup` kendi bloğunu eklemeden önce stok tanımları `postconf -X`
+ile siliyordu, ama silinecek anahtar listesi **elle dört tane** yazılmıştı
+(RHEL'in stok `main.cf`'ine bakılarak). Debian'ın stok dosyası
+`smtpd_relay_restrictions`'ı da tanımlıyor, dolayısıyla her `postfix`,
+`postconf`, `sendmail`, `mailq` çağrısı `overriding earlier entry` uyarısı
+bastırıyordu. Değer aynı olduğu için güvenlik etkisi yok — ama gerçek uyarılar
+bu gürültünün içinde kaybolur.
+
+Düzeltme: liste artık `main.cf.append` şablonunun kendisinden türetiliyor
+(31 anahtar). Şablona yeni anahtar eklendiğinde burasının unutulması mümkün
+değil. Faz 5a'daki nginx `gzip` tekrarıyla aynı sınıf hata.
+
+**4. Yedi PHP-FPM master'ı birden çalışıyor — ~197 MB boşa**
+
+apt, her PHP sürümünün FPM servisini kurulumda **başlatır ve enable eder**;
+kurulum betiği de üstüne her sürüm için `svc_hazirla` çağırıyordu. Taze kurulan
+sunucuda 7.4-8.5 arası yedi master ayaktaydı, altısının tek bir havuzu bile
+yoktu (kiracılar kendi `php-fpm-<kullanıcı>.service` birimlerini kullanıyor).
+Ölçüm: 197 MB, ve her açılışta geri geliyor. RHEL'de dnf servisleri
+başlatmadığı için bu tamamen Debian'a özgü bir regresyon.
+
+Düzeltme: bir sürümün master'ı **yalnız o sürümde kiracı havuzu varsa**
+(`c_*.conf`) başlatılıyor; yoksa `disable --now`. Kontrol "Debian mi" değil
+"havuz var mı" — mevcut sunucularda 8.1'de canlı kiracı varsa servis
+durdurulmamalı ve güncelleme sırasında installer'ın yeniden koşması siteleri
+düşürmemeli. Panel, paylaşılan havuza geri düşen bir kiracı için o sürümü
+talep üzerine geri açıyor (`provisioner.paylasilanFPMHazirla`: enable +
+reload-or-restart). `enable`'ın oraya eklenmesi bu düzeltmenin ön koşuluydu —
+`reload-or-restart` durmuş servisi başlatır ama disable kalırsa ilk reboot'ta
+site 502 verirdi.
+
+**5. 🔴 Disk kotası ikinci reboot'ta sessizce kayboluyor**
+
+En ciddi bulgu. `sanalcp-quotacheck.service` birimi şu koşulu taşıyordu:
+
+```
+ConditionPathExists=!/aquota.user
+```
+
+Koşul birimin **tamamına** uygulanıyor, oysa birim İKİ ayrı iş yapıyor:
+
+| İş | Ne sıklıkta gerekli |
+|---|---|
+| `quotacheck -cum /` | bir kez (dosyayı üretir, büyük diskte dakikalar) |
+| `quotaon -u /` | **her açılışta** |
+
+İlk reboot'ta `/aquota.user` yok, birim koşar, kota açılır — her şey sağlıklı
+görünür. İkinci reboot'ta dosya artık vardır, koşul tutmaz, systemd birimi
+atlar ve `quotaon` hiç çağrılmaz. Sunucu, **kota muhasebesi açık ama
+enforcement kapalı** halde gelir: `repquota` çalışır, sayılar doğrudur, hiçbir
+limit uygulanmaz.
+
+Dağıtımın kendi birimi bizi kurtarmıyor: `systemd-fstab-generator` quotaon
+bağımlılığını **`/etc/fstab`'daki kota seçeneklerinden** kurar, kök dosya
+sistemi ise `usrquota`'yı çekirdek komut satırından (`rootflags=`) alıyor —
+dolayısıyla `quotaon-root.service`'i hiçbir şey çekmiyor. Ayrıca Debian'da
+`quotaon.service` diye bir birim yok (paket `quota.service` / `quotaon@.service`
+gönderiyor), yani installer'daki `systemctl enable quotaon.service` çağrısı da
+sessizce başarısız oluyordu.
+
+Düzeltme: koşul birimden kaldırıldı; `quotacheck` kendi `ExecStart`'ı içinde
+dosya yokluğuna göre korunuyor, `quotaon` her açılışta koşuyor.
+
+🔴 **İkinci katman:** ilk düzeltme denendiğinde birim sunucuda DEĞİŞMEDİ. Birimi
+yazan blok, "kota henüz kurulu değil" dalının içindeydi; kök fs'te kota zaten
+aktifse installer `root fs user quota already active` deyip bloğu tamamen
+atlıyordu. Yani düzeltme, kurulu hiçbir sunucuya `sanalcp-update` ile **asla**
+ulaşmayacaktı — hata sonsuza kadar yaşardı. Birim artık her koşuda yazılıyor;
+mount'ta kota zaten varsa birim hemen başlatılıp enforcement **reboot
+gerekmeden** geri getiriliyor (mevcut sunucuların onarım yolu). Kurulum
+çıktısında yeni satır: `✓ quota enforcement active (quotaon)`.
+
+**Bu hata Debian 12'yi de aynı şekilde etkiliyor.** Faz 5a'da tek reboot
+yaptığım için görünmedi — tek reboot bu hatayı kusursuz sağlıklı gösterir.
+
+### Testlere eklenenler
+
+| Test | Ne yakalar |
+|---|---|
+| `TestDovecot24SablonuInboxYolunuEziyor` | `mail_inbox_path` şablondan düşerse |
+| `TestDovecot24LMTPKullaniciBicimiOverride` | `\| username` filtresi geri gelirse; ayrıca ayarın ana şablona (ezilir) yazılmasını engeller |
+| kabul: `mail_inbox_path` **etkin** değeri | şablon doğru ama stok dosya eziyorsa |
+| kabul: LMTP `auth_username_format` **etkin** değeri | aynı |
+| kabul: `postconf -n` uyarı sayısı | main.cf'te tekrar eden anahtar |
+| kabul: `sanalcp-quotacheck` bu açılışta koştu mu | kota biriminin tek seferlik koşula geri dönmesi |
+
+🔴 İlk iki kabul kontrolü **etkin değere** bakıyor, dosya içeriğine değil. Bu
+faz bunun neden şart olduğunu iki kez gösterdi: dosyamız doğru yazılmışken stok
+`conf.d` dosyaları değeri geri ezdi.
+
+Kota kalıcılık kontrolü de aynı mantıkta: "quotaon şu an açık" ile "sonraki
+açılışta da açık olacak" farklı iddialar. Birim `RemainAfterExit=yes` taşıdığı
+için, bu açılışta koştuysa `active` görünür; koşul yüzünden atlandıysa
+`inactive` kalır ve kontrol düşer.
+
+### Doğrulanan davranışlar
+
+- MariaDB **11.8.6** — 69 migration diskte/DB'de eşit, panel sorunsuz
+- Dovecot **2.4.1** — 2.4 şablonu birebir kuruldu, `doveconf -n` temiz
+- Sanal kutuya **IMAPS girişi** (993) ve mesaj okuma
+- Postfix → LMTP → maildir **teslimat**, bounce yok, yerleşim 2.3 ile aynı
+- Kiracı sağlama: site + Linux kullanıcı + per-tenant FPM + nginx vhost + DB
+- nginx → `php-fpm-<kullanıcı>.sock` üzerinden **PHP 8.3.33 çalıştırma**
+- ext4 kotası: GRUB + tek seferlik reboot + `quotacheck` + `quotaon`, `repquota` okunur
+- kota **enforcement'ı gerçekten uyguluyor**: 5 MB sınırın üstündeki kiracıda iki
+  ayrı `dd` yazması 0 bayt kopyaladı (sınır aşımı bloklandı)
+- **iki ardışık reboot** boyunca kota, site, posta ve panel ayakta kaldı
+- PHP 7.4 · 8.0 · 8.1 · 8.2 · 8.3 · 8.4 · 8.5 sury'den kurulu (8.5 dahil)
+
 ---
 
 ## 6. Sıralama
@@ -677,7 +853,7 @@ sorguları ve Faz 5a'daki 39 kontrolün trixie'de tekrarı.
 | ~~**4**~~ | ✅ Installer soyutlaması + sury deposu (+ planda olmayan 3 Go boşluğu) | orta |
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
-| **5b** | Canlı test: **Debian 13** — MariaDB 11.8 **+ 🔴 Dovecot 2.4 şablonu** (bkz. §5c) | — |
+| ~~**5b**~~ | ✅ Canlı test: **Debian 13** — 44 kontrol/0 hata, 5 hata bulundu ve düzeltildi (§5f) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 

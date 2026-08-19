@@ -1,0 +1,22 @@
+# SanalCP — Dovecot 2.4 LMTP kullanıcı adı biçimi.
+#
+# 🔴 NEDEN AYRI DOSYA: Debian'ın stok conf.d/20-lmtp.conf dosyası şunu yazar:
+#
+#     protocol lmtp {
+#       auth_username_format = %{user | username | lower}
+#     }
+#
+# `username` filtresi adresin ALAN ADINI KIRPAR. Tek alan adlı klasik kurulumda
+# doğrudur; sanal alan adlarında yıkıcıdır — userdb sorgusu `email='test'`
+# olarak koşar, hiçbir satır dönmez ve postfix teslimatı
+# `550 5.1.1 User doesn't exist` ile REDDEDER. IMAP girişi çalıştığı için hata
+# ilk bakışta görünmez: kutuya girilir ama posta hiç düşmez.
+#
+# Ayarı 10-sanalcp-mail.conf içine yazmak İŞE YARAMAZ: dovecot conf.d/*.conf
+# dosyalarını alfabetik yükler, 20-lmtp.conf bizim 10- dosyamızdan SONRA gelir
+# ve değeri geri ezer. Bu yüzden override 99- önekiyle en sona konuyor.
+#
+# Sadece 2.4 için gerekli — 2.3'te stok 20-lmtp.conf böyle bir satır taşımaz.
+protocol lmtp {
+  auth_username_format = %{user | lower}
+}

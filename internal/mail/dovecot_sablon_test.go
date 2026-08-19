@@ -95,3 +95,42 @@ func TestDovecotSablonlariParolaYerTutucusuTasir(t *testing.T) {
 		t.Error("2.3 SQL şablonunda __PANEL_MAIL_DB_PASS__ yok")
 	}
 }
+
+// 🔴 Faz 5b canlı testinde bulundu: 2.4 şablonu mail_driver + mail_path yazıyor
+// ama Debian'ın stok 10-mail.conf'u AYRI bir `mail_inbox_path` ayarı
+// (/var/mail/%{user}, mbox) tanımlıyor ve bizim satırlarımız onu ezmiyordu.
+// Sonuç: dovecot açılır, IMAP girişi çalışır, ama INBOX /var/mail altında mbox
+// olarak açılmaya çalışıldığı için teslimat "Permission denied" ile düşerdi.
+// %{home} 2.3'teki `mail_location = maildir:~/` yerleşimini birebir tekrarlar.
+func TestDovecot24SablonuInboxYolunuEziyor(t *testing.T) {
+	a := yalnizAyarSatirlari(sablonOku(t, "10-sanalcp-mail-2.4.conf.tmpl"))
+	if !strings.Contains(a, "mail_inbox_path = %{home}") {
+		t.Error("2.4 şablonunda `mail_inbox_path = %{home}` yok — stok mbox INBOX yolu ayakta kalır, posta teslim edilmez")
+	}
+}
+
+// 🔴 Faz 5b canlı testinde bulundu: stok 20-lmtp.conf, protocol lmtp içinde
+// `auth_username_format = %{user | username | lower}` yazar; `username` filtresi
+// alan adını kırpar ve sanal kutu userdb sorgusu hiç eşleşmez
+// (postfix: "550 5.1.1 User doesn't exist"). Dovecot conf.d/*.conf dosyalarını
+// ALFABETİK yükler, yani 20-lmtp.conf bizim 10- dosyamızı ezer — override'ın
+// 99- önekiyle AYRI dosyada durması bu testin asıl konusu.
+func TestDovecot24LMTPKullaniciBicimiOverride(t *testing.T) {
+	a := yalnizAyarSatirlari(sablonOku(t, "99-sanalcp-lmtp-2.4.conf.tmpl"))
+	if !strings.Contains(a, "protocol lmtp") {
+		t.Error("99- override dosyasında `protocol lmtp` bloğu yok")
+	}
+	if !strings.Contains(a, "auth_username_format = %{user | lower}") {
+		t.Error("99- override dosyasında `auth_username_format = %{user | lower}` yok")
+	}
+	// `username` filtresi tam olarak kaçındığımız şey — sızarsa hata geri gelir.
+	if strings.Contains(a, "| username") {
+		t.Error("99- override dosyasında `| username` filtresi var — alan adını kırpar, sanal kutulara teslimat durur")
+	}
+	// Ana şablona yazmak İŞE YARAMAZ (20-lmtp.conf sonra yüklenir); oraya
+	// konursa bu test sessizce yeşil kalmasın diye açıkça kontrol ediliyor.
+	ana := yalnizAyarSatirlari(sablonOku(t, "10-sanalcp-mail-2.4.conf.tmpl"))
+	if strings.Contains(ana, "auth_username_format") {
+		t.Error("auth_username_format ana 2.4 şablonunda — stok 20-lmtp.conf onu ezer, override 99- dosyasında olmalı")
+	}
+}

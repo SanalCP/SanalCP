@@ -19,6 +19,16 @@ protocols = imap lmtp
 mail_driver = maildir
 mail_path = %{home}
 
+# 🔴 mail_inbox_path: 2.4'te INBOX'ın yeri AYRI bir ayar. Debian'ın stok
+# conf.d/10-mail.conf dosyası `mail_inbox_path = /var/mail/%{user}` (mbox) yazar
+# ve bizim mail_driver/mail_path satırlarımız onu ezse de BU ayar ayakta kalır —
+# sonuç: dovecot INBOX'ı /var/mail altında mbox olarak açmaya çalışır, sanal
+# kutuda o yola yazma izni olmadığı için teslimat "Permission denied" ile düşer.
+# %{home} vermek 2.3'teki `mail_location = maildir:~/` yerleşimini birebir
+# tekrarlar (cur/new/tmp doğrudan kutu kökünde) — yedek/geri yükleme ve
+# 2.3 sunucusundan göç bu sayede dağıtımdan bağımsız çalışır.
+mail_inbox_path = %{home}
+
 # 🔴 Stok auth-system (PAM) KAPATILMALIDIR — kurulum betiği ve panelin
 # HealDovecotAuth'u bunu yapar. Açık kalırsa her sanal kutu girişi önce PAM'a
 # sorulur (pam_unix gecikmesi ~2 sn) ve IMAP üzerinden root dahil sistem

@@ -111,6 +111,18 @@ elif findmnt -no OPTIONS / | grep -qwE 'usrquota|uquota|quota'; then
       *"is on"*) gecti "ext kota enforcement açık (quotaon)" ;;
       *)         kaldi "mount kotalı ama quotaon KAPALI (muhasebe var, limit uygulanmıyor)" ;;
     esac
+
+    # 🔴 KALICILIK: quotaon'un ŞU AN açık olması, SONRAKİ açılışta da açık
+    # olacağı anlamına GELMEZ. Birim tek seferlik bir koşulla (ilk açılışta
+    # dosya yokken) gelirse ilk reboot sağlıklı görünür, ikinciden itibaren
+    # enforcement sessizce kaybolur — Faz 5b'de tam olarak bu yaşandı.
+    # RemainAfterExit=yes olduğu için birim BU açılışta koştuysa "active" olur.
+    if systemctl list-unit-files sanalcp-quotacheck.service >/dev/null 2>&1; then
+      case "$(systemctl is-active sanalcp-quotacheck.service 2>/dev/null)" in
+        active) gecti "kota birimi bu açılışta koştu (quotaon her boot'ta)" ;;
+        *)      kaldi "sanalcp-quotacheck bu açılışta koşmadı — sonraki reboot'ta enforcement kaybolur" ;;
+      esac
+    fi
   fi
   repquota -u -O csv / >/dev/null 2>&1 && gecti "repquota okunabiliyor" || kaldi "repquota başarısız"
 else
@@ -146,6 +158,34 @@ if command -v postconf >/dev/null 2>&1; then
           || kaldi "dovecot $DVER ama 2.3 şablonu değil (mail_location yok)"
       fi
     else kaldi "doveconf -n BAŞARISIZ (dovecot ${DVER:-?} — 2.4 sözdizimi farkı olabilir)"; fi
+
+    # 🔴 ETKİN DEĞERLER — şablona bakmak YETMEZ. Aşağıdaki iki ayar bizim
+    # dosyamızda doğru yazılsa bile stok conf.d dosyaları tarafından ezilebilir
+    # (dovecot conf.d/*.conf'u ALFABETİK yükler). İkisi de Faz 5b canlı testinde
+    # tam olarak böyle kaçtı: servis ayakta, IMAP girişi çalışıyor, posta düşmüyor.
+    if printf '%s' "$DVER" | grep -qE '^(2\.[4-9]|[3-9])'; then
+      IPATH=$(doveconf -h mail_inbox_path 2>/dev/null)
+      case "$IPATH" in
+        */var/mail/*) kaldi "mail_inbox_path stok mbox yolunda ($IPATH) — INBOX'a teslimat 'Permission denied' ile düşer" ;;
+        *)            gecti "mail_inbox_path maildir'de (${IPATH:-kutu kökü})" ;;
+      esac
+      # LMTP kullanıcı adı biçimi: `username` filtresi alan adını kırpar.
+      LFMT=$(doveconf -f protocol=lmtp -h auth_username_format 2>/dev/null)
+      case "$LFMT" in
+        *username*) kaldi "LMTP auth_username_format alan adını kırpıyor ($LFMT) — sanal kutulara teslimat 550 User doesn't exist" ;;
+        "")         kaldi "LMTP auth_username_format okunamadı" ;;
+        *)          gecti "LMTP auth_username_format alan adını koruyor ($LFMT)" ;;
+      esac
+    fi
+  fi
+  # Postfix uyarı gürültüsü: aynı anahtarın main.cf'te iki kez tanımlanması
+  # her postfix/postconf çağrısında "overriding earlier entry" bastırır ve
+  # GERÇEK uyarıları gömer.
+  if command -v postconf >/dev/null 2>&1; then
+    PFUYARI=$(postconf -n 2>&1 >/dev/null | grep -c 'overriding earlier entry' || true)
+    [ "${PFUYARI:-0}" -eq 0 ] \
+      && gecti "main.cf'te tekrar eden anahtar yok" \
+      || kaldi "main.cf'te $PFUYARI tekrar eden anahtar (postconf 'overriding earlier entry' uyarısı)"
   fi
 else atla "posta kurulu değil"; fi
 

@@ -271,11 +271,14 @@ case "$ROOTFS_TYPE" in
 esac
 if [ -z "$KOTA_FLAG" ]; then
   warn "root fs is '$ROOTFS_TYPE' — disk quota is not supported there (only XFS and ext2/3/4); the panel will report quota as unavailable"
-elif echo "$ROOTFS_OPTS" | grep -qwE 'usrquota|uquota|quota'; then
-  ok "root fs user quota already active ($ROOTFS_TYPE)"
 else
-  if grep -q "$KOTA_FLAG" /etc/default/grub 2>/dev/null; then
+  KOTA_MOUNTTA=0
+  echo "$ROOTFS_OPTS" | grep -qwE 'usrquota|uquota|quota' && KOTA_MOUNTTA=1
+  if [ "$KOTA_MOUNTTA" = 1 ]; then
+    ok "root fs user quota already active ($ROOTFS_TYPE)"
+  elif grep -q "$KOTA_FLAG" /etc/default/grub 2>/dev/null; then
     ok "GRUB $KOTA_FLAG already present"
+    warn "Disk quota needs a ONE-TIME reboot to take effect (root fs quota can't be enabled via remount)."
   else
     if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub 2>/dev/null; then
       sed -i "s/^\(GRUB_CMDLINE_LINUX=\"[^\"]*\)\"/\1 $KOTA_FLAG\"/" /etc/default/grub
@@ -293,35 +296,64 @@ else
       else grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || true; fi
     fi
     ok "GRUB $KOTA_FLAG added (root is $ROOTFS_TYPE)"
+    warn "Disk quota needs a ONE-TIME reboot to take effect (root fs quota can't be enabled via remount)."
   fi
-  warn "Disk quota needs a ONE-TIME reboot to take effect (root fs quota can't be enabled via remount)."
-  # ext2/3/4 only: after the reboot the accounting files have to exist and quota
-  # has to be switched on. quotaon.service does this on a mount that already
-  # carries usrquota, but the FIRST boot after the flag is added has no aquota.*
-  # yet — quotacheck builds it. Both are no-ops if already done.
+
+  # 🔴 The unit below is written on EVERY run, including when quota is already
+  # active on the mount. It used to sit inside the "quota not set up yet" branch,
+  # so a server that had already rebooted never received a corrected unit — the
+  # bug in item 5 of §5f would have survived every sanalcp-update forever.
+  # ext2/3/4 only. Two DIFFERENT jobs, and they have different lifetimes:
+  #
+  #   quotacheck  → ONCE, to build /aquota.user (minutes on a large disk).
+  #   quotaon     → EVERY boot, or enforcement is silently lost.
+  #
+  # 🔴 The unit used to carry `ConditionPathExists=!/aquota.user` for the whole
+  # service, so from the SECOND boot on systemd skipped it — including the
+  # quotaon call — and the server came up with accounting but NO enforcement.
+  # Found live on Debian 13 (Faz 5b) only because the box was rebooted twice;
+  # a single reboot looks perfectly healthy. Affects Debian 12 the same way.
+  #
+  # Why the distro's own unit does not cover us: systemd-fstab-generator wires
+  # quotaon up from the QUOTA OPTIONS IN /etc/fstab, and the root filesystem
+  # gets its usrquota from the kernel cmdline (rootflags=) instead — so nothing
+  # pulls quotaon-root.service in. `quotaon.service` does not even exist on
+  # Debian (the package ships quota.service / quotaon@.service).
   if [ "$ROOTFS_TYPE" != "xfs" ] && command -v quotacheck >/dev/null 2>&1; then
-    systemctl enable quotaon.service >/dev/null 2>&1 || true
     cat > /etc/systemd/system/sanalcp-quotacheck.service <<'QC'
 [Unit]
-Description=SanalCP — build ext quota accounting files on first boot after rootflags=usrquota
+Description=SanalCP — ext quota accounting files (once) + enforcement (every boot)
 DefaultDependencies=no
 After=local-fs.target
-Before=quotaon.service
-ConditionPathExists=!/aquota.user
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/sbin/quotacheck -cum /
-ExecStart=/usr/sbin/quotaon -u /
+# quotacheck only when the accounting file is missing — it is expensive.
+ExecStart=/bin/sh -c '[ -f /aquota.user ] || /usr/sbin/quotacheck -cum /'
+# quotaon on EVERY boot. Already-on is not an error worth failing the unit for
+# (and `quotaon` exit codes are unreliable in both directions — see
+# internal/kaynaklimit/kota_ext4.go).
+ExecStart=/bin/sh -c '/usr/sbin/quotaon -u / 2>/dev/null || true'
 
 [Install]
 WantedBy=local-fs.target
 QC
     systemctl daemon-reload >/dev/null 2>&1
     systemctl enable sanalcp-quotacheck.service >/dev/null 2>&1 \
-      && ok "quotacheck oneshot armed for the next boot (ext quota accounting files)" \
-      || warn "could not arm quotacheck — after the reboot run: quotacheck -cum / && quotaon -u /"
+      && ok "quota unit armed (quotacheck once + quotaon on every boot)" \
+      || warn "could not arm quota unit — after the reboot run: quotacheck -cum / && quotaon -u /"
+    # Mount already carries quota: enforcement can be restored RIGHT NOW, no
+    # reboot needed. This is the path that repairs an existing server whose
+    # quotaon was lost on its second boot. Not run before the reboot, so
+    # quotacheck never scans a filesystem that has no quota active yet.
+    if [ "$KOTA_MOUNTTA" = 1 ]; then
+      systemctl start sanalcp-quotacheck.service >/dev/null 2>&1 || true
+      case "$(quotaon -p -u / 2>/dev/null || true)" in
+        *"is on"*) ok "quota enforcement active (quotaon)" ;;
+        *)         warn "quotaon still reports off — check: quotacheck -cum / && quotaon -u /" ;;
+      esac
+    fi
   fi
 fi
 
@@ -587,10 +619,37 @@ fi
 # Debian php-fpm has been running since apt installed it — "enable --now" would
 # be a no-op and the pools would never be loaded (found live on Debian 12).
 svc_hazirla "$SYS_PHP_SVC"
+
+# 🔴 A per-version FPM master is only started if that version actually has a
+# TENANT pool (c_*.conf). Reason found live on Debian 13: apt starts AND enables
+# every phpX.Y-fpm at package install, so a fresh box ran 7 masters — 6 of them
+# with no pool at all, costing ~197 MB and coming back on every boot. dnf never
+# starts them, so this was a Debian-only regression.
+#
+# The check is "has tenant pools", NOT "is Debian": on an existing server with
+# live tenants on 8.1 the service MUST keep running, and an update re-running
+# this installer must not knock those sites offline. The panel re-enables a
+# version on demand when a tenant falls back to the shared pool
+# (provisioner.paylasilanFPMHazirla → enable + reload-or-restart).
+atil_fpm=0
 for v in $PHP_VERS; do
-  svc_hazirla "$(debian_mi && echo "php$v-fpm" || echo "php$v-php-fpm")"
+  if debian_mi; then svc="php$v-fpm";     pooldir="/etc/php/$v/fpm/pool.d"
+  else                svc="php$v-php-fpm"; pooldir="/etc/opt/remi/php$v/php-fpm.d"; fi
+  # The system PHP was already handled above; never touch it here (on Debian
+  # $PHP_VERS contains 8.3, whose pool dir holds phpmyadmin/roundcube — not
+  # c_*.conf — so an unguarded loop would disable the panel's own FPM).
+  [ "$svc" = "$SYS_PHP_SVC" ] && continue
+  if ls "$pooldir"/c_*.conf >/dev/null 2>&1; then
+    svc_hazirla "$svc"
+  else
+    systemctl disable --now "$svc" >/dev/null 2>&1 && atil_fpm=$((atil_fpm+1))
+  fi
 done
-ok "php-fpm (system 8.3 + per-version pools, config reloaded)"
+if [ "$atil_fpm" -gt 0 ]; then
+  ok "php-fpm (system $SYS_PHP_SVC active; $atil_fpm idle per-version master stopped — started on demand)"
+else
+  ok "php-fpm (system 8.3 + per-version pools, config reloaded)"
+fi
 
 # ---- named (DNS server) — nameserver for tenant domains ----
 # 🔴 Paths and the service name differ per family; they MUST match

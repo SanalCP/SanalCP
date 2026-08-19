@@ -861,6 +861,21 @@ func phpPoolPath(sk, phpSurum string) (string, string, string) {
 		ay.Service
 }
 
+// paylasilanFPMHazirla: paylasilan phpX.Y-fpm servisini ONCE enable eder, sonra
+// baslatir/reload eder.
+//
+// 🔴 NEDEN enable DE GEREKIYOR: Debian'da apt her PHP surumunun FPM servisini
+// kurulumda baslatir VE enable eder; kurulum betigi kullanilmayan surumleri
+// durdurup disable ederek bosa giden ~30 MB/surum bellegi geri aliyor
+// (Faz 5b canli testinde 6 atil master = ~197 MB olculdu). Paylasilan havuz
+// yoluna geri dusuldugunde (per-tenant FPM rollback'i) o surumun servisi tekrar
+// gerekir: "reload-or-restart" durmus servisi calistirir ama DISABLE kalirsa
+// ilk yeniden baslatmada site 502 verir. Bu yuzden ikisi birlikte yapilir.
+func paylasilanFPMHazirla(svc string) ([]byte, error) {
+	_, _ = exec.Command("systemctl", "enable", svc).CombinedOutput()
+	return exec.Command("systemctl", "reload-or-restart", svc).CombinedOutput()
+}
+
 // writePoolValidated: tenant php-fpm pool dosyasini (sertlestirilmis template ile)
 // yazar, reload ONCESI `php-fpm -t` ile dogrular; gecersizse eski icerige GERI DONER
 // (nginx/DNS'teki backup-rollback deseni). Basariliysa ilgili php-fpm servisini reload eder.
@@ -900,7 +915,7 @@ func writePoolValidated(sk, phpSurum string) (socket, service string, err error)
 			return "", "", fmt.Errorf("php-fpm -t (%s) başarısız, pool geri alındı: %s: %w", v, strings.TrimSpace(string(out)), e)
 		}
 	}
-	if out, e := exec.Command("systemctl", "reload-or-restart", svc).CombinedOutput(); e != nil {
+	if out, e := paylasilanFPMHazirla(svc); e != nil {
 		return "", "", fmt.Errorf("php-fpm (%s) reload: %s: %w", svc, strings.TrimSpace(string(out)), e)
 	}
 	return sock, svc, nil
