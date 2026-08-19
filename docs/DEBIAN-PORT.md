@@ -1,7 +1,7 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-4b tamamlandı; Faz 5a statik ön-uçuşu yapıldı (2026-08-19).
-Sıradaki: Faz 5a canlı kurulum (Debian 12 sunucu gerekiyor).
+**Durum:** Faz 0-4b ve **Faz 5a (canlı Debian 12 testi) tamamlandı** (2026-08-19).
+Sıradaki: Faz 5b — Debian 13 (MariaDB 11.8 + Dovecot 2.4 şablonu).
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -511,6 +511,94 @@ ların MariaDB 10.11'de uygulanması, panelin ayağa kalkması, BIND'in
 `/var/lib/bind`'e yazabilmesi (AppArmor), kota için GRUB + tek seferlik reboot,
 `quotacheck` oneshot'ı, per-tenant PHP-FPM izolasyonu ve sanal FTP girişi.
 
+## 5d. Faz 5a — canlı Debian 12 testi ✅ (2026-08-19)
+
+**Ortam:** Debian 12 bookworm · kök fs **ext4** · MariaDB 10.11.18 · 2 vCPU / 3.8 GB.
+Tertemiz sunucuya `sanalcp-install.sh` ile sıfırdan kurulum.
+
+Kök fs'in ext4 olması şans eseri iyi denk geldi: Faz 3'ün **ext4 kota backend'i**
+de böylece gerçek donanımda sınandı.
+
+### Sonuç
+
+Kabul testi (`scripts/debian-kabul-testi.sh`): **39 kontrol, 0 hata.**
+Installer üç kez üst üste çalıştırıldı — **idempotent**.
+
+Uçtan uca kanıtlananlar:
+
+| Ne | Kanıt |
+|---|---|
+| Kurulum | `EXIT=0`, hiç `✗` yok |
+| Panel | `/healthz` 200, 69 migration MariaDB 10.11'de uygulandı |
+| Giriş | root + PAM ile API token alındı |
+| Site oluşturma | `kotatest.example` → HTTP **200** |
+| PHP | `PHPOK-8.3.33-c_kotatest_example` — kiracının kendi kullanıcısı |
+| İzolasyon | FPM worker'ı `c_kotatest_example` (per-tenant, CageFS muadili) |
+| **Disk kotası** | limitler gerçekten yazıldı: blok **995328/1048576 KiB**, inode **23750/25000** |
+| DNS | zone `/var/lib/bind`'e `bind:bind` yazıldı, `dig` gerçek SOA döndürdü (AppArmor aşıldı) |
+| Posta | postfix check temiz, OpenDKIM **8891** dinliyor, rspamd 11332, `doveconf -n` temiz |
+| FTP | `auth/30mysql` sembolik link, unix/pam kolları kalkmış, port 21 dinliyor |
+
+### Bulunan yedi hata
+
+Statik ön-uçuş paket adlarını ve dosya düzenlerini doğrulamıştı; canlı testin
+bulduğu hataların **hiçbiri o sınıftan değildi**. Hepsi "servis ayakta ama
+sessizce işlevsiz" türü:
+
+1. **MariaDB soketi sabitti** (`internal/hesaplar`) → panel Debian'da HİÇ
+   açılmadı (crash-loop). `osfam.MariaDBSoket()` eklendi: önce var olan adaya
+   bakar, yoksa aile varsayılanı.
+2. 🔴 **`systemctl enable --now` Debian'da yetmiyor.** apt paketi kurarken
+   servisi BAŞLATIR (dnf başlatmaz); biz config'i sonraki adımlarda yazdığımız
+   için servis çoktan çalışıyor ve `enable --now` no-op oluyor. Kanıt: bind9
+   23:54:30'da başlamış, `named.conf` 23:56:27'de yazılmış; php8.3-fpm
+   23:56:02'de başlamış, havuz 23:56:22'de yazılmış. Sonuç: phpMyAdmin FPM
+   soketi hiç oluşmadı, named include'u hiç okunmadı. → ortak kütüphaneye
+   `svc_hazirla` (enable + **restart**).
+3. **`sanalcp-optimize` iki yerden bozuktu:** MariaDB tuning'i Debian'da
+   olmayan `/etc/my.cnf.d`'ye yazıyordu (dosya okunmadı ama "yazıldı" dendi;
+   düzeltince buffer_pool 128M→768M, `skip_name_resolve` OFF→ON) ve nginx perf
+   bloğundaki `gzip on;` Debian'ın stok `nginx.conf`'uyla çakışıp `nginx -t`'yi
+   patlatarak **tüm** tuning'i geri aldırıyordu → artık `nginx.conf`'ta zaten
+   tanımlı direktifler ad bazlı eleniyor.
+4. **PHP sürüm döngüsü ya-hep-ya-hiç'ti:** sury/bookworm'da
+   `php8.5-{intl,opcache,pgsql}` yok ve toplu kurulum 8.5'in diğer 12 paketini
+   de düşürüyordu. Artık tek tek deneniyor, eksikler adıyla raporlanıyor.
+   Ayrıca `update-alternatives` "en yeni"yi seçtiği için `php` CLI 8.4'e
+   kayıyordu (wp-cli/composer onu kullanır) → 8.3'e sabitlendi.
+5. **Kiracı FPM havuzu `listen.owner = nginx` sabitti** → Debian'da havuz
+   "cannot get uid for user 'nginx'" ile reddediliyor, **hiçbir site
+   oluşturulamıyordu**.
+6. **ACL `u:nginx:rX` sabitti** ve `setfacl` hatası yutuluyordu → ACL hiç
+   kurulmuyor, web kullanıcısı `public_html`'i okuyamıyor, **her site 404**.
+   Artık başarısızlık loglanıyor.
+7. **ext4 kota durumu yanlış okunuyordu:** `quotaon -p` kota AÇIKKEN de rc=1
+   dönüyor (quota-tools 4.06); kod `err != nil` görüp stdout'u okumadan
+   dönüyordu → panel çalışan kotayı "kapalı, reboot gerekli" sanıyordu.
+   Faz 3'te "çıkış koduna güvenilemez" notu vardı ama yalnız KAPALI durum
+   doğrulanmıştı. Karar artık saf `ext4AktifCoz`'da ve yalnız stdout'a bakıyor.
+   **Aynı tuzak kabul testi betiğinde de vardı** (`pipefail` + `quotaon | grep`).
+
+> **Ders:** yedi hatanın altısı, "aynı işi yapan ikinci bir yer" olduğu için
+> vardı — soyutlama bir çağrı yerini atlamıştı. Statik testler bunları
+> yakalayamaz; yalnız gerçek bir kurulum yakalar. Faz 5b/5c'de aynı beklenti
+> geçerli.
+
+### Kota etkinleştirme akışı — canlı doğrulandı
+
+Reboot öncesi/sonrası ölçüldü. GRUB'a `rootflags=usrquota` yazıldı, tek seferlik
+reboot sonrası:
+
+```
+mount:    rw,relatime,quota,usrquota,errors=remount-ro
+quotaon:  user quota on / (/dev/sda1) is on      (rc=1 — çıkış kodu yanıltıcı!)
+repquota: User,BlockStatus,FileStatus,BlockUsed,BlockSoftLimit,...
+```
+
+`sanalcp-quotacheck.service` oneshot'ı `/aquota.user`'ı üretti ve `quotaon`'u
+açtı. §4'teki "Faz 5'e kalan canlı sorular" böylece yanıtlandı: **klasik
+`quotacheck` yolu gerekli ve yeterli**, `tune2fs -O quota` denenmedi.
+
 ---
 
 ## 6. Sıralama
@@ -523,7 +611,7 @@ ların MariaDB 10.11'de uygulanması, panelin ayağa kalkması, BIND'in
 | ~~**3**~~ | ✅ Kota backend arayüzü + ext4 uygulaması | **yüksek** |
 | ~~**4**~~ | ✅ Installer soyutlaması + sury deposu (+ planda olmayan 3 Go boşluğu) | orta |
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
-| **5a** | Canlı test: **Debian 12** (MariaDB 10.11 — bilinen DB, yalnız dağıtım farkı test edilir) | — |
+| ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
 | **5b** | Canlı test: **Debian 13** — MariaDB 11.8 **+ 🔴 Dovecot 2.4 şablonu** (bkz. §5c) | — |
 | **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
