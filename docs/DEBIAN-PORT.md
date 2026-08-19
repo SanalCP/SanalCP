@@ -1,9 +1,10 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-5c tamamlandı (2026-08-19). Debian 12, Debian 13 ve
-Ubuntu 26.04 LTS canlı testten geçti (sırasıyla 42/42, 44/44, 46/46 kontrol),
-her üçünde iki ardışık reboot sonrası kota, site ve posta doğrulandı.
-Sıradaki: Ubuntu 24.04 canlı testi ve Faz 6 (Apache backend + CVE ekranı).
+**Durum:** Faz 0-5c tamamlandı (2026-08-19). **Dört hedefin dördü de** canlı
+testten geçti: Debian 12, Debian 13, Ubuntu 26.04 LTS ve Ubuntu 24.04 LTS.
+Her birinde iki ardışık reboot sonrası kota enforcement'ı, uçtan uca posta
+teslimatı ve site servisi doğrulandı.
+Sıradaki: Faz 6 (Apache backend + CVE ekranı).
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -1091,10 +1092,126 @@ ayrıştırdığı için panel kotayı doğru raporluyor
 - **İki ardışık reboot** sonrası: 46/46 kontrol, valkey 6379'un sahibi, kota
   açık, site ve posta çalışıyor, valkey `NOAUTH` diyor (yani panelin ACL'i etkin)
 
-### Kalan: Ubuntu 24.04
+### Ubuntu 24.04 → §5i
 
-24.04 (noble) statik olarak ayrıldı (§5g): Dovecot 2.3 şablonu, MariaDB 10.11 ve
-**valkey yerine redis-server**. Kod yolları hazır ama canlı test edilmedi.
+
+---
+
+## 5i. Ubuntu 24.04 LTS (noble) canlı testi ✅ (2026-08-19)
+
+Sunucu: Ubuntu 24.04.4 LTS (noble), çekirdek 6.8, 2 vCPU / 3.8 GB / ext4.
+
+§5g'de statik olarak ayırt edilen kararlar noble'da doğru çıktı ve canlıda
+çalıştı: önbellek `redis-server`'a düştü ve 6379'un sahibi o oldu, Dovecot 2.3
+şablonu kuruldu, MariaDB 10.11.14.
+
+"Muhtemelen geçer" diye başlanan bu test **üç hata** buldu; ikisi diğer üç
+dağıtımı da etkiliyordu.
+
+### 🔴 1. `pipefail` + `grep -q` = SIGPIPE — kurulum adım 1'de öldü
+
+İlk deneme şu satırla durdu:
+
+```
+✗ deb.sury.org repo added but php8.3-fpm doesn't resolve to it
+  — check /etc/apt/sources.list.d/sanalcp-sury-php.list
+```
+
+İşaret edilen dosya **kusursuzdu**; depo da çalışıyordu. Kontrol şuydu:
+
+```bash
+apt-cache policy php8.3-fpm 2>/dev/null | grep -q sury.org
+```
+
+`grep -q` eşleşmeyi bulduğu **an** çıkar; bu boruyu kapatır, `apt-cache` SIGPIPE
+alır ve `set -o pipefail` altında boru hattı **141** döner — eşleşme BAŞARILI
+olmasına rağmen. Ölçüldü:
+
+| | rc |
+|---|---|
+| `pipefail` ile | **141** |
+| `pipefail` olmadan | 0 |
+| çıktı değişkene alınıp eşleştirilince | 0 |
+
+Debian 12/13 ve Ubuntu 26.04'te neden geçti: orada `php8.3-fpm` yalnız sury'de
+var, `apt-cache` çıktısı kısa, grep çıkmadan yazmayı bitiriyor. noble'da paket
+ayrıca `noble`, `noble-updates` ve `noble-security`'de de var; çıktı uzuyor ve
+yarış çevriliyor. Yani dağıtım farkı değil, **çıktı uzunluğu** farkı — bu yüzden
+sınıf olarak sinsi.
+
+Bu kod tabanında **üçüncü** tekrar:
+
+1. `quotaon | grep` → kota kapalı sanıldı (`internal/kaynaklimit/kota_ext4.go`)
+2. `ss -lntp | grep -q 127.0.0.1:8891` → OpenDKIM dinlemiyor sanıldı; §5h'de
+   "sebebini kesinleştiremedim" diye bırakılan yanlış-olumsuzun açıklaması budur
+3. `apt-cache policy | grep -q sury.org` → bu
+
+Düzeltme tek tek değil, sınıf olarak:
+
+- `sanalcp-ortak.sh`'a `cikti_esler` eklendi: çıktıyı değişkene alır, bash'in
+  `=~` operatörüyle eşleştirir — hiç boru yok, dolayısıyla SIGPIPE de yok.
+- Riskli 13 çağrı çevrildi (installer, ftp-setup, redis-setup, `pkg_kurulu`,
+  kabul testinin tamamı).
+- Üreticisi gerçekten builtin (`echo`) ya da anında biten (`head -c4`) satırlar
+  `# sigpipe-ok` ile işaretlendi — karar bilinçli olsun diye.
+- `TestPipefailBetiklerindeGrepQBoruHattiYok` deseni yasaklıyor: `pipefail`
+  taşıyan bir betikte işaretsiz her `| grep -q` testi kırar.
+
+### 🔴 2. Çekirdekte vfsv2 kota formatı yok — kota hiç açılmıyor
+
+Reboot sonrası kota kapalıydı; oysa mount `usrquota` taşıyor, `/aquota.user`
+üretilmiş ve birim başarıyla koşmuştu. Elle çalıştırınca gerçek sebep çıktı:
+
+```
+quotaon: using //aquota.user on /dev/sda1 [/]: No such process
+quotaon: Quota format not supported in kernel.
+```
+
+Ubuntu çekirdeği bu formatı **modül** olarak veriyor (`CONFIG_QFMT_V2=m`) ve
+modülü `linux-modules-extra-*` paketine koyuyor — bulut/minimal imajlar o paketi
+kurmuyor:
+
+```
+/lib/modules/6.8.0-137-generic/kernel/fs/quota/  → dizin YOK
+modprobe quota_v2 → FATAL: Module quota_v2 not found
+```
+
+Debian 12/13 ve Ubuntu 26.04'te modül mevcut olduğu için orada görünmedi.
+
+Düzeltme: kurulum `modprobe quota_v2` deniyor; olmazsa
+`linux-modules-extra-$(uname -r)` kurup tekrar deniyor. Başarılıysa
+`/etc/modules-load.d/sanalcp-quota.conf` yazılıyor ve birime
+`ExecStartPre=-/sbin/modprobe quota_v2` ekleniyor. Sağlanamazsa kurulum bunu
+**dürüstçe** söylüyor ("enforcement will not work on this kernel;
+accounting-only") — sessizce başarılı görünmüyor.
+
+### 🔴 3. `systemctl start` zaten aktif birimde no-op
+
+İkinci düzeltme uygulandıktan sonra modül yüklendi, birim `active` göründü —
+kota yine kapalıydı. Sebep onarım yolundaki tek kelimeydi:
+
+```bash
+systemctl start sanalcp-quotacheck.service     # HİÇBİR ŞEY YAPMAZ
+```
+
+Birim `RemainAfterExit=yes` taşıyor; açılışta bir kez koştuğu için systemd onu
+zaten "başlatılmış" sayar ve `start` sessizce hiçbir şey yapmaz. `restart`
+gerekiyordu. Faz 5a'daki "`enable --now` apt'te no-op" hatasıyla aynı sınıf:
+*komut başarıyla döndü, ama iş yapılmadı.*
+
+### Doğrulama yöntemi
+
+Her düzeltme **bozuk durum yeniden kurularak** kanıtlandı: modül paketi
+kaldırıldı, `modules-load.d` silindi, `quotaoff` çekildi ve kurulum sıfırdan
+koşturuldu. Ara adımda "modül geldi ama kota hâlâ kapalı" görülmeseydi 3 numaralı
+hata fark edilmeyecekti.
+
+### Sonuç
+
+İki ardışık reboot sonrası: **43 kontrol / 0 hata**, `quota_v2` her açılışta
+yükleniyor, kota enforcement gerçekten uyguluyor (sınır üstü `dd` → 0 bayt),
+LMTP teslimatı + IMAPS okuma, nginx üzerinden PHP 8.3.33, önbellek 6379'un
+sahibi `redis-server`, panel 200.
 
 ---
 
@@ -1110,7 +1227,7 @@ ayrıştırdığı için panel kotayı doğru raporluyor
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
 | ~~**5b**~~ | ✅ Canlı test: **Debian 13** — 44 kontrol/0 hata, 5 hata bulundu ve düzeltildi (§5f) | — |
-| ~~**5c**~~ | ✅ Statik ön-uçuş (§5g) + canlı **Ubuntu 26.04** (§5h) — 46 kontrol/0 hata, 2 hata bulundu ve düzeltildi · 24.04 canlı testi kaldı | — |
+| ~~**5c**~~ | ✅ Statik ön-uçuş (§5g) + canlı **Ubuntu 26.04** (§5h, 46/0) ve **Ubuntu 24.04** (§5i, 43/0) — 5 hata bulundu ve düzeltildi | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
 **Faz 0-4b tamamlandı (2026-08-19).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`

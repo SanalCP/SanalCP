@@ -42,7 +42,7 @@ done
 if servis_aktif "$SYS_PHP_SVC"; then gecti "sistem PHP → $SYS_PHP_SVC active"; else kaldi "sistem PHP → $SYS_PHP_SVC DEĞİL active"; fi
 kontrol "panel (sanalcp) active" servis_aktif sanalcp
 # FTP ve posta opsiyonel bileşenler: kurulmadıysa test edilmez, YANLIŞ negatif üretmez.
-if systemctl list-unit-files --no-legend "$(servis_ad ftp).service" 2>/dev/null | grep -q .; then
+if cikti_esler '.' systemctl list-unit-files --no-legend "$(servis_ad ftp).service"; then
   kontrol "ftp → $(servis_ad ftp) active" servis_aktif "$(servis_ad ftp)"
 else atla "ftp kurulu değil"; fi
 
@@ -98,7 +98,7 @@ KURULU=$(php_kurulu_surumler | tr '\n' ' ')
 [ -n "$KURULU" ] && gecti "kurulu PHP sürümleri: $KURULU" || kaldi "hiç PHP sürümü bulunamadı"
 [ -d "$SYS_PHP_POOL_DIR" ] && gecti "sistem havuz dizini $SYS_PHP_POOL_DIR" || kaldi "sistem havuz dizini YOK: $SYS_PHP_POOL_DIR"
 if debian_mi; then
-  apt-cache policy php8.3-fpm 2>/dev/null | grep -q sury.org && gecti "php8.3-fpm sury deposundan" || kaldi "php8.3-fpm sury'den GELMİYOR"
+  cikti_esler 'sury\.org' apt-cache policy php8.3-fpm && gecti "php8.3-fpm sury deposundan" || kaldi "php8.3-fpm sury'den GELMİYOR"
 fi
 
 baslik "DNS (BIND)"
@@ -113,7 +113,7 @@ if runuser -u "$DNS_USER" -- test -w "$DNS_ZONE_DIR" 2>/dev/null; then
   gecti "$DNS_USER kullanıcısı $DNS_ZONE_DIR dizinine yazabiliyor"
 else kaldi "$DNS_USER kullanıcısı $DNS_ZONE_DIR dizinine YAZAMIYOR (AppArmor/izin)"; fi
 if debian_mi && command -v aa-status >/dev/null 2>&1; then
-  aa-status --json 2>/dev/null | grep -q 'usr.sbin.named' && atla "AppArmor named profili etkin — zone yazma yukarıda gerçekten test edildi" || gecti "AppArmor'da named profili yok"
+  cikti_esler 'usr.sbin.named' aa-status --json && atla "AppArmor named profili etkin — zone yazma yukarıda gerçekten test edildi" || gecti "AppArmor'da named profili yok"
 fi
 
 baslik "Disk kotası"
@@ -125,7 +125,7 @@ case "$FS" in
 esac
 if [ -z "$BEKLENEN" ]; then
   atla "kök fs '$FS' kotayı desteklemiyor — panel bunu dürüstçe kapalı göstermeli"
-elif findmnt -no OPTIONS / | grep -qwE 'usrquota|uquota|quota'; then
+elif cikti_esler '(^|,)(usrquota|uquota|quota)(,|$)' findmnt -no OPTIONS /; then
   gecti "kök fs kotası MOUNT'ta etkin ($FS)"
   if [ "$FS" != xfs ]; then
     # 🔴 quotaon'un ÇIKIŞ KODUNA GÜVENME: kota AÇIKKEN bile rc=1 dönebiliyor
@@ -135,7 +135,17 @@ elif findmnt -no OPTIONS / | grep -qwE 'usrquota|uquota|quota'; then
     qcikti=$(quotaon -p -u / 2>/dev/null || true)
     case "$qcikti" in
       *"is on"*) gecti "ext kota enforcement açık (quotaon)" ;;
-      *)         kaldi "mount kotalı ama quotaon KAPALI (muhasebe var, limit uygulanmıyor)" ;;
+      *)
+        # En sık sebep, çekirdekte vfsv2 kota formatının OLMAMASI: Ubuntu bunu
+        # linux-modules-extra-* paketine koyuyor ve bulut imajları kurmuyor.
+        # O durumda mount usrquota taşır, /aquota.user üretilir, birim başarıyla
+        # koşar — ama kota HİÇ açılmaz. Ubuntu 24.04'te canlı görüldü.
+        if ! cikti_esler 'quota_v2' lsmod && ! modprobe -n quota_v2 >/dev/null 2>&1; then
+          kaldi "quotaon KAPALI — çekirdekte quota_v2 formatı yok (Ubuntu: linux-modules-extra-\$(uname -r) kurulmalı)"
+        else
+          kaldi "mount kotalı ama quotaon KAPALI (muhasebe var, limit uygulanmıyor)"
+        fi
+        ;;
     esac
 
     # 🔴 KALICILIK: quotaon'un ŞU AN açık olması, SONRAKİ açılışta da açık
@@ -160,7 +170,7 @@ fi
 baslik "Posta"
 if command -v postconf >/dev/null 2>&1; then
   kontrol "postfix check temiz" postfix check
-  postconf -h smtpd_milters 2>/dev/null | grep -q '8891' && gecti "postfix milter 8891 (OpenDKIM)" || kaldi "postfix smtpd_milters OpenDKIM'i göstermiyor"
+  cikti_esler '8891' postconf -h smtpd_milters && gecti "postfix milter 8891 (OpenDKIM)" || kaldi "postfix smtpd_milters OpenDKIM'i göstermiyor"
   # 🔴 OpenDKIM inet:8891 dinlemiyorsa imzalama sessizce hiç çalışmaz.
   #
   # Kontrol `ss` çıktısını AYRIŞTIRMIYOR, porta gerçekten BAĞLANIYOR — postfix'in
@@ -176,13 +186,13 @@ if command -v postconf >/dev/null 2>&1; then
     elif command -v timeout >/dev/null 2>&1; then
       timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8891' 2>/dev/null && { dkim_dinliyor=1; break; }
     else
-      ss -lnt 2>/dev/null | grep -q '127.0.0.1:8891' && { dkim_dinliyor=1; break; }
+      cikti_esler '127\.0\.0\.1:8891' ss -lnt && { dkim_dinliyor=1; break; }
     fi
     sleep 1
   done
   if [ "$dkim_dinliyor" = 1 ]; then gecti "OpenDKIM 127.0.0.1:8891 bağlantı kabul ediyor"
   else kaldi "OpenDKIM 8891 DİNLEMİYOR (unix sokete kaymış olabilir — service.d/override.conf)"; fi
-  ss -lntp 2>/dev/null | grep -q '127.0.0.1:11332' && gecti "rspamd milter 11332 dinliyor" || kaldi "rspamd 11332 dinlemiyor"
+  cikti_esler '127\.0\.0\.1:11332' ss -lnt && gecti "rspamd milter 11332 dinliyor" || kaldi "rspamd 11332 dinlemiyor"
   # Dovecot 2.4 sözdizimi kırılması burada yakalanır.
   if command -v doveconf >/dev/null 2>&1; then
     # `doveconf --version` diye bir seçenek YOK (2.4'te "invalid option" der);
@@ -192,7 +202,7 @@ if command -v postconf >/dev/null 2>&1; then
       gecti "doveconf -n temiz (dovecot ${DVER:-?})"
       # 🔴 Kurulan şablon dovecot sürümüyle EŞLEŞMELİ: 2.4'te 2.3 şablonu
       # (mail_location) hiç açılmaz, 2.3'te 2.4 şablonu da öyle.
-      if printf '%s' "$DVER" | grep -qE '^(2\.[4-9]|[3-9])'; then
+      if [[ "$DVER" =~ ^(2\.[4-9]|[3-9]) ]]; then
         grep -q 'mail_driver' /etc/dovecot/conf.d/10-sanalcp-mail.conf 2>/dev/null \
           && gecti "dovecot 2.4 şablonu kurulu (sürümle eşleşiyor)" \
           || kaldi "dovecot $DVER ama 2.3 şablonu kurulu (mail_driver yok)"
@@ -207,7 +217,7 @@ if command -v postconf >/dev/null 2>&1; then
     # dosyamızda doğru yazılsa bile stok conf.d dosyaları tarafından ezilebilir
     # (dovecot conf.d/*.conf'u ALFABETİK yükler). İkisi de Faz 5b canlı testinde
     # tam olarak böyle kaçtı: servis ayakta, IMAP girişi çalışıyor, posta düşmüyor.
-    if printf '%s' "$DVER" | grep -qE '^(2\.[4-9]|[3-9])'; then
+    if [[ "$DVER" =~ ^(2\.[4-9]|[3-9]) ]]; then
       IPATH=$(doveconf -h mail_inbox_path 2>/dev/null)
       case "$IPATH" in
         */var/mail/*) kaldi "mail_inbox_path stok mbox yolunda ($IPATH) — INBOX'a teslimat 'Permission denied' ile düşer" ;;
@@ -239,12 +249,12 @@ if pkg_kurulu "$(paket_ad ftp)"; then
     # Debian: direktif-başına-dosya + auth SEMBOLİK LİNKİ (wrapper yalnız linkleri okur).
     [ -f /etc/pure-ftpd/conf/MySQLConfigFile ] && gecti "conf/MySQLConfigFile var" || kaldi "conf/MySQLConfigFile YOK"
     [ -L /etc/pure-ftpd/auth/30mysql ] && gecti "auth/30mysql sembolik linki var" || kaldi "auth/30mysql sembolik link DEĞİL (wrapper yok sayar)"
-    ls /etc/pure-ftpd/auth/ 2>/dev/null | grep -qE 'unix|pam' && kaldi "auth/ altında unix/pam kolu DURUYOR (sistem kullanıcıları FTP'ye girebilir)" || gecti "unix/pam auth kolları kaldırılmış"
+    cikti_esler 'unix|pam' ls /etc/pure-ftpd/auth/ && kaldi "auth/ altında unix/pam kolu DURUYOR (sistem kullanıcıları FTP'ye girebilir)" || gecti "unix/pam auth kolları kaldırılmış"
     [ -s /etc/ssl/private/pure-ftpd.pem ] && gecti "TLS sertifikası doğru yolda" || kaldi "/etc/ssl/private/pure-ftpd.pem YOK (Debian'da yol sabittir)"
   else
     grep -q '^MySQLConfigFile' /etc/pure-ftpd/pure-ftpd.conf 2>/dev/null && gecti "pure-ftpd.conf MySQL auth" || kaldi "pure-ftpd.conf MySQL auth satırı yok"
   fi
-  ss -lnt 2>/dev/null | grep -q ':21 ' && gecti "port 21 dinleniyor" || kaldi "port 21 dinlenmiyor"
+  cikti_esler ':21 ' ss -lnt && gecti "port 21 dinleniyor" || kaldi "port 21 dinlenmiyor"
 else atla "ftp kurulu değil"; fi
 
 baslik "Kiracı izolasyonu"

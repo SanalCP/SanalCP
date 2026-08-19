@@ -94,7 +94,10 @@ KV_SVC="$KV_PKG"
 rakip_onbellek_kapat
 systemctl enable "$KV_SVC" >/dev/null 2>&1
 systemctl restart "$KV_SVC"; sleep 2
-if systemctl is-active --quiet "$KV_SVC" && REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null | grep -q PONG; then
+# PING çıktısı kısa ama boru hattının yanlış-olumsuzu burada "exit 1" demek —
+# bkz. sanalcp-ortak.sh:cikti_esler (pipefail + grep -q = SIGPIPE tuzağı).
+PONG_CIKTI=$(REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null || true)
+if systemctl is-active --quiet "$KV_SVC" && [[ "$PONG_CIKTI" == *PONG* ]]; then
   log "✓ $KV_SVC ACTIVE + admin auth OK"
 else
   log "✗ $KV_SVC başlatılamadı — journalctl -u $KV_SVC"

@@ -63,7 +63,7 @@ warn() { echo -e "  ${c_y}!${c_0} $*"; }
 die()  { echo -e "${c_r}✗ $*${c_0}" >&2; exit 1; }
 step() { echo -e "${c_b}══ $* ══${c_0}"; }
 
-is_elf() { head -c4 "$1" 2>/dev/null | grep -q $'\x7fELF'; }
+is_elf() { head -c4 "$1" 2>/dev/null | grep -q $'\x7fELF'; }  # sigpipe-ok: head 4 bayt yazıp çıkar
 
 [ "$(id -u)" = 0 ] || die "root gerekli (sudo sanalcp-restore)"
 command -v curl >/dev/null || die "curl gerekli"

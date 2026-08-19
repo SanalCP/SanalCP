@@ -65,9 +65,15 @@ quotaon -p -u /        # "user quota on / (...) is on" demeli
 
 ### Ubuntu
 
-**Ubuntu 26.04 LTS** canlı test edildi ve desteklenmektedir. **Ubuntu 24.04 LTS**
-kod yolları hazır (Dovecot 2.3, MariaDB 10.11 ve valkey yerine redis-server) ama
-canlı test edilmedi; kurulum çalışması beklenir, üretim için önerilmez.
+**Ubuntu 26.04 LTS ve Ubuntu 24.04 LTS** canlı test edildi ve desteklenmektedir.
+
+Ubuntu 24.04'e özgü bir düzeltme — **disk kotası çalışmıyordu.** Ubuntu, ext4
+kotasının ihtiyaç duyduğu çekirdek modülünü ayrı bir pakette
+(`linux-modules-extra-*`) gönderiyor ve bulut sunucu imajları bu paketi
+kurmuyor. Modül olmadan kota hiç açılmıyor, üstelik her şey sağlıklı görünüyor:
+disk kotalı bağlanmış, muhasebe dosyası üretilmiş, servis çalışıyor — ama tek
+bir limit uygulanmıyor. Kurulum artık modülü tespit edip gerekiyorsa kuruyor,
+her açılışta yüklenmesini sağlıyor ve sağlayamazsa bunu açıkça bildiriyor.
 
 Ubuntu'ya özgü bir düzeltme: Ubuntu'nun rspamd paketi `redis-server`'ı
 Recommends olarak getirir (Debian'da bu satır `valkey-server | redis-server`

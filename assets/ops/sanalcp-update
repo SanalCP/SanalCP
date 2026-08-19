@@ -97,7 +97,8 @@ fi
 # IMPORTANT: hash the WHOLE release (binary + frontend-dist + migrations), not just the
 # binary. Otherwise a frontend-only / migration-only update would be wrongly SKIPPED
 # because the binary sha stayed the same.
-head -c4 "$NEWBIN" | grep -q $'\x7fELF' || die "$(t "indirilen binary geçerli ELF değil — iptal" "downloaded binary is not a valid ELF — aborting")"
+# sigpipe-ok: head 4 bayt yazıp çıkar, SIGPIPE oluşmaz
+head -c4 "$NEWBIN" | grep -q $'\x7fELF' || die "$(t "indirilen binary geçerli ELF değil — iptal" "downloaded binary is not a valid ELF — aborting")"  # sigpipe-ok
 CURVER=$(surum); [ -n "$CURVER" ] || CURVER="?"
 echo "  $(t "mevcut sürüm: $CURVER" "current version: $CURVER")"
 # NOTE: reduce every sha256sum to ONLY the hash with cut — otherwise the (random tmp)
@@ -336,7 +337,7 @@ command -v quota >/dev/null 2>&1 || pkg_kur "$(paket_ad kota-ext)" "$(paket_ad k
 QROOTFS=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 QROOTOPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
 QSENTINEL=/etc/sanalcp/reboot-required-quota
-if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|quota'; then
+if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|quota'; then  # sigpipe-ok: echo builtin
   if ! grep -q 'rootflags=uquota' /etc/default/grub 2>/dev/null; then
     if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub 2>/dev/null; then
       sed -i 's/^\(GRUB_CMDLINE_LINUX="[^"]*\)"/\1 rootflags=uquota"/' /etc/default/grub

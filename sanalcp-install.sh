@@ -208,10 +208,43 @@ else
     *) die "deb.sury.org has no PHP repo for '${OS_KODADI:-unknown}' — supported: Debian 12/13, Ubuntu 22.04/24.04/26.04" ;;
   esac
   echo "deb [signed-by=$SURY_KEY] https://packages.sury.org/php/ $OS_KODADI main" > /etc/apt/sources.list.d/sanalcp-sury-php.list
-  depo_yenile
-  apt-cache policy php8.3-fpm 2>/dev/null | grep -q sury.org \
-    && ok "deb.sury.org PHP ($OS_KODADI)" \
-    || die "deb.sury.org repo added but php8.3-fpm doesn't resolve to it — check /etc/apt/sources.list.d/sanalcp-sury-php.list"
+
+  # 🔴 NEVER pipe apt-cache into `grep -q` here. This script runs under
+  # `set -o pipefail`, and `grep -q` exits the instant it matches — which closes
+  # the pipe, hands apt-cache a SIGPIPE, and makes the PIPELINE return 141 even
+  # though the match SUCCEEDED. Capture into a variable and match on that.
+  #
+  # Found live on Ubuntu 24.04. It passed on Debian 12/13 and Ubuntu 26.04 purely
+  # because there `php8.3-fpm` comes from sury alone, so apt-cache's output fits
+  # in the pipe buffer and it finishes writing before grep exits. On noble the
+  # package also exists in noble, noble-updates and noble-security, the output is
+  # longer, and the race flips — the install died at step 1 with a message
+  # blaming /etc/apt/sources.list.d, which was perfectly correct all along.
+  #
+  # Same trap as `quotaon | grep` (internal/kaynaklimit/kota_ext4.go) — third
+  # time in this codebase, hence the sweep in scripts/pipefail-grep-taramasi.sh.
+  #
+  # The retry is kept for a different, real reason: sury is a SINGLE third-party
+  # host and the whole install depends on it.
+  sury_ok=0
+  for deneme in 1 2 3; do
+    depo_yenile || true
+    pol=$(apt-cache policy php8.3-fpm 2>/dev/null || true)
+    case "$pol" in *sury.org*) sury_ok=1 ;; esac
+    [ "$sury_ok" = 1 ] && break
+    [ "$deneme" -lt 3 ] && { warn "deb.sury.org index not ready (attempt $deneme/3) — retrying in $((deneme * 5))s"; sleep $((deneme * 5)); }
+  done
+  if [ "$sury_ok" = 1 ]; then
+    ok "deb.sury.org PHP ($OS_KODADI)"
+  else
+    # Report what apt ACTUALLY said, then distinguish the two real causes.
+    [ -n "${DEPO_SON_CIKTI:-}" ] && printf '%s\n' "$DEPO_SON_CIKTI" >&2
+    case "$pol" in
+      *"Version table"*)
+        die "php8.3-fpm resolves, but NOT to deb.sury.org — another repo is winning; check apt pinning and /etc/apt/sources.list.d/sanalcp-sury-php.list" ;;
+    esac
+    die "could not read the deb.sury.org index for '$OS_KODADI' after 3 attempts — see the apt output above (network/proxy/DNS or sury outage)"
+  fi
 fi
 
 # ============ 2) BASE PACKAGES ============
@@ -273,7 +306,7 @@ if [ -z "$KOTA_FLAG" ]; then
   warn "root fs is '$ROOTFS_TYPE' — disk quota is not supported there (only XFS and ext2/3/4); the panel will report quota as unavailable"
 else
   KOTA_MOUNTTA=0
-  echo "$ROOTFS_OPTS" | grep -qwE 'usrquota|uquota|quota' && KOTA_MOUNTTA=1
+  echo "$ROOTFS_OPTS" | grep -qwE 'usrquota|uquota|quota' && KOTA_MOUNTTA=1  # sigpipe-ok: echo builtin
   if [ "$KOTA_MOUNTTA" = 1 ]; then
     ok "root fs user quota already active ($ROOTFS_TYPE)"
   elif grep -q "$KOTA_FLAG" /etc/default/grub 2>/dev/null; then
@@ -320,6 +353,27 @@ else
   # pulls quotaon-root.service in. `quotaon.service` does not even exist on
   # Debian (the package ships quota.service / quotaon@.service).
   if [ "$ROOTFS_TYPE" != "xfs" ] && command -v quotacheck >/dev/null 2>&1; then
+    # 🔴 KERNEL KOTA FORMATI: ext2/3/4 kotası `quota_v2` (vfsv2) modülünü ister.
+    # Ubuntu bunu çekirdek yapılandırmasında MODÜL olarak veriyor
+    # (CONFIG_QFMT_V2=m) ve modülü linux-modules-extra-* paketine koyuyor —
+    # bulut/minimal imajlar o paketi KURMUYOR. Sonuç, Ubuntu 24.04'te canlı
+    # görüldü: mount usrquota taşıyor, /aquota.user üretiliyor, birim başarıyla
+    # koşuyor, ama `quotaon` şunu diyor ve kota hiç açılmıyor:
+    #
+    #   quotaon: Quota format not supported in kernel.
+    #
+    # Debian 12/13 ve Ubuntu 26.04'te modül mevcut olduğu için orada görünmedi.
+    if ! modprobe quota_v2 >/dev/null 2>&1; then
+      pkg_kur "linux-modules-extra-$(uname -r)" >/dev/null 2>&1 || true
+      modprobe quota_v2 >/dev/null 2>&1 || true
+    fi
+    if modprobe quota_v2 >/dev/null 2>&1 || lsmod 2>/dev/null | grep -q quota_v2; then  # sigpipe-ok: lsmod kısa çıktı
+      # Her açılışta yüklensin (birimin ExecStartPre'si de ayrıca deniyor).
+      printf 'quota_v2\n' > /etc/modules-load.d/sanalcp-quota.conf
+      ok "kernel quota format (quota_v2) available"
+    else
+      warn "kernel quota format (quota_v2) NOT available — disk quota ENFORCEMENT will not work on this kernel; accounting-only. Install linux-modules-extra-$(uname -r) (Ubuntu) or use a kernel with CONFIG_QFMT_V2."
+    fi
     cat > /etc/systemd/system/sanalcp-quotacheck.service <<'QC'
 [Unit]
 Description=SanalCP — ext quota accounting files (once) + enforcement (every boot)
@@ -329,6 +383,10 @@ After=local-fs.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# The vfsv2 quota format is a MODULE on Ubuntu; without it quotaon fails with
+# "Quota format not supported in kernel". "-" = do not fail the unit if the
+# module is built in (modprobe then has nothing to do).
+ExecStartPre=-/sbin/modprobe quota_v2
 # quotacheck only when the accounting file is missing — it is expensive.
 ExecStart=/bin/sh -c '[ -f /aquota.user ] || /usr/sbin/quotacheck -cum /'
 # quotaon on EVERY boot. Already-on is not an error worth failing the unit for
@@ -348,7 +406,12 @@ QC
     # quotaon was lost on its second boot. Not run before the reboot, so
     # quotacheck never scans a filesystem that has no quota active yet.
     if [ "$KOTA_MOUNTTA" = 1 ]; then
-      systemctl start sanalcp-quotacheck.service >/dev/null 2>&1 || true
+      # 🔴 restart, START DEĞİL. Birim `RemainAfterExit=yes` taşıyor; açılışta bir
+      # kez koştuğu için zaten "active" görünür ve `systemctl start` HİÇBİR ŞEY
+      # YAPMAZ. Onarım yolu bu yüzden sessizce etkisiz kalıyordu (Ubuntu 24.04'te
+      # canlı görüldü: modül kuruldu, birim "active", kota yine kapalı).
+      # `enable --now`ın apt'te no-op olmasıyla aynı sınıf hata.
+      systemctl restart sanalcp-quotacheck.service >/dev/null 2>&1 || true
       case "$(quotaon -p -u / 2>/dev/null || true)" in
         *"is on"*) ok "quota enforcement active (quotaon)" ;;
         *)         warn "quotaon still reports off — check: quotacheck -cum / && quotaon -u /" ;;
@@ -707,7 +770,7 @@ fi
 # ---- acme.sh (Let's Encrypt SSL) — the panel calls /root/.acme.sh/acme.sh ----
 # LE requires a valid-looking email (@ + dot). If admin@local etc. isn't valid,
 # register without a contact instead.
-AEMAIL="$ADMIN_EPOSTA"; echo "$AEMAIL" | grep -qE '@[^@]+\.[^@]+$' || AEMAIL=""
+AEMAIL="$ADMIN_EPOSTA"; echo "$AEMAIL" | grep -qE '@[^@]+\.[^@]+$' || AEMAIL=""  # sigpipe-ok: echo builtin
 if [ ! -x /root/.acme.sh/acme.sh ]; then
   ACME_INSTALLER=$(mktemp)
   if download https://get.acme.sh "$ACME_INSTALLER"; then
@@ -753,7 +816,7 @@ if rhel_mi && [ -f /etc/httpd/conf/httpd.conf ]; then
   elif ! grep -qE "^Listen 127.0.0.1:10080" /etc/httpd/conf/httpd.conf; then
     echo "Listen 127.0.0.1:10080" >> /etc/httpd/conf/httpd.conf
   fi
-  semanage port -l 2>/dev/null | grep -qE "http_port_t.*\b10080\b" || \
+  cikti_esler "http_port_t.*\b10080\b" semanage port -l || \
     semanage port -a -t http_port_t -p tcp 10080 2>/dev/null || \
     semanage port -m -t http_port_t -p tcp 10080 2>/dev/null
   if apachectl configtest >/dev/null 2>&1; then
@@ -813,7 +876,7 @@ if rhel_mi; then
   # (Also guaranteed at panel startup by ensureFPMSELinuxFcontext; this line covers
   # the state before first boot.)
   if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ] && command -v semanage >/dev/null 2>&1; then
-    semanage fcontext -l 2>/dev/null | grep -q "/run/php-fpm-\[" || \
+    cikti_esler "/run/php-fpm-\[" semanage fcontext -l || \
       semanage fcontext -a -t httpd_var_run_t "/run/php-fpm-[^/]+(/.*)?" 2>/dev/null || true
     ok "SELinux fcontext: per-tenant php-fpm socket (httpd_var_run_t)"
   fi
@@ -890,7 +953,7 @@ if [ -n "$IP" ]; then
 fi
 # valkey vs redis: EL9 and Debian 12 still ship redis (see internal/osfam).
 KV_SVC=$(debian_mi && echo valkey-server || echo valkey)
-systemctl list-unit-files --no-legend "$KV_SVC.service" 2>/dev/null | grep -q "$KV_SVC" || \
+cikti_esler "$KV_SVC" systemctl list-unit-files --no-legend "$KV_SVC.service" || \
   KV_SVC=$(debian_mi && echo redis-server || echo redis)
 echo -e "  services: $(systemctl is-active "$(servis_ad db)" "$(servis_ad web)" "$KV_SVC" "$SYS_PHP_SVC" "$(servis_ad dns)" "$(servis_ad ftp)" sanalcp "$(servis_ad cron)" | tr '\n' ' ')"
 echo -e "  panel :8443 → HTTP $CODE   ·   API (auth) → HTTP $API   ·   DNS :53 → $(systemctl is-active "$(servis_ad dns)")   ·   FTP :21 → $(systemctl is-active "$(servis_ad ftp)")"
@@ -902,7 +965,7 @@ echo -e "${c_g} ✓ SanalCP installation complete${c_0}"
 echo -e "   Panel:    ${c_b}https://${IP:-SERVER_IP}:8443${c_0}"
 echo -e "   Username: ${c_b}root${c_0}   Password: ${c_b}this server's root password${c_0}"
 echo -e "   (panel admin login verifies against the server's root account via PAM)"
-if [ -n "${KOTA_FLAG:-}" ] && ! findmnt -no OPTIONS / 2>/dev/null | grep -qwE 'usrquota|uquota|quota'; then
+if [ -n "${KOTA_FLAG:-}" ] && ! cikti_esler '(^|,)(usrquota|uquota|quota)(,|$)' findmnt -no OPTIONS /; then
   echo -e "   ${c_y}Disk quota: $KOTA_FLAG was written to GRUB — takes effect after a ONE-TIME reboot.${c_0}"
 fi
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"

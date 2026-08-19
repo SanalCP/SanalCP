@@ -101,6 +101,32 @@ rakip_onbellek_kapat(){
   return 0
 }
 
+# cikti_esler <ERE deseni> <komut> [arg...] : komutun çıktısında desen var mı?
+#
+# 🔴 `komut | grep -q desen` KULLANMAYIN. Bu betikler `set -o pipefail` ile
+# koşuyor ve `grep -q` eşleşmeyi bulduğu ANDA çıkar; bu boruyu kapatır, üretici
+# SIGPIPE alır ve boru hattı 141 döner — EŞLEŞME BAŞARILI OLSA BİLE. Sonuç
+# sessiz bir yanlış-olumsuz: kontrol "yok" der, oysa vardır.
+#
+# Üretici ne kadar çok/yavaş yazarsa risk o kadar büyük. Bu yüzden aynı kod
+# Debian'da geçip Ubuntu'da düşebiliyor: çıktı uzunluğu değişince yarış çevriliyor.
+# Canlı örnekler:
+#   · Ubuntu 24.04'te `apt-cache policy php8.3-fpm | grep -q sury.org` rc=141
+#     döndü ve kurulum adım 1'de, doğru olan sources.list dosyasını suçlayarak öldü.
+#   · Kabul testinde `ss -lntp | grep -q 127.0.0.1:8891` OpenDKIM'i dinlemiyor
+#     gösterdi; OpenDKIM o sırada dinliyordu.
+#   · Aynı sınıf daha önce `quotaon | grep` için de yaşandı
+#     (internal/kaynaklimit/kota_ext4.go).
+#
+# Çıktı önce DEĞİŞKENE alınır, eşleştirme bash'in kendi `=~` operatörüyle
+# yapılır — hiç boru yok, dolayısıyla SIGPIPE de yok.
+cikti_esler(){
+  local desen="$1"; shift
+  local cikti
+  cikti=$("$@" 2>/dev/null || true)
+  [[ "$cikti" =~ $desen ]]
+}
+
 # ---- package manager ----
 pkg_kur(){ # install, quiet; non-zero on failure
   if debian_mi; then
@@ -112,13 +138,27 @@ pkg_kur(){ # install, quiet; non-zero on failure
 }
 pkg_kurulu(){
   if debian_mi; then
-    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "^install ok installed"
+    # Boru YOK: cikti_esler ile aynı gerekçe (pipefail + grep -q = SIGPIPE tuzağı).
+    local durum; durum=$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null || true)
+    [[ "$durum" == "install ok installed"* ]]
   else
     rpm -q "$1" >/dev/null 2>&1
   fi
 }
+# depo_yenile: paket indekslerini yeniler.
+#
+# 🔴 Çıkış kodunu ve apt/dnf'in KENDİ hata metnini korur (DEPO_SON_CIKTI).
+# Eskiden her şey /dev/null'a gidiyordu; Ubuntu 24.04 kurulumunda
+# packages.sury.org'a erişim geçici olarak başarısız oldu, hata kaybolduğu için
+# kurulum "repo eklendi ama php8.3-fpm ona çözülmüyor — sources.list'i kontrol
+# edin" diyerek YANLIŞ yeri suçladı. Dosya kusursuzdu; sorun ağdaydı.
+DEPO_SON_CIKTI=""
 depo_yenile(){
-  if debian_mi; then apt-get update -qq >/dev/null 2>&1; else dnf makecache -q >/dev/null 2>&1; fi
+  local cikti rc
+  if debian_mi; then cikti=$(apt-get update -qq 2>&1); rc=$?
+  else                cikti=$(dnf makecache -q 2>&1);  rc=$?; fi
+  DEPO_SON_CIKTI="$cikti"
+  return "$rc"
 }
 
 # ---- logical name -> real package / systemd unit ----

@@ -117,7 +117,7 @@ ensure_context() { # path  type  [recursive]
     fi
   fi
 }
-want() { echo ",$ONLY," | grep -q ",$1,"; }
+want() { echo ",$ONLY," | grep -q ",$1,"; }  # sigpipe-ok: echo builtin
 
 # ================= BÖLÜMLER =================
 sec_phpmyadmin() {
