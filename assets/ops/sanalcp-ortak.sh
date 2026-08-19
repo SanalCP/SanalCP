@@ -66,6 +66,41 @@ valkey_yok(){
   return 1
 }
 
+# rakip_onbellek_kapat: 6379'u yalnız BİZİM seçtiğimiz cache servisi tutsun.
+#
+# 🔴 NEDEN GEREKLİ (Ubuntu 26.04'te canlı bulundu): Ubuntu'nun rspamd paketi
+#
+#     Recommends: redis-server
+#
+# yazar — Debian 13'teki gibi `valkey-server | redis-server` ALTERNATİFLİ değil.
+# apt Recommends'i varsayılan olarak kurduğu için, biz valkey-server kurup
+# ayağa kaldırdıktan SONRA gelen rspamd kurulumu redis-server'ı da getiriyor
+# (ve apt onu enable edip başlatıyor).
+#
+# Sonuç sinsi: o an valkey 6379'u tuttuğu için redis başlayamaz ve kurulum
+# sağlıklı görünür. Ama İKİSİ DE enable olduğundan bir sonraki açılışta portu
+# hangisinin kapacağı YARIŞA kalır. Ubuntu 26.04'te reboot sonrası redis kazandı:
+# valkey crash-loop'a girdi (bind: Address already in use), panelin önbellek
+# ayarları (maxmemory/allkeys-lru/acl) valkey.conf'ta kaldığı için hiç
+# uygulanmadı ve panel cache servisini "failed" gördü.
+#
+# Paket KALDIRILMIYOR — rspamd'ın Recommends'i memnun kalsın; yalnız rakip
+# servis disable+stop ediliyor, sonra bizimki portu geri alıyor.
+rakip_onbellek_kapat(){
+  local benim rakip
+  benim=$(servis_ad cache)
+  case "$benim" in
+    valkey-server|valkey) rakip=redis-server ;;
+    redis-server|redis)   rakip=valkey-server ;;
+    *) return 0 ;;
+  esac
+  systemctl cat "$rakip" >/dev/null 2>&1 || return 0   # kurulu değil: yapacak iş yok
+  systemctl disable --now "$rakip" >/dev/null 2>&1 || true
+  # Rakip portu bırakmış olabilir; bizimki devralsın (zaten ayaktaysa zararsız).
+  systemctl restart "$benim" >/dev/null 2>&1 || true
+  return 0
+}
+
 # ---- package manager ----
 pkg_kur(){ # install, quiet; non-zero on failure
   if debian_mi; then

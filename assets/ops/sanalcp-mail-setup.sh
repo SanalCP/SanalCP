@@ -61,6 +61,10 @@ if ! command -v rspamadm >/dev/null 2>&1 && rhel_mi; then
     "https://rspamd.com/rpm-stable/centos-${EL_VERSION}/rspamd.repo"
 fi
 pkg_kur rspamd || { log "✗ rspamd kurulamadı"; exit 1; }
+# 🔴 rspamd kurulumu Ubuntu'da redis-server'ı Recommends olarak GETİRİR ve apt
+# onu enable eder — panelin valkey'i ile 6379 için yarışır. Ayrıntı ve neden
+# paketin kaldırılmadığı: sanalcp-ortak.sh:rakip_onbellek_kapat.
+rakip_onbellek_kapat
 # 🔴 rspamd, panelin per-tenant cache Redis/Valkey'iyle AYNI INSTANCE'I paylaşır
 # (ikisi de 127.0.0.1:6379) — sanalcp-redis-setup panelin cache sunucusunu bu
 # betikten ÖNCE (kurulumda bir adım önce) zaten kurup çalıştırdı. AlmaLinux

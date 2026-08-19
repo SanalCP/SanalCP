@@ -46,6 +46,32 @@ if systemctl list-unit-files --no-legend "$(servis_ad ftp).service" 2>/dev/null 
   kontrol "ftp → $(servis_ad ftp) active" servis_aktif "$(servis_ad ftp)"
 else atla "ftp kurulu değil"; fi
 
+# 🔴 6379'u tek bir cache servisi tutmalı. Ubuntu'nun rspamd paketi
+# redis-server'ı Recommends olarak getiriyor (Debian 13'te alternatifli, Ubuntu'da
+# değil); ikisi de enable kalırsa açılışta portu kim kapacağı yarışa kalır ve
+# kaybeden crash-loop'a girer. Kurulum anında hata GÖRÜNMEZ — ilk reboot'ta çıkar.
+KV_BEKLENEN=$(servis_ad cache 2>/dev/null || echo valkey-server)
+case "$KV_BEKLENEN" in
+  valkey*) KV_RAKIP=redis-server ;;
+  redis*)  KV_RAKIP=valkey-server ;;
+  *)       KV_RAKIP="" ;;
+esac
+if [ -n "$KV_RAKIP" ] && systemctl cat "$KV_RAKIP" >/dev/null 2>&1; then
+  if systemctl is-enabled "$KV_RAKIP" >/dev/null 2>&1 || systemctl is-active --quiet "$KV_RAKIP"; then
+    kaldi "rakip cache servisi $KV_RAKIP hâlâ enable/active — 6379 için $KV_BEKLENEN ile yarışır (reboot'ta biri düşer)"
+  else
+    gecti "rakip cache servisi $KV_RAKIP devre dışı"
+  fi
+fi
+# Portu gerçekten bizim servis mi tutuyor?
+KV_SAHIP=$(ss -lntp 2>/dev/null | awk '/127.0.0.1:6379/{print}' | grep -oE '"[a-z-]+"' | head -1 | tr -d '"')
+if [ -n "$KV_SAHIP" ]; then
+  case "$KV_BEKLENEN" in
+    "$KV_SAHIP"*|*"$KV_SAHIP"*) gecti "6379 sahibi $KV_SAHIP (beklenen $KV_BEKLENEN)" ;;
+    *) kaldi "6379'u $KV_SAHIP tutuyor, beklenen $KV_BEKLENEN — panelin önbellek ayarları uygulanmıyor" ;;
+  esac
+fi
+
 baslik "Panel"
 KOD=$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/healthz 2>/dev/null)
 [ "$KOD" = 200 ] && gecti "/healthz → 200" || kaldi "/healthz → ${KOD:-yanıt yok}"
@@ -136,7 +162,25 @@ if command -v postconf >/dev/null 2>&1; then
   kontrol "postfix check temiz" postfix check
   postconf -h smtpd_milters 2>/dev/null | grep -q '8891' && gecti "postfix milter 8891 (OpenDKIM)" || kaldi "postfix smtpd_milters OpenDKIM'i göstermiyor"
   # 🔴 OpenDKIM inet:8891 dinlemiyorsa imzalama sessizce hiç çalışmaz.
-  if ss -lntp 2>/dev/null | grep -q '127.0.0.1:8891'; then gecti "OpenDKIM 127.0.0.1:8891 dinliyor"
+  #
+  # Kontrol `ss` çıktısını AYRIŞTIRMIYOR, porta gerçekten BAĞLANIYOR — postfix'in
+  # yapacağı şey bu. Ubuntu 26.04'te `ss -lntp` bir koşuda soketi listelemedi
+  # (aynı çağrı `RTNETLINK answers: Invalid argument` da basıyordu) ve kontrol
+  # yanlış yere "kaldı" dedi; OpenDKIM o sırada dinliyordu. Bağlantı denemesi
+  # hem daha doğru hem de ss'in ayrıcalık/çekirdek kaprislerinden bağımsız.
+  # Yeniden denemeli: forklanan daemon soketi bağlamadan systemd "active" der.
+  dkim_dinliyor=0
+  for _ in 1 2 3 4 5; do
+    if command -v nc >/dev/null 2>&1; then
+      nc -z -w2 127.0.0.1 8891 2>/dev/null && { dkim_dinliyor=1; break; }
+    elif command -v timeout >/dev/null 2>&1; then
+      timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/8891' 2>/dev/null && { dkim_dinliyor=1; break; }
+    else
+      ss -lnt 2>/dev/null | grep -q '127.0.0.1:8891' && { dkim_dinliyor=1; break; }
+    fi
+    sleep 1
+  done
+  if [ "$dkim_dinliyor" = 1 ]; then gecti "OpenDKIM 127.0.0.1:8891 bağlantı kabul ediyor"
   else kaldi "OpenDKIM 8891 DİNLEMİYOR (unix sokete kaymış olabilir — service.d/override.conf)"; fi
   ss -lntp 2>/dev/null | grep -q '127.0.0.1:11332' && gecti "rspamd milter 11332 dinliyor" || kaldi "rspamd 11332 dinlemiyor"
   # Dovecot 2.4 sözdizimi kırılması burada yakalanır.

@@ -1,9 +1,9 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-5b tamamlandı (2026-08-19). Debian 13 (trixie) canlı testten
-43 kontrol / 0 hata ile geçti; testte bulunan 5 hata düzeltildi (§5f) — biri
-(kotanın ikinci reboot'ta kaybolması) Debian 12'yi de etkiliyordu.
-Sıradaki: Faz 5c — Ubuntu 26.04.
+**Durum:** Faz 0-5c tamamlandı (2026-08-19). Debian 12, Debian 13 ve
+Ubuntu 26.04 LTS canlı testten geçti (sırasıyla 42/42, 44/44, 46/46 kontrol),
+her üçünde iki ardışık reboot sonrası kota, site ve posta doğrulandı.
+Sıradaki: Ubuntu 24.04 canlı testi ve Faz 6 (Apache backend + CVE ekranı).
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -983,6 +983,119 @@ koşulları. Ubuntu'da özellikle bakılacaklar: AppArmor profilleri (Ubuntu'da
 Debian'dan daha sıkı), `ufw` varsayılanları, ve Faz 5b'de bulunan beş hatanın
 Ubuntu'da tekrarlanmadığının doğrulanması.
 
+
+---
+
+## 5h. Faz 5c — canlı Ubuntu 26.04 LTS testi ✅ (2026-08-19)
+
+Sunucu: Ubuntu 26.04 LTS (resolute), çekirdek **7.0.0-30-generic**,
+2 vCPU / 3.8 GB / 38 GB ext4. Kurulum sıfırdan, `--lang tr`.
+
+### Sonuç
+
+Kurulum **ilk denemede uçtan uca aktı**, 49 ✓ / 0 uyarı verdi ve sekiz servis
+ayağa kalktı. §5g'deki statik ön-uçuş sonuç verdi: paket adı, depo, yol
+sınıfından tek bir hata çıkmadı. Uçtan uca kiracı sağlama + site + posta da ilk
+denemede çalıştı (Dovecot 2.4.2, MariaDB 11.8.6, PHP 8.3.33).
+
+Debian 13'te bulunan beş hatanın **hiçbiri** Ubuntu'da tekrarlamadı — düzeltmeler
+dağıtımdan bağımsız tutulduğu için.
+
+Ama **bir hata** çıktı ve yine aynı sınıftandı: kurulum anında görünmez,
+ilk reboot'ta ortaya çıkar.
+
+### 🔴 Bulunan hata: redis ve valkey 6379 için yarışıyor
+
+Ubuntu 26.04'te kurulum sonrası **hem valkey-server hem redis-server** kuruluydu
+ve ikisi de `enabled`. Kurulum anında sorun görünmüyor: valkey 6379'u önce
+tuttuğu için redis başlayamıyor ve sessizce başarısız oluyor. Ama ikisi de
+enable olduğundan **açılışta portu kimin kapacağı yarışa kalıyor.** İlk reboot'ta
+redis kazandı:
+
+```
+valkey-server.service: Failed with result 'exit-code'
+# Warning: Could not create server TCP listening socket 127.0.0.1:6379:
+#          bind: Address already in use
+# Failed listening on port 6379 (tcp), aborting.
+valkey-server.service: Start request repeated too quickly.
+```
+
+Zarar üç katmanlı:
+
+1. Panelin cache servisi (`valkey-server`) **failed** durumda
+2. Panelin önbellek ayarları (`maxmemory 256mb`, `allkeys-lru`, `aclfile`)
+   `valkey.conf`'ta kaldığı için **hiç uygulanmıyor** — 6379'da parolasız,
+   sınırsız bir redis duruyor
+3. Hangi servisin kazandığı deterministik değil, yani sunucular arasında
+   davranış tutarsız
+
+**Kök neden bir dağıtım paketleme farkı:**
+
+| | rspamd'ın Recommends satırı | Sonuç |
+|---|---|---|
+| Debian 13 | `valkey-server \| redis-server` | valkey zaten kurulu, redis GELMEZ |
+| Ubuntu 26.04 | `redis-server` (alternatifsiz) | valkey kurulu olsa da redis GELİR |
+
+apt Recommends'i varsayılan olarak kurar. rspamd, kurulum sırasında **adım 12'de**
+(`sanalcp-mail-setup`) geliyor — yani cache'i ayağa kaldırdığımız **adım 11'den
+SONRA**. Bu yüzden düzeltmenin yalnız `sanalcp-redis-setup` içinde olması
+yetmezdi.
+
+Düzeltme: `sanalcp-ortak.sh`'a `rakip_onbellek_kapat` eklendi. Seçilen cache
+servisinin rakibini (`valkey`↔`redis`) disable+stop ediyor, sonra bizimkine
+portu devraldırıyor. İki yerden çağrılıyor: `sanalcp-redis-setup` (idempotent
+onarım) ve `sanalcp-mail-setup` içinde rspamd kurulumunun **hemen ardından**
+(taze kurulumda sırayı yakalayan yer).
+
+Paket kaldırılmıyor — rspamd'ın Recommends'i memnun kalsın; yalnız rakip servis
+devre dışı bırakılıyor.
+
+### Kabul testine eklenenler
+
+| Kontrol | Ne yakalar |
+|---|---|
+| rakip cache servisi devre dışı mı | ikisi de enable kalırsa (reboot yarışı) |
+| 6379'un sahibi beklenen servis mi | portu yanlış daemon tutuyorsa |
+
+Kontroller **bozuk kutu üzerinde önce doğrulandı**: düzeltme uygulanmadan
+koşturulduklarında üçü birden düştü (`cache → valkey-server DEĞİL active`,
+`rakip cache servisi redis-server hâlâ enable/active`,
+`6379'u redis-server tutuyor`). Sonra düzeltme uygulanıp 46/46'ya çıkıldı.
+
+### `quotaon` çıkış kodu Ubuntu'da da güvenilmez
+
+Faz 5a'da bulunan tuzak burada da doğrulandı ve mevcut kodun doğru davrandığı
+görüldü. Ubuntu 26.04'te `quotaon -p -u /`:
+
+```
+stdout : user quota on / (/dev/sda1) is on
+stderr : quotaon: Cannot stat() mounted device tmpfs: No such file or directory
+rc     : 1          ← kota AÇIKKEN
+```
+
+`internal/kaynaklimit/kota_ext4.go` çıkış kodunu yok sayıp yalnız stdout'u
+ayrıştırdığı için panel kotayı doğru raporluyor
+(`kota_reboot_gerekli=false`, `kota_fs_uyumsuz=false`).
+
+### Doğrulanan davranışlar
+
+- Ubuntu 26.04 LTS · çekirdek 7.0 · systemd 259 · AppArmor 110 profil enforce
+- sury `resolute` deposu: PHP 7.4 – 8.5 kuruldu, sistem PHP 8.3'e sabitlendi
+- MariaDB **11.8.6**, 69 migration diskte/DB'de eşit
+- Dovecot **2.4.2** → 2.4 şablonu; `mail_inbox_path` ve LMTP override doğru
+- Uçtan uca posta: LMTP teslimatı + IMAPS okuma, bounce yok, maildir yerleşimi
+  Debian 12/13 ile birebir aynı
+- Kiracı sağlama + per-tenant FPM + nginx üzerinden **PHP 8.3.33**
+- ext4 kotası **enforcement uyguluyor**: `dd: IO error: Disk quota exceeded`
+- Atıl 6 PHP-FPM master'ı durduruldu (Debian'daki düzeltme Ubuntu'da da çalıştı)
+- **İki ardışık reboot** sonrası: 46/46 kontrol, valkey 6379'un sahibi, kota
+  açık, site ve posta çalışıyor, valkey `NOAUTH` diyor (yani panelin ACL'i etkin)
+
+### Kalan: Ubuntu 24.04
+
+24.04 (noble) statik olarak ayrıldı (§5g): Dovecot 2.3 şablonu, MariaDB 10.11 ve
+**valkey yerine redis-server**. Kod yolları hazır ama canlı test edilmedi.
+
 ---
 
 ## 6. Sıralama
@@ -997,7 +1110,7 @@ Ubuntu'da tekrarlanmadığının doğrulanması.
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
 | ~~**5b**~~ | ✅ Canlı test: **Debian 13** — 44 kontrol/0 hata, 5 hata bulundu ve düzeltildi (§5f) | — |
-| **5c** | Statik ön-uçuş ✅ (§5g) · canlı test: **Ubuntu 26.04**, ardından 24.04 — sunucu bekleniyor | — |
+| ~~**5c**~~ | ✅ Statik ön-uçuş (§5g) + canlı **Ubuntu 26.04** (§5h) — 46 kontrol/0 hata, 2 hata bulundu ve düzeltildi · 24.04 canlı testi kaldı | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
 **Faz 0-4b tamamlandı (2026-08-19).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`

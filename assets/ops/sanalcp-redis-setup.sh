@@ -89,6 +89,9 @@ echo "════ $KV_PKG enable + (re)start ════"
 # çalışma-anı fallback'i devreye girdiyse tablo hâlâ valkey der, sistemde ise
 # redis vardır.
 KV_SVC="$KV_PKG"
+# Rakip cache servisi (redis vs valkey) varsa 6379'u ondan al — bkz.
+# sanalcp-ortak.sh:rakip_onbellek_kapat.
+rakip_onbellek_kapat
 systemctl enable "$KV_SVC" >/dev/null 2>&1
 systemctl restart "$KV_SVC"; sleep 2
 if systemctl is-active --quiet "$KV_SVC" && REDISCLI_AUTH="$ADMIN" "$KV_BIN" PING 2>/dev/null | grep -q PONG; then

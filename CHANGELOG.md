@@ -65,9 +65,17 @@ quotaon -p -u /        # "user quota on / (...) is on" demeli
 
 ### Ubuntu
 
-Ubuntu kurulumu bu sürümde **henüz canlı test edilmedi** ve desteklenen olarak
-işaretlenmemiştir. Debian ile aynı kod yolunu kullandığı için büyük ölçüde
-çalışması beklenir, ancak doğrulanmadan önerilmez.
+**Ubuntu 26.04 LTS** canlı test edildi ve desteklenmektedir. **Ubuntu 24.04 LTS**
+kod yolları hazır (Dovecot 2.3, MariaDB 10.11 ve valkey yerine redis-server) ama
+canlı test edilmedi; kurulum çalışması beklenir, üretim için önerilmez.
+
+Ubuntu'ya özgü bir düzeltme: Ubuntu'nun rspamd paketi `redis-server`'ı
+Recommends olarak getirir (Debian'da bu satır `valkey-server | redis-server`
+alternatifli olduğu için sorun çıkmaz). Sonuçta hem valkey hem redis kurulu ve
+etkin kalıyor, açılışta 6379 portunu hangisinin kapacağı yarışa dönüşüyordu —
+kaybeden servis başlamıyor, panelin önbellek ayarları (bellek limiti, tahliye
+politikası, parola) uygulanmamış hâlde kalıyordu. Kurulum artık kullanılmayan
+önbellek servisini devre dışı bırakıyor.
 
 ---
 
