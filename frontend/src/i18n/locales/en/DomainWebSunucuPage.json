@@ -79,5 +79,6 @@
   "header_permissions": "Permissions-Policy",
   "header_permissions_desc": "Disable camera/microphone/geolocation APIs by default",
   "header_csp_upgrade": "Upgrade Insecure Requests",
-  "header_csp_upgrade_desc": "Auto-upgrade HTTP links to HTTPS"
+  "header_csp_upgrade_desc": "Auto-upgrade HTTP links to HTTPS",
+  "backend_apache_unavailable": "The Apache backend is not supported on this operating system yet (AlmaLinux/RHEL family only)."
 }

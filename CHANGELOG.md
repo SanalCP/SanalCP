@@ -63,6 +63,19 @@ quotaon -p -u /        # "user quota on / (...) is on" demeli
   neden: INBOX'ın mbox yolunda aranması ve LMTP'nin adresten alan adını
   kırpması). Her ikisi de düzeltildi.
 
+### Bu sürümde Debian/Ubuntu'da kapalı olan iki özellik
+
+Yarım çalışan bir ekran yerine, çalışmayan özellik kapatıldı ve **nedeni panelde
+yazıyor**:
+
+- **Apache backend** (nginx önde, Apache arkada). Yapılandırma düzeni Debian'da
+  RHEL'dekinden tamamen farklı. Seçenek artık menüde devre dışı görünüyor ve
+  gerekçesi yazıyor. Bu sürümden önce seçilebiliyordu ve seçilince **site 502
+  veriyordu**; güncelleme, bu duruma düşmüş siteleri açılışta otomatik onarır.
+- **Güvenlik açığı (CVE) taraması.** RHEL'in `dnf updateinfo --security`
+  çıktısının Debian'da doğrudan karşılığı yok. Panel "0 açık" gibi yanıltıcı bir
+  sayı göstermek yerine taramanın desteklenmediğini söylüyor.
+
 ### Ubuntu
 
 **Ubuntu 26.04 LTS ve Ubuntu 24.04 LTS** canlı test edildi ve desteklenmektedir.

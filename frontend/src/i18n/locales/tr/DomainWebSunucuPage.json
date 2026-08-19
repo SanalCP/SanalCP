@@ -79,5 +79,6 @@
   "header_permissions": "Permissions-Policy",
   "header_permissions_desc": "Kamera/mikrofon/konum API'lerini varsayılan kapat",
   "header_csp_upgrade": "Upgrade Insecure Requests",
-  "header_csp_upgrade_desc": "HTTP linkleri otomatik HTTPS'e yükselt"
+  "header_csp_upgrade_desc": "HTTP linkleri otomatik HTTPS'e yükselt",
+  "backend_apache_unavailable": "Apache backend bu işletim sisteminde henüz desteklenmiyor (yalnızca AlmaLinux/RHEL ailesi)."
 }

@@ -80,6 +80,21 @@ DB=$(mysql -N -B panel -e 'SELECT COUNT(*) FROM schema_migrations' 2>/dev/null |
 [ "$DISK" -gt 0 ] && [ "$DISK" = "$DB" ] && gecti "migration: diskte $DISK = DB'de $DB" || kaldi "migration uyuşmuyor (disk=$DISK db=$DB)"
 kontrol "panel binary sürümü okunabiliyor" grep -qa 'SanalCP ' /opt/sanalcp/bin/sanalcp-server
 
+# Apache backend Debian ailesinde v1'de kapalı. DB'de 'apache' yazan bir satır
+# kalırsa nginx 127.0.0.1:10080'e proxy'ler, orada hiçbir şey dinlemez ve site
+# 502 verir. Panel açılışta bunu onarıyor (HealApacheBackendOnStartup); bu
+# kontrol onarımın gerçekten çalıştığını doğrular.
+if command -v mysql >/dev/null 2>&1; then
+  APB=$(mysql -N -e "SELECT COUNT(*) FROM panel.domains WHERE web_backend='apache'" 2>/dev/null || echo "")
+  if [ -n "$APB" ]; then
+    if [ "$APB" = 0 ]; then
+      gecti "desteklenmeyen backend'e ayarlı domain yok"
+    else
+      kaldi "$APB domain 'apache' backend'inde — bu sistemde Apache yok, siteler 502 verir"
+    fi
+  fi
+fi
+
 baslik "Web katmanı"
 kontrol "nginx -t geçerli" nginx -t
 # 🔴 Debian'ın varsayılan sitesi kalırsa "duplicate default server" ile nginx hiç kalkmaz.

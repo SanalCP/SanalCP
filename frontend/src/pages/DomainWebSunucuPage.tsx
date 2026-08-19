@@ -80,6 +80,10 @@ export default function DomainWebSunucuPage() {
   const [isleniyor, setIsleniyor] = useState(false)
 
   const [backend, setBackend] = useState<string>('php-fpm')
+  // Apache backend Debian ailesinde v1'de kapalı; hangi seçeneklerin gerçekten
+  // seçilebilir olduğunu SUNUCU söyler (bkz. GET /domains/:id/web-backend).
+  const [mevcutBackendler, setMevcutBackendler] = useState<string[]>(['php-fpm', 'apache', 'static'])
+  const [apacheNotu, setApacheNotu] = useState<string | null>(null)
   const [backendDegistiriliyor, setBackendDegistiriliyor] = useState(false)
 
   const [vhostOzel, setVhostOzel] = useState<VhostOzelYanit | null>(null)
@@ -94,10 +98,14 @@ export default function DomainWebSunucuPage() {
     setYuk(true); setHata(null)
     Promise.all([
       api.get<Yanit>(`/domains/${id}/nginx-settings`),
-      api.get<{backend: string}>(`/domains/${id}/web-backend`),
+      api.get<{backend: string; mevcutlar?: string[]; apache_notu?: string}>(`/domains/${id}/web-backend`),
     ]).then(([y, b]) => {
       setYanit(y.data); setA(y.data.ayarlar)
       setBackend(b.data.backend)
+      // Sunucunun gerçekten sunabildiği backend'ler. Eski panellerde bu alan
+      // yoksa üçünü de kabul et (geriye dönük uyum).
+      setMevcutBackendler(b.data.mevcutlar ?? ['php-fpm', 'apache', 'static'])
+      setApacheNotu(b.data.apache_notu ?? null)
     }).catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
     api.get<VhostOzelYanit>(`/domains/${id}/vhost-ozel`).then(v => {
@@ -202,6 +210,10 @@ export default function DomainWebSunucuPage() {
           {(['php-fpm','apache','static'] as const).map(k => {
             const b = BACKEND_BILGI[k]
             const aktif = backend === k
+            // Seçeneği GİZLEMİYORUZ: kullanıcı Apache'yi arıyor olabilir.
+            // Kartı devre dışı gösterip NEDENİNİ söylemek, sessizce yok
+            // etmekten dürüst.
+            const kullanilamaz = !mevcutBackendler.includes(k)
             const renkler: Record<string, string> = {
               emerald: aktif ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-emerald-500/20' : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 dark:bg-emerald-900/20',
               indigo:  aktif ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20'    : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20',
@@ -210,15 +222,22 @@ export default function DomainWebSunucuPage() {
             return (
               <button key={k} type="button"
                 onClick={() => backendKaydet(k)}
-                disabled={backendDegistiriliyor || aktif}
-                className={`text-left p-4 border rounded-lg transition disabled:cursor-default ${renkler[b.renk]}`}
+                disabled={backendDegistiriliyor || aktif || kullanilamaz}
+                title={kullanilamaz ? (apacheNotu ?? t('DomainWebSunucuPage:backend_apache_unavailable')) : undefined}
+                className={`text-left p-4 border rounded-lg transition disabled:cursor-default ${
+                  kullanilamaz
+                    ? 'border-slate-200 dark:border-slate-800 opacity-55 cursor-not-allowed'
+                    : renkler[b.renk]
+                }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-lg leading-none">{b.ikon}</span>
                   {aktif && <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-300">{t('DomainWebSunucuPage:active_label')}</span>}
                 </div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{b.ad}</div>
-                <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">{b.aciklama}</div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">
+                  {kullanilamaz ? (apacheNotu ?? t('DomainWebSunucuPage:backend_apache_unavailable')) : b.aciklama}
+                </div>
               </button>
             )
           })}

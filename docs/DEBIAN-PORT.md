@@ -1,10 +1,10 @@
 # Debian / Ubuntu desteği — teknik plan
 
-**Durum:** Faz 0-5c tamamlandı (2026-08-19). **Dört hedefin dördü de** canlı
-testten geçti: Debian 12, Debian 13, Ubuntu 26.04 LTS ve Ubuntu 24.04 LTS.
+**Durum:** **Tüm fazlar (0-6) tamamlandı** (2026-08-19). Dört hedefin dördü de
+canlı testten geçti: Debian 12, Debian 13, Ubuntu 26.04 LTS ve Ubuntu 24.04 LTS.
 Her birinde iki ardışık reboot sonrası kota enforcement'ı, uçtan uca posta
-teslimatı ve site servisi doğrulandı.
-Sıradaki: Faz 6 (Apache backend + CVE ekranı).
+teslimatı ve site servisi doğrulandı. Debian ailesinde desteklenmeyen iki özellik
+(Apache backend, CVE ekranı) kapalı ve gerekçesi kullanıcıya söyleniyor.
 **Hedef:** birincil Debian 13 (trixie) + Ubuntu 26.04 LTS (resolute);
 ikincil Ubuntu 24.04 (noble) + Debian 12 (bookworm).
 **Tarih:** 2026-08-18
@@ -1213,6 +1213,90 @@ yükleniyor, kota enforcement gerçekten uyguluyor (sınır üstü `dd` → 0 ba
 LMTP teslimatı + IMAPS okuma, nginx üzerinden PHP 8.3.33, önbellek 6379'un
 sahibi `redis-server`, panel 200.
 
+
+---
+
+## 5j. Faz 6 — Apache backend + CVE ekranı ✅ (2026-08-19)
+
+Plandaki karar (§7.0, madde 3 ve 4): her ikisi de Debian ailesinde v1'de
+**kapalı**, ve *dürüstçe* kapalı — yarım çalışan bir ekran yerine "bu sunucuda
+kullanılamıyor" denecek.
+
+### CVE ekranı: zaten tamamdı
+
+Doğrulandı, iş çıkmadı. Üç uç nokta da `osfam.GuvenlikGuncellemeDestekli()`
+kapısından geçiyor ve arayüz sayıları hiç göstermiyor. Ubuntu 24.04'te canlı:
+
+```
+GET  /system/cve            → 200 {"desteklenmiyor":true,"destek_notu":"..."}
+POST /system/cve/guncelle   → 501 {"hata":"... desteklenmiyor"}
+```
+
+`CveWidget` `desteklenmiyor` gelince açıklama metnini basıyor. Kritik nokta
+kodun kendi yorumunda: *"0 kritik açık demek, taramanın hiç çalışmadığı bir
+sistemde yanıltıcı olurdu."* Doğru davranış.
+
+### 🔴 Apache backend: kapı VARDI, ama uygulanmıyordu
+
+`osfam.ApacheBackendDestekli()` fonksiyonu mevcuttu — ve **hiçbir yerde
+çağrılmıyordu.** Yalnız iki yorum satırında anılıyordu. Ubuntu 24.04'te canlı
+denendiğinde sıra şuydu:
+
+1. `PUT /domains/1/web-backend {"backend":"apache"}`
+2. DB satırı `apache` olarak **güncellendi**
+3. nginx vhost'una `proxy_pass http://127.0.0.1:10080` yazıldı ve reload edildi
+4. Apache vhost yazımı patladı: `open /etc/httpd/conf.d/dom_...: no such file or directory`
+5. İstek **HTTP 500** + ham iç hata döndü (RHEL yolunu sızdırarak)
+6. **Site 502 Bad Gateway** oldu — 10080'de hiçbir şey dinlemiyor
+
+Sunucuda `httpd` ikilisi de `/etc/httpd` dizini de yok; panel yine de seçeneği
+menüde sunuyordu.
+
+Daha kötüsü: DB satırı `apache` olarak **kaldı**. `sanalcp-repair` kiracı
+vhost'larını yeniden render etmediği için site, birisi backend'i elle
+değiştirene kadar 502'de kalıyordu.
+
+**Ders:** bir kapı fonksiyonunun var olması, uygulandığı anlamına gelmez.
+Faz 5c'de aynı biçimde bir *test* yanlış varsayımı sabitliyordu; burada bir
+*fonksiyon* hiç çağrılmıyordu. İkisi de "yazıldı" görünüp çalışmayan kod.
+
+### Üç katmanlı düzeltme
+
+| Katman | Ne yapar | Neden gerekli |
+|---|---|---|
+| `SetWebBackend` | desteklenmeyen backend'i **DB'ye dokunmadan önce** 501 ile reddeder | hasarın kaynağı |
+| `GetWebBackend` | `mevcutlar`'dan apache'yi çıkarır, `apache_notu` ile **nedenini söyler** | çalışmayacak seçenek menüde durmasın |
+| `renderAndReload` | `apache` + desteklenmiyor → sessizce `php-fpm`'e düşer | tüm vhost yazımlarının tek çıkış noktası; eski satırlar |
+| `HealApacheBackendOnStartup` | açılışta `apache` satırlarını `php-fpm`'e indirir + vhost'u yeniler | zaten bozulmuş sunucu kendi kendine toparlasın |
+
+Dördüncüsü olmadan düzeltme yeni kurulumları korur ama **mevcut hasarı
+onarmaz** — Faz 5b/5f'deki "kodda düzeltme var, sunucuya hiç ulaşmıyor"
+desenine düşerdik. Açılış, güncellemeden sonra çalışan tek nokta
+(bkz. `HealRoundcubeSMTP`'deki aynı ders).
+
+Arayüz tarafında seçenek **gizlenmiyor**, devre dışı gösterilip gerekçesi
+yazılıyor: kullanıcı Apache'yi arıyor olabilir, sessizce yok olması panelin
+bozuk olduğunu düşündürür.
+
+### Canlı doğrulama (Ubuntu 24.04)
+
+Hasar önce **yeniden üretildi** (site 502, DB `apache`), sonra düzeltme
+dağıtıldı:
+
+```
+GET  → {"backend":"apache","mevcutlar":["php-fpm","static"],"apache_notu":"..."}
+PUT  → HTTP 501, DB DEĞİŞMEDİ
+açılış onarımı → DB php-fpm, vhost'tan 10080 bloğu silindi, site PHP 8.3.33
+```
+
+Kabul testine "desteklenmeyen backend'e ayarlı domain yok" kontrolü eklendi;
+satır elle `apache` yapılıp kontrolün düştüğü, panel yeniden başlatılınca
+onarımın çalıştığı doğrulandı. **44 kontrol / 0 hata.**
+
+Testler mutasyonla sınandı: kapı sökülünce
+`TestApacheBackendDebianAilesindeSecilemez` ve
+`TestMevcutBackendListesiSistemeGoreDegisir` düşüyor.
+
 ---
 
 ## 6. Sıralama
@@ -1228,7 +1312,7 @@ sahibi `redis-server`, panel 200.
 | ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
 | ~~**5b**~~ | ✅ Canlı test: **Debian 13** — 44 kontrol/0 hata, 5 hata bulundu ve düzeltildi (§5f) | — |
 | ~~**5c**~~ | ✅ Statik ön-uçuş (§5g) + canlı **Ubuntu 26.04** (§5h, 46/0) ve **Ubuntu 24.04** (§5i, 43/0) — 5 hata bulundu ve düzeltildi | — |
-| **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
+| ~~**6**~~ | ✅ Apache backend + CVE ekranı: Debian'da kapalı ve dürüstçe belirtiliyor (§5j) | düşük |
 
 **Faz 0-4b tamamlandı (2026-08-19).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
 çağrısı YOKTUR; hepsi `internal/osfam` üzerinden geçer. Kalan tek istisna

@@ -930,6 +930,23 @@ func renderAndReload(opts VhostOpts, sk string) error {
 		opts.Backend = "php-fpm"
 	}
 
+	// 🔴 SON SAVUNMA HATTI: Apache backend'i yalnız RHEL ailesinde çalışır
+	// (writeApacheVhost /etc/httpd/conf.d ve `httpd` ikilisine gömülü). API
+	// katmanı artık desteklenmeyen seçimi reddediyor, ama DB'de HÂLÂ 'apache'
+	// yazan satırlar olabilir:
+	//   · bu kapı uygulanmadan önce yapılmış seçimler,
+	//   · RHEL sunucusundan alınmış bir yedeğin Debian'a geri yüklenmesi.
+	//
+	// O satırlar için Apache yolunu denemek nginx'i 127.0.0.1:10080'e proxy'lemek
+	// demektir — orada hiçbir şey dinlemez ve site 502 verir. Sessizce php-fpm'e
+	// düşmek, çalışan bir siteyle çalışmayan bir site arasındaki farktır.
+	// renderAndReload TÜM vhost yazımlarının tek çıkış noktası olduğu için
+	// normalizasyon burada yapılıyor.
+	if opts.Backend == "apache" && !osfam.ApacheBackendDestekli() {
+		log.Printf("vhost %s: apache backend bu sistemde desteklenmiyor, php-fpm'e düşülüyor", sk)
+		opts.Backend = "php-fpm"
+	}
+
 	// 🔴 Per-tenant FPM (Seçenek A) aktifse socket'i DAİMA per-tenant socket'e zorla.
 	// renderAndReload TÜM vhost yazımlarının tek çıkış noktası → SSL-issue (EnableSelfSigned/
 	// EnableLetsEncrypt), SetPHPVersion, DisableSSL gibi bu fonksiyonu DOĞRUDAN çağıran

@@ -25,6 +25,7 @@ import (
 	"sanalcp/internal/kota"
 	"sanalcp/internal/mail"
 	"sanalcp/internal/middleware"
+	"sanalcp/internal/osfam"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/redis"
 	"sanalcp/internal/tenanthesap"
@@ -745,6 +746,36 @@ type setBackendReq struct {
 
 var gecerliBackendler = map[string]bool{"php-fpm": true, "apache": true, "static": true}
 
+// backendKullanilabilir: bu SUNUCUDA seçilebilir mi?
+//
+// 🔴 Apache backend'i Debian ailesinde v1'de KAPALI (bkz. osfam.ApacheBackendDestekli).
+// Kapı daha önce yalnız yorumlarda anılıyordu, hiçbir yerde UYGULANMIYORDU; Ubuntu
+// 24.04'te canlı denendiğinde olan şu oldu:
+//
+//  1. DB satırı 'apache' olarak GÜNCELLENDİ,
+//  2. nginx vhost'una 127.0.0.1:10080 proxy bloğu yazıldı ve reload edildi,
+//  3. Apache vhost yazımı /etc/httpd/conf.d yok diye patladı (RHEL yolu),
+//  4. istek HTTP 500 + ham iç hata döndü, SİTE 502 OLDU.
+//
+// Yani sunucuda hiç Apache yokken bile seçenek sunuluyor ve seçilince site
+// düşüyordu. Kontrol artık DB'ye DOKUNMADAN ÖNCE yapılır.
+func backendKullanilabilir(b string) bool {
+	if b == "apache" {
+		return osfam.ApacheBackendDestekli()
+	}
+	return gecerliBackendler[b]
+}
+
+// kullanilabilirBackendler: UI'ın göstereceği liste — desteklenmeyen seçenek
+// hiç listelenmez (kullanıcıya çalışmayacak bir seçim sunmayalım).
+func kullanilabilirBackendler() []string {
+	out := []string{"php-fpm"}
+	if osfam.ApacheBackendDestekli() {
+		out = append(out, "apache")
+	}
+	return append(out, "static")
+}
+
 func (h *Handlers) GetWebBackend(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	var backend string
@@ -758,10 +789,16 @@ func (h *Handlers) GetWebBackend(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	yanit := map[string]any{
 		"backend":   backend,
-		"mevcutlar": []string{"php-fpm", "apache", "static"},
-	})
+		"mevcutlar": kullanilabilirBackendler(),
+	}
+	// Neden eksik olduğunu SÖYLE: seçeneğin sessizce yok olması, kullanıcıya
+	// panelin bozuk olduğunu düşündürür.
+	if !osfam.ApacheBackendDestekli() {
+		yanit["apache_notu"] = "Apache backend bu işletim sisteminde henüz desteklenmiyor (yalnızca AlmaLinux/RHEL ailesi)."
+	}
+	httpx.WriteJSON(w, http.StatusOK, yanit)
 }
 
 func (h *Handlers) SetWebBackend(w http.ResponseWriter, r *http.Request) {
@@ -773,6 +810,12 @@ func (h *Handlers) SetWebBackend(w http.ResponseWriter, r *http.Request) {
 	}
 	if !gecerliBackendler[req.Backend] {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz backend (php-fpm|apache|static)")
+		return
+	}
+	// 🔴 DB'ye dokunmadan ÖNCE: desteklenmeyen backend seçilirse hiçbir şey değişmesin.
+	if !backendKullanilabilir(req.Backend) {
+		httpx.WriteError(w, http.StatusNotImplemented,
+			"Apache backend bu işletim sisteminde henüz desteklenmiyor (yalnızca AlmaLinux/RHEL ailesi)")
 		return
 	}
 	var alanAdi, sk, phpSurum string

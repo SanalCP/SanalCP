@@ -201,6 +201,11 @@ func main() {
 	// efektif kotayı (domain override > plan > varsayılan) idempotent uygula; noquota ise
 	// (tek seferlik reboot bekliyor) sessizce atla. Boot'u bloklamaz (bg goroutine).
 	go kaynaklimit.HealKotaOnStartup(context.Background(), d)
+	// Apache backend Debian/Ubuntu'da desteklenmiyor. DB'de 'apache' yazan bir
+	// satır kaldıysa (kapı uygulanmadan önceki seçim ya da RHEL'den geri
+	// yüklenmiş yedek) nginx boşluğa proxy'ler ve site 502 verir. Açılışta
+	// php-fpm'e indirilip vhost yeniden yazılır.
+	provisioner.HealApacheBackendOnStartup(context.Background(), d)
 	// Mail: Postfix/Dovecot config dosyalarının varlığını doğrula + aktif mail_domains'lerin
 	// maildir kök dizinini onar. Eksikse yalnız uyarı loglar (sanalcp-mail-setup henüz
 	// çalıştırılmamış olabilir), fatal değildir.
