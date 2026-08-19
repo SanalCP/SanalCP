@@ -10,7 +10,10 @@ package osfam
 // hedef Ubuntu sürümlerinde var, ama Debian 12'de YOK — orada redis-server'a
 // düşülür. Bu tür durumlar `ozelPaket` içinde, gerekçesiyle birlikte toplanır.
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 // Mantıksal ad sabitleri — yazım hatası derleme zamanında yakalansın diye.
 const (
@@ -185,3 +188,33 @@ func ApacheBackendDestekli() bool { return Mevcut().RHELMi() }
 // Debian'da doğrudan karşılığı yok (apt tarafında ayrı bir veri kaynağı ve
 // ayrıştırma gerekir). Yanlış "0 açık" göstermektense ekran kapatılıyor.
 func GuvenlikGuncellemeDestekli() bool { return Mevcut().RHELMi() }
+
+// MariaDBSoket: MariaDB unix soketinin yolu.
+//
+// 🔴 Dağıtım paketlemesine bağlı: RHEL /var/lib/mysql/mysql.sock, Debian
+// /run/mysqld/mysqld.sock. Panelin root bağlantısı (internal/hesaplar) YALNIZ
+// unix soketi üzerinden kurulur — yol yanlışsa panel hiç açılmaz.
+//
+// Tabloya körü körüne güvenmek yerine ÖNCE var olan adaya bakılır: böylece
+// özelleştirilmiş bir my.cnf (ya da ileride değişen bir paket varsayılanı) da
+// doğru çözülür. Hiçbiri yoksa ailenin varsayılanı döner — bu durumda hata
+// mesajı en azından doğru yolu gösterir.
+func MariaDBSoket() string { return Mevcut().MariaDBSoket() }
+
+func (b Bilgi) MariaDBSoket() string { return mariaDBSoketSec(b, dosyaVar) }
+
+func dosyaVar(y string) bool { _, err := os.Stat(y); return err == nil }
+
+// mariaDBSoketSec: saf çekirdek — varlık kontrolü dışarıdan verilir (test edilebilir).
+func mariaDBSoketSec(b Bilgi, varMi func(string) bool) string {
+	adaylar := []string{"/var/lib/mysql/mysql.sock", "/run/mysqld/mysqld.sock"}
+	if b.DebianMi() {
+		adaylar = []string{"/run/mysqld/mysqld.sock", "/var/lib/mysql/mysql.sock"}
+	}
+	for _, a := range adaylar {
+		if varMi(a) {
+			return a
+		}
+	}
+	return adaylar[0]
+}

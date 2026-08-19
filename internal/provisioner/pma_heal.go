@@ -27,6 +27,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"sanalcp/internal/osfam"
 )
 
 const (
@@ -112,7 +114,7 @@ exit;
 // mariadbSocket: MariaDB unix socket yolunu döndürür (SHOW/@@socket üzerinden), çözülemezse
 // AlmaLinux/MariaDB standart yolu. phpMyAdmin socket-login için (GCP-agnostik) kullanılır.
 func mariadbSocket() string {
-	const fallback = "/var/lib/mysql/mysql.sock"
+	fallback := osfam.MariaDBSoket() // aileye göre; @@socket okunamazsa kullanılır
 	if pkgDB != nil {
 		var s string
 		if err := pkgDB.QueryRow(`SELECT @@socket`).Scan(&s); err == nil && strings.TrimSpace(s) != "" {

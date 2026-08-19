@@ -387,14 +387,35 @@ if [ "$BASE_PHP_VER" = "8.3" ]; then
 elif rhel_mi; then
   warn "system PHP is $BASE_PHP_VER, expected 8.3 — webmail, phpMyAdmin and any domain set to PHP '8.3' may not work. Fix manually: dnf module reset php -y && dnf module enable php:remi-8.3 -y && dnf install -y $BASE_PKGS"
 else
-  # On Debian `php` is an alternatives symlink; the panel only ever addresses
-  # php8.3-fpm by name, so a different default CLI is cosmetic — but say it.
-  warn "the default 'php' CLI is $BASE_PHP_VER, not 8.3 — harmless (the panel addresses php8.3-fpm directly), set with: update-alternatives --set php /usr/bin/php8.3"
+  # Debian'da `php` bir alternatives sembolik linkidir ve sürüm döngüsünden
+  # sonra 8.3'e sabitlenir (aşağıya bakın) — bu aşamadaki değer geçicidir.
+  warn "the default 'php' CLI is $BASE_PHP_VER at this point — it is pinned to 8.3 after the version loop"
 fi
 for v in $PHP_VERS; do
-  pkgs=""; for e in $PHP_EXT; do pkgs="$pkgs $(php_pkg "$v" "$e")"; done
-  pkg_kur $pkgs "$(php_pkg "$v" "$PHP_REDIS_EXT")" && ok "php$v (+redis)" || warn "php$v — some packages skipped"
+  pkgs=""; for e in $PHP_EXT $PHP_REDIS_EXT; do pkgs="$pkgs $(php_pkg "$v" "$e")"; done
+  if pkg_kur $pkgs; then
+    ok "php$v (+redis)"
+  else
+    # 🔴 Tek eksik paket TÜM sürümü düşürmesin. Batch install ya hep ya hiçtir:
+    # sury/bookworm'da php8.5-opcache yok ve bu, 8.5'in diğer 14 eklentisinin de
+    # kurulmamasına yol açıyordu (canlı Debian 12 testinde bulundu). Batch
+    # başarısızsa tek tek denenir, eksikler ADIYLA raporlanır.
+    eksik=""
+    for p1 in $pkgs; do pkg_kur "$p1" || eksik="$eksik $p1"; done
+    if [ -n "$eksik" ]; then warn "php$v kuruldu, bulunamayan paket(ler):$eksik"
+    else ok "php$v (+redis)"; fi
+  fi
 done
+# 🔴 Sistem PHP'si 8.3 OLMALI (panel phpMap'i her OS için böyle varsayar).
+# Debian'da update-alternatives "en yeni"yi seçer: php8.4/8.5 kurulunca `php`
+# CLI oraya kayar ve wp-cli/composer 8.3 yerine onu kullanır. RHEL'de böyle bir
+# sorun yok (temel `php` paketi zaten 8.3). Sürüm döngüsünden SONRA sabitlenir.
+if debian_mi && [ -x /usr/bin/php8.3 ]; then
+  update-alternatives --set php /usr/bin/php8.3 >/dev/null 2>&1
+  CLIV=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "?")
+  [ "$CLIV" = "8.3" ] && ok "php CLI pinned to 8.3 (wp-cli/composer parity with RHEL)" \
+                      || warn "php CLI is $CLIV, expected 8.3 — wp-cli/composer will use it"
+fi
 if [ ! -x /usr/local/bin/wp ]; then
   curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar 2>/dev/null \
     && chmod +x /usr/local/bin/wp && ok "wp-cli" || warn "wp-cli download failed (needed for WordPress features)"
@@ -562,11 +583,14 @@ if [ -f /etc/systemd/system/sanalcp-db-backup.timer ]; then
     && ok "daily panel DB backup ACTIVE (03:30 → /var/backups/sanalcp/db, 14 days)" \
     || warn "DB backup timer failed to start — daily panel DB backup may not run"
 fi
-systemctl enable --now "$SYS_PHP_SVC" >/dev/null 2>&1
+# 🔴 enable + RESTART (svc_hazirla): the pools were written in step 6/9, and on
+# Debian php-fpm has been running since apt installed it — "enable --now" would
+# be a no-op and the pools would never be loaded (found live on Debian 12).
+svc_hazirla "$SYS_PHP_SVC"
 for v in $PHP_VERS; do
-  systemctl enable --now "$(debian_mi && echo "php$v-fpm" || echo "php$v-php-fpm")" >/dev/null 2>&1
+  svc_hazirla "$(debian_mi && echo "php$v-fpm" || echo "php$v-php-fpm")"
 done
-ok "php-fpm (system 8.3 + per-version pools)"
+ok "php-fpm (system 8.3 + per-version pools, config reloaded)"
 
 # ---- named (DNS server) — nameserver for tenant domains ----
 # 🔴 Paths and the service name differ per family; they MUST match
@@ -613,7 +637,10 @@ chown "$DNS_USER:$DNS_USER" "$DNS_ZONE_DIR" 2>/dev/null || true
 # zone files live under $DNS_ZONE_DIR (SELinux named_zone_t context is REQUIRED on RHEL)
 rhel_mi && restorecon -R "$DNS_ZONE_DIR" "$DNS_CONF_DIR" >/dev/null 2>&1 || true
 if named-checkconf >/dev/null 2>&1; then
-  systemctl enable --now "$(servis_ad dns)" >/dev/null 2>&1 && ok "named (authoritative DNS, :53 open, recursion off)" || warn "named failed to start"
+  # Same reason as php-fpm: on Debian bind9 is already running (apt started it)
+  # and would never re-read the include we just added.
+  svc_hazirla "$(servis_ad dns)"
+  systemctl is-active --quiet "$(servis_ad dns)" && ok "named (authoritative DNS, :53 open, recursion off)" || warn "named failed to start"
 else
   warn "named-checkconf error — check DNS config manually"
 fi

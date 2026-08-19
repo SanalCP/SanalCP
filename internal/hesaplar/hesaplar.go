@@ -14,6 +14,8 @@ import (
 	"sanalcp/internal/secretcrypt"
 
 	"github.com/go-sql-driver/mysql"
+
+	"sanalcp/internal/osfam"
 )
 
 // box: db_pass_plain gibi panel metadata'sındaki parolaları şifreler.
@@ -31,7 +33,10 @@ var box *secretcrypt.Box
 // bağlantı havuzu üzerinden native driver ile yapılıyor.
 var rootDB *sql.DB
 
-const rootSocket = "/var/lib/mysql/mysql.sock"
+// rootSocket: MariaDB unix soketi — dağıtım paketlemesine göre çözülür
+// (RHEL /var/lib/mysql/mysql.sock · Debian /run/mysqld/mysqld.sock).
+// Sabit bırakıldığında panel Debian'da hiç açılmıyordu.
+var rootSocket = osfam.MariaDBSoket()
 
 // Init: panelin sır şifreleme kutusunu ayarlar VE root MySQL bağlantısını açar.
 // main.go'da config.Load() sonrası, herhangi bir hesap oluşturma isteğinden

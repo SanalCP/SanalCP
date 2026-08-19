@@ -137,6 +137,17 @@ else
   MYSQL_SOCK=/var/lib/mysql/mysql.sock
 fi
 
+# MariaDB drop-in config dizini: RHEL /etc/my.cnf.d, Debian
+# /etc/mysql/mariadb.conf.d. 🔴 Yanlış dizine yazmak SESSİZ başarısızlıktır —
+# dosya oluşur (ya da oluşmaz), MariaDB onu hiç okumaz ve tuning uygulanmamış
+# olmasına rağmen "yazıldı" denir. Var olan dizin tercih edilir.
+MYSQL_CONF_DIR=""
+for d in $(debian_mi && echo "/etc/mysql/mariadb.conf.d /etc/mysql/conf.d /etc/my.cnf.d" \
+                    || echo "/etc/my.cnf.d /etc/mysql/mariadb.conf.d /etc/mysql/conf.d"); do
+  [ -d "$d" ] && { MYSQL_CONF_DIR="$d"; break; }
+done
+[ -n "$MYSQL_CONF_DIR" ] || MYSQL_CONF_DIR=$(debian_mi && echo /etc/mysql/mariadb.conf.d || echo /etc/my.cnf.d)
+
 # php_pkg <version token> <extension> -> real package name
 #   Remi: "83" + "fpm" -> php83-php-fpm      sury: "8.3" + "fpm" -> php8.3-fpm
 php_pkg(){ if debian_mi; then echo "php$1-$2"; else echo "php$1-php-$2"; fi; }
@@ -149,6 +160,22 @@ php_kurulu_surumler(){
   else
     ls -d /etc/opt/remi/php* 2>/dev/null | sed 's#/etc/opt/remi/php##'
   fi
+}
+
+# svc_hazirla <unit...>: enable + RESTART.
+#
+# 🔴 "systemctl enable --now" YETMEZ ve bu fark yalnız Debian'da görünür:
+# apt, paketi kurarken servisi BAŞLATIR (dnf başlatmaz). Biz config'i kurulumun
+# ilerleyen adımlarında yazdığımız için servis o sırada çoktan çalışıyordur ve
+# "enable --now" çalışan bir birimde NO-OP'tur → yazdığımız config asla
+# yüklenmez. Faz 5a canlı testinde tam olarak bu oldu: php-fpm havuzları ve
+# named include'u diske yazıldı, süreçler onları hiç görmedi.
+svc_hazirla(){
+  local u
+  for u in "$@"; do
+    systemctl enable "$u" >/dev/null 2>&1
+    systemctl restart "$u" >/dev/null 2>&1
+  done
 }
 
 # selinux_var: is SELinux actually in play? (Debian: never.)

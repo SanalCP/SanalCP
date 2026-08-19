@@ -105,7 +105,11 @@ fi
 
 # ================= MARIADB =================
 echo "════════ MariaDB ════════"
-MYSQL_CNF=/etc/my.cnf.d/sanalcp-tuning.cnf
+# Dizin aileye göre çözülür (sanalcp-ortak). Debian'da /etc/my.cnf.d YOKTUR ve
+# oraya yazmak sessizce hiçbir şey yapmazdı. Dosya adı "50-server.cnf"ten sonra
+# okunsun diye harfle başlar (dizin alfabetik yüklenir → bizim ayarlarımız ezer).
+MYSQL_CNF="$MYSQL_CONF_DIR/sanalcp-tuning.cnf"
+mkdir -p "$MYSQL_CONF_DIR"
 [ -f "$MYSQL_CNF" ] && cp -a "$MYSQL_CNF" "${MYSQL_CNF}.bak.${TS}"
 cat > "$MYSQL_CNF" <<CNF
 # SanalCP tuning — otomatik üretildi (RAM=${RAM_MB}MB, CPU=${CPU}). sanalcp-optimize ile yenile.
@@ -254,6 +258,27 @@ open_file_cache_valid 30s;
 open_file_cache_min_uses 2;
 open_file_cache_errors off;
 NGX
+
+# 🔴 nginx.conf'ta ZATEN tanımlı direktifleri ELE. Dağıtımların stok
+# nginx.conf'u farklı direktifler taşıyor: Debian 12 "gzip on;" yazıyor,
+# AlmaLinux 9 "tcp_nodelay on;" yazıyor. Tekrar tanımlamak "duplicate
+# directive" ile nginx -t'yi patlatır ve bu blok TAMAMEN geri alınırdı — yani
+# tuning'in hiçbiri uygulanmazdı (Debian 12 canlı testinde tam olarak bu oldu).
+# Ad bazlı elemek, dağıtım başına liste tutmaktan daha dayanıklı.
+mv "$NGX_PERF" "${NGX_PERF}.ham"
+: > "$NGX_PERF"
+while IFS= read -r satir; do
+  case "$satir" in
+    ''|\#*) printf '%s\n' "$satir" >> "$NGX_PERF"; continue ;;
+  esac
+  ad=${satir%% *}; ad=${ad%;}
+  if grep -qE "^[[:space:]]*${ad}[[:space:]]" "$NGINX_CONF"; then
+    printf '# (atlandi — nginx.conf icinde zaten tanimli) %s\n' "$satir" >> "$NGX_PERF"
+  else
+    printf '%s\n' "$satir" >> "$NGX_PERF"
+  fi
+done < "${NGX_PERF}.ham"
+rm -f "${NGX_PERF}.ham"
 
 # 3) doğrula → başarısızsa geri al
 if nginx -t >/dev/null 2>&1; then
