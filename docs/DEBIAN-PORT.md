@@ -806,6 +806,29 @@ gerekmeden** geri getiriliyor (mevcut sunucuların onarım yolu). Kurulum
 **Bu hata Debian 12'yi de aynı şekilde etkiliyor.** Faz 5a'da tek reboot
 yaptığım için görünmedi — tek reboot bu hatayı kusursuz sağlıklı gösterir.
 
+### 🔴 Ortak desen: "kodda düzeltme var, sunucuya hiç ulaşmıyor"
+
+Yukarıdaki 3 ve 5 numaralı hatalar aynı yapısal kusuru paylaşıyordu ve
+düzeltmelerin İLK hâli de aynı kusura sahipti:
+
+| Yer | Koşul | Sonuç |
+|---|---|---|
+| kota birimi | "kota henüz kurulu değil" dalının içinde | kurulu sunucu birimi hiç yenilemez |
+| `main.cf` temizliği | `if ! grep -q sanalcp-mail main.cf` | blok varsa temizlik hiç koşmaz |
+
+İkisi de **taze kurulumda** doğru davranıyor, **mevcut kurulumda** hiçbir şey
+yapmıyordu. Yani `sanalcp-update` ile dağıtılan bir düzeltme kullanıcıya asla
+ulaşmayacaktı — hata kodda "düzeltilmiş" görünürken sahada sonsuza kadar
+yaşardı.
+
+Kural olarak alındı: **onarım yolları kurulum yollarının içine gömülmez.**
+Idempotent olan iş her koşuda çalışır; "zaten yapılmış" kısayolu yalnızca
+pahalı işler için (ör. `quotacheck`) ve o işin kendi `ExecStart`'ında olur.
+
+Bu, Debian 12 sunucusunda somut olarak görüldü: kota düzeltmesi ilk denemede
+sunucuda hiç değişiklik yapmadı, `main.cf` uyarısı da düzeltme dağıtıldıktan
+sonra kabul testinde hâlâ düşüyordu.
+
 ### Testlere eklenenler
 
 | Test | Ne yakalar |
@@ -839,6 +862,24 @@ için, bu açılışta koştuysa `active` görünür; koşul yüzünden atlandı
   ayrı `dd` yazması 0 bayt kopyaladı (sınır aşımı bloklandı)
 - **iki ardışık reboot** boyunca kota, site, posta ve panel ayakta kaldı
 - PHP 7.4 · 8.0 · 8.1 · 8.2 · 8.3 · 8.4 · 8.5 sury'den kurulu (8.5 dahil)
+
+### Debian 12'de doğrulama (aynı gün, geri dönük)
+
+Kota hatası Debian 12'yi de etkilediği için Faz 5a sunucusu geri açıldı ve
+hata **önce kanıtlandı**: eski birimle tek reboot sonrası
+`quotaon ... is off`, birim `inactive`, systemd günlüğünde
+`skipped because of an unmet condition check (ConditionPathExists=!/aquota.user)`.
+
+Düzeltilmiş paket kurulduktan sonra:
+
+- kota **reboot gerekmeden** geri geldi, iki ardışık reboot boyunca ayakta kaldı
+- `main.cf` temizliği üç stok tekrarı yorumladı, `postconf` uyarısı sıfırlandı,
+  etkin değerler (`inet_interfaces`, `smtpd_milters`, `virtual_transport`, …) korundu
+- kabul testi **42/42** (iki eksik kontrol Dovecot 2.4'e özgü, 2.3'te uygulanmaz)
+- uçtan uca posta: LMTP teslimatı + IMAPS okuma, bounce yok
+- maildir yerleşimi Debian 13 ile **birebir aynı** (cur/new/tmp kutu kökünde) —
+  `mail_inbox_path = %{home}` seçiminin amacı buydu
+- nginx üzerinden PHP 8.3.33
 
 ---
 

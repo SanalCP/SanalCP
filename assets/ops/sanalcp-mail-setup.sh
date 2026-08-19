@@ -113,6 +113,55 @@ done
 log "5 mysql-virtual-*.cf dosyası yazıldı (root:postfix 0640)"
 
 echo "════ Postfix: main.cf / master.cf ════"
+
+# 🔴 Bu dedup HER KOŞUDA çalışır, blok zaten eklenmiş olsa bile.
+#
+# Eskiden temizlik yalnız bloğu İLK eklerken yapılıyordu. Sonuç: kurulu bir
+# sunucuda tekrar eden anahtar varsa sanalcp-update ile ASLA düzelmiyordu —
+# aynı tuzağa disk kotası biriminde de düşülmüştü (bkz. docs/DEBIAN-PORT.md §5f).
+# Faz 5b'de Debian 12 sunucusunda tam olarak bu görüldü: kodda düzeltme vardı,
+# sunucuya hiç ulaşmıyordu.
+#
+# Tekrar eden anahtar postfix'i bozmaz (sonuncusu kazanır) ama her postfix,
+# postconf, sendmail ve mailq çağrısında "overriding earlier entry" uyarısı
+# bastırır ve GERÇEK uyarıları gömer.
+#
+# Anahtar listesi şablondan türetilir, elle sayılmaz: şablona yeni bir anahtar
+# eklendiğinde burasının unutulması mümkün olmasın diye.
+postfix_tekrarlari_temizle() {
+  local marker='# ===== sanalcp-mail ====='
+  grep -qF "$marker" /etc/postfix/main.cf 2>/dev/null || return 0
+  awk -v tmpl="$TMPL/postfix/main.cf.append" -v marker="$marker" '
+    BEGIN {
+      while ((getline satir < tmpl) > 0)
+        if (match(satir, /^[a-z_0-9]+[[:space:]]*=/)) {
+          anahtar = substr(satir, 1, RLENGTH); sub(/[[:space:]]*=$/, "", anahtar); bizim[anahtar] = 1
+        }
+      close(tmpl)
+    }
+    # Marker görülene kadar: bizim bloğumuzun da tanımladığı anahtarları yorumla.
+    !gordu {
+      if (index($0, marker)) { gordu = 1; print; next }
+      if (match($0, /^[a-z_0-9]+[[:space:]]*=/)) {
+        a = substr($0, 1, RLENGTH); sub(/[[:space:]]*=$/, "", a)
+        if (a in bizim) { print "#" $0 "  # SanalCP: alttaki sanalcp-mail bloğunda tanımlı"; next }
+      }
+    }
+    { print }
+  ' /etc/postfix/main.cf > /etc/postfix/main.cf.sanalcp-yeni || return 1
+  # Yazdıktan sonra postconf ile doğrula; geçmezse ESKİ dosyaya geri dön
+  # (nginx/DNS'teki backup-rollback deseninin aynısı).
+  if [ -s /etc/postfix/main.cf.sanalcp-yeni ]; then
+    cp -a /etc/postfix/main.cf /etc/postfix/main.cf.sanalcp-yedek
+    cat /etc/postfix/main.cf.sanalcp-yeni > /etc/postfix/main.cf
+    if ! postconf -n >/dev/null 2>&1; then
+      cat /etc/postfix/main.cf.sanalcp-yedek > /etc/postfix/main.cf
+      log "UYARI: main.cf tekrar temizliği geri alındı (postconf doğrulamadı)"
+    fi
+  fi
+  rm -f /etc/postfix/main.cf.sanalcp-yeni
+}
+
 if ! grep -q 'sanalcp-mail' /etc/postfix/main.cf; then
   # Stok main.cf'te de tanımlı olan anahtarları alta tekrar eklemek çalışır
   # (sonuncusu kazanır) ama her postconf/postfix/sendmail çağrısında
@@ -131,6 +180,11 @@ if ! grep -q 'sanalcp-mail' /etc/postfix/main.cf; then
   cat "$TMPL/postfix/main.cf.append" >> /etc/postfix/main.cf
   log "main.cf'e sanalcp-mail bloğu eklendi"
 fi
+# Blok yeni eklenmiş olsun ya da önceden var olsun: kalan tekrarları temizle.
+postfix_tekrarlari_temizle
+PFTEKRAR=$(postconf -n 2>&1 >/dev/null | grep -c 'overriding earlier entry' || true)
+if [ "${PFTEKRAR:-0}" -eq 0 ]; then log "main.cf'te tekrar eden anahtar yok"
+else log "UYARI: main.cf'te hâlâ $PFTEKRAR tekrar eden anahtar var"; fi
 if ! grep -qE '^submission\s+inet' /etc/postfix/master.cf; then
   cat "$TMPL/postfix/master.cf.append" >> /etc/postfix/master.cf
   log "master.cf'e submission (587) servisi eklendi"
