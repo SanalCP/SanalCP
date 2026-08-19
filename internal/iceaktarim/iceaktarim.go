@@ -43,6 +43,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/sys/unix"
+
+	"sanalcp/internal/osfam"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -184,8 +186,9 @@ func sahiplendir(mutlakYol, sk string) {
 	// Per-user izin modeli: nginx okuma-ACL'i (dosya yöneticisi Extract ile aynı).
 	// setfacl yoksa sessiz atlanır.
 	if _, err := exec.LookPath("setfacl"); err == nil {
-		_, _ = exec.Command("setfacl", "-R", "-m", "u:nginx:rX", mutlakYol).CombinedOutput()
-		_, _ = exec.Command("setfacl", "-R", "-d", "-m", "u:nginx:rX", mutlakYol).CombinedOutput()
+		wk := osfam.WebKullanici() // RHEL nginx · Debian www-data
+		_, _ = exec.Command("setfacl", "-R", "-m", "u:"+wk+":rX", mutlakYol).CombinedOutput()
+		_, _ = exec.Command("setfacl", "-R", "-d", "-m", "u:"+wk+":rX", mutlakYol).CombinedOutput()
 	}
 }
 

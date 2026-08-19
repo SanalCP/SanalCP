@@ -21,6 +21,8 @@ import (
 	"sanalcp/internal/provisioner"
 
 	"golang.org/x/sys/unix"
+
+	"sanalcp/internal/osfam"
 )
 
 // NOT: jailJoinStrict KALDIRILDI. Yol'u EvalSymlinks ile ÇÖZÜP resolved bir string
@@ -291,8 +293,9 @@ func (h *Handlers) Extract(w http.ResponseWriter, r *http.Request) {
 	// default-ACL'i genelde bunu zaten miras verir; hedef docroot-dışıysa/ACL yoksa garanti.
 	// setfacl yoksa (acl paketi eksik) sessiz atlanır — dosyalar tenant'ta, site diğer yolla servis edilir.
 	if _, err := exec.LookPath("setfacl"); err == nil {
-		_, _ = exec.Command("setfacl", "-P", "-R", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
-		_, _ = exec.Command("setfacl", "-P", "-R", "-d", "-m", "u:nginx:rX", hedefAbs).CombinedOutput()
+		wk := osfam.WebKullanici() // RHEL nginx · Debian www-data
+		_, _ = exec.Command("setfacl", "-P", "-R", "-m", "u:"+wk+":rX", hedefAbs).CombinedOutput()
+		_, _ = exec.Command("setfacl", "-P", "-R", "-d", "-m", "u:"+wk+":rX", hedefAbs).CombinedOutput()
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{

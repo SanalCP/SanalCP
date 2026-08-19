@@ -767,7 +767,11 @@ command -v sanalcp-optimize >/dev/null 2>&1 && sanalcp-optimize >/dev/null 2>&1 
 
 # ============ 12) Start panel (migrations run at startup) ============
 step "12) Starting the panel"
-systemctl enable --now sanalcp >/dev/null 2>&1; sleep 3
+# 🔴 svc_hazirla (enable + RESTART): tekrar kurulumda binary diske YENİ yazılır
+# ama "enable --now" çalışan ESKİ süreci öldürmez — disk yeni, bellek eski olur
+# ve fark ancak bir sonraki reboot'ta ortaya çıkar. Faz 5a'da tam olarak bu
+# yaşandı: düzeltilmiş süreç ayakta kaldı, reboot sonrası eski binary açıldı.
+svc_hazirla sanalcp; sleep 3
 systemctl enable --now nginx >/dev/null 2>&1; systemctl restart nginx >/dev/null 2>&1
 if systemctl is-active --quiet sanalcp; then ok "sanalcp ACTIVE"; else journalctl -u sanalcp --no-pager -n 20; die "panel failed to start"; fi
 

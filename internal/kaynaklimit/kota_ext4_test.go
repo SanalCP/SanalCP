@@ -2,6 +2,7 @@ package kaynaklimit
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
@@ -200,5 +201,39 @@ func TestKotaGecersizSKReddedilir(t *testing.T) {
 	}
 	if sk.uygulama != 0 {
 		t.Errorf("geçersiz sk backend'e ulaştı (%d çağrı)", sk.uygulama)
+	}
+}
+
+// 🔴 Faz 5a regresyonu: quotaon'un ÇIKIŞ KODU her iki yönde de güvenilmez.
+// Debian 12 / quota-tools 4.06'da kota AÇIKKEN rc=1 dönüyor; kod hatayı görüp
+// erken dönünce panel çalışan kotayı "kapalı, reboot gerekli" diye raporladı.
+// Karar YALNIZ stdout'a bakmalı.
+func TestExt4AktifCozCikisKodunaBakmaz(t *testing.T) {
+	const acikCikti = "user quota on / (/dev/vda1) is on\n"
+
+	// quotaon "on" diyor (rc ne olursa olsun) → hem muhasebe hem uygulama açık.
+	if a, e := ext4AktifCoz(acikCikti, false); !a || !e {
+		t.Errorf("quotaon 'is on' derken accounting=%v enforcement=%v — ikisi de true olmalı", a, e)
+	}
+	// quotaon susuyor ama mount kotalı → muhasebe var, uygulama yok.
+	if a, e := ext4AktifCoz("", true); !a || e {
+		t.Errorf("mount kotalı/quotaon kapalı: accounting=%v enforcement=%v — (true,false) olmalı", a, e)
+	}
+	// İkisi de yok → kota kapalı.
+	if a, e := ext4AktifCoz("", false); a || e {
+		t.Errorf("kota kapalıyken accounting=%v enforcement=%v — ikisi de false olmalı", a, e)
+	}
+}
+
+// Aktif(), quotaon hata DÖNSE BİLE stdout'u dikkate almalı.
+func TestExt4AktifQuotaonHataliCikisKoduylaDaCalisir(t *testing.T) {
+	eski := quotaonSorgula
+	t.Cleanup(func() { quotaonSorgula = eski })
+	quotaonSorgula = func() (string, error) {
+		return "user quota on / (/dev/sda1) is on\n", errors.New("exit status 1")
+	}
+	a, e := ext4Kota{}.Aktif()
+	if !a || !e {
+		t.Fatalf("rc=1 + 'is on' çıktısı: accounting=%v enforcement=%v — ikisi de true olmalı", a, e)
 	}
 }

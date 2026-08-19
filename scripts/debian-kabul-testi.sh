@@ -102,7 +102,15 @@ if [ -z "$BEKLENEN" ]; then
 elif findmnt -no OPTIONS / | grep -qwE 'usrquota|uquota|quota'; then
   gecti "kök fs kotası MOUNT'ta etkin ($FS)"
   if [ "$FS" != xfs ]; then
-    quotaon -p -u / 2>/dev/null | grep -q 'is on' && gecti "ext kota enforcement açık (quotaon)" || kaldi "mount kotalı ama quotaon KAPALI (muhasebe var, limit uygulanmıyor)"
+    # 🔴 quotaon'un ÇIKIŞ KODUNA GÜVENME: kota AÇIKKEN bile rc=1 dönebiliyor
+    # (Debian 12 / quota-tools 4.06). `quotaon | grep` boru hattı pipefail
+    # altında bu yüzden yanlış negatif verir — panelin Go tarafında da tam
+    # olarak bu hata vardı. Tek güvenilir sinyal STDOUT.
+    qcikti=$(quotaon -p -u / 2>/dev/null || true)
+    case "$qcikti" in
+      *"is on"*) gecti "ext kota enforcement açık (quotaon)" ;;
+      *)         kaldi "mount kotalı ama quotaon KAPALI (muhasebe var, limit uygulanmıyor)" ;;
+    esac
   fi
   repquota -u -O csv / >/dev/null 2>&1 && gecti "repquota okunabiliyor" || kaldi "repquota başarısız"
 else
