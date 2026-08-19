@@ -89,7 +89,7 @@ func ozelPaket(b Bilgi, mantiksal string) string {
 	// yayınlandığı için valkey-server bookworm'da YOKTUR. Doğrulandı:
 	// packages.debian.org/bookworm/valkey-server -> "Package not available".
 	// Debian 13, Ubuntu 24.04/25.10/26.04'te mevcut.
-	if mantiksal == PaketCache && b.Aile == Debian && bookwormVeyaOncesi(b) {
+	if mantiksal == PaketCache && b.Aile == Debian && valkeyYok(b) {
 		return "redis-server"
 	}
 	return ""
@@ -97,31 +97,60 @@ func ozelPaket(b Bilgi, mantiksal string) string {
 
 // ozelServis: ozelPaket'in servis karşılığı.
 func ozelServis(b Bilgi, mantiksal string) string {
-	if mantiksal == PaketCache && b.Aile == Debian && bookwormVeyaOncesi(b) {
+	if mantiksal == PaketCache && b.Aile == Debian && valkeyYok(b) {
 		return "redis-server"
 	}
 	return ""
 }
 
-// bookwormVeyaOncesi: Debian 12 ve öncesi mi? Ubuntu için daima false —
-// hedeflenen tüm Ubuntu sürümlerinde valkey mevcut.
+// valkeyYok: bu dağıtım sürümünde valkey-server paketi YOK mu?
+//
+// Valkey, Redis'ten Mart 2024'te çatallandı; ondan önce dondurulmuş her
+// arşivde yalnız redis-server vardır.
+//
+//	Debian  12 (bookworm, 2023)   → valkey YOK
+//	Debian  13 (trixie)           → valkey var
+//	Ubuntu  22.04 (jammy)         → valkey YOK
+//	Ubuntu  24.04 (noble, Nis'24) → valkey YOK  🔴
+//	Ubuntu  24.10+ / 26.04        → valkey var
+//
+// 🔴 Ubuntu 24.04 daha önce "valkey var" sayılıyordu ve fonksiyon Ubuntu için
+// koşulsuz false dönüyordu. Yanlıştı: noble arşivinde valkey-server hiç yok
+// (doğrulandı: archive.ubuntu.com dists/noble main+universe Packages —
+// redis-server 5:7.0.15 var, valkey-server yok). Kurulum orada valkey-server
+// kurmaya çalışıp önbellek katmanını komple kaybederdi.
 //
 // KodAdi güvenilir olduğunda ona bakılır; boşsa VERSION_ID'ye düşülür (bazı
 // minimal imajlarda VERSION_CODENAME bulunmayabilir).
-func bookwormVeyaOncesi(b Bilgi) bool {
-	if b.ID == "ubuntu" {
-		return false
-	}
+func valkeyYok(b Bilgi) bool {
 	switch b.KodAdi {
-	case "bookworm", "bullseye", "buster", "stretch":
+	case "bookworm", "bullseye", "buster", "stretch", // Debian ≤ 12
+		"jammy", "noble": // Ubuntu 22.04, 24.04
 		return true
-	case "trixie", "forky", "sid":
+	case "trixie", "forky", "sid", // Debian ≥ 13
+		"oracular", "plucky", "questing", "resolute": // Ubuntu ≥ 24.10
 		return false
 	}
-	// KodAdi yok: VERSION_ID sayısal karşılaştırması ("12", "12.5" -> 12)
+	// KodAdi yok: VERSION_ID sayısal karşılaştırması.
 	ana := b.Surum
 	if i := strings.IndexByte(ana, '.'); i > 0 {
 		ana = ana[:i]
+	}
+	if b.ID == "ubuntu" {
+		// Ubuntu sürümü YIL.AY biçiminde: 24.04 ve öncesi valkey'siz,
+		// 24.10 ilk valkey'li sürüm. Yıl eşitse ay ayırt eder.
+		yil, ay := ana, ""
+		if i := strings.IndexByte(b.Surum, '.'); i > 0 {
+			ay = b.Surum[i+1:]
+		}
+		switch {
+		case yil < "24":
+			return true
+		case yil == "24":
+			return ay <= "04"
+		default:
+			return false
+		}
 	}
 	switch ana {
 	case "9", "10", "11", "12":

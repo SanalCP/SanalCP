@@ -38,16 +38,30 @@ if rhel_mi; then
   case "$EL_MAJOR" in ''|*[!0-9]*) EL_MAJOR=10 ;; esac
 fi
 
-# bookworm_veya_oncesi: Debian 12 and older. Mirrors osfam.bookwormVeyaOncesi —
-# valkey-server does not exist there (it forked from Redis in 2024, bookworm is
-# from 2023), so the cache package falls back to redis-server. Always false for
-# Ubuntu: every targeted Ubuntu has valkey.
-bookworm_veya_oncesi(){
-  [ "$OS_ID" = ubuntu ] && return 1
+# valkey_yok: does this release LACK the valkey-server package? Mirrors
+# osfam.valkeyYok — keep the two in step (internal/osfam parity test).
+#
+# Valkey forked from Redis in March 2024, so every archive frozen before that
+# ships redis-server only:
+#   Debian 12 bookworm (2023) no · Debian 13 trixie yes
+#   Ubuntu 22.04 jammy no · Ubuntu 24.04 noble no · Ubuntu 24.10+ / 26.04 yes
+#
+# 🔴 Ubuntu used to return "has valkey" unconditionally here. Wrong for 24.04:
+# noble's archive has no valkey-server at all (verified against
+# archive.ubuntu.com main+universe), so the install would lose its cache layer.
+valkey_yok(){
   case "$OS_KODADI" in
-    bookworm|bullseye|buster|stretch) return 0 ;;
-    trixie|forky|sid)                 return 1 ;;
+    bookworm|bullseye|buster|stretch|jammy|noble)          return 0 ;;
+    trixie|forky|sid|oracular|plucky|questing|resolute)    return 1 ;;
   esac
+  if [ "$OS_ID" = ubuntu ]; then
+    # Ubuntu sürümü YIL.AY: 24.04 ve öncesi valkey'siz, 24.10 ilki.
+    case "${OS_SURUM%%.*}" in
+      2[0-3]|1?) return 0 ;;
+      24) case "${OS_SURUM#*.}" in 04|0[0-4]) return 0 ;; *) return 1 ;; esac ;;
+      *)  return 1 ;;
+    esac
+  fi
   case "${OS_SURUM%%.*}" in 9|10|11|12) return 0 ;; esac
   return 1
 }
@@ -80,7 +94,7 @@ paket_ad(){
     dns)        debian_mi && echo bind9         || echo bind ;;
     dns-arac)   debian_mi && echo bind9-utils   || echo bind-utils ;;
     ftp)        debian_mi && echo pure-ftpd-mysql || echo pure-ftpd ;;
-    cache)      if debian_mi; then bookworm_veya_oncesi && echo redis-server || echo valkey-server
+    cache)      if debian_mi; then valkey_yok && echo redis-server || echo valkey-server
                 else echo valkey; fi ;;
     antivirus)  debian_mi && echo clamav-daemon    || echo clamav ;;
     av-guncel)  debian_mi && echo clamav-freshclam || echo clamav-update ;;
@@ -100,7 +114,7 @@ servis_ad(){
     db)     echo mariadb ;;
     dns)    debian_mi && echo bind9   || echo named ;;
     ftp)    debian_mi && echo pure-ftpd-mysql || echo pure-ftpd ;;
-    cache)  if debian_mi; then bookworm_veya_oncesi && echo redis-server || echo valkey-server
+    cache)  if debian_mi; then valkey_yok && echo redis-server || echo valkey-server
             else echo valkey; fi ;;
     antivirus) debian_mi && echo clamav-daemon || echo clamd@scan ;;
     cron)   debian_mi && echo cron    || echo crond ;;

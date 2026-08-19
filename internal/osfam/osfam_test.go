@@ -208,7 +208,13 @@ func TestCacheValkeyRedisSurumeGoreCozulur(t *testing.T) {
 		{"Debian 13", Bilgi{Aile: Debian, ID: "debian", Surum: "13", KodAdi: "trixie"}, "valkey-server", "valkey-server"},
 		{"Debian 12", Bilgi{Aile: Debian, ID: "debian", Surum: "12", KodAdi: "bookworm"}, "redis-server", "redis-server"},
 		{"Ubuntu 26.04", Bilgi{Aile: Debian, ID: "ubuntu", Surum: "26.04", KodAdi: "resolute"}, "valkey-server", "valkey-server"},
-		{"Ubuntu 24.04", Bilgi{Aile: Debian, ID: "ubuntu", Surum: "24.04", KodAdi: "noble"}, "valkey-server", "valkey-server"},
+		{"Ubuntu 24.10", Bilgi{Aile: Debian, ID: "ubuntu", Surum: "24.10", KodAdi: "oracular"}, "valkey-server", "valkey-server"},
+		// 🔴 24.04 (noble) arşivinde valkey-server YOK. Bu satır önce
+		// "valkey-server" bekliyordu; yani test, hatalı varsayımı SABİTLİYORDU
+		// ve bu yüzden hiçbir şey uyarmadı. Faz 5c statik ön-uçuşunda
+		// archive.ubuntu.com Packages indeksine bakılarak düzeltildi.
+		{"Ubuntu 24.04", Bilgi{Aile: Debian, ID: "ubuntu", Surum: "24.04", KodAdi: "noble"}, "redis-server", "redis-server"},
+		{"Ubuntu 22.04", Bilgi{Aile: Debian, ID: "ubuntu", Surum: "22.04", KodAdi: "jammy"}, "redis-server", "redis-server"},
 		{"AlmaLinux", Bilgi{Aile: RHEL, ID: "almalinux", Surum: "10.0"}, "valkey", "valkey"},
 	}
 	for _, d := range durumlar {
@@ -224,6 +230,27 @@ func TestCacheValkeyRedisSurumeGoreCozulur(t *testing.T) {
 }
 
 // KodAdi yoksa (minimal imaj) VERSION_ID'den karar verilebilmeli.
+// Ubuntu'da sürüm YIL.AY biçiminde olduğu için sayısal karşılaştırma tek
+// başına yetmez: 24.04 valkey'siz, 24.10 valkey'li — aynı yıl, farklı sonuç.
+func TestCacheUbuntuKodAdiYokkaAyaBakar(t *testing.T) {
+	durumlar := []struct {
+		surum string
+		paket string
+	}{
+		{"22.04", "redis-server"},
+		{"24.04", "redis-server"},
+		{"24.10", "valkey-server"},
+		{"26.04", "valkey-server"},
+	}
+	for _, d := range durumlar {
+		b := Bilgi{Aile: Debian, ID: "ubuntu", Surum: d.surum}
+		if got := b.Paket(PaketCache); got != d.paket {
+			t.Errorf("Ubuntu %s: got %q want %q", d.surum, got, d.paket)
+		}
+	}
+}
+
+
 func TestCacheKodAdiYokkaSurumdenCozer(t *testing.T) {
 	b12 := Bilgi{Aile: Debian, ID: "debian", Surum: "12"}
 	if got := b12.Paket(PaketCache); got != "redis-server" {

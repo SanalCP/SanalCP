@@ -881,6 +881,108 @@ Düzeltilmiş paket kurulduktan sonra:
   `mail_inbox_path = %{home}` seçiminin amacı buydu
 - nginx üzerinden PHP 8.3.33
 
+
+---
+
+## 5g. Faz 5c statik ön-uçuş — Ubuntu ✅ (2026-08-19)
+
+Faz 5a'da işe yarayan desen tekrarlandı: sunucu açmadan önce "yanlış paket adı /
+yanlış depo / yanlış yol" sınıfı, **gerçek arşiv meta verisine** sorularak
+kapatıldı. Hiçbir şey varsayılmadı; her iddia `archive.ubuntu.com` ve
+`packages.sury.org` indekslerinden doğrulandı.
+
+### Doğrulanan sürümler
+
+| | Ubuntu 24.04 (noble) | Ubuntu 26.04 (resolute) |
+|---|---|---|
+| Arşivde | ✅ Release: 25 Nis 2024 | ✅ Release: 23 Nis 2026 |
+| MariaDB | 10.11.7 | **11.8.6** (Debian 13 ile aynı) |
+| Dovecot | 2.3.21 → **2.3 şablonu** | **2.4.2** → **2.4 şablonu** |
+| nginx | 1.24.0 | 1.28.3 |
+| Postfix | 3.8.6 | 3.10.6 |
+| PHP (sury) | 7.4 – 8.5 | 7.4 – 8.5 |
+
+Dovecot 2.4.2, Faz 5b'de test ettiğim 2.4.1'den yeni; sürüm seçimi `>= 2.4`
+karşılaştırması yaptığı için doğru şablona gidiyor.
+
+### sury Ubuntu'yu gerçekten yayınlıyor mu?
+
+Kritik soruydu: `deb.sury.org` tarihsel olarak Debian deposudur, Ubuntu
+kullanıcıları `ppa:ondrej/php` kullanır. Installer ise her ikisi için de
+`packages.sury.org/php/` yazıyordu.
+
+Doğrulandı — sury Ubuntu dağıtımlarını da yayınlıyor:
+
+```
+dists/jammy/Release    → Origin: deb.sury.org  Suite: jammy
+dists/noble/Release    → Origin: deb.sury.org  Suite: noble
+dists/resolute/Release → Origin: deb.sury.org  Suite: resolute
+```
+
+Packages indeksinde `php7.4-fpm` … `php8.5-fpm` mevcut ve paket sürümleri
+`+ubuntu24.04~1` / `+ubuntu26.04~1` ile o dağıtıma göre derlenmiş. Installer'ın
+kod adı listesi (`bullseye bookworm trixie | jammy noble resolute`) doğru.
+
+### 🔴 Bulunan tek hata: Ubuntu 24.04'te valkey yok
+
+`osfam` ve `sanalcp-ortak.sh`, Ubuntu için koşulsuz "valkey var" diyordu:
+
+```go
+func bookwormVeyaOncesi(b Bilgi) bool {
+    if b.ID == "ubuntu" { return false }   // ← yanlış
+```
+
+Yanlıştı. Valkey Redis'ten **Mart 2024'te** çatallandı, Ubuntu 24.04 ise
+**Nisan 2024'te** dondu — paket arşive girmedi:
+
+| | valkey-server | redis-server |
+|---|---|---|
+| Ubuntu 22.04 jammy | yok | var |
+| Ubuntu 24.04 noble | **yok** | 5:7.0.15 |
+| Ubuntu 24.10+ | var | var |
+| Ubuntu 26.04 resolute | 9.0.3 | 5:8.0.5 |
+
+(main + universe Packages indeksinin tamamı tarandı.)
+
+Kurulum noble'da `valkey-server` kurmayı deneyip başarısız olacak, önbellek
+katmanı komple kaybolacaktı.
+
+**Testin kendisi hatayı sabitliyordu.** `TestCacheValkeyRedisSurumeGoreCozulur`
+içindeki satır aynen şuydu:
+
+```go
+{"Ubuntu 24.04", ..., "valkey-server", "valkey-server"},
+```
+
+Yani yanlış varsayım teste yazılmıştı ve bu yüzden hiçbir şey uyarmadı. Testler
+davranışı sabitler — sabitlenen davranış yanlışsa test koruma değil, kilittir.
+
+Düzeltme: kavram "bookworm ve öncesi" değil doğrudan **"valkey yok"** olarak
+adlandırıldı (`valkeyYok` / `valkey_yok`) ve Ubuntu da kapsandı. Kod adı yoksa
+sayısal karşılaştırma Ubuntu'nun YIL.AY biçimini ayırt ediyor: 24.04 valkey'siz,
+24.10 valkey'li — aynı yıl, farklı sonuç.
+
+Go↔shell eşliği mutasyonla doğrulandı: shell tarafı Ubuntu için "valkey var"
+demeye zorlandığında parite testi `ubuntu2404` alt testinde düşüyor
+(*"installer valkey-server diyor, osfam redis-server diyor"*).
+
+### Paket adı taraması
+
+`paket_ad` tablosundaki her mantıksal adın karşılığı iki Ubuntu sürümünün
+main+universe indeksinde arandı: nginx · mariadb-server · bind9 · bind9-utils ·
+pure-ftpd-mysql · redis-server / valkey-server · clamav-daemon ·
+clamav-freshclam · cron · apache2 · apache2-utils · libarchive-tools ·
+openssh-server · xfsprogs · quota. **valkey dışında hepsi ikisinde de mevcut.**
+
+### Canlı testte görülecekler
+
+Statik doğrulama "paket var" der, "çalışıyor" demez. Debian 13 tecrübesi
+gösterdi ki asıl hatalar bu katmanın altında: stok yapılandırma dosyalarının
+bizimkini ezmesi, apt'nin servisleri başlatması, tek seferlik systemd
+koşulları. Ubuntu'da özellikle bakılacaklar: AppArmor profilleri (Ubuntu'da
+Debian'dan daha sıkı), `ufw` varsayılanları, ve Faz 5b'de bulunan beş hatanın
+Ubuntu'da tekrarlanmadığının doğrulanması.
+
 ---
 
 ## 6. Sıralama
@@ -895,7 +997,7 @@ Düzeltilmiş paket kurulduktan sonra:
 | ~~**4b**~~ | ✅ Ops betikleri + tek shell tablosu (`sanalcp-ortak.sh`) | orta |
 | ~~**5a**~~ | ✅ Canlı test: **Debian 12** — 39 kontrol/0 hata, 7 hata bulundu ve düzeltildi (§5d) | — |
 | ~~**5b**~~ | ✅ Canlı test: **Debian 13** — 44 kontrol/0 hata, 5 hata bulundu ve düzeltildi (§5f) | — |
-| **5c** | Canlı test: **Ubuntu 26.04**, ardından 24.04 | — |
+| **5c** | Statik ön-uçuş ✅ (§5g) · canlı test: **Ubuntu 26.04**, ardından 24.04 — sunucu bekleniyor | — |
 | **6** | Apache backend + CVE ekranı: Debian'da kapat, dürüstçe belirt | düşük |
 
 **Faz 0-4b tamamlandı (2026-08-19).** Go tarafında artık doğrudan `dnf`/`yum`/`rpm`
