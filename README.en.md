@@ -6,7 +6,7 @@
 
 # SanalCP
 
-**A free and open source hosting control panel.** Turns a blank **AlmaLinux** server into a complete hosting stack with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + email + phpMyAdmin + firewall, all installed and configured automatically.
+**A free and open source hosting control panel.** Turns a blank **AlmaLinux, Debian or Ubuntu** server into a complete hosting stack with a single command — nginx + MariaDB + multi-version PHP + Valkey (Redis) + email + phpMyAdmin + firewall, all installed and configured automatically.
 
 > **Free forever.** There is no pro edition, no feature gating, no license key, and no
 > user/domain limit. The entire panel is **MIT** licensed — commercial use included,
@@ -66,7 +66,6 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 
 | Missing | Status |
 |---|---|
-| **Debian / Ubuntu support** | AlmaLinux/RHEL family only (9.4+ / 10). The next priority. |
 | **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
 | **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
 | **App installer beyond WordPress** | One-click install is WordPress only. |
@@ -77,7 +76,16 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 
 ## One-line install
 
-On a clean AlmaLinux 9.4+ / 10 server (min. 2 GB RAM), as **root**:
+On a clean server (min. 2 GB RAM), as **root**:
+
+```bash
+curl -fsSL https://sanalcp.com/kur | bash
+```
+
+That URL serves a script **pinned to the released commit and to the archive's
+SHA-256**; installation does not start unless the downloaded package verifies.
+The older one-liner that pulls the `main` branch directly still works, but
+performs no integrity check:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
@@ -228,10 +236,12 @@ The panel's standard settings (security headers, caching, the "extra directives"
 ## System requirements
 
 - **AlmaLinux 10** or **AlmaLinux 9.4+** (matching RHEL / Rocky releases also work)
+- or **Debian 13 / 12**, **Ubuntu 26.04 LTS / 24.04 LTS** — all four verified on live servers
 - At least **2 GB RAM**, 2 vCPUs (for 5 PHP versions + MariaDB + Valkey)
 - Root access + an internet connection
-- For disk quotas the root filesystem must be **XFS** (the AlmaLinux default). On ext4 the
-  panel still runs, only per-tenant disk quotas are disabled.
+- Disk quotas work on both **XFS** and **ext4** root filesystems. On ext4 quotas need
+  `rootflags=usrquota` on the kernel command line and **one reboot**; the installer sets
+  this up and tells you on screen.
 
 ## Post-install helper tools
 

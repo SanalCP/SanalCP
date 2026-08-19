@@ -6,7 +6,7 @@
 
 # SanalCP
 
-**Ücretsiz ve açık kaynak hosting kontrol paneli.** Boş bir **AlmaLinux** sunucuyu tek komutla komple bir barındırma sistemine çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + e-posta + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
+**Ücretsiz ve açık kaynak hosting kontrol paneli.** Boş bir **AlmaLinux, Debian veya Ubuntu** sunucuyu tek komutla komple bir barındırma sistemine çevirir — nginx + MariaDB + çok sürümlü PHP + Valkey (Redis) + e-posta + phpMyAdmin + güvenlik duvarı, hepsi otomatik kurulur ve ayarlanır.
 
 > **Her zaman ücretsiz.** Pro sürüm, özellik kilidi, lisans anahtarı, kullanıcı/domain
 > sınırı yoktur. Panelin tamamı **MIT** lisanslıdır — ticari kullanım dahil, kısıtsız.
@@ -67,7 +67,6 @@ yol haritasındadırlar:
 
 | Eksik | Durum |
 |---|---|
-| **Debian / Ubuntu desteği** | Yalnızca AlmaLinux/RHEL ailesi (9.4+ / 10). Sıradaki en öncelikli iş. |
 | **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
 | **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
 | **WordPress dışı uygulama kurucu** | Tek tık kurulum yalnızca WordPress için. |
@@ -78,7 +77,15 @@ yol haritasındadırlar:
 
 ## Tek satır kurulum
 
-Temiz bir AlmaLinux 9.4+ / 10 (min. 2 GB RAM) sunucuda **root** olarak:
+Temiz bir sunucuda (min. 2 GB RAM) **root** olarak:
+
+```bash
+curl -fsSL https://sanalcp.com/kur | bash
+```
+
+Bu adres, yayınlanmış son sürümün **commit'ine ve arşiv SHA-256'sına sabitlenmiş**
+bir betik sunar; indirilen paket doğrulanmadan kurulum başlamaz. `main` dalını
+doğrudan çeken eski tek satır hâlâ çalışır ama bütünlük doğrulaması yapmaz:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
@@ -229,10 +236,12 @@ Panelin standart ayarları (güvenlik başlıkları, cache, "ek direktifler" ala
 ## Sistem gereksinimleri
 
 - **AlmaLinux 10** veya **AlmaLinux 9.4+** (aynı sürümdeki RHEL / Rocky de çalışır)
+- veya **Debian 13 / 12**, **Ubuntu 26.04 LTS / 24.04 LTS** — dördü de canlı test edildi
 - En az **2 GB RAM**, 2 vCPU (5 PHP sürümü + MariaDB + Valkey için)
 - Root erişimi + internet bağlantısı
-- Disk kotasının çalışması için kök dosya sistemi **XFS** olmalıdır (AlmaLinux varsayılanı).
-  ext4'te panel çalışır, yalnız per-tenant disk kotası devre dışı kalır.
+- Disk kotası hem **XFS** hem **ext4** kök dosya sisteminde çalışır. ext4'te kota,
+  çekirdek komut satırına `rootflags=usrquota` eklenmesini ve **tek seferlik bir
+  yeniden başlatmayı** gerektirir; kurulum bunu hazırlar ve ekranda bildirir.
 
 ## Kurulum sonrası yardımcı araçlar
 
