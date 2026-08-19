@@ -25,6 +25,12 @@ fi
 [ -d "$TMPL" ] || { log "✗ mail template dizini bulunamadı ($TMPL)"; exit 1; }
 ENV=/etc/sanalcp/env
 
+# Aile tespiti + paket adları (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || { log "✗ sanalcp-ortak bulunamadı"; exit 1; }
+
 echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # GERÇEK VPS'TE BULUNDU: postfix-mysql / dovecot-mysql AYRI paketler — temel postfix/dovecot
 # paketleri MySQL sorgu-harita desteğini İÇERMİYOR. Bunlar olmadan servisler "active" görünür
@@ -32,20 +38,29 @@ echo "════ Postfix + Dovecot + OpenDKIM + Rspamd paketleri ════"
 # "unsupported dictionary type: mysql" der, Dovecot auth süreci "Unknown database driver
 # 'mysql'" ile crash-loop'a girer (auth soketi var ama arkasındaki süreç sürekli ölür) —
 # yani TÜM sanal posta kutusu doğrulaması sessizce bozuk kalır, hiçbir hata dışarı sızmaz.
-dnf install -y postfix postfix-mysql dovecot dovecot-mysql dovecot-pigeonhole opendkim >/tmp/mail-setup.log 2>&1 \
+# Debian'da dovecot TEK paket değil: çekirdek + protokol paketleri ayrıdır
+# (dovecot-imapd/lmtpd olmadan IMAP ve LMTP teslimatı hiç yoktur) ve Sieve
+# desteği "pigeonhole" adıyla değil dovecot-sieve/managesieved olarak gelir.
+if debian_mi; then
+  MAIL_PKGS="postfix postfix-mysql dovecot-core dovecot-imapd dovecot-lmtpd \
+             dovecot-mysql dovecot-sieve dovecot-managesieved opendkim opendkim-tools"
+else
+  MAIL_PKGS="postfix postfix-mysql dovecot dovecot-mysql dovecot-pigeonhole opendkim"
+fi
+# shellcheck disable=SC2086
+pkg_kur $MAIL_PKGS \
   && log "postfix(+mysql) + dovecot(+mysql/Sieve) + opendkim kuruldu" || { log "kurulum uyarı (bazı paketler zaten olabilir)"; }
 
-# Rspamd'ın resmi deposu EL 8/9/10 paketlerini yayınlıyor. EPEL bazı çalışma
-# bağımlılıklarını sağlar; repo dosyası yalnız yoksa eklenir.
-if ! command -v rspamadm >/dev/null 2>&1; then
-  dnf install -y epel-release >/tmp/rspamd-setup.log 2>&1 || true
-  . /etc/os-release
-  EL_VERSION=$(printf '%s' "${PLATFORM_ID:-platform:el9}" | sed 's/.*el//')
+# Rspamd: Debian/Ubuntu'da dağıtımın kendi deposunda var (trixie: 3.12.1) —
+# üçüncü parti depoya GEREK YOK. RHEL'de yok; resmi rspamd deposu EL 8/9/10
+# paketlerini yayınlıyor ve EPEL bazı çalışma bağımlılıklarını sağlıyor.
+if ! command -v rspamadm >/dev/null 2>&1 && rhel_mi; then
+  pkg_kur epel-release || true
+  EL_VERSION="${EL_MAJOR:-9}"
   curl -fsSL -o /etc/yum.repos.d/rspamd.repo \
     "https://rspamd.com/rpm-stable/centos-${EL_VERSION}/rspamd.repo"
 fi
-dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
-  || { log "✗ rspamd kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+pkg_kur rspamd || { log "✗ rspamd kurulamadı"; exit 1; }
 # 🔴 rspamd, panelin per-tenant cache Redis/Valkey'iyle AYNI INSTANCE'I paylaşır
 # (ikisi de 127.0.0.1:6379) — sanalcp-redis-setup panelin cache sunucusunu bu
 # betikten ÖNCE (kurulumda bir adım önce) zaten kurup çalıştırdı. AlmaLinux
@@ -56,16 +71,15 @@ dnf install -y rspamd >>/tmp/rspamd-setup.log 2>&1 \
 # Bu yüzden burada kurmuyoruz/restart etmiyoruz — hangisi ZATEN ÇALIŞIYORSA onu
 # kullanıyoruz; ikisi de çalışmıyorsa (redis-setup hiç koşmamışsa/başarısızsa)
 # ancak o zaman kendimiz kuruyoruz.
-if systemctl is-active --quiet valkey; then
-  KV_SERVICE=valkey
-elif systemctl is-active --quiet redis; then
-  KV_SERVICE=redis
-else
-  KV_SERVICE=valkey
-  if ! dnf install -y valkey >>/tmp/rspamd-setup.log 2>&1; then
-    KV_SERVICE=redis
-    dnf install -y redis >>/tmp/rspamd-setup.log 2>&1 \
-      || { log "✗ Redis/Valkey kurulamadı"; cat /tmp/rspamd-setup.log; exit 1; }
+KV_SERVICE=""
+for aday in $(paket_ad cache) $(debian_mi && echo redis-server || echo redis); do
+  systemctl is-active --quiet "$aday" && { KV_SERVICE="$aday"; break; }
+done
+if [ -z "$KV_SERVICE" ]; then
+  KV_SERVICE=$(paket_ad cache)
+  if ! pkg_kur "$KV_SERVICE"; then
+    KV_SERVICE=$(debian_mi && echo redis-server || echo redis)
+    pkg_kur "$KV_SERVICE" || { log "✗ Redis/Valkey kurulamadı"; exit 1; }
   fi
   systemctl enable --now "$KV_SERVICE" >/dev/null 2>&1
 fi
@@ -99,27 +113,114 @@ done
 log "5 mysql-virtual-*.cf dosyası yazıldı (root:postfix 0640)"
 
 echo "════ Postfix: main.cf / master.cf ════"
+
+# 🔴 Bu dedup HER KOŞUDA çalışır, blok zaten eklenmiş olsa bile.
+#
+# Eskiden temizlik yalnız bloğu İLK eklerken yapılıyordu. Sonuç: kurulu bir
+# sunucuda tekrar eden anahtar varsa sanalcp-update ile ASLA düzelmiyordu —
+# aynı tuzağa disk kotası biriminde de düşülmüştü (bkz. docs/DEBIAN-PORT.md §5f).
+# Faz 5b'de Debian 12 sunucusunda tam olarak bu görüldü: kodda düzeltme vardı,
+# sunucuya hiç ulaşmıyordu.
+#
+# Tekrar eden anahtar postfix'i bozmaz (sonuncusu kazanır) ama her postfix,
+# postconf, sendmail ve mailq çağrısında "overriding earlier entry" uyarısı
+# bastırır ve GERÇEK uyarıları gömer.
+#
+# Anahtar listesi şablondan türetilir, elle sayılmaz: şablona yeni bir anahtar
+# eklendiğinde burasının unutulması mümkün olmasın diye.
+postfix_tekrarlari_temizle() {
+  local marker='# ===== sanalcp-mail ====='
+  grep -qF "$marker" /etc/postfix/main.cf 2>/dev/null || return 0
+  awk -v tmpl="$TMPL/postfix/main.cf.append" -v marker="$marker" '
+    BEGIN {
+      while ((getline satir < tmpl) > 0)
+        if (match(satir, /^[a-z_0-9]+[[:space:]]*=/)) {
+          anahtar = substr(satir, 1, RLENGTH); sub(/[[:space:]]*=$/, "", anahtar); bizim[anahtar] = 1
+        }
+      close(tmpl)
+    }
+    # Marker görülene kadar: bizim bloğumuzun da tanımladığı anahtarları yorumla.
+    !gordu {
+      if (index($0, marker)) { gordu = 1; print; next }
+      if (match($0, /^[a-z_0-9]+[[:space:]]*=/)) {
+        a = substr($0, 1, RLENGTH); sub(/[[:space:]]*=$/, "", a)
+        if (a in bizim) { print "#" $0 "  # SanalCP: alttaki sanalcp-mail bloğunda tanımlı"; next }
+      }
+    }
+    { print }
+  ' /etc/postfix/main.cf > /etc/postfix/main.cf.sanalcp-yeni || return 1
+  # Yazdıktan sonra postconf ile doğrula; geçmezse ESKİ dosyaya geri dön
+  # (nginx/DNS'teki backup-rollback deseninin aynısı).
+  if [ -s /etc/postfix/main.cf.sanalcp-yeni ]; then
+    cp -a /etc/postfix/main.cf /etc/postfix/main.cf.sanalcp-yedek
+    cat /etc/postfix/main.cf.sanalcp-yeni > /etc/postfix/main.cf
+    if ! postconf -n >/dev/null 2>&1; then
+      cat /etc/postfix/main.cf.sanalcp-yedek > /etc/postfix/main.cf
+      log "UYARI: main.cf tekrar temizliği geri alındı (postconf doğrulamadı)"
+    fi
+  fi
+  rm -f /etc/postfix/main.cf.sanalcp-yeni
+}
+
 if ! grep -q 'sanalcp-mail' /etc/postfix/main.cf; then
-  # Alma/RHEL stok main.cf bu dört anahtarı zaten tanımlar. Aynı anahtarları alta
-  # eklemek çalışsa da her postconf/postfix çağrısında "overriding earlier entry"
-  # üretir; önce stok tanımları kaldırıp tek bir kanonik blok yaz.
-  postconf -X inet_interfaces
-  postconf -X mydestination
-  postconf -X smtpd_tls_cert_file
-  postconf -X smtpd_tls_key_file
+  # Stok main.cf'te de tanımlı olan anahtarları alta tekrar eklemek çalışır
+  # (sonuncusu kazanır) ama her postconf/postfix/sendmail çağrısında
+  # "overriding earlier entry" uyarısı bastırır — gerçek uyarılar bu gürültünün
+  # içinde kaybolur. Önce stok tanımları kaldırıp tek kanonik blok yazıyoruz.
+  #
+  # 🔴 Anahtar listesi ŞABLONDAN TÜRETİLİR, elle sayılmaz. Eskiden dört anahtar
+  # sabit yazılıydı (RHEL stok main.cf'ine bakılarak); Debian'ın stok dosyası
+  # smtpd_relay_restrictions'ı da tanımladığı için Faz 5b canlı testinde uyarı
+  # geri geldi. Şablona yeni bir anahtar eklendiğinde burasının unutulmaması
+  # için liste artık şablonun kendisinden okunuyor.
+  awk '/^[a-z_0-9]+[[:space:]]*=/{sub(/[[:space:]]*=.*/,"");print}' \
+    "$TMPL/postfix/main.cf.append" | sort -u | while read -r anahtar; do
+    [ -n "$anahtar" ] && postconf -X "$anahtar" 2>/dev/null || true
+  done
   cat "$TMPL/postfix/main.cf.append" >> /etc/postfix/main.cf
   log "main.cf'e sanalcp-mail bloğu eklendi"
 fi
+# Blok yeni eklenmiş olsun ya da önceden var olsun: kalan tekrarları temizle.
+postfix_tekrarlari_temizle
+PFTEKRAR=$(postconf -n 2>&1 >/dev/null | grep -c 'overriding earlier entry' || true)
+if [ "${PFTEKRAR:-0}" -eq 0 ]; then log "main.cf'te tekrar eden anahtar yok"
+else log "UYARI: main.cf'te hâlâ $PFTEKRAR tekrar eden anahtar var"; fi
 if ! grep -qE '^submission\s+inet' /etc/postfix/master.cf; then
   cat "$TMPL/postfix/master.cf.append" >> /etc/postfix/master.cf
   log "master.cf'e submission (587) servisi eklendi"
 fi
 
 echo "════ Dovecot: SQL auth + drop-in config ════"
-sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
-chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
-chmod 640 /etc/dovecot/dovecot-sql.conf.ext
-cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+# 🔴 Dovecot 2.4 YAPILANDIRMA DİLİNİ KIRDI. 2.3 dosyası 2.4'te açılmaz:
+#   mail_location kalktı (mail_driver + mail_path)
+#   passdb { driver = sql }  →  passdb sql { }  (adlandırılmış blok)
+#   SQL bağlantısı ayrı dosyadan (dovecot-sql.conf.ext) değil conf'un içinden
+#   ssl_cert/ssl_key  →  ssl_server_cert_file / ssl_server_key_file
+#   %u  →  %{user}
+# AlmaLinux ve Debian 12 → 2.3 · Debian 13 ve Ubuntu 26.04 → 2.4.
+# Sürüm okunamazsa 2.3'e düşülür (mevcut kurulu tabanın tamamı 2.3).
+DVSURUM=$(dovecot --version 2>/dev/null | awk '{print $1}')
+DVANA=${DVSURUM%%.*}; DVIKI=$(printf '%s' "$DVSURUM" | cut -d. -f2)
+if [ "${DVANA:-2}" -gt 2 ] 2>/dev/null || { [ "${DVANA:-2}" = 2 ] && [ "${DVIKI:-3}" -ge 4 ] 2>/dev/null; }; then
+  sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/10-sanalcp-mail-2.4.conf.tmpl" > /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  chown root:dovecot /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  chmod 640 /etc/dovecot/conf.d/10-sanalcp-mail.conf   # DB parolası İÇERİR
+  # 2.3'ten kalan SQL dosyası varsa artık okunmuyor; yanıltmasın diye kaldırılır.
+  [ -f /etc/dovecot/dovecot-sql.conf.ext ] && mv /etc/dovecot/dovecot-sql.conf.ext /etc/dovecot/dovecot-sql.conf.ext.2.3-devredisi
+  # 🔴 LMTP kullanıcı adı biçimi: stok 20-lmtp.conf alan adını kırpar ve bizim
+  # 10- dosyamızdan SONRA yüklenir; override 99- önekiyle en sona konmalı.
+  # Ayrıntı için şablonun kendi başlığına bakın.
+  cp "$TMPL/dovecot/99-sanalcp-lmtp-2.4.conf.tmpl" /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
+  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde, LMTP override yazıldı)"
+else
+  sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
+  chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
+  chmod 640 /etc/dovecot/dovecot-sql.conf.ext
+  cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
+  # 2.4'ten geri düşülen kurulumda kalmasın: 2.3 bu ayarı tanımaz, dovecot açılmaz.
+  rm -f /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
+  log "dovecot ${DVSURUM:-2.3.x} → 2.3 şablonu kuruldu"
+fi
 # Stok PAM passdb'sini kapat: kutular sanaldır (SQL passdb). Açık kalırsa her
 # girişte önce PAM denenir, kullanıcı sistemde olmadığı için pam_unix gecikme
 # uygular (ölçüldü: ~1.4-2.1 sn/giriş) ve IMAP'ten sistem hesaplarına parola
@@ -141,6 +242,28 @@ chown -R opendkim:opendkim /etc/opendkim
 # yoksa exit 78/CONFIG) çalıştırmaya devam ettirir — sessiz başarısızlık.
 cp "$TMPL/opendkim/opendkim.conf.tmpl" /etc/opendkim.conf
 chown root:opendkim /etc/opendkim.conf
+# 🔴 Debian: Socket ayarı iki yerden EZİLEBİLİR.
+#   1) /etc/systemd/system/opendkim.service.d/override.conf — varsa ExecStart'ı
+#      "-p <socket>" ile yeniden tanımlar ve opendkim.conf'taki Socket satırını
+#      GEÇERSİZ kılar. (Stok birim yalnız "ExecStart=/usr/sbin/opendkim"dir;
+#      bu drop-in'i /lib/opendkim/opendkim.service.generate üretir.)
+#   2) /etc/default/opendkim — systemd birimi bunu OKUMAZ (dosyanın kendi notu:
+#      "legacy configuration file"), ama yukarıdaki üretici onu KAYNAK alır.
+# Postfix smtpd_milters inet:127.0.0.1:8891'i beklediği için, socket unix'e
+# kayarsa DKIM imzalama hiçbir hata vermeden hiç çalışmaz.
+if debian_mi; then
+  ODK_DROPIN=/etc/systemd/system/opendkim.service.d/override.conf
+  if [ -f "$ODK_DROPIN" ] && grep -qE '^ExecStart=.*[[:space:]]-p[[:space:]]' "$ODK_DROPIN"; then
+    mv "$ODK_DROPIN" "${ODK_DROPIN}.sanal-devredisi"
+    systemctl daemon-reload >/dev/null 2>&1
+    log "opendkim systemd drop-in'i devre dışı bırakıldı (socket'i eziyordu) → ${ODK_DROPIN}.sanal-devredisi"
+  fi
+  # Üretici sonradan çalıştırılırsa aynı tuzağı kurmasın.
+  if [ -f /etc/default/opendkim ] && grep -qE '^[[:space:]]*SOCKET=' /etc/default/opendkim; then
+    sed -i 's/^[[:space:]]*SOCKET=/#SOCKET=/' /etc/default/opendkim
+    log "/etc/default/opendkim içindeki SOCKET= yorumlandı (opendkim.conf yetkili)"
+  fi
+fi
 log "/etc/opendkim.conf + KeyTable/SigningTable/TrustedHosts (boş, panel DKIM ürettikçe dolar)"
 
 echo "════ Rspamd + Redis ════"
@@ -184,12 +307,14 @@ mysql -u root -N -e "SELECT sistem_kullanici FROM panel.mail_domains WHERE durum
   chown "${sk}:${sk}" "/home/${sk}/mail" 2>/dev/null
 done
 
+if selinux_var; then
 echo "════ SELinux ════"
 setsebool -P httpd_can_network_connect_db 1 2>/dev/null && log "httpd_can_network_connect_db=1"
-if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ]; then
+if true; then
   log "UYARI: SELinux enforcing — postfix_t/dovecot_t'nin /etc/pki/sanalcp ve /home/*/mail" \
       "okuma/yazmasında AVC red'i olabilir. 'ausearch -m avc -ts recent' ile kontrol et; gerekirse" \
       "'sanalcp-repair --only mail' veya elle semanage/setsebool ile düzelt."
+fi
 fi
 
 echo "════ postfix + dovecot + opendkim + rspamd enable + (re)start ════"
@@ -219,7 +344,8 @@ echo "════ Roundcube webmail (/webmail/) ════"
 # INTL_IDNA_VARIANT_UTS46" ile 500 verir (IDN alan adı dönüşümü intl eklentisini zorunlu
 # kılıyor). Bu, phpMyAdmin'in kullandığı TEMEL sistem PHP'sine ait, remi'nin per-domain
 # PHP paketlerinden BAĞIMSIZ.
-dnf install -y php-intl >/dev/null 2>&1
+# Sistem PHP'si: RHEL'de "php-intl", Debian'da sürüm adlı "php8.3-intl".
+pkg_kur "$(debian_mi && echo php8.3-intl || echo php-intl)" >/dev/null 2>&1
 RCVER=1.7.2
 mkdir -p /opt/roundcube
 if [ ! -f /opt/roundcube/index.php ]; then
@@ -269,8 +395,9 @@ SQL
   chown -R apache:apache /opt/roundcube /var/lib/roundcube
   restorecon -R /opt/roundcube /var/lib/roundcube >/dev/null 2>&1
   # php-fpm pool'u (assets/php-fpm/roundcube.conf) install.sh'ın "ARTIFACT DEPLOY" adımında
-  # zaten /etc/php-fpm.d/roundcube.conf'a kopyalanmış olmalı (phpmyadmin.conf ile aynı desen).
-  systemctl reload php-fpm >/dev/null 2>&1 || systemctl restart php-fpm >/dev/null 2>&1
+  # zaten $SYS_PHP_POOL_DIR/roundcube.conf'a kopyalanmış olmalı (phpmyadmin.conf ile aynı
+  # desen). Birim adı da aileye göre değişir: php-fpm ↔ php8.3-fpm.
+  systemctl reload "$SYS_PHP_SVC" >/dev/null 2>&1 || systemctl restart "$SYS_PHP_SVC" >/dev/null 2>&1
   log "✓ roundcube yapılandırıldı — https://<sunucu>:8443/webmail/"
 fi
 

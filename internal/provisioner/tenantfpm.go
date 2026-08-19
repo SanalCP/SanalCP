@@ -483,7 +483,7 @@ func EnableTenantFPM(db *sql.DB, domainID int64, sk, surum string) (string, erro
 		sharedPool := filepath.Join(ay.PoolDir, sk+".conf")
 		if _, err := os.Stat(sharedPool); err == nil {
 			_ = os.Rename(sharedPool, sharedPool+".bak")
-			_, _ = exec.Command("systemctl", "reload-or-restart", ay.Service).CombinedOutput()
+			_, _ = paylasilanFPMHazirla(ay.Service)
 		}
 	}
 
@@ -547,7 +547,7 @@ func RollbackToSharedFPM(db *sql.DB, domainID int64, sk, surum string) error {
 	var socket string
 	if _, err := os.Stat(bak); err == nil {
 		_ = os.Rename(bak, sharedPool)
-		_, _ = exec.Command("systemctl", "reload-or-restart", ay.Service).CombinedOutput()
+		_, _ = paylasilanFPMHazirla(ay.Service)
 		socket = filepath.Join(ay.SockDir, sk+".sock")
 	} else {
 		// .bak yok → hardened paylaşılan pool'u yeniden yaz (php-fpm -t + rollback iceride)

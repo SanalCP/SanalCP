@@ -47,6 +47,14 @@ act()   { CHK=$((CHK+1)); FIXN=$((FIXN+1)); echo -e "  ${c_y}$([ $DRY -eq 1 ] &&
 warn()  { echo -e "  ${c_y}!${c_0} $*"; }
 err()   { ERRN=$((ERRN+1)); echo -e "  ${c_r}✗${c_0} $*"; }
 
+# Aile tespiti + yollar (installer ile AYNI tablo).
+ORTAK=/usr/local/bin/sanalcp-ortak
+[ -f "$ORTAK" ] || ORTAK=/opt/sanalcp/src/scripts/sanalcp-ortak.sh
+# shellcheck source=/dev/null
+. "$ORTAK" 2>/dev/null || { echo "  ✗ sanalcp-ortak bulunamadi"; exit 1; }
+
+# SELinux yalnizca RHEL'de; Debian'da getenforce yok → SEL=0 ve tum ensure_context
+# cagrilari sessizce no-op olur (fonksiyonun ilk satiri).
 SEL=0; command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" != "Disabled" ] && SEL=1
 HAVE_SEMANAGE=0; command -v semanage >/dev/null 2>&1 && HAVE_SEMANAGE=1
 
@@ -117,7 +125,12 @@ sec_phpmyadmin() {
   head_ "phpMyAdmin"
   local PMA=/opt/phpmyadmin
   [ -d "$PMA" ] || { warn "$PMA yok, atlanıyor"; return 0; }
-  local PG; PG=$(awk -F= '/^[[:space:]]*group/{gsub(/ /,"",$2);print $2}' /etc/php-fpm.d/phpmyadmin.conf 2>/dev/null); PG=${PG:-apache}
+  # Havuz dosyasinin yeri aileye gore degisir (RHEL /etc/php-fpm.d, Debian
+  # /etc/php/8.3/fpm/pool.d) ve havuzun grubu da oyle (apache / www-data).
+  # Yanlis yol okunursa varsayilan "apache"ye dusulur ve Debian'da config.inc.php
+  # var olmayan bir gruba verilirdi.
+  local PG; PG=$(awk -F= '/^[[:space:]]*group/{gsub(/ /,"",$2);print $2}' "$SYS_PHP_POOL_DIR/phpmyadmin.conf" 2>/dev/null)
+  PG=${PG:-$(debian_mi && echo "$WEB_USER" || echo apache)}
   ensure_context "$PMA" httpd_sys_content_t -R
   if [ -f "$PMA/config.inc.php" ]; then
     # pool kullanıcısı (apache) okuyabilmeli; secret içerdiği için world-readable OLMAMALI

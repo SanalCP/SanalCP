@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.7.1",
-  "duyuru": "ACİL YAMA — 0.7.0 KULLANMAYIN. 0.7.0 ile gelen api_tokenlari migration'ı, foreign key kolonunu users.id ile uyumsuz tanımlıyordu (BIGINT / BIGINT UNSIGNED). InnoDB bu foreign key'i reddediyor (errno 150), migration başarısız oluyor ve panel HİÇ AÇILMIYOR. 0.7.0'a güncelleyen ya da sıfırdan kuran her sunucu etkileniyordu. 0.7.1 yalnızca bu kolonu düzeltir; başka davranış değişikliği YOKTUR. AYRICA: sanalcp-update'in geri dönüş (rollback) mekanizması güçlendirildi. Eskiden rollback binary'yi ve veritabanını güncelleme öncesine döndürüyor ama migration DOSYALARINI diskte yeni sürümden bırakıyordu; bu durumda eski binary de açılamıyor ve kurtarılabilir bir geri dönüş tam kesintiye dönüşüyordu. Artık migration dizininin tam kopyası güncelleme öncesinde alınıyor ve rollback sırasında geri yükleniyor. Bu iyileştirme bir SONRAKİ güncellemeden itibaren devreye girer. AYRICA: depodaki tüm migration'ları boş bir veritabanına uygulayan bir smoke testi eklendi — bu sınıftaki hatalar artık yayından önce yakalanır.",
-  "kritik": true,
-  "yayin_tarihi": "2026-08-18"
+  "son_surum": "0.8.0",
+  "duyuru": "Debian desteği. Panel artık Debian 12 (bookworm) ve Debian 13 (trixie) üzerinde kuruluyor; AlmaLinux/RHEL desteği aynen sürüyor. PHP paketleri Debian'da deb.sury.org deposundan gelir (7.4-8.5). Dovecot 2.4 için ayrı bir yapılandırma şablonu var; sürüm otomatik seçilir. 🔴 ÖNEMLİ DÜZELTME (Debian 12 VE 13): disk kotası ikinci yeniden başlatmadan itibaren sessizce devre dışı kalıyordu — kota muhasebesi çalışıyor, sayılar doğru görünüyor, ama hiçbir limit uygulanmıyordu. Bu güncelleme kotayı yeniden başlatma gerekmeden onarır. Kurulu Debian sunucularında güncelleme sonrası 'quotaon -p -u /' çıktısının 'is on' dediğini teyit edin. AYRICA: postfix main.cf'te tekrar eden anahtarlar temizleniyor (her postfix komutunda uyarı bastırıyordu) ve kullanılmayan PHP-FPM master süreçleri durduruluyor (Debian'da yedi sürüm birden çalışıyordu, ~197 MB). Ubuntu henüz canlı test edilmedi; Ubuntu kurulumu bu sürümde DESTEKLENEN olarak işaretlenmemiştir.",
+  "kritik": false,
+  "yayin_tarihi": "2026-08-19"
 }

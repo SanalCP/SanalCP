@@ -131,7 +131,7 @@ func ensureCacheZone() (changed bool, err error) {
 	// bu durumda nginx worker (uid nginx) alt dizine erişmek için gereken traverse (x)
 	// hakkına sahip olmaz ve fastcgi_cache "Permission denied" ile başarısız olur.
 	_ = os.Chmod(filepath.Dir(cacheZoneDir), 0755)
-	if uid, gid, e := uidGid("nginx"); e == nil {
+	if uid, gid, e := uidGid(osfam.WebKullanici()); e == nil {
 		_ = os.Chown(cacheZoneDir, uid, gid)
 	}
 	_, _ = exec.Command("restorecon", "-R", cacheZoneDir).CombinedOutput()
@@ -246,6 +246,22 @@ var phpMapDebian = map[string]phpAyar{
 	"8.5": {PoolDir: "/etc/php/8.5/fpm/pool.d", SockDir: "/run/php", Service: "php8.5-fpm", FpmBin: "/usr/sbin/php-fpm8.5"},
 	"8.6": {PoolDir: "/etc/php/8.6/fpm/pool.d", SockDir: "/run/php", Service: "php8.6-fpm", FpmBin: "/usr/sbin/php-fpm8.6"},
 }
+
+// SistemPHPSurum: panelin KENDİ bileşenlerinin (phpMyAdmin, Roundcube/webmail)
+// koştuğu PHP sürümü. Her iki ailede de 8.3 varsayılır — installer bunu garanti
+// eder (RHEL'de remi-8.3 modül akışı, Debian'da sury php8.3).
+const SistemPHPSurum = "8.3"
+
+// SistemPHPHavuzDizin / SistemPHPServis: sistem PHP'sinin FPM havuz dizini ve
+// systemd unit adı.
+//
+// NEDEN FONKSİYON: RHEL'de "/etc/php-fpm.d" + "php-fpm", Debian'da
+// "/etc/php/8.3/fpm/pool.d" + "php8.3-fpm". Bu iki değer panelin phpMyAdmin ve
+// webmail onarımlarında sabit yazılıydı; Debian'da havuz yanlış dizine yazılır
+// ve `systemctl reload php-fpm` var olmayan bir birime giderdi → phpMyAdmin ve
+// webmail sessizce çalışmazdı.
+func SistemPHPHavuzDizin() string { return phpMap[SistemPHPSurum].PoolDir }
+func SistemPHPServis() string     { return phpMap[SistemPHPSurum].Service }
 
 func ValidateDomain(d string) error {
 	d = strings.ToLower(strings.TrimSpace(d))
@@ -656,8 +672,8 @@ var phpPoolTmpl = template.Must(template.New("p").Parse(`[{{.User}}]
 user = {{.User}}
 group = {{.User}}
 listen = {{.Socket}}
-listen.owner = nginx
-listen.group = nginx
+listen.owner = {{.WebKullanici}}
+listen.group = {{.WebKullanici}}
 listen.mode = 0660
 pm = ondemand
 pm.max_children = 8
@@ -845,6 +861,21 @@ func phpPoolPath(sk, phpSurum string) (string, string, string) {
 		ay.Service
 }
 
+// paylasilanFPMHazirla: paylasilan phpX.Y-fpm servisini ONCE enable eder, sonra
+// baslatir/reload eder.
+//
+// 🔴 NEDEN enable DE GEREKIYOR: Debian'da apt her PHP surumunun FPM servisini
+// kurulumda baslatir VE enable eder; kurulum betigi kullanilmayan surumleri
+// durdurup disable ederek bosa giden ~30 MB/surum bellegi geri aliyor
+// (Faz 5b canli testinde 6 atil master = ~197 MB olculdu). Paylasilan havuz
+// yoluna geri dusuldugunde (per-tenant FPM rollback'i) o surumun servisi tekrar
+// gerekir: "reload-or-restart" durmus servisi calistirir ama DISABLE kalirsa
+// ilk yeniden baslatmada site 502 verir. Bu yuzden ikisi birlikte yapilir.
+func paylasilanFPMHazirla(svc string) ([]byte, error) {
+	_, _ = exec.Command("systemctl", "enable", svc).CombinedOutput()
+	return exec.Command("systemctl", "reload-or-restart", svc).CombinedOutput()
+}
+
 // writePoolValidated: tenant php-fpm pool dosyasini (sertlestirilmis template ile)
 // yazar, reload ONCESI `php-fpm -t` ile dogrular; gecersizse eski icerige GERI DONER
 // (nginx/DNS'teki backup-rollback deseni). Basariliysa ilgili php-fpm servisini reload eder.
@@ -858,7 +889,12 @@ func writePoolValidated(sk, phpSurum string) (socket, service string, err error)
 	_ = os.MkdirAll(filepath.Dir(sock), 0755)
 
 	var poolBuf bytes.Buffer
-	if e := phpPoolTmpl.Execute(&poolBuf, map[string]string{"User": sk, "Socket": sock}); e != nil {
+	// 🔴 listen.owner/group nginx'in çalıştığı kullanıcı olmalı. Sabit "nginx"
+	// yazıldığında Debian'da php-fpm havuzu "cannot get uid for user 'nginx'"
+	// ile reddediyor ve HİÇBİR site oluşturulamıyordu (Faz 5a canlı testi).
+	if e := phpPoolTmpl.Execute(&poolBuf, map[string]string{
+		"User": sk, "Socket": sock, "WebKullanici": osfam.WebKullanici(),
+	}); e != nil {
 		return "", "", fmt.Errorf("pool template: %w", e)
 	}
 
@@ -879,7 +915,7 @@ func writePoolValidated(sk, phpSurum string) (socket, service string, err error)
 			return "", "", fmt.Errorf("php-fpm -t (%s) başarısız, pool geri alındı: %s: %w", v, strings.TrimSpace(string(out)), e)
 		}
 	}
-	if out, e := exec.Command("systemctl", "reload-or-restart", svc).CombinedOutput(); e != nil {
+	if out, e := paylasilanFPMHazirla(svc); e != nil {
 		return "", "", fmt.Errorf("php-fpm (%s) reload: %s: %w", svc, strings.TrimSpace(string(out)), e)
 	}
 	return sock, svc, nil
@@ -1537,16 +1573,24 @@ func hardenHomePerms(home, sk string, uid, gid int) {
 		_ = os.Chown(ph, uid, gid)
 		_ = os.Chmod(ph, 0o750)
 		// home: nginx yalnız traverse edebilsin (list yok).
-		_, _ = exec.Command("setfacl", "-m", "u:nginx:--x", home).CombinedOutput()
+		// 🔴 ACL kullanıcısı aileye göre (RHEL nginx · Debian www-data). Sabit
+		// "nginx" yazıldığında setfacl Debian'da "invalid user" ile başarısız
+		// oluyor, hata da yutulduğu için ACL hiç kurulmuyordu → web kullanıcısı
+		// public_html'i okuyamıyor → HER SİTE 404 (Faz 5a canlı testi).
+		wk := osfam.WebKullanici()
+		_, _ = exec.Command("setfacl", "-m", "u:"+wk+":--x", home).CombinedOutput()
 		// public_html: nginx oku+traverse (rX) + DEFAULT ACL (üst dizin) → yeni oluşturulan
 		// alt dizin/dosyalar u:nginx:rX'i miras alır. -R DEĞİL: mevcut içerik HealHomePerms
 		// (sentinel) tarafından tek seferde dönüştürülür; yeni site zaten boş.
-		_, _ = exec.Command("setfacl", "-m", "u:nginx:rX", ph).CombinedOutput()
-		_, _ = exec.Command("setfacl", "-d", "-m", "u:nginx:rX", ph).CombinedOutput()
+		if out, err := exec.Command("setfacl", "-m", "u:"+wk+":rX", ph).CombinedOutput(); err != nil {
+			// Sessiz kalmasın: bu başarısızlık siteyi 404'e düşürür.
+			log.Printf("hardenHomePerms: setfacl u:%s:rX %s BAŞARISIZ: %v %s", wk, ph, err, strings.TrimSpace(string(out)))
+		}
+		_, _ = exec.Command("setfacl", "-d", "-m", "u:"+wk+":rX", ph).CombinedOutput()
 		return
 	}
 	// Fail-safe (acl yok): eski grup=nginx modeli — servis asla kırılmaz.
-	if _, nginxGid, err := uidGid("nginx"); err == nil {
+	if _, nginxGid, err := uidGid(osfam.WebKullanici()); err == nil {
 		log.Printf("hardenHomePerms: 'acl' yok, fail-safe grup=nginx modeli (%s)", home)
 		_ = os.Chown(home, uid, nginxGid)
 		_ = os.Chmod(home, 0o710)
@@ -1570,8 +1614,8 @@ func HardenHomePermsRecursive(ph string) {
 	if fi, e := os.Stat(ph); e != nil || !fi.IsDir() {
 		return
 	}
-	_, _ = exec.Command("setfacl", "-R", "-m", "u:nginx:rX", ph).CombinedOutput()
-	_, _ = exec.Command("setfacl", "-R", "-d", "-m", "u:nginx:rX", ph).CombinedOutput()
+	_, _ = exec.Command("setfacl", "-R", "-m", "u:"+osfam.WebKullanici()+":rX", ph).CombinedOutput()
+	_, _ = exec.Command("setfacl", "-R", "-d", "-m", "u:"+osfam.WebKullanici()+":rX", ph).CombinedOutput()
 }
 
 // HealHomePerms: MEVCUT tüm tenant ev dizinlerine (retroaktif) izolasyon izinlerini

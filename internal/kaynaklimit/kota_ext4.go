@@ -82,17 +82,48 @@ func (ext4Kota) Aktif() (accounting, enforcement bool) {
 		})
 		return false, false
 	}
+	cikti, _ := quotaonSorgula()
+	return ext4AktifCoz(cikti, mountKotaliOku())
+}
+
+// quotaonSorgula: `quotaon -p -u /` STDOUT'u. Hata bilerek yok sayılır.
+//
+// 🔴 ÇIKIŞ KODU HER İKİ YÖNDE DE GÜVENİLMEZ — canlı olarak iki farklı sistemde
+// doğrulandı:
+//   - kota KAPALI  : tanı mesajı stderr'e gider, rc=0 (yani "başarı" gibi görünür)
+//   - kota AÇIK    : stdout "user quota on / (/dev/sda1) is on", rc=1 (Debian 12,
+//     quota-tools 4.06) — hata sanılıp erken dönülürse kota AÇIKKEN kapalı
+//     raporlanır. Faz 5a'da tam olarak bu oldu: panel "reboot gerekli" dedi,
+//     oysa kota çalışıyordu.
+//
+// Tek güvenilir sinyal STDOUT'tur.
+var quotaonSorgula = func() (string, error) {
+	if _, err := exec.LookPath("quotaon"); err != nil {
+		quotaAracUyari.Do(func() {
+			log.Printf("kota[ext4]: quotaon bulunamadı — `quota` paketi kurulu değil, disk kotası kullanılamıyor")
+		})
+		return "", err
+	}
 	var stdout bytes.Buffer
 	cmd := exec.Command("quotaon", "-p", "-u", kotaMount)
-	cmd.Stdout = &stdout // stderr BİLEREK yutulur: kota kapalıyken tanı mesajı oraya gider
-	if err := cmd.Run(); err != nil {
-		return false, false
-	}
-	if ext4QuotaonAktif(stdout.String()) {
+	cmd.Stdout = &stdout // stderr BİLEREK yutulur: kapalıyken tanı mesajı oraya gider
+	err := cmd.Run()
+	return stdout.String(), err
+}
+
+func mountKotaliOku() bool {
+	mounts, _ := os.ReadFile("/proc/self/mounts")
+	return ext4MountKotali(string(mounts))
+}
+
+// ext4AktifCoz: saf karar — quotaon çıktısı + mount seçeneği.
+// quotaon "on" diyorsa hem muhasebe hem uygulama açıktır; demiyorsa ama mount
+// kotalıysa muhasebe var, uygulama yok (XFS'teki uqnoenforce'un karşılığı).
+func ext4AktifCoz(quotaonCikti string, mountKotali bool) (accounting, enforcement bool) {
+	if ext4QuotaonAktif(quotaonCikti) {
 		return true, true
 	}
-	mounts, _ := os.ReadFile("/proc/self/mounts")
-	return ext4MountKotali(string(mounts)), false
+	return mountKotali, false
 }
 
 // ext4LimitArgs: setquota'ya verilecek arg-slice (saf → birim-test edilebilir).

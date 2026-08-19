@@ -19,7 +19,7 @@ import (
 // gerekliServisler: e-postanın FİİLEN çalışması için ayakta olması gereken
 // servisler. rspamd/opendkim KASITLI olarak listede değil — onlar olmadan da
 // posta akar (yalnız spam filtresi/DKIM imzası olmaz), postfix'in milter
-// ayarı milter_default_action=accept (bkz. scripts/sanalcp-mail-setup.sh).
+// ayarı milter_default_action=accept (bkz. assets/ops/sanalcp-mail-setup.sh).
 var gerekliServisler = []string{"postfix", "dovecot"}
 
 // MailAltyapisiVar: e-posta yığını sunucuda kurulu VE çalışıyor mu?

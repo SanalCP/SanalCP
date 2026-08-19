@@ -1,0 +1,95 @@
+# SanalCP — Postfix/Dovecot sanal posta kutuları · **Dovecot 2.4 sözdizimi**.
+#
+# 🔴 NEDEN İKİ ŞABLON VAR: Dovecot 2.4 yapılandırma dilini kırdı. 2.3 dosyası
+# 2.4'te açılmıyor (mail_location kalktı, passdb/userdb artık ADLANDIRILMIŞ blok
+# istiyor, SQL bağlantısı ayrı dosyadan değil conf'un içinden geliyor).
+# Hangi dağıtımda hangisinin geleceği sabit değil — sanalcp-mail-setup
+# `doveconf` sürümüne bakıp bu dosyayı ya da 10-sanalcp-mail.conf.tmpl'i kurar.
+#   Debian 12 / AlmaLinux → 2.3 · Debian 13 / Ubuntu 26.04 → 2.4
+#
+# 2.3'ten farklar (hepsi gerçek 2.4.1 ayrıştırıcısıyla doğrulandı):
+#   mail_location = maildir:~/   →  mail_driver = maildir + mail_path
+#   passdb { driver = sql }      →  passdb sql { }
+#   args = /etc/dovecot/...ext   →  bağlantı+sorgular BU DOSYADA
+#   %u                           →  %{user}
+protocols = imap lmtp
+
+# Posta yeri: userdb "home" alanını döndürüyor (bkz. userdb sorgusu), kutu da
+# doğrudan orada. 2.4'te mail_location tek satırı yerine sürücü + yol ayrı.
+mail_driver = maildir
+mail_path = %{home}
+
+# 🔴 mail_inbox_path: 2.4'te INBOX'ın yeri AYRI bir ayar. Debian'ın stok
+# conf.d/10-mail.conf dosyası `mail_inbox_path = /var/mail/%{user}` (mbox) yazar
+# ve bizim mail_driver/mail_path satırlarımız onu ezse de BU ayar ayakta kalır —
+# sonuç: dovecot INBOX'ı /var/mail altında mbox olarak açmaya çalışır, sanal
+# kutuda o yola yazma izni olmadığı için teslimat "Permission denied" ile düşer.
+# %{home} vermek 2.3'teki `mail_location = maildir:~/` yerleşimini birebir
+# tekrarlar (cur/new/tmp doğrudan kutu kökünde) — yedek/geri yükleme ve
+# 2.3 sunucusundan göç bu sayede dağıtımdan bağımsız çalışır.
+mail_inbox_path = %{home}
+
+# 🔴 Stok auth-system (PAM) KAPATILMALIDIR — kurulum betiği ve panelin
+# HealDovecotAuth'u bunu yapar. Açık kalırsa her sanal kutu girişi önce PAM'a
+# sorulur (pam_unix gecikmesi ~2 sn) ve IMAP üzerinden root dahil sistem
+# hesaplarına parola denenebilir.
+
+# ---- SQL bağlantısı (2.3'te dovecot-sql.conf.ext idi) ----
+sql_driver = mysql
+mysql 127.0.0.1 {
+  user = mailro
+  password = __PANEL_MAIL_DB_PASS__
+  dbname = panel
+}
+
+passdb sql {
+  default_password_scheme = SHA512-CRYPT
+  query = SELECT email AS user, password_hash AS password FROM mailboxes WHERE email='%{user}' AND status='active'
+}
+
+userdb sql {
+  query = SELECT CONCAT('/home/',md.sistem_kullanici,'/mail/',m.local_part) AS home, md.uid_n AS uid, md.gid_n AS gid FROM mailboxes m JOIN mail_domains md ON md.id=m.mail_domain_id WHERE m.email='%{user}' AND m.status='active' AND md.durum='active'
+}
+
+# Kimlik doğrulama önbelleği: Roundcube her HTTP isteğinde YENİ IMAP oturumu
+# açar; önbellek olmadan her istek yeniden passdb sorgusu demektir.
+auth_cache_size = 10M
+auth_cache_ttl = 1 hours
+auth_cache_negative_ttl = 1 mins
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+
+# Pigeonhole/Sieve: panelin ürettiği kutu-başı filtre ve vacation betiği.
+protocol lmtp {
+  mail_plugins {
+    sieve = yes
+  }
+}
+sieve_script personal {
+  driver = file
+  path = ~/sieve
+  active_path = ~/.dovecot.sieve
+}
+sieve_vacation_min_period = 1d
+sieve_vacation_default_period = 7d
+sieve_vacation_max_period = 30d
+
+# Varsayılan sertifika: panelin kendi self-signed sertifikası.
+# 2.4'te ssl_cert/ssl_key adları değişti ve "<" dosya-okuma öneki kalktı:
+# artık doğrudan dosya YOLU verilir.
+ssl_server_cert_file = /etc/ssl/sanalcp/panel.crt
+ssl_server_key_file = /etc/ssl/sanalcp/panel.key

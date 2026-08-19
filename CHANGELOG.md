@@ -11,6 +11,66 @@ sayfa altbilgisinden görebilirsiniz.
 
 ---
 
+## 0.8.x — Debian desteği
+
+**0.8.0** (2026-08-19)
+
+Panel artık **Debian 12 (bookworm)** ve **Debian 13 (trixie)** üzerinde kuruluyor.
+AlmaLinux/RHEL desteği aynen sürüyor; tek bir kurulum betiği iki aileyi de kuruyor.
+
+- PHP paketleri Debian'da **deb.sury.org** deposundan gelir (7.4 – 8.5).
+  Depo anahtarı `signed-by` ile yalnız o depoya kapsanır, `apt-key` kullanılmaz.
+- İşletim sistemi farkları tek bir tabloda toplandı: Go tarafında
+  `internal/osfam`, shell tarafında `assets/ops/sanalcp-ortak.sh`. İkisinin
+  tutarlı kalmasını bir eşlik testi zorluyor.
+- **Dovecot 2.4** için ayrı yapılandırma şablonu var (2.4 yapılandırma dilini
+  kırdı: `mail_location` kalktı, `passdb`/`userdb` adlandırılmış blok istiyor,
+  SQL bağlantısı ayrı dosyadan değil conf'un içinden geliyor). Şablon dovecot
+  sürümüne göre otomatik seçilir.
+- BIND, Pure-FTPd, OpenDKIM ve PHP-FPM için Debian'a özgü yol/servis/paket
+  adları ve AppArmor kısıtları karşılandı.
+
+### 🔴 Disk kotası düzeltmesi — Debian 12 ve 13'ü etkiliyordu
+
+Kota, **ikinci yeniden başlatmadan itibaren sessizce devre dışı kalıyordu.**
+Muhasebe çalışmaya devam ediyor, `repquota` doğru sayılar gösteriyor, panel
+kullanımı doğru raporluyor — ama **hiçbir limit uygulanmıyordu**. Tek bir
+yeniden başlatma sonrası her şey sağlıklı görünüyordu; hata ancak ikinci
+yeniden başlatmada ortaya çıkıyor.
+
+Nedeni, kota biriminin `quotacheck` (bir kez gerekli) ile `quotaon` (her
+açılışta gerekli) işlerini tek bir "yalnızca ilk açılışta çalış" koşulunun
+altında birleştirmesiydi.
+
+Bu güncelleme kotayı **yeniden başlatma gerekmeden** onarır. Güncelleme
+sonrasında teyit etmek için:
+
+```
+quotaon -p -u /        # "user quota on / (...) is on" demeli
+```
+
+### Diğer düzeltmeler
+
+- Postfix `main.cf`'te tekrar eden anahtarlar temizleniyor. Bunlar postfix'i
+  bozmuyordu (sonuncusu kazanır) ama her `postfix`, `postconf`, `sendmail` ve
+  `mailq` çağrısında `overriding earlier entry` uyarısı bastırıp gerçek
+  uyarıları gömüyordu.
+- Kullanılmayan PHP-FPM master süreçleri durduruluyor. Debian'da paket
+  kurulumu her PHP sürümünün servisini başlattığı için taze bir sunucuda yedi
+  master birden çalışıyordu (ölçüldü: ~197 MB). Bir sürümün master'ı artık
+  yalnız o sürümde site varsa çalışır; gerektiğinde otomatik açılır.
+- Sanal posta kutularına teslimat Dovecot 2.4'te hiç çalışmıyordu (iki ayrı
+  neden: INBOX'ın mbox yolunda aranması ve LMTP'nin adresten alan adını
+  kırpması). Her ikisi de düzeltildi.
+
+### Ubuntu
+
+Ubuntu kurulumu bu sürümde **henüz canlı test edilmedi** ve desteklenen olarak
+işaretlenmemiştir. Debian ile aynı kod yolunu kullandığı için büyük ölçüde
+çalışması beklenir, ancak doğrulanmadan önerilmez.
+
+---
+
 ## 0.7.x — Otomatik saldırı engelleme ve yönetim API'si
 
 **0.7.1** (2026-08-18) — **acil yama, 0.7.0 kullanılmamalıdır**
