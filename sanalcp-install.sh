@@ -916,10 +916,11 @@ command -v sanalcp-mail-setup >/dev/null 2>&1 && sanalcp-mail-setup >/dev/null 2
 # on new installs (panel_ayarlari.root_girisi_acik=0) and can be re-enabled
 # from Panel Settings if needed. SSH root access is completely unaffected —
 # this only touches the panel's web login.
-step "13) Admin access (root + PAM)"
+step "13) Admin access"
 DSN="panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true"
 if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
-  # auxiliary users record (ownership/audit); login is still verified via root+PAM
+  # auxiliary users record (ownership/audit); backs the root/shadow fallback
+  # path (default-off — see below), NOT the primary login anymore
   /opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici root \
     -parola "$(openssl rand -hex 16)" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
     && ok "admin record ready" || warn "seed skipped (not critical)"
@@ -938,11 +939,10 @@ mysql panel -e "UPDATE panel_ayarlari SET varsayilan_dil='$PANEL_LANG' WHERE id=
 if [ -z "$ADMIN_PAROLA" ]; then
   ADMIN_PAROLA=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)
 fi
-if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
-  /opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici "$ADMIN_KULLANICI" \
-    -parola "$ADMIN_PAROLA" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
-    && ok "admin account created" || die "admin account could not be created"
-fi
+[ -x /opt/sanalcp/bin/sanalcp-seed-admin ] || die "sanalcp-seed-admin bulunamadı — panel admin hesabı oluşturulamaz, kurulum durduruldu"
+/opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici "$ADMIN_KULLANICI" \
+  -parola "$ADMIN_PAROLA" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
+  && ok "admin account created" || die "admin account could not be created"
 
 # Root/shadow giriş yolunu KAPAT. Migration bunu 1 (açık) olarak ekliyor ki
 # mevcut kurulumlar kilitlenmesin; yeni kurulumda ise girecek gerçek bir admin
