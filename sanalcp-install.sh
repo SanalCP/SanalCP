@@ -929,6 +929,24 @@ mysql panel -e "UPDATE panel_ayarlari SET varsayilan_dil='$PANEL_LANG' WHERE id=
   && ok "panel default language set to '$PANEL_LANG'" || warn "could not set panel default language"
 ok "Login: username 'root' + this server's root password"
 
+# Shell history hardening — the panel login IS this server's root password (see
+# internal/auth/handlers.go:rootShadowHash), so operators routinely handle that
+# password in a root shell. AlmaLinux/Debian default to HISTCONTROL=ignoredups,
+# which still records EVERY unique line — a password pasted at a prompt that was
+# not actually reading a password lands in ~/.bash_history in cleartext and stays
+# there. `ignoreboth` adds `ignorespace`: any command typed with a LEADING SPACE
+# is never written to history.
+install -d -m 0755 /etc/profile.d
+cat > /etc/profile.d/sanalcp-history.sh <<'HISTEOF'
+# SanalCP: commands starting with a SPACE are kept out of shell history
+# (ignorespace) + repeated commands collapse to one entry (ignoredups).
+# When you must paste a password or token into the shell, prefix the line
+# with a space so it is never persisted to ~/.bash_history.
+export HISTCONTROL=ignoreboth
+HISTEOF
+chmod 0644 /etc/profile.d/sanalcp-history.sh
+ok "shell history hardening (HISTCONTROL=ignoreboth)"
+
 # ============ 14) Permission repair ============
 step "14) Permission/SELinux repair"
 command -v sanalcp-repair >/dev/null 2>&1 && sanalcp-repair --quiet >/dev/null 2>&1 && ok "sanalcp-repair" || warn "repair skipped"
