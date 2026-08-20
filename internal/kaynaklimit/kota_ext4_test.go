@@ -232,6 +232,12 @@ func TestExt4AktifQuotaonHataliCikisKoduylaDaCalisir(t *testing.T) {
 	quotaonSorgula = func() (string, error) {
 		return "user quota on / (/dev/sda1) is on\n", errors.New("exit status 1")
 	}
+	// Aktif() ayrıca quotaon'un PATH'te olmasını arar. Bunu da sahtelemezsek
+	// test, makinede `quota` paketi kurulu olup olmamasına göre sonuç değiştirir:
+	// geliştirme sunucusunda geçer, CI runner'ında (paket yok) düşer.
+	eskiVar := quotaonVar
+	t.Cleanup(func() { quotaonVar = eskiVar })
+	quotaonVar = func() bool { return true }
 	a, e := ext4Kota{}.Aktif()
 	if !a || !e {
 		t.Fatalf("rc=1 + 'is on' çıktısı: accounting=%v enforcement=%v — ikisi de true olmalı", a, e)

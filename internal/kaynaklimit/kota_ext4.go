@@ -74,9 +74,19 @@ func ext4MountKotali(mounts string) bool {
 	return false
 }
 
+// quotaonVar: `quotaon` ikilisi PATH'te mi. Değişken olmasının sebebi test
+// edilebilirlik: Aktif() bu kontrolü doğrudan exec.LookPath ile yapsaydı,
+// quotaonSorgula'yı sahteleyen testler makinede `quota` paketi kurulu olup
+// olmamasına göre farklı sonuç verirdi (CI'da kurulu değildir, geliştirme
+// sunucusunda kuruludur).
+var quotaonVar = func() bool {
+	_, err := exec.LookPath("quotaon")
+	return err == nil
+}
+
 // Aktif: enforcement quotaon'dan, accounting quotaon+mount seçeneğinden okunur.
 func (ext4Kota) Aktif() (accounting, enforcement bool) {
-	if _, err := exec.LookPath("quotaon"); err != nil {
+	if !quotaonVar() {
 		quotaAracUyari.Do(func() {
 			log.Printf("kota[ext4]: quotaon bulunamadı — `quota` paketi kurulu değil, disk kotası kullanılamıyor")
 		})
