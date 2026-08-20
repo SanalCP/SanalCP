@@ -10,6 +10,7 @@ import Modal from '@/components/Modal'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
 import { T } from '@/lib/tablo'
+import { metneGoreSirala } from '@/lib/sirala'
 
 type Domain = {
   id: number; alan_adi: string; sistem_kullanici: string
@@ -296,13 +297,14 @@ export default function DomainsPage() {
 
   const filtreli = useMemo(() => {
     const s = q.trim().toLowerCase()
-    if (!s) return items
+    // Liste ilk sütuna (alan adı) göre alfabetik; arama sonucu da aynı sırada.
+    if (!s) return metneGoreSirala(items, d => d.alan_adi)
     // Alt alan adları da aranır: kullanıcı "blog.site.com" yazdığında listede
     // ana domain (ve altındaki eşleşen alt alan) çıkmalı — aksi hâlde alt alan
     // adı listede GÖRÜNÜR ama ARANAMAZ olurdu.
-    return items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
+    return metneGoreSirala(items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
       || (d.bayi_adi || '').toLowerCase().includes(s)
-      || (d.alt_alanlar || []).some(a => a.tam_ad.toLowerCase().includes(s)))
+      || (d.alt_alanlar || []).some(a => a.tam_ad.toLowerCase().includes(s))), d => d.alan_adi)
   }, [items, q])
 
   function togga(id: number) {

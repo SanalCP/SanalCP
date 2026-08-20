@@ -15,6 +15,7 @@ import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { T } from '@/lib/tablo'
+import { metneGoreSirala } from '@/lib/sirala'
 
 type Musteri = {
   id: number
@@ -68,8 +69,11 @@ export default function MusterilerPage() {
 
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()
-    if (!t) return liste
-    return liste.filter((m) => `${m.ad} ${m.eposta} ${m.notlar}`.toLowerCase().includes(t))
+    const temel = t
+      ? liste.filter((m) => `${m.ad} ${m.eposta} ${m.notlar}`.toLowerCase().includes(t))
+      : liste
+    // İlk sütun müşteri adı.
+    return metneGoreSirala(temel, (m) => m.ad)
   }, [liste, aranan])
 
   async function kaydet() {

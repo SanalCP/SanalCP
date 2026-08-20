@@ -123,6 +123,7 @@ export default function VeritabanlariGenelPage() {
         uc="/genel/veritabanlari"
         kolonlar={kolonlar}
         araAlan={(s) => `${s.db_adi} ${s.db_user} ${s.alan_adi}`}
+        siralaAlan={(s) => s.db_adi}
         satirAnahtar={(s) => s.id}
         bosMesaj={t('VeritabanlariGenelPage:empty')}
         yenilemeTetik={yenile}

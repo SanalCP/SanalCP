@@ -9,6 +9,7 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from './Breadcrumb'
 import EmptyState from './EmptyState'
 import { T } from '@/lib/tablo'
+import { metneGoreSirala } from '@/lib/sirala'
 
 export type Kolon<T> = {
   baslik: string
@@ -20,13 +21,17 @@ export type Kolon<T> = {
 export type Rozet = { etiket: string; deger: React.ReactNode; vurgu?: 'normal' | 'uyari' | 'tehlike' }
 
 export default function GenelListe<T>({
-  baslik, aciklama, uc, kolonlar, araAlan, satirAnahtar, bosMesaj, ozet, yenilemeTetik,
+  baslik, aciklama, uc, kolonlar, araAlan, siralaAlan, satirAnahtar, bosMesaj, ozet, yenilemeTetik,
 }: {
   baslik: string
   aciklama: string
   uc: string
   kolonlar: Kolon<T>[]
   araAlan: (satir: T) => string
+  // İlk sütundaki veri. Verilmezse araAlan kullanılır — arama alanı birden fazla
+  // kolonu birleştiren sayfalarda (örn. veritabanları) bunu geçmek ZORUNLUDUR,
+  // yoksa sıralama birleşik metne göre yapılır.
+  siralaAlan?: (satir: T) => string
   satirAnahtar: (satir: T) => string | number
   bosMesaj: string
   ozet?: (liste: T[]) => Rozet[]
@@ -50,11 +55,13 @@ export default function GenelListe<T>({
     return () => { iptal = true }
   }, [uc, yenilemeTetik])
 
+  // Sıralama filtrelemeden ÖNCE değil sonra da olabilir; arama sonucu da aynı
+  // sırada kalsın diye süzülmüş listeye uygulanır.
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()
-    if (!t) return liste
-    return liste.filter((s) => araAlan(s).toLowerCase().includes(t))
-  }, [liste, aranan, araAlan])
+    const temel = t ? liste.filter((s) => araAlan(s).toLowerCase().includes(t)) : liste
+    return metneGoreSirala(temel, siralaAlan ?? araAlan)
+  }, [liste, aranan, araAlan, siralaAlan])
 
   const rozetler = ozet && liste.length > 0 ? ozet(liste) : []
 

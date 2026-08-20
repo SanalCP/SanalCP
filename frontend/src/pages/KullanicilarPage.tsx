@@ -14,6 +14,7 @@ import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { T } from '@/lib/tablo'
+import { metneGoreSirala } from '@/lib/sirala'
 
 type Kullanici = {
   id: number
@@ -118,8 +119,11 @@ export default function KullanicilarPage() {
 
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()
-    if (!t) return liste
-    return liste.filter((k) => `${k.kullanici_adi} ${k.eposta} ${k.ad_soyad}`.toLowerCase().includes(t))
+    const temel = t
+      ? liste.filter((k) => `${k.kullanici_adi} ${k.eposta} ${k.ad_soyad}`.toLowerCase().includes(t))
+      : liste
+    // İlk sütun kullanıcı adı.
+    return metneGoreSirala(temel, (k) => k.kullanici_adi)
   }, [liste, aranan])
 
   async function olustur() {
