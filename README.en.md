@@ -84,12 +84,19 @@ curl -fsSL https://sanalcp.com/kur | bash
 
 That URL serves a script **pinned to the released commit and to the archive's
 SHA-256**; installation does not start unless the downloaded package verifies.
-The older one-liner that pulls the `main` branch directly still works, but
-performs no integrity check:
+
+The one-liner that pulls the `main` branch directly **no longer works without an
+integrity check** — `install.sh` refuses to install unless a SHA-256 is supplied.
+For a pinned install, obtain the hash from a channel you trust that is
+independent of this repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh \
+  | SANALCP_REF=<commit-sha> SANALCP_SHA256=<hash> bash
 ```
+
+To deliberately skip verification (trusting GitHub's TLS alone) you must pass
+`SANALCP_INSECURE=1`; this is not recommended for production servers.
 
 Installation takes ~5-10 minutes (package downloads). When it finishes, the panel URL and login credentials are printed to the screen.
 

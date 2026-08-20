@@ -84,12 +84,20 @@ curl -fsSL https://sanalcp.com/kur | bash
 ```
 
 Bu adres, yayınlanmış son sürümün **commit'ine ve arşiv SHA-256'sına sabitlenmiş**
-bir betik sunar; indirilen paket doğrulanmadan kurulum başlamaz. `main` dalını
-doğrudan çeken eski tek satır hâlâ çalışır ama bütünlük doğrulaması yapmaz:
+bir betik sunar; indirilen paket doğrulanmadan kurulum başlamaz.
+
+`main` dalını doğrudan çeken tek satır, **bütünlük doğrulaması olmadan artık
+çalışmaz** — `install.sh` SHA-256 verilmeden kurulumu reddeder. Sabitlenmiş
+kurulum için hash'i bu depodan bağımsız, güvendiğiniz bir kanaldan alın:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sanalcp/sanalcp/main/install.sh \
+  | SANALCP_REF=<commit-sha> SANALCP_SHA256=<hash> bash
 ```
+
+Doğrulamayı bilinçli olarak atlamak (yalnızca GitHub'ın TLS'ine güvenmek)
+istiyorsanız `SANALCP_INSECURE=1` vermeniz gerekir; üretim sunucularında
+önerilmez.
 
 Kurulum ~5-10 dakika sürer (paket indirmeleri). Bittiğinde panel adresi + giriş bilgileri ekrana yazılır.
 

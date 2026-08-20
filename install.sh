@@ -15,8 +15,10 @@
 # kanaldan (proje web sitesi, imzalı duyuru, yayımcıyla doğrudan teyit) alıp verin:
 #   curl -fsSL .../install.sh | SANALCP_REF=<commit-sha> SANALCP_SHA256=<hash> bash
 # SANALCP_REF verilmezse hareketli "main" dalı indirilir (repoya push olur olmaz
-# etkili olur — en zayıf mod). SANALCP_SHA256 verilirse indirilen arşivin bayt
-# bütünlüğü doğrulanır, uyuşmazsa kurulum durur.
+# etkili olur — en zayıf mod). SANALCP_SHA256 ZORUNLUDUR: verilmezse kurulum
+# başlamadan durur; verildiğinde indirilen arşivin bayt bütünlüğü doğrulanır ve
+# uyuşmazlıkta kurulum durur. Doğrulamasız kurulum yalnızca SANALCP_INSECURE=1
+# ile, bilinçli olarak mümkündür.
 set -euo pipefail
 
 REPO="sanalcp/sanalcp"
@@ -42,8 +44,27 @@ command -v sha256sum >/dev/null 2>&1 || { echo -e "${c_r}✗ sha256sum required$
 if [ "$REF" = "main" ]; then
   echo -e "${c_y}! SANALCP_REF verilmedi — hareketli 'main' dalı indiriliyor (bkz. bu betiğin başındaki not).${c_0}"
 fi
+
+# 🔴 GÜVENLİK (tedarik zinciri): SHA-256 verilmeden kurulum YAPILMAZ. Eskiden
+# burada yalnızca bir uyarı basılıp kuruluma devam ediliyordu; bu, doğrulanmamış
+# bir tarball'ın root olarak çalıştırılması demekti (GitHub hesabı ele geçirilirse
+# doğrudan RCE). Doğrulamayı bilinçli olarak atlamak isteyen SANALCP_INSECURE=1
+# vermek zorunda — sessiz/varsayılan bir kaçış yolu yok.
 if [ -z "$EXPECTED_SHA256" ]; then
-  echo -e "${c_y}! SANALCP_SHA256 verilmedi — indirilen arşivin bütünlüğü doğrulanamayacak.${c_0}"
+  if [ "${SANALCP_INSECURE:-0}" = "1" ]; then
+    echo -e "${c_y}! SANALCP_INSECURE=1 — SHA-256 doğrulaması bilinçli olarak atlanıyor.${c_0}"
+    echo -e "${c_y}  İndirilen arşivin bütünlüğü doğrulanmayacak; yalnızca GitHub'ın TLS'ine güveniliyor.${c_0}"
+  else
+    echo -e "${c_r}✗ SANALCP_SHA256 verilmedi — kurulum GÜVENLİK NEDENİYLE durduruldu.${c_0}"
+    echo -e "${c_r}  Arşivin bütünlüğü doğrulanmadan root olarak kurulum yapılmaz.${c_0}"
+    echo
+    echo -e "  Sürüme sabitlenmiş kurulum (önerilen):"
+    echo -e "    curl -fsSL .../install.sh | SANALCP_REF=<commit-sha> SANALCP_SHA256=<hash> bash"
+    echo
+    echo -e "  SHA'yı ve hash'i bu depodan BAĞIMSIZ, güvendiğiniz bir kanaldan alın."
+    echo -e "  Doğrulamayı bilerek atlamak istiyorsanız: SANALCP_INSECURE=1"
+    exit 1
+  fi
 fi
 
 echo -e "${c_b}══ Downloading SanalCP (github.com/$REPO@$REF) ══${c_0}"
