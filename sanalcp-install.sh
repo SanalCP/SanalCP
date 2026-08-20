@@ -50,6 +50,11 @@ download(){
 # rewrite the id=1 row's bcrypt hash, but nothing would ever read it: the
 # printed password could not log in and no other admin would exist. Rejected
 # here, up front, instead of 15 minutes later in step 13.
+# Trim surrounding whitespace first: auth.KullaniciRootMu() applies
+# strings.TrimSpace before comparing, so " root" reaches the shadow path just
+# like "root" does. Without the trim, the case below would wave it through.
+ADMIN_KULLANICI="${ADMIN_KULLANICI#"${ADMIN_KULLANICI%%[![:space:]]*}"}"
+ADMIN_KULLANICI="${ADMIN_KULLANICI%"${ADMIN_KULLANICI##*[![:space:]]}"}"
 case "${ADMIN_KULLANICI,,}" in
   root) die "--admin-kullanici root is not allowed: 'root' is the legacy panel shadow-login account this installer disables, so the generated password would never work -- pick another name" ;;
 esac
