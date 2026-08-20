@@ -18,6 +18,7 @@ import (
 	"sanalcp/internal/kilit"
 	"sanalcp/internal/kota"
 	"sanalcp/internal/middleware"
+	"sanalcp/internal/panelbayrak"
 )
 
 type Handlers struct {
@@ -345,10 +346,20 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 
 // sonAdminMi: verilen kullanıcı, sistemdeki tek aktif admin mi?
 func (h *Handlers) sonAdminMi(r *http.Request, id int64) (bool, error) {
+	// users tablosundaki root satırı (id=1) role='admin' + status='active'
+	// olduğu için bu sayıma doğal olarak dahil. Ama root/shadow girişi
+	// KAPALIYKEN o satırla panele GİRİLEMEZ — kurtarma değeri yoktur.
+	// Sayılsaydı sistemdeki son gerçek admin silinebilir, ardından panele
+	// kimse giremezdi (root da giremez). Bu yüzden bayrak kapalıyken root
+	// dışlanır; açıkken mevcut davranış birebir korunur.
+	sorgu := `SELECT COUNT(*) FROM users WHERE role='admin' AND status='active' AND id<>?`
+	args := []any{id}
+	if !panelbayrak.RootGirisiAcik(r.Context(), h.DB) {
+		sorgu += ` AND id<>?`
+		args = append(args, rootID)
+	}
 	var n int
-	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM users WHERE role='admin' AND status='active' AND id<>?`, id).Scan(&n)
-	if err != nil {
+	if err := h.DB.QueryRowContext(r.Context(), sorgu, args...).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil

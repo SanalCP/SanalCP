@@ -10,7 +10,7 @@
 #
 # Designed to be idempotent (safe to re-run). Run as root.
 #
-#   ./sanalcp-install.sh [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
+#   ./sanalcp-install.sh [--admin-kullanici <k>] [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
 #
 # assets/ must sit next to this script:
 #   sanalcp-server  sanalcp-seed-admin  frontend-dist.tar.gz
@@ -21,8 +21,9 @@ set -uo pipefail
 # and assets/ would be looked up in the caller's directory.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 A="$HERE/assets"
-ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""
+ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""; ADMIN_KULLANICI="admin"
 while [ $# -gt 0 ]; do case "$1" in
+  --admin-kullanici) shift; ADMIN_KULLANICI="$1" ;;
   --admin-parola) shift; ADMIN_PAROLA="$1" ;;
   --admin-eposta) shift; ADMIN_EPOSTA="$1" ;;
   --lang) shift; PANEL_LANG="$1" ;;
@@ -42,6 +43,21 @@ download(){
   curl -fsSL --retry 3 --connect-timeout 15 -o "$out" "$url" ||
     curl -4fsSL --retry 3 --connect-timeout 15 -o "$out" "$url"
 }
+
+# 'root' is NOT a valid panel admin name. auth.KullaniciRootMu() matches it
+# case-insensitively and routes that login to the legacy /etc/shadow path --
+# which this installer disables in step 13. sanalcp-seed-admin would happily
+# rewrite the id=1 row's bcrypt hash, but nothing would ever read it: the
+# printed password could not log in and no other admin would exist. Rejected
+# here, up front, instead of 15 minutes later in step 13.
+# Trim surrounding whitespace first: auth.KullaniciRootMu() applies
+# strings.TrimSpace before comparing, so " root" reaches the shadow path just
+# like "root" does. Without the trim, the case below would wave it through.
+ADMIN_KULLANICI="${ADMIN_KULLANICI#"${ADMIN_KULLANICI%%[![:space:]]*}"}"
+ADMIN_KULLANICI="${ADMIN_KULLANICI%"${ADMIN_KULLANICI##*[![:space:]]}"}"
+case "${ADMIN_KULLANICI,,}" in
+  root) die "--admin-kullanici root is not allowed: 'root' is the legacy panel shadow-login account this installer disables, so the generated password would never work -- pick another name" ;;
+esac
 
 if [ -z "${SANALCP_TANIM_TESTI:-}" ]; then
 [ "$(id -u)" = 0 ] || die "root required"
@@ -909,13 +925,17 @@ command -v sanalcp-ftp-setup >/dev/null 2>&1 && sanalcp-ftp-setup >/dev/null 2>&
 command -v sanalcp-mail-setup >/dev/null 2>&1 && sanalcp-mail-setup >/dev/null 2>&1 && ok "sanalcp-mail-setup (Postfix/Dovecot/OpenDKIM)" || warn "mail-setup skipped"
 
 # ============ 13) Admin access ============
-# 🔴 Panel admin login = the server's ROOT user (PAM/shadow verification).
-# There is NO separate panel password. Login: username 'root' + this server's
-# root password.
-step "13) Admin access (root + PAM)"
+# 🔴 The installer now creates a real admin account in the `users` table —
+# THAT is the panel's primary login going forward. The legacy root/shadow
+# login path (username 'root' + this server's root password) ships DISABLED
+# on new installs (panel_ayarlari.root_girisi_acik=0) and can be re-enabled
+# from Panel Settings if needed. SSH root access is completely unaffected —
+# this only touches the panel's web login.
+step "13) Admin access"
 DSN="panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true"
 if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
-  # auxiliary users record (ownership/audit); login is still verified via root+PAM
+  # auxiliary users record (ownership/audit); backs the root/shadow fallback
+  # path (default-off — see below), NOT the primary login anymore
   /opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici root \
     -parola "$(openssl rand -hex 16)" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
     && ok "admin record ready" || warn "seed skipped (not critical)"
@@ -927,7 +947,69 @@ mysql panel -e "UPDATE users SET email='', full_name='' WHERE username='root' AN
 # authenticated) — the value picked in step 0.
 mysql panel -e "UPDATE panel_ayarlari SET varsayilan_dil='$PANEL_LANG' WHERE id=1;" >/dev/null 2>&1 \
   && ok "panel default language set to '$PANEL_LANG'" || warn "could not set panel default language"
-ok "Login: username 'root' + this server's root password"
+# Gerçek admin hesabı — panelin BİRİNCİL giriş yolu artık bu (bkz.
+# docs/superpowers/specs/2026-08-20-panel-auth-root-ayirma-design.md).
+# Yukarıdaki root tohumlaması yerinde kalıyor: root/shadow yolu Panel
+# Ayarları'ndan tekrar açılabilir ve o yol users.id=1 satırına bağlı.
+if [ -z "$ADMIN_PAROLA" ]; then
+  ADMIN_PAROLA=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)
+fi
+[ -x /opt/sanalcp/bin/sanalcp-seed-admin ] || die "sanalcp-seed-admin bulunamadı — panel admin hesabı oluşturulamaz, kurulum durduruldu"
+/opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici "$ADMIN_KULLANICI" \
+  -parola "$ADMIN_PAROLA" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
+  && ok "admin account created" || die "admin account could not be created"
+
+# Root/shadow giriş yolunu KAPAT. Migration bunu 1 (açık) olarak ekliyor ki
+# mevcut kurulumlar kilitlenmesin; yeni kurulumda ise girecek gerçek bir admin
+# zaten var, o yüzden kapalı başlıyoruz.
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=0 WHERE id=1;" >/dev/null 2>&1 || true
+# 🔴 The UPDATE must be VERIFIED, not assumed. The root_girisi_acik column is
+# created by migration 0069, which runs at the first panel start (step 12); if
+# that start failed or the migration did not land, the UPDATE above is a no-op
+# and the install would ship with the flag at its DEFAULT 1 (root login OPEN) --
+# silently breaking the very promise this branch makes. Read the value back and
+# stop the install if it is not 0.
+# NOTE: no `mysql ... | grep -q` pipeline here -- with `set -o pipefail` that
+# pattern silently yields false negatives (see internal/osfam/pipefail_grep_test.go).
+ROOT_GIRISI_DEGER="$(mysql -N -B panel -e "SELECT root_girisi_acik FROM panel_ayarlari WHERE id=1;" 2>/dev/null)"
+case "$ROOT_GIRISI_DEGER" in
+  0) ok "panel root login disabled (SSH root access is unaffected)" ;;
+  *) die "could not disable panel root login (root_girisi_acik='$ROOT_GIRISI_DEGER') -- migration 0069 probably did not run; check 'journalctl -u sanalcp' and re-run the installer" ;;
+esac
+
+echo
+echo "  ╔══════════════════════════════════════════════════════════════╗"
+echo "  ║  PANEL LOGIN — bu parola BİR KEZ gösterilir, kaydedin        ║"
+echo "  ╚══════════════════════════════════════════════════════════════╝"
+echo "    kullanıcı : $ADMIN_KULLANICI"
+echo "    parola    : $ADMIN_PAROLA"
+echo
+echo "  Bu parola hiçbir dosyaya yazılmadı. Kaybederseniz SSH ile:"
+echo "    DSN=\$(grep -m1 '^PANEL_DB_DSN=' /etc/sanalcp/env | cut -d= -f2-)"
+echo "    /opt/sanalcp/bin/sanalcp-seed-admin -dsn \"\$DSN\" \\"
+echo "      -kullanici $ADMIN_KULLANICI -parola '<yeni-parola>'"
+echo
+echo "  Panel root girişini SSH'tan geri açmak (acil durum):"
+echo "    mysql panel -e \"UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;\""
+echo
+
+# Shell history hardening — the panel login IS this server's root password (see
+# internal/auth/handlers.go:rootShadowHash), so operators routinely handle that
+# password in a root shell. AlmaLinux/Debian default to HISTCONTROL=ignoredups,
+# which still records EVERY unique line — a password pasted at a prompt that was
+# not actually reading a password lands in ~/.bash_history in cleartext and stays
+# there. `ignoreboth` adds `ignorespace`: any command typed with a LEADING SPACE
+# is never written to history.
+install -d -m 0755 /etc/profile.d
+cat > /etc/profile.d/sanalcp-history.sh <<'HISTEOF'
+# SanalCP: commands starting with a SPACE are kept out of shell history
+# (ignorespace) + repeated commands collapse to one entry (ignoredups).
+# When you must paste a password or token into the shell, prefix the line
+# with a space so it is never persisted to ~/.bash_history.
+export HISTCONTROL=ignoreboth
+HISTEOF
+chmod 0644 /etc/profile.d/sanalcp-history.sh
+ok "shell history hardening (HISTCONTROL=ignoreboth)"
 
 # ============ 14) Permission repair ============
 step "14) Permission/SELinux repair"

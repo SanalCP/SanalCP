@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/panelbayrak"
 )
 
 // claims: RequireAuth middleware zaten doğruladı; header'dan tekrar parse ederek
@@ -84,7 +85,21 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 	// doğrulama shadow'dan, değiştirme chpasswd ile. Bayi hesaplarının
 	// sistemde karşılığı yoktur; onlar users.password_hash kullanır.
 	if KullaniciRootMu(c.Username) {
-		if !rootParolaDogrula(b.Mevcut) {
+		// Panel root girişi KAPALIYKEN panel /etc/shadow'a hiç dokunmaz —
+		// giriş kapısıyla (bkz. Login) aynı ilke. Bayrak kapatıldıktan sonra
+		// hâlâ elinde root oturumu olan bir istemci bu uçtan sistem
+		// parolasını değiştirmeye devam edemesin diye.
+		//
+		// Burada Login'deki genel mesaj KULLANILMAZ: çağıran zaten kimlik
+		// doğrulamış bir root oturumu, yani sızdırılacak bir bilgi yok;
+		// ne yapması gerektiğini söyleyen açık bir mesaj daha doğru.
+		if !panelbayrak.RootGirisiAcik(r.Context(), h.DB) {
+			WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", false)
+			httpx.WriteError(w, http.StatusForbidden,
+				"panel root girişi kapalı; sunucu root parolası SSH üzerinden 'passwd' ile değiştirilir")
+			return
+		}
+		if !rootParolaDogrulaFn(b.Mevcut) {
 			WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", false)
 			httpx.WriteError(w, http.StatusUnauthorized, "mevcut parola hatalı")
 			return

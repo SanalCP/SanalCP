@@ -15,6 +15,7 @@ import (
 	yescrypt "github.com/openwall/yescrypt-go"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/panelbayrak"
 	"sanalcp/internal/system"
 )
 
@@ -90,6 +91,12 @@ func rootParolaDogrula(parola string) bool {
 	}
 	return legacyCryptDogrula(parola, hash)
 }
+
+// rootParolaDogrulaFn — rootParolaDogrula'nın test edilebilir sarmalayıcısı.
+// Gerçek doğrulama /etc/shadow'u okur; testler bu değişkeni geçici olarak
+// değiştirerek Login'in bayrak kapısını dosya sistemine bağımlı olmadan
+// doğrular. Üretimde ASLA değiştirilmez.
+var rootParolaDogrulaFn = rootParolaDogrula
 
 // legacyCryptSaltAyikla — "$id$[rounds=N$]salt$digest" hash'inden openssl'in
 // -salt argümanına verilecek "[rounds=N$]salt" bölümünü çıkarır. Salt ve
@@ -179,7 +186,16 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if KullaniciRootMu(req.Kullanici) {
-		if !rootParolaDogrula(req.Parola) {
+		// Root/shadow yolu artık BAYRAKLI (bkz. migrations/0069). Kapalıysa
+		// parola DOĞRU olsa bile reddedilir — panel girişi sunucunun root
+		// parolasıyla eşleşmeyi bıraksın diye. Kısa devre bilinçli: bayrak
+		// kapalıyken /etc/shadow hiç okunmaz.
+		//
+		// Yanıt hatalı-parola dalıyla BİREBİR aynı: root yolunun kapalı
+		// olduğu sızarsa, saldırgan hangi sunucularda bu yolun hâlâ açık
+		// olduğunu tarayarak ayıklayabilirdi. 401 döndüğü için deneme
+		// middleware.GirisLimiti sayacına da girer.
+		if !panelbayrak.RootGirisiAcik(r.Context(), h.DB) || !rootParolaDogrulaFn(req.Parola) {
 			WriteAudit(h.DB, 0, req.Kullanici, ip, "auth.login", req.Kullanici, false)
 			httpx.WriteError(w, http.StatusUnauthorized, "kullanıcı adı veya parola hatalı")
 			return

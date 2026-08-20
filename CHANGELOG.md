@@ -11,6 +11,55 @@ sayfa altbilgisinden görebilirsiniz.
 
 ---
 
+## 0.9.x — Panel girişi root'tan ayrıldı
+
+**0.9.0** (2026-08-20)
+
+Panel girişi artık sunucunun root parolasına bağlı değil.
+
+İlk sürümden bu yana panele `root` kullanıcı adı ve **sunucunun root parolasıyla**
+giriliyordu; panel bu parolayı doğrudan `/etc/shadow`'dan okuyup doğruluyordu.
+Bunun iki sonucu vardı:
+
+- Sunucuda `passwd` çalıştırmak panel girişini **haber vermeden** bozuyordu.
+  Panel başarısız girişleri `audit_log` tablosuna yazdığı için journald sessiz
+  kalıyor, sebep de görünmüyordu.
+- Panelin web arayüzü, sunucunun en yetkili kimlik bilgisini kabul eden bir
+  saldırı yüzeyi haline geliyordu.
+
+Bu sürümde panelin kendi yönetici hesabı var:
+
+- **Yeni kurulumlar** kurulum sırasında bir admin hesabı üretir
+  (`--admin-kullanici` ile ad verilebilir, varsayılan `admin`). Parola yalnız
+  ekrana basılır, diske yazılmaz. Kurulum root girişini kapalı başlatır.
+- **Mevcut kurulumlarda hiçbir şey bozulmaz.** Migration `root_girisi_acik`
+  sütununu `1` varsayılanıyla ekler; bugüne kadar nasıl giriyorsanız öyle
+  girmeye devam edersiniz.
+- Geçiş üç adım: Kullanıcılar ekranından admin rolünde bir hesap açın, o
+  hesapla girip çalıştığını doğrulayın, sonra **Araçlar ve Ayarlar → Sunucu
+  Bakımı → "Sunucu root parolasıyla panel girişi"** kartından root girişini
+  kapatın.
+
+İki bağımsız kilitlenme koruması var. Root dışında aktif bir yönetici hesabı
+yoksa panel root girişini kapatmayı reddeder; ayrıca root girişi kapalıyken
+sistemdeki son gerçek yönetici hesabı silinemez ya da askıya alınamaz (root
+satırı bu sayıma dahil edilmez, çünkü o hesapla girilemez — sayılsaydı tek
+adımda panele kimsenin giremeyeceği bir duruma düşülebilirdi).
+
+Kapatmak yalnız yeni girişleri durdurmakla kalmaz: **root'un canlı oturumları
+düşürülür** (`auth_version` artırılır) ve **API token'ları iptal edilir**. Üç
+yazma tek transaction'da yapılır — yarım uygulanmış bir kapatma (bayrak kapalı,
+token'lar canlı) mümkün değil.
+
+**SSH root erişimi bu değişiklikten hiç etkilenmez**; sunucunun root parolası
+iptal edilmez. Panelden kilitlenirseniz SSH ile geri açabilirsiniz:
+
+```
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;"
+```
+
+---
+
 ## 0.8.x — Debian desteği
 
 **0.8.0** (2026-08-19)

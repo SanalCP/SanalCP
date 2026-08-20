@@ -376,6 +376,10 @@ func main() {
 			r.With(middleware.AdminOnly).Put("/system/panel-dil", panelAyarH.DilKaydet)
 			r.With(middleware.AdminOnly).Get("/system/oturum-bosta", panelAyarH.OturumBosta)
 			r.With(middleware.AdminOnly).Put("/system/oturum-bosta", panelAyarH.OturumBostaKaydet)
+			// Panelin root/shadow giriş yolu anahtarı (bkz. migrations/0069).
+			// SSH root erişimini ETKİLEMEZ — yalnız :8443 panel girişi.
+			r.With(middleware.AdminOnly).Get("/system/root-girisi", panelAyarH.RootGirisi)
+			r.With(middleware.AdminOnly).Put("/system/root-girisi", panelAyarH.RootGirisiKaydet)
 			eklentiH.Routes(r)
 			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
 			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.

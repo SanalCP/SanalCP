@@ -1,0 +1,12 @@
+{
+  "label": "Panel login with the server root password",
+  "desc": "When enabled, the panel can be accessed with the username 'root' and the server's root password. Disabling is recommended: changing your SSH root password will no longer affect panel login, and the audit log can tell operators apart. Your SSH root access is unaffected by this setting.",
+  "on": "Enabled",
+  "off": "Disabled",
+  "save": "Save",
+  "saving": "Saving…",
+  "saved_on": "Panel login with root enabled.",
+  "saved_off": "Panel login with root disabled.",
+  "load_failed": "Could not read the setting.",
+  "save_failed": "Could not save the setting."
+}

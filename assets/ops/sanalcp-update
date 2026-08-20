@@ -355,6 +355,27 @@ elif [ "$QROOTFS" = "xfs" ]; then
   [ -f "$QSENTINEL" ] && rm -f "$QSENTINEL" 2>/dev/null && ok "$(t "disk kotası aktif — reboot sentinel temizlendi" "disk quota active — reboot sentinel cleared")" || ok "$(t "disk kotası aktif (kök XFS user quota)" "disk quota active (root XFS user quota)")"
 fi
 
+# 10c) Shell history hardening — the panel login IS the server's root password, so
+# operators handle it in a root shell all the time. The distro default
+# (HISTCONTROL=ignoredups) still records every unique line, so a password pasted at a
+# prompt that was not reading a password persists in ~/.bash_history in cleartext.
+# `ignoreboth` adds `ignorespace` (leading space = never written to history).
+# Installed here too, not just in the installer: EXISTING installs never re-run
+# sanalcp-install.sh, so an installer-only fix would reach nobody. Idempotent.
+HISTDROP=/etc/profile.d/sanalcp-history.sh
+if ! grep -q 'HISTCONTROL=ignoreboth' "$HISTDROP" 2>/dev/null; then
+  install -d -m 0755 /etc/profile.d
+  cat > "$HISTDROP" <<'HISTEOF'
+# SanalCP: commands starting with a SPACE are kept out of shell history
+# (ignorespace) + repeated commands collapse to one entry (ignoredups).
+# When you must paste a password or token into the shell, prefix the line
+# with a space so it is never persisted to ~/.bash_history.
+export HISTCONTROL=ignoreboth
+HISTEOF
+  chmod 0644 "$HISTDROP"
+  ok "$(t "kabuk geçmişi sertleştirildi (HISTCONTROL=ignoreboth)" "shell history hardened (HISTCONTROL=ignoreboth)")"
+fi
+
 # 11) restart + health check (rolls back binary + DB on failure)
 step "$(t "Yeniden başlatılıyor" "Restarting")"
 systemctl restart sanalcp

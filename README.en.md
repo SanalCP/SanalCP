@@ -96,39 +96,74 @@ Installation takes ~5-10 minutes (package downloads). When it finishes, the pane
 ## After install
 
 - **Panel:** `https://SERVER_IP:8443` (self-signed certificate — click through the browser warning)
-- **First login:** user **`root`** · password = **the server's own root password**
+- **First login:** the administrator username and password **printed on screen** at the end
+  of the install (username defaults to `admin`; override with `--admin-kullanici` /
+  `--admin-parola`)
 
-After the first login you **do not have to keep using `root`** — see the section below.
+> ⚠️ **That password is shown once and is never written to any file.** Save the box from
+> the installer output. If you lose it, see "Recovery" below.
+
+After the first login, enabling **Profile → Two-Factor Authentication (2FA)** is recommended.
 
 ## Authentication and account model
 
 The panel has **two separate password worlds**. Understanding this matters for your security.
 
-### 1. `root` — the recovery path
+### 1. Panel accounts — the primary login
 
-The `root` user's password is **not stored** in the panel database. At login the panel reads
-the hash from `/etc/shadow` and verifies it (yescrypt natively in Go; a fallback path handles
-legacy sha512/sha256/md5crypt). Locked (`!`, `!!`, `*`) or empty-password accounts are **never** accepted.
+You log in with **real panel accounts** from the `users` table. Their passwords are stored
+in the panel database using **bcrypt (cost 12)** and have **nothing to do with** the
+server's root password.
 
-This path is preserved deliberately: even if the panel database is corrupted or every panel
-account is deleted, you can still get in as long as you have server access — **there is no
-lockout risk.**
+The installer creates that account for you and prints its credentials **to the screen only**
+(never to disk). The username defaults to `admin`; you can change it with
+`--admin-kullanici` — except that `root` is rejected, because that name belongs to the
+separate path described in 2 below.
 
-> **What this means:** when you log in as `root`, the panel password *is* the server root
-> password. Don't use this account for day-to-day work — do the following instead.
+Further administrator/reseller accounts are created from **Users → New account**.
 
-### 2. Panel accounts — the recommended path
+### 2. `root` — the break-glass path, **disabled by default**
 
-**You can create an administrator account that is completely independent of root, with its
-own password.** These passwords are stored in the panel database using **bcrypt (cost 12)**
-and have nothing to do with the server's root password.
+For the username `root` the panel looks the password up in `/etc/shadow` rather than in the
+database (yescrypt natively in Go; a fallback path handles legacy sha512/sha256/md5crypt).
+Locked (`!`, `!!`, `*`) or empty-password accounts are **never** accepted.
 
-**Recommended first step after installation:**
+This path **ships disabled on new installs** — so that panel login does not depend on the
+server's root password and the audit log can tell operators apart. On **existing** installs
+it stays **enabled** after an update, so nothing changes behind your back; closing it is
+your call.
 
-1. Log in as `root`.
-2. **Users → New account** → **Role: Administrator**, and create an account for yourself.
-3. Log out, log in with the new account, and enable **Profile → Two-Factor Authentication (2FA)**.
-4. Do daily administration with this account; keep `root` login for recovery only.
+Where to toggle it: **Tools & Settings → "Panel login with the server root password".**
+
+- When you disable it, the panel requires an **active non-root administrator account** to
+  exist — you cannot lock yourself out in a single step.
+- Disabling also **revokes root's existing sessions and API tokens.**
+
+> 🔵 **Your SSH root access is NOT affected by this setting.** The flag concerns the
+> `:8443` panel login only; the server's root password, the `sshd` configuration and SSH
+> root login are untouched. As long as you can reach the server, your recovery path stays
+> open (see "Recovery").
+
+### Recovery — when you cannot log in
+
+Both paths are fixed over SSH; connect to the server as root:
+
+```bash
+# Read the DSN from the env file (it contains a password — don't echo it)
+DSN=$(grep -m1 '^PANEL_DB_DSN=' /etc/sanalcp/env | cut -d= -f2-)
+
+# 1) Reset the administrator password (creates the account if missing)
+/opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici admin -parola 'NEW_PASSWORD'
+
+# 2) Lost your 2FA device — seed-admin does NOT touch 2FA, clear it separately
+mysql panel -e "UPDATE users SET totp_enabled=0, totp_secret='' WHERE username='admin';"
+
+# 3) Break-glass: re-enable the panel's root login (when you cannot get in at all)
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;"
+```
+
+> ⚠️ `sanalcp-seed-admin` resets **the password only**. If 2FA is enabled, login still
+> stops at the 2FA step; a lost TOTP also needs the second command.
 
 Roles:
 
@@ -354,7 +389,7 @@ PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
 ./sanalcp-server
 ```
 
-The backend API lives under `/api/v1`; health check at `/healthz`. `root` login is verified against `/etc/shadow` (see "Authentication and account model"); in development you can seed a separate admin with `scripts/seed_admin.go`:
+The backend API lives under `/api/v1`; health check at `/healthz`. Panel login uses real accounts from the `users` table; the `root` / `/etc/shadow` path is a break-glass route that can be switched off with a flag (see "Authentication and account model"). In development you can seed the admin account with `scripts/seed_admin.go`:
 
 ```bash
 go run scripts/seed_admin.go -dsn '<DSN>' -kullanici admin -parola 'YOUR_CHOSEN_PASSWORD'
