@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 
-// /araclar-ayarlar sayfasının başlık satırındaki kırmızı reboot butonu — gerçek bir
+// /araclar-ayarlar sayfasının başlık satırındaki turuncu reboot butonu — gerçek bir
 // `systemctl reboot` tetikler (bkz. internal/system/reboot.go). Domain silmedeki gibi
 // yazarak-onay değil, SunucuOptimize.tsx'teki gibi hafif "Emin misiniz?" iki adımlı onay:
-// bu geri dönüşsüz veri kaybı değil, ~1 dakikalık güvenli bir kesinti.
+// bu geri dönüşsüz veri kaybı değil, ~1 dakikalık güvenli bir kesinti. Yanındaki
+// kırmızı SunucuKapat butonu ise geri dönüşsüzdür ve daha ağır onay ister.
 
 export default function SunucuYenidenBaslat() {
   const { t } = useTranslation(['SunucuYenidenBaslat', 'common'])
@@ -37,7 +38,7 @@ export default function SunucuYenidenBaslat() {
       <div className="flex items-center gap-2">
         <span className="text-xs text-slate-600 dark:text-slate-300">{t('SunucuYenidenBaslat:confirm')}</span>
         <button onClick={baslat} disabled={baslatiliyor}
-          className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition font-medium disabled:opacity-40">
+          className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition font-medium disabled:opacity-40">
           {baslatiliyor ? t('SunucuYenidenBaslat:starting') : t('SunucuYenidenBaslat:yes_reboot')}
         </button>
         <button onClick={() => setOnay(false)} disabled={baslatiliyor}
@@ -52,7 +53,7 @@ export default function SunucuYenidenBaslat() {
     <div className="flex items-center gap-2">
       {hata && <span className="text-xs text-red-600 dark:text-red-400">{hata}</span>}
       <button onClick={() => setOnay(true)}
-        className="text-xs px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition font-medium flex items-center gap-1.5">
+        className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition font-medium flex items-center gap-1.5">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v8" />
         </svg>

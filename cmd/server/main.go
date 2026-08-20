@@ -368,6 +368,7 @@ func main() {
 			r.With(middleware.AdminOnly).Get("/system/kernelcare", system.KernelcareDurumHandler)
 			r.With(middleware.AdminOnly).Post("/system/kernelcare/yamala", system.KernelcareYamala)
 			r.With(middleware.AdminOnly).Post("/system/reboot", system.Reboot)
+			r.With(middleware.AdminOnly).Post("/system/kapat", system.Kapat)
 			r.With(middleware.AdminOnly).Get("/system/hostname", system.HostnameDurum)
 			r.With(middleware.AdminOnly).Put("/system/hostname", system.HostnameKaydet)
 			r.With(middleware.AdminOnly).Get("/system/panel-domain", panelAyarH.Durum)

@@ -1,0 +1,9 @@
+{
+  "start_failed": "could not shut down",
+  "shutting_down": "Server is shutting down — use your provider's panel to power it back on.",
+  "confirm_hint": "Type {{word}} to shut down:",
+  "confirm_word": "SHUTDOWN",
+  "starting": "Shutting down…",
+  "yes_shutdown": "Yes, shut down",
+  "shutdown_button": "Shut Down Server"
+}

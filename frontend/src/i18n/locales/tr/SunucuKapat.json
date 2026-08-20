@@ -1,0 +1,9 @@
+{
+  "start_failed": "kapatılamadı",
+  "shutting_down": "Sunucu kapatılıyor — yeniden açmak için sağlayıcı panelini kullanın.",
+  "confirm_hint": "Kapatmak için {{word}} yazın:",
+  "confirm_word": "KAPAT",
+  "starting": "Kapatılıyor…",
+  "yes_shutdown": "Evet, kapat",
+  "shutdown_button": "Sunucuyu Kapat"
+}

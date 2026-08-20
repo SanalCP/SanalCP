@@ -59,7 +59,7 @@ export default function PanelDomain() {
   }
 
   return (
-    <div className="mb-6 p-4 border rounded-2xl bg-violet-50 dark:bg-violet-900/15 border-violet-200 dark:border-violet-800/50">
+    <div className="h-full p-4 border rounded-2xl bg-violet-50 dark:bg-violet-900/15 border-violet-200 dark:border-violet-800/50">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0 bg-violet-100 dark:bg-violet-900/40">🔗</div>
         <div className="flex-1 min-w-0">
@@ -88,7 +88,7 @@ export default function PanelDomain() {
           {uyari && <div className="mt-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 text-xs">{uyari}</div>}
           {basari && <div className="mt-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 text-xs">{basari}</div>}
 
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               type="text"
               value={domain}

@@ -9,6 +9,7 @@ import PanelGuncelleme from '@/components/PanelGuncelleme'
 import SunucuOptimize from '@/components/SunucuOptimize'
 import PanelDomain from '@/components/PanelDomain'
 import SunucuYenidenBaslat from '@/components/SunucuYenidenBaslat'
+import SunucuKapat from '@/components/SunucuKapat'
 import HostnameAyari from '@/components/HostnameAyari'
 import NameserverAyari from '@/components/NameserverAyari'
 import SSHPortUyarisi from '@/components/SSHPortUyarisi'
@@ -193,6 +194,7 @@ export default function AraclarAyarlarPage() {
         </div>
         <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center">
           <SunucuYenidenBaslat />
+          <SunucuKapat />
           <div className="relative w-full sm:w-72">
             <Ikon d={I.search}
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -218,13 +220,15 @@ export default function AraclarAyarlarPage() {
             {t('AraclarAyarlarPage:section_maintenance')}
           </h2>
         </div>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <PanelGuncelleme />
           <HostnameAyari />
           <PanelDomain />
           <NameserverAyari />
           <SunucuOptimize />
           <OturumBostaAyari />
+        </div>
+        <div className="mt-3">
           <RootGirisiAyari />
         </div>
       </section>
