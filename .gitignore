@@ -36,3 +36,6 @@ id_ed25519*
 .vscode/
 *.swp
 __pycache__/
+
+# Derleme önbelleği — takip edilmemeli, her build sonrası kirli görünüyordu.
+frontend/tsconfig.tsbuildinfo
