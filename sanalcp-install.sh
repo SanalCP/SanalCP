@@ -44,6 +44,16 @@ download(){
     curl -4fsSL --retry 3 --connect-timeout 15 -o "$out" "$url"
 }
 
+# 'root' is NOT a valid panel admin name. auth.KullaniciRootMu() matches it
+# case-insensitively and routes that login to the legacy /etc/shadow path --
+# which this installer disables in step 13. sanalcp-seed-admin would happily
+# rewrite the id=1 row's bcrypt hash, but nothing would ever read it: the
+# printed password could not log in and no other admin would exist. Rejected
+# here, up front, instead of 15 minutes later in step 13.
+case "${ADMIN_KULLANICI,,}" in
+  root) die "--admin-kullanici root is not allowed: 'root' is the legacy panel shadow-login account this installer disables, so the generated password would never work -- pick another name" ;;
+esac
+
 if [ -z "${SANALCP_TANIM_TESTI:-}" ]; then
 [ "$(id -u)" = 0 ] || die "root required"
 [ -d "$A" ] || die "assets/ not found ($A)"
@@ -947,9 +957,20 @@ fi
 # Root/shadow giriş yolunu KAPAT. Migration bunu 1 (açık) olarak ekliyor ki
 # mevcut kurulumlar kilitlenmesin; yeni kurulumda ise girecek gerçek bir admin
 # zaten var, o yüzden kapalı başlıyoruz.
-mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=0 WHERE id=1;" >/dev/null 2>&1 \
-  && ok "panel root login disabled (SSH root access is unaffected)" \
-  || warn "could not disable panel root login"
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=0 WHERE id=1;" >/dev/null 2>&1 || true
+# 🔴 The UPDATE must be VERIFIED, not assumed. The root_girisi_acik column is
+# created by migration 0069, which runs at the first panel start (step 12); if
+# that start failed or the migration did not land, the UPDATE above is a no-op
+# and the install would ship with the flag at its DEFAULT 1 (root login OPEN) --
+# silently breaking the very promise this branch makes. Read the value back and
+# stop the install if it is not 0.
+# NOTE: no `mysql ... | grep -q` pipeline here -- with `set -o pipefail` that
+# pattern silently yields false negatives (see internal/osfam/pipefail_grep_test.go).
+ROOT_GIRISI_DEGER="$(mysql -N -B panel -e "SELECT root_girisi_acik FROM panel_ayarlari WHERE id=1;" 2>/dev/null)"
+case "$ROOT_GIRISI_DEGER" in
+  0) ok "panel root login disabled (SSH root access is unaffected)" ;;
+  *) die "could not disable panel root login (root_girisi_acik='$ROOT_GIRISI_DEGER') -- migration 0069 probably did not run; check 'journalctl -u sanalcp' and re-run the installer" ;;
+esac
 
 echo
 echo "  ╔══════════════════════════════════════════════════════════════╗"
@@ -959,8 +980,12 @@ echo "    kullanıcı : $ADMIN_KULLANICI"
 echo "    parola    : $ADMIN_PAROLA"
 echo
 echo "  Bu parola hiçbir dosyaya yazılmadı. Kaybederseniz SSH ile:"
-echo "    /opt/sanalcp/bin/sanalcp-seed-admin -dsn '<DSN>' \\"
+echo "    DSN=\$(grep -m1 '^PANEL_DB_DSN=' /etc/sanalcp/env | cut -d= -f2-)"
+echo "    /opt/sanalcp/bin/sanalcp-seed-admin -dsn \"\$DSN\" \\"
 echo "      -kullanici $ADMIN_KULLANICI -parola '<yeni-parola>'"
+echo
+echo "  Panel root girişini SSH'tan geri açmak (acil durum):"
+echo "    mysql panel -e \"UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;\""
 echo
 
 # Shell history hardening — the panel login IS this server's root password (see
