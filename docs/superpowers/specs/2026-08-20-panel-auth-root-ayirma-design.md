@@ -32,7 +32,19 @@ Brainstorming sırasında dört karar netleşti:
 | Mevcut kurulumların göçü | Migration bayrağı **açık** ekler, installer yeni kurulumlarda kapatır | Update'in otomatik admin üretmesi, tamamen elle |
 | Üretilen admin parolası | **Yalnız ekrana**, diske yazılmaz | Root-only dosyaya da yazma, kurulumda interaktif sorma |
 
-Kurtarma yolu her durumda `sanalcp-seed-admin`'dir: SSH root erişimi durduğu için kilitlenme kalıcı değildir.
+Kurtarma her durumda SSH üzerinden yapılır (SSH root erişimi bu çalışmada hiç değiştirilmiyor), ama **tek bir komut değildir** — kaybedilen şeye göre üç ayrı adım vardır:
+
+| Kaybedilen | Kurtarma |
+|---|---|
+| Yönetici parolası | `sanalcp-seed-admin -dsn "$DSN" -kullanici admin -parola '<yeni>'` (DSN: `/etc/sanalcp/env` içindeki `PANEL_DB_DSN=`) |
+| TOTP cihazı (2FA) | `mysql panel -e "UPDATE users SET totp_enabled=0, totp_secret='' WHERE username='admin';"` |
+| Panele erişimin tamamı | `mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;"` — break-glass yolunu geri açar |
+
+> ⚠️ `sanalcp-seed-admin` **yalnız `password_hash`'i** yazar (`scripts/seed_admin.go`,
+> `ON DUPLICATE KEY UPDATE`); `totp_enabled`/`totp_secret` alanlarına DOKUNMAZ. Yani
+> 2FA açık bir hesapta parola sıfırlamak tek başına yetmez, giriş 2FA adımında takılır.
+> Seed aracına 2FA sıfırlama bayrağı EKLENMEDİ (kapsam dışı); doğru kurtarma yolu
+> yukarıdaki SQL'dir. Aynı tablo README.md / README.en.md'de de belgelenmiştir.
 
 ## Mimari
 

@@ -96,38 +96,73 @@ Kurulum ~5-10 dakika sürer (paket indirmeleri). Bittiğinde panel adresi + giri
 ## Kurulum sonrası
 
 - **Panel:** `https://SUNUCU_IP:8443` (self-signed sertifika — tarayıcı uyarısını geçin)
-- **İlk giriş:** kullanıcı **`root`** · parola = **sunucunun root parolası**
+- **İlk giriş:** kurulumun sonunda **ekrana basılan** yönetici kullanıcı adı ve parolası
+  (varsayılan kullanıcı adı `admin`; `--admin-kullanici` / `--admin-parola` ile değiştirilebilir)
 
-İlk girişten sonra **root ile çalışmaya devam etmeniz gerekmez** — aşağıdaki bölüme bakın.
+> ⚠️ **Bu parola bir kez gösterilir ve hiçbir dosyaya yazılmaz.** Kurulum çıktısındaki
+> kutuyu kaydedin. Kaybederseniz aşağıdaki "Kurtarma" bölümüne bakın.
+
+İlk girişten sonra **Profil → İki Adımlı Doğrulama (2FA)** açmanız önerilir.
 
 ## Kimlik doğrulama ve hesap modeli
 
 Panelde **iki ayrı parola dünyası** vardır; bunu bilerek kullanmak güvenliğiniz açısından önemlidir.
 
-### 1. `root` — kurtarma yolu
+### 1. Panel hesapları — birincil giriş yolu
 
-`root` kullanıcısının parolası panel veritabanında **tutulmaz**. Panel, giriş anında
-`/etc/shadow`'daki hash'i okuyup doğrular (yescrypt native Go ile; eski sha512/sha256/md5crypt
-formatları için yedek yol). Kilitli (`!`, `!!`, `*`) veya parolasız hesaplar **asla** kabul edilmez.
+Panele giriş, `users` tablosundaki **gerçek panel hesaplarıyla** yapılır. Bu hesapların
+parolası panel veritabanında **bcrypt (cost 12)** ile saklanır ve sunucunun root
+parolasıyla **hiçbir ilgisi yoktur.**
 
-Bu yol bilinçli olarak korunmuştur: panel veritabanı bozulsa veya tüm panel hesapları
-silinse bile sunucuya erişiminiz olduğu sürece panele girebilirsiniz — **kilitlenme riski yoktur.**
+Kurulum betiği bu hesabı sizin için oluşturur ve kimlik bilgilerini **yalnız ekrana**
+basar (diske yazmaz). Kullanıcı adı varsayılan olarak `admin`'dir; `--admin-kullanici`
+ile değiştirebilirsiniz — ancak `root` adı kabul edilmez (aşağıdaki 2. maddeye ait
+ayrı bir yoldur).
 
-> **Bunun anlamı:** panel oturumunuz `root` ile açıldığında, panel parolası = sunucu root
-> parolasıdır. Bu hesabı günlük kullanım için tercih etmeyin; aşağıdaki adımı uygulayın.
+Yeni yönetici/bayi hesaplarını **Kullanıcılar → Yeni hesap** ekranından açarsınız.
 
-### 2. Panel hesapları — günlük kullanım için önerilen yol
+### 2. `root` — break-glass (acil kurtarma) yolu, **varsayılan kapalı**
 
-**Root'tan tamamen bağımsız, kendi parolası olan yönetici hesabı açabilirsiniz.**
-Bu hesapların parolası panel veritabanında **bcrypt (cost 12)** ile saklanır ve sunucunun
-root parolasıyla hiçbir ilgisi yoktur.
+Panel, `root` kullanıcı adıyla girişte parolayı veritabanında değil `/etc/shadow`'da
+arar (yescrypt native Go ile; eski sha512/sha256/md5crypt formatları için yedek yol).
+Kilitli (`!`, `!!`, `*`) veya parolasız hesaplar **asla** kabul edilmez.
 
-**Önerilen kurulum sonrası ilk adım:**
+Bu yol **yeni kurulumlarda kapalı gelir** — panel girişi sunucunun root parolasına
+bağlı olmasın, güvenlik günlüğünde kimin ne yaptığı ayırt edilebilsin diye. Mevcut
+kurulumlarda ise güncelleme sonrası **açık kalır**, hiçbir davranış değişmez;
+kapatma kararı sizindir.
 
-1. `root` ile girin.
-2. **Kullanıcılar → Yeni hesap** → **Rol: Yönetici** seçip kendinize bir hesap açın.
-3. Çıkış yapıp yeni hesabınızla girin ve **Profil → İki Adımlı Doğrulama (2FA)** açın.
-4. Günlük yönetimi bu hesapla yapın; `root` girişini yalnızca kurtarma için saklayın.
+Açıp kapatma yeri: **Araçlar ve Ayarlar → "Sunucu root parolasıyla panel girişi".**
+
+- Kapatırken panel, root dışında **aktif bir yönetici hesabı** olmasını şart koşar —
+  tek adımda kendinizi dışarı kilitleyemezsiniz.
+- Kapatma, o ana kadar açılmış root **oturumlarını ve API token'larını da iptal eder.**
+
+> 🔵 **SSH root erişiminiz bu ayardan HİÇ etkilenmez.** Bayrak yalnız `:8443` panel
+> girişini ilgilendirir; sunucunun root parolası, `sshd` yapılandırması ve SSH ile
+> root girişi olduğu gibi kalır. Yani sunucuya erişiminiz olduğu sürece kurtarma
+> yolunuz kapanmaz (bkz. "Kurtarma").
+
+### Kurtarma — panele giremiyorsanız
+
+Her iki yol da SSH'tan çözülür; sunucuya root olarak bağlanın:
+
+```bash
+# DSN'i ortam dosyasından al (parola içerir, ekrana basmayın)
+DSN=$(grep -m1 '^PANEL_DB_DSN=' /etc/sanalcp/env | cut -d= -f2-)
+
+# 1) Yönetici parolasını sıfırla (hesap yoksa oluşturur)
+/opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici admin -parola 'YENI_PAROLA'
+
+# 2) 2FA cihazınızı kaybettiyseniz — seed-admin 2FA'ya DOKUNMAZ, ayrıca temizlenmeli
+mysql panel -e "UPDATE users SET totp_enabled=0, totp_secret='' WHERE username='admin';"
+
+# 3) Break-glass: panelin root girişini geri aç (panele hiç giremiyorsanız)
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=1 WHERE id=1;"
+```
+
+> ⚠️ `sanalcp-seed-admin` **yalnız parolayı** sıfırlar. 2FA açıksa giriş yine 2FA
+> adımında takılır; kaybolmuş bir TOTP için 2. komut da gereklidir.
 
 Roller:
 
@@ -355,7 +390,7 @@ PANEL_DB_DSN="root@unix(/var/lib/mysql/mysql.sock)/panel" \
 ./sanalcp-server
 ```
 
-Backend API `/api/v1` altında; sağlık kontrolü `/healthz`. `root` girişi `/etc/shadow`'a karşı doğrulanır (bkz. "Kimlik doğrulama ve hesap modeli"); geliştirmede `scripts/seed_admin.go` ile ayrı bir admin tohumlayabilirsin:
+Backend API `/api/v1` altında; sağlık kontrolü `/healthz`. Panel girişi `users` tablosundaki gerçek hesaplarla yapılır; `root`/`/etc/shadow` yolu bayrakla kapatılabilen bir break-glass yoludur (bkz. "Kimlik doğrulama ve hesap modeli"). Geliştirmede admin hesabını `scripts/seed_admin.go` ile tohumlayabilirsin:
 
 ```bash
 go run scripts/seed_admin.go -dsn '<DSN>' -kullanici admin -parola 'SECELECEGIN_PAROLA'
