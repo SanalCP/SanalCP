@@ -297,6 +297,10 @@ func main() {
 	// (çok daha yüksek) sınırlarını açar. İstisna listesi kasten dar tutulur.
 	r.Use(httpx.LimitBody(httpx.VarsayilanGovdeSiniri))
 	r.Use(metrics.Middleware) // toplama burada; sunum (/metrics) loopback-only cliSrv'de (aşağıda)
+	// 🔴 GÜVENLİK: state-changing uçlarda same-origin kontrolü. Origin/Referer
+	// taşımayan istekler (curl, API token'lı otomasyon, git webhook) etkilenmez;
+	// gerekçenin tamamı middleware.CSRFKoruma'nın başındaki yorumda.
+	r.Use(middleware.CSRFKoruma)
 
 	r.Post("/api/v1/git-webhook/{secret}", gitH.Webhook)
 	r.Post("/api/v1/internal/pma-redeem", pmaH.Bozdur)
