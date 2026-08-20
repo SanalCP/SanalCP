@@ -59,6 +59,12 @@ Varsayılanın `1` olması göç stratejisinin tamamıdır: migration mevcut kur
 
 `KullaniciRootMu` (`internal/auth/parola.go:36`) saf fonksiyon olarak kalır. Aynı dosyanın yorumu onu "bu ayrımın tek karar noktası" diye tanımlıyor; bayrak okuma bir DB işlemidir ve oraya girmez, `Login` içinde kalır.
 
+**İkinci kapı: `/me/parola`.** `Login` tek başına yetmez. `ParolaDegistir` (`internal/auth/profile.go:87`, `POST /me/parola`) root oturumları için `/etc/shadow`'u okur ve `chpasswd` ile sistem parolasını değiştirir. Bu uç bayrakla korunmazsa, bayrak kapatılmadan önce alınmış bir root oturumu süresi dolana kadar sistem parolasını değiştirmeye devam eder — yani "bayrak kapalıyken panel `/etc/shadow`'a dokunmaz" ilkesi uçtan uca doğru olmaz.
+
+Bu bir yetki yükseltmesi **değildir**: dal `KullaniciRootMu(c.Username)` ile oturumun kullanıcı adına bakar, ayrı bir admin hesabı o dala hiç girmez (`profile.go:108`'deki `users.password_hash` dalına düşer). Root oturumu açmak zaten root parolasını bilmeyi gerektirir ve o parolayı bilen SSH ile de girebilir. Yine de bayrak kapalıyken bu uç da reddeder.
+
+Yanıt burada `Login`'den bilinçli olarak **farklıdır**: `Login` kimliği doğrulanmamış bir istemciye konuştuğu için genel `401` döner (bayrak durumu sızmasın). Bu uçta çağıran zaten doğrulanmış bir root oturumudur, sızacak bilgi yoktur — açık bir `403` ve ne yapması gerektiğini söyleyen mesaj döner: sistem parolası SSH üzerinden `passwd` ile değiştirilir.
+
 ### 3. Installer
 
 `sanalcp-install.sh` adım 13 (`Admin access (root + PAM)`) yeniden yazılır:
