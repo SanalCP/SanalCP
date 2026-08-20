@@ -10,7 +10,7 @@
 #
 # Designed to be idempotent (safe to re-run). Run as root.
 #
-#   ./sanalcp-install.sh [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
+#   ./sanalcp-install.sh [--admin-kullanici <k>] [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
 #
 # assets/ must sit next to this script:
 #   sanalcp-server  sanalcp-seed-admin  frontend-dist.tar.gz
@@ -21,8 +21,9 @@ set -uo pipefail
 # and assets/ would be looked up in the caller's directory.
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 A="$HERE/assets"
-ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""
+ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""; ADMIN_KULLANICI="admin"
 while [ $# -gt 0 ]; do case "$1" in
+  --admin-kullanici) shift; ADMIN_KULLANICI="$1" ;;
   --admin-parola) shift; ADMIN_PAROLA="$1" ;;
   --admin-eposta) shift; ADMIN_EPOSTA="$1" ;;
   --lang) shift; PANEL_LANG="$1" ;;
@@ -909,9 +910,12 @@ command -v sanalcp-ftp-setup >/dev/null 2>&1 && sanalcp-ftp-setup >/dev/null 2>&
 command -v sanalcp-mail-setup >/dev/null 2>&1 && sanalcp-mail-setup >/dev/null 2>&1 && ok "sanalcp-mail-setup (Postfix/Dovecot/OpenDKIM)" || warn "mail-setup skipped"
 
 # ============ 13) Admin access ============
-# 🔴 Panel admin login = the server's ROOT user (PAM/shadow verification).
-# There is NO separate panel password. Login: username 'root' + this server's
-# root password.
+# 🔴 The installer now creates a real admin account in the `users` table —
+# THAT is the panel's primary login going forward. The legacy root/shadow
+# login path (username 'root' + this server's root password) ships DISABLED
+# on new installs (panel_ayarlari.root_girisi_acik=0) and can be re-enabled
+# from Panel Settings if needed. SSH root access is completely unaffected —
+# this only touches the panel's web login.
 step "13) Admin access (root + PAM)"
 DSN="panel:${DBPASS}@tcp(127.0.0.1:3306)/panel?parseTime=true"
 if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
@@ -927,7 +931,37 @@ mysql panel -e "UPDATE users SET email='', full_name='' WHERE username='root' AN
 # authenticated) — the value picked in step 0.
 mysql panel -e "UPDATE panel_ayarlari SET varsayilan_dil='$PANEL_LANG' WHERE id=1;" >/dev/null 2>&1 \
   && ok "panel default language set to '$PANEL_LANG'" || warn "could not set panel default language"
-ok "Login: username 'root' + this server's root password"
+# Gerçek admin hesabı — panelin BİRİNCİL giriş yolu artık bu (bkz.
+# docs/superpowers/specs/2026-08-20-panel-auth-root-ayirma-design.md).
+# Yukarıdaki root tohumlaması yerinde kalıyor: root/shadow yolu Panel
+# Ayarları'ndan tekrar açılabilir ve o yol users.id=1 satırına bağlı.
+if [ -z "$ADMIN_PAROLA" ]; then
+  ADMIN_PAROLA=$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)
+fi
+if [ -x /opt/sanalcp/bin/sanalcp-seed-admin ]; then
+  /opt/sanalcp/bin/sanalcp-seed-admin -dsn "$DSN" -kullanici "$ADMIN_KULLANICI" \
+    -parola "$ADMIN_PAROLA" -eposta "$ADMIN_EPOSTA" -dil "$PANEL_LANG" >/dev/null 2>&1 \
+    && ok "admin account created" || die "admin account could not be created"
+fi
+
+# Root/shadow giriş yolunu KAPAT. Migration bunu 1 (açık) olarak ekliyor ki
+# mevcut kurulumlar kilitlenmesin; yeni kurulumda ise girecek gerçek bir admin
+# zaten var, o yüzden kapalı başlıyoruz.
+mysql panel -e "UPDATE panel_ayarlari SET root_girisi_acik=0 WHERE id=1;" >/dev/null 2>&1 \
+  && ok "panel root login disabled (SSH root access is unaffected)" \
+  || warn "could not disable panel root login"
+
+echo
+echo "  ╔══════════════════════════════════════════════════════════════╗"
+echo "  ║  PANEL LOGIN — bu parola BİR KEZ gösterilir, kaydedin        ║"
+echo "  ╚══════════════════════════════════════════════════════════════╝"
+echo "    kullanıcı : $ADMIN_KULLANICI"
+echo "    parola    : $ADMIN_PAROLA"
+echo
+echo "  Bu parola hiçbir dosyaya yazılmadı. Kaybederseniz SSH ile:"
+echo "    /opt/sanalcp/bin/sanalcp-seed-admin -dsn '<DSN>' \\"
+echo "      -kullanici $ADMIN_KULLANICI -parola '<yeni-parola>'"
+echo
 
 # Shell history hardening — the panel login IS this server's root password (see
 # internal/auth/handlers.go:rootShadowHash), so operators routinely handle that
