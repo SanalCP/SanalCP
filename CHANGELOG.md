@@ -13,6 +13,29 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Panel girişi root'tan ayrıldı
 
+**0.9.1** (2026-08-20)
+
+Arayüz düzeni ve yeni bir sunucu kapatma düğmesi.
+
+- **Araçlar ve Ayarlar**: sunucu bakımı kartları tek sütunda tam genişlik
+  duruyordu, artık geniş ekranda satırda üç, tablette iki kart. "Sunucu root
+  parolasıyla panel girişi" kartı tam satır kaldı.
+- **Sunucuyu Kapat** düğmesi eklendi (sayfa başlığında, turuncuya alınan
+  yeniden başlat düğmesinin yanında, kırmızı). Yazılımsal kapatmadır:
+  `systemctl poweroff` ile systemd servisleri düzenli durdurur, dosya
+  sistemlerini senkronize edip söker, sonra gücü keser. **Yeniden başlatmanın
+  aksine bu işlem kendiliğinden geri gelmez** — sunucuyu ancak sağlayıcı
+  panelinden veya fiziksel olarak açabilirsiniz. Bu yüzden onay adımı daha
+  ağırdır: kutuya `KAPAT` yazmak gerekir. Uç yalnız admin rolüne açıktır.
+- **Profil**: kartlar geniş ekranda ikişerli; Tercihler tam satır.
+- **Listeler ilk sütuna göre alfabetik sıralanıyor** — domainler, DNS, e-posta,
+  veritabanları, SSL, kullanıcılar, müşteriler. Sıralama Türkçe harf sırasına
+  göre yapılır (ç, ğ, ı, ö, ş, ü) ve sayı içeren adlarda doğal sıra korunur
+  (`db2` < `db10`). Not: SSL listesi önceden en yakın sertifika bitişine göre
+  sıralıydı; süresi dolan/dolmak üzere olanlar artık listenin başında değil ama
+  üstteki özet rozetlerinde ve satır rozetlerinde görünmeye devam ediyor.
+- Panel favicon'una `.ico` yedeği eklendi.
+
 **0.9.0** (2026-08-20)
 
 Panel girişi artık sunucunun root parolasına bağlı değil.
