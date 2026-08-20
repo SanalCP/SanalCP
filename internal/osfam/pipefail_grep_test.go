@@ -16,10 +16,10 @@ import (
 // düşebiliyor (çıktı uzunluğu değişince yarış çevriliyor).
 //
 // Bu kod tabanında ÜÇ KEZ yaşandı:
-//   1. `quotaon | grep` → kota kapalı sanıldı (internal/kaynaklimit/kota_ext4.go)
-//   2. `ss -lntp | grep -q ...:8891` → OpenDKIM dinlemiyor sanıldı (kabul testi)
-//   3. `apt-cache policy | grep -q sury.org` → Ubuntu 24.04 kurulumu adım 1'de
-//      öldü ve DOĞRU olan sources.list dosyasını suçladı
+//  1. `quotaon | grep` → kota kapalı sanıldı (internal/kaynaklimit/kota_ext4.go)
+//  2. `ss -lntp | grep -q ...:8891` → OpenDKIM dinlemiyor sanıldı (kabul testi)
+//  3. `apt-cache policy | grep -q sury.org` → Ubuntu 24.04 kurulumu adım 1'de
+//     öldü ve DOĞRU olan sources.list dosyasını suçladı
 //
 // Doğrusu: çıktıyı değişkene al, bash'in `=~`/`case`'i ile eşleştir; ya da
 // sanalcp-ortak.sh:cikti_esler yardımcısını kullan.

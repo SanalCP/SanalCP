@@ -1,0 +1,118 @@
+name: CI
+
+# Her push ve PR'da: derleme, testler, statik analiz, bağımlılık taraması.
+# Bu iş akışı 2026-08 güvenlik denetiminden sonra eklendi — o tarihe kadar depoda
+# yazılmış _test.go dosyaları hiçbir zaman otomatik koşmuyordu ve bağımlılık
+# taraması hiç yapılmamıştı.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go — vet, test, gofmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Üretimde dağıtılan binary ile aynı dil sürümü (go.mod: go 1.24), ama
+      # daima en güncel yama sürümü — stdlib açıkları yalnızca yamayla kapanır.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          check-latest: true
+          cache: true
+
+      - name: gofmt
+        run: |
+          set -euo pipefail
+          bicimsiz=$(gofmt -l . | grep -v '^frontend/' || true)
+          if [ -n "$bicimsiz" ]; then
+            echo "✗ gofmt uygulanmamış dosyalar:"; echo "$bicimsiz"; exit 1
+          fi
+          echo "✓ gofmt temiz"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  govulncheck:
+    name: Go — bağımlılık/stdlib açık taraması
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 🔴 Tarama, üretimde kullanılan Go sürümüyle yapılmalıdır: stdlib açıkları
+      # kullanılan toolchain'in yama sürümüne bağlıdır. Daha yeni bir Go ile
+      # taramak stdlib'i yamalı gösterip yanlış bir güvenlik hissi verirdi.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          check-latest: true
+          cache: true
+
+      # govulncheck@latest artık Go >= 1.25 ister; 1.24 toolchain'i altında
+      # derlenebilen son sürüme pinliyoruz. Açık VERİTABANI her koşuda canlı
+      # çekilir, dolayısıyla pin taramanın güncelliğini etkilemez.
+      #
+      # 🔴 continue-on-error GEÇİCİDİR. 2026-08-20 taramasında bulunan stdlib
+      # açıklarının bir kısmı yalnızca Go 1.25 hattında düzeltilmiştir
+      # ("Fixed in: go1.25.x") — yani 1.24 ile kalındığı sürece bu adım
+      # yamayla yeşile dönemez. Adımı bloklayıcı yapmak CI'yı kalıcı kırmızıda
+      # bırakır ve herkesin görmezden gelmesine yol açardı; bu yüzden şimdilik
+      # raporlayıcı. Go 1.25 geçişi tamamlandığında (go.mod'daki godebug
+      # pinlerinin gözden geçirilmesi dahil) İKİ govulncheck adımından da bu
+      # satır KALDIRILMALIDIR.
+      - name: govulncheck (kaynak)
+        continue-on-error: true
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+      # Kaynak taraması yalnızca CI'nın derlediği kodu görür. Kurulumlara giden
+      # şey depoda commit'li ÖNCEDEN DERLENMİŞ binary'dir; onu ayrıca tarıyoruz.
+      # Binary eski bir Go yama sürümüyle derlendiyse bu adım kırmızı olur —
+      # çözüm güncel toolchain ile yeniden derleyip assets/'i tazelemektir.
+      - name: govulncheck (dağıtılan binary)
+        continue-on-error: true
+        run: |
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary assets/sanalcp-server
+
+  frontend:
+    name: Frontend — tip kontrolü, build, npm audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # `npm run build` = `tsc -b && vite build` — tip kontrolü buraya dahildir.
+      - name: build
+        run: npm run build
+
+      - name: npm audit
+        run: npm audit --audit-level=high

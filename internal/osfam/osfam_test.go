@@ -250,7 +250,6 @@ func TestCacheUbuntuKodAdiYokkaAyaBakar(t *testing.T) {
 	}
 }
 
-
 func TestCacheKodAdiYokkaSurumdenCozer(t *testing.T) {
 	b12 := Bilgi{Aile: Debian, ID: "debian", Surum: "12"}
 	if got := b12.Paket(PaketCache); got != "redis-server" {
