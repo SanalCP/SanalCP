@@ -75,15 +75,19 @@ Varsayılanın `1` olması göç stratejisinin tamamıdır: migration mevcut kur
 
 Ayarlar sayfasına `AdminOnly` bir anahtar eklenir: "Sunucu root parolasıyla panel girişi". Bayrağı okuyup yazan uçlar mevcut `panel_ayarlari` handler desenini izler.
 
-**Son-admin koruması.** Root girişi kapalıyken geriye tek admin kalmışsa, o hesabın silinmesi, `status='suspended'` yapılması veya rolünün düşürülmesi reddedilir. Bu, tasarımdaki tek gerçek kilitlenme deliğidir ve bilinçli olarak kapatılır. Root açıkken kısıt uygulanmaz, çünkü break-glass yolu duruyordur.
+**Son-admin koruması.** Bu koruma **zaten mevcut** ve üç handler'a da bağlı: `usersH.Sil` (`internal/users/handlers.go:646`), `usersH.DurumDegistir` (`:416`) ve `usersH.Guncelle` (`:317`), hepsi `sonAdminMi` (`:347`) üzerinden geçiyor. Eklenecek bir koruma yok; **düzeltilecek bir sayım var**.
 
-Kontrolün girmesi gereken üç handler (`cmd/server/main.go:579-584`):
+`sonAdminMi` bugün şunu soruyor:
 
-- `usersH.Sil` — `DELETE /users/{id}`
-- `usersH.DurumDegistir` — `POST /users/{id}/durum` (`suspended` yönü)
-- `usersH.Guncelle` — `PUT /users/{id}` (rol `admin`'den düşürülüyorsa)
+```sql
+SELECT COUNT(*) FROM users WHERE role='admin' AND status='active' AND id<>?
+```
 
-`users` tablosundaki root satırı bu sayımda **admin olarak sayılmaz**: root girişi kapalıyken o satırla giriş yapılamadığı için kurtarma değeri yoktur.
+`users` tablosundaki root satırı (`id=1`) `role='admin'` ve `status='active'` olduğu için bu sayıma **her zaman dahil**. Root girişi kapatıldığında sonuç şu olur: sistemdeki son gerçek admin silinebilir, çünkü root kalan admin sanılır — ama root ile giriş yapılamadığı için panele kimse giremez. Kilitlenme deliği tam burada.
+
+Düzeltme: root girişi kapalıyken sayım root satırını **dışlar**. Root açıkken mevcut davranış birebir korunur, çünkü o zaman root gerçekten kullanılabilir bir kurtarma yoludur.
+
+**Bayrağı kapatan ucun kendi koruması.** Ayarlar'dan root girişi kapatılırken sistemde aktif ve root olmayan bir admin yoksa istek reddedilir. Aksi halde tek adımda kendini dışarı kilitlemek mümkün olurdu: root kapanır, girebilecek başka hesap yoktur. Bu kontrol `sonAdminMi` düzeltmesinden bağımsızdır — biri hesap silmeyi, diğeri bayrağı kapatmayı korur.
 
 ### 5. Göç
 
@@ -104,8 +108,13 @@ Kod tarafında göç işi yoktur. Mevcut iki kurulum (`cloud.sanalcp.com` ve iki
 
 Kullanıcı yönetimi tarafında:
 
-- Root kapalıyken tek kalan admin silinemez, pasife alınamaz, rolü düşürülemez.
-- Root açıkken bu kısıt uygulanmaz.
+- `sonAdminMi`: root girişi kapalıyken root satırı sayılmaz — geriye tek gerçek admin kalmışsa silme/pasifleştirme/rol düşürme reddedilir.
+- `sonAdminMi`: root girişi açıkken root satırı sayılır, mevcut davranış birebir korunur.
+
+Ayarlar ucunda:
+
+- Aktif ve root olmayan admin yokken root girişini kapatma isteği reddedilir.
+- Böyle bir admin varken kapatma başarılı olur.
 
 Installer tarafında `internal/osfam` altındaki mevcut testler korunur: installer paritesi (Debian/RHEL ortak gövde) ve `set -o pipefail` altında `| grep -q` boru hattı yasağı. Yeni installer kodu ortak gövdede kalır, dağıtıma özel dallanma eklemez.
 
