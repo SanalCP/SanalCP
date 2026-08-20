@@ -1,0 +1,12 @@
+{
+  "label": "Sunucu root parolasıyla panel girişi",
+  "desc": "Açıkken panele 'root' kullanıcı adı ve sunucunun root parolasıyla girilebilir. Kapatmanız önerilir: SSH root parolanızı değiştirmek panel girişini etkilemez ve güvenlik günlüğünde kimin giriş yaptığı ayırt edilebilir. SSH root erişiminiz bu ayardan etkilenmez.",
+  "on": "Açık",
+  "off": "Kapalı",
+  "save": "Kaydet",
+  "saving": "Kaydediliyor…",
+  "saved_on": "Root ile panel girişi açıldı.",
+  "saved_off": "Root ile panel girişi kapatıldı.",
+  "load_failed": "Ayar okunamadı.",
+  "save_failed": "Ayar kaydedilemedi."
+}
