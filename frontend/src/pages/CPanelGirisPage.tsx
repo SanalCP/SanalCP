@@ -20,9 +20,9 @@ export default function CPanelGirisPage() {
     setYuk(true); setHata(null)
     try {
       const r = await axios.post('/api/v1/musteri/login', { kullanici, parola })
-      const { token, bitis, domain_id, alan_adi } = r.data
-      // Tek atomik nokta — store hem token'ı hem müşteri bayraklarını yazıyor.
-      useAuth.getState().girisMusteri(token, bitis, domain_id, alan_adi, kullanici)
+      const { bitis, domain_id, alan_adi } = r.data
+      // Oturum HttpOnly çerezde geldi; store yalnız arayüz durumunu yazıyor.
+      useAuth.getState().girisMusteri(bitis, domain_id, alan_adi, kullanici)
       nav('/abonelikler/' + domain_id, { replace: true })
       setTimeout(() => window.location.reload(), 100)
     } catch (e) {

@@ -115,14 +115,11 @@ func TestParolaDegistir_RootGirisiKapaliykenShadowaDokunulmaz(t *testing.T) {
 
 	secret := []byte("test")
 	h := &Handlers{DB: db, Secret: secret, LifetimeSec: 3600}
-	tok, err := Issue(secret, 3600, 1, "root", "admin", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	// Kimlik üretimdeki gibi context'ten gelir (middleware.RequireAuth koyar).
 	govde := strings.NewReader(`{"mevcut":"dogru-parola","yeni":"yeni-parola-12"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/me/parola", govde)
-	req.Header.Set("Authorization", "Bearer "+tok)
+	req = req.WithContext(ClaimsContext(req.Context(),
+		&Claims{UserID: 1, Username: "root", Role: "admin"}))
 	w := httptest.NewRecorder()
 
 	h.ParolaDegistir(w, req)
@@ -200,14 +197,16 @@ func TestLogin_RootGirisiAcikkenDogruParolaTokenUretir(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&yanit); err != nil {
 		t.Fatalf("yanıt çözülemedi: %v", err)
 	}
-	if yanit.Token == "" {
-		t.Fatal("200 döndü ama token boş")
+	// Token yanıt GÖVDESİNDE dönmemeli — oturum yalnız HttpOnly çerezde taşınır.
+	if yanit.Token != "" {
+		t.Fatal("yanıt gövdesinde token var; oturum yalnız HttpOnly çerezde dönmeli")
 	}
 	if yanit.Kullanici.ID != 1 || yanit.Kullanici.Adi != "root" || yanit.Kullanici.Rol != "admin" {
 		t.Fatalf("beklenen 1/root/admin, gelen %d/%s/%s",
 			yanit.Kullanici.ID, yanit.Kullanici.Adi, yanit.Kullanici.Rol)
 	}
-	c, err := Parse(secret, yanit.Token)
+	ham := oturumCerezindenToken(t, w)
+	c, err := Parse(secret, ham)
 	if err != nil {
 		t.Fatalf("üretilen token çözülemedi: %v", err)
 	}

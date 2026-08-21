@@ -21,10 +21,6 @@ var scopeDB *sql.DB
 // Init: middleware paketine DB handle'ı verir (müşteri-scope askı kontrolü için).
 func Init(db *sql.DB) { scopeDB = db }
 
-type ctxKey int
-
-const claimsKey ctxKey = 1
-
 // RequireAuth: token'ı doğrular ve claim'leri context'e koyar.
 //
 // Tek token tipi vardır (auth.Claims); rol ayrımı claim içindeki Role
@@ -34,13 +30,29 @@ const claimsKey ctxKey = 1
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			raw := strings.TrimSpace(r.Header.Get("Authorization"))
-			const p = "Bearer "
-			if !strings.HasPrefix(raw, p) {
-				httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
-				return
+			// Kimlik iki yoldan gelebilir ve ikisi AYRI şeylerdir:
+			//
+			//   1) HttpOnly oturum çerezi — tarayıcıdaki panel oturumu. JWT'yi
+			//      JavaScript'e hiç göstermez; XSS oturumu okuyamaz.
+			//   2) Authorization: Bearer scp_… — otomasyon için kişisel API
+			//      token'ı. Tarayıcı bunu kendiliğinden eklemez, yani CSRF
+			//      yüzeyi yoktur.
+			//
+			// Çerez ÖNCELİKLİDİR: tarayıcıdan gelen bir istekte her ikisi de
+			// varsa, kimliği belirleyen şey oturum olmalıdır. Aksi hâlde bir
+			// saldırgan sayfa kendi API token'ını başlıkla ekleyip kurbanın
+			// oturumunun üstüne yazabilirdi (session fixation'ın tersi).
+			tokenRaw := auth.OturumCerezDegeri(r)
+			cerezden := tokenRaw != ""
+			if !cerezden {
+				raw := strings.TrimSpace(r.Header.Get("Authorization"))
+				const p = "Bearer "
+				if !strings.HasPrefix(raw, p) {
+					httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
+					return
+				}
+				tokenRaw = raw[len(p):]
 			}
-			tokenRaw := raw[len(p):]
 			// CVE-2025-30204 savunma: dogrulama ONCESI asiri-uzun token reddedilir (pre-auth DoS yuzeyi kucultulur)
 			if len(tokenRaw) > 8192 {
 				httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")
@@ -56,7 +68,11 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 			// interaktif oturumlar içindir; bir yedekleme script'inin "boşta
 			// kaldığı için" kilitlenmesi anlamsız olurdu. Token'ın süresi
 			// kendi bitis_at alanıyla yönetilir.
-			if auth.APITokenMi(tokenRaw) {
+			//
+			// API token'ı yalnız başlıktan kabul edilir. Çerezde scp_… taşımak
+			// meşru bir akış değildir; kabul etmek, API token'larını CSRF'e
+			// açık hâle getirirdi (tarayıcı çerezi kendiliğinden gönderir).
+			if !cerezden && auth.APITokenMi(tokenRaw) {
 				if scopeDB == nil {
 					httpx.WriteError(w, http.StatusServiceUnavailable, "oturum doğrulanamadı")
 					return
@@ -67,7 +83,7 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 					return
 				}
 				auth.APITokenKullanimIsle(scopeDB, tokenID, httpx.ClientIP(r))
-				ctx := context.WithValue(r.Context(), claimsKey, c)
+				ctx := auth.ClaimsContext(r.Context(), c)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -113,7 +129,7 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 				UPDATE users SET last_activity_at = NOW()
 				 WHERE id = ? AND (last_activity_at IS NULL OR last_activity_at < NOW() - INTERVAL 30 SECOND)`,
 				c.UserID)
-			ctx := context.WithValue(r.Context(), claimsKey, c)
+			ctx := auth.ClaimsContext(r.Context(), c)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -359,32 +375,30 @@ func KapsamSQL(r *http.Request, domainAlias string) (string, []any) {
 	return " WHERE 1 = 0", nil
 }
 
-// ClaimsContext: verilen context'e admin/bayi claim'lerini yerleştirir.
+// Kimlik bağlamı auth paketinde yaşar (bkz. internal/auth/context.go).
+// Buradaki üçlü, çağrı yerlerini kırmamak için ince birer sarmalayıcıdır;
+// anahtarın auth'ta olması, auth paketindeki handler'ların da aynı doğrulanmış
+// kimliği okuyabilmesi için gereklidir — middleware'i import edemezler.
+
+// ClaimsContext: verilen context'e doğrulanmış claim'leri yerleştirir.
 //
 // RequireAuth bunu token doğruladıktan sonra kendisi yapar; bu dışa açık
 // biçim, kimlik bağlamını elle kurması gereken yerler içindir (başka
-// paketlerin yetki testleri gibi — claimsKey paket-özeldir ve dışarıdan
-// erişilemez). Üretim yolunda çağrılmaz.
+// paketlerin yetki testleri gibi). Üretim yolunda çağrılmaz.
 func ClaimsContext(ctx context.Context, c *auth.Claims) context.Context {
-	return context.WithValue(ctx, claimsKey, c)
+	return auth.ClaimsContext(ctx, c)
 }
 
 // ClaimsIle: isteğe kimlik bilgisi iliştirilmiş bir kopyasını döner.
 //
-// Yalnızca TESTLER için — üretimde claims'i RequireAuth, doğrulanmış JWT'den
+// Yalnızca TESTLER için — üretimde claims'i RequireAuth, doğrulanmış oturumdan
 // yazar. Bu fonksiyon bir yetki KAPISI DEĞİLDİR ve hiçbir denetimi atlatmaz:
 // aynı süreçte çalışan kod zaten kendi context'ini kurabilir. Var olma sebebi,
 // handler'ların (ör. domains.sahipBayiCoz) rol davranışının kendi paketinden
-// test edilebilmesi — claimsKey dışa kapalı olduğu için aksi mümkün değil.
+// test edilebilmesi.
 func ClaimsIle(r *http.Request, c *auth.Claims) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), claimsKey, c))
+	return r.WithContext(auth.ClaimsContext(r.Context(), c))
 }
 
-func ClaimsFrom(r *http.Request) *auth.Claims {
-	v := r.Context().Value(claimsKey)
-	if v == nil {
-		return nil
-	}
-	c, _ := v.(*auth.Claims)
-	return c
-}
+// ClaimsFrom: istekteki doğrulanmış claim'ler (yoksa nil).
+func ClaimsFrom(r *http.Request) *auth.Claims { return auth.ClaimsFrom(r) }

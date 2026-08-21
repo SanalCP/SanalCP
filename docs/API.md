@@ -5,7 +5,9 @@ kullanır — yani ayrı, sınırlı bir "API sürümü" yoktur; **arayüzde gö
 işlem otomasyona da açıktır.**
 
 - Taban adres: `https://<panel-adresiniz>:8443/api/v1`
-- Kimlik doğrulama: `Authorization: Bearer <token>`
+- Kimlik doğrulama: `Authorization: Bearer <token>` (otomasyon için `scp_…` API
+  token'ları). Tarayıcıdaki panel oturumu ayrı bir yoldur ve HttpOnly çerezle
+  taşınır — JavaScript okuyamaz, bu yüzden arayüz Authorization başlığı kurmaz.
 - İstek/yanıt gövdesi: JSON (`Content-Type: application/json`)
 
 ---
@@ -17,14 +19,33 @@ işlem otomasyona da açıktır.**
 Ham token **yalnız bir kez** gösterilir; sunucuda yalnızca SHA-256 özeti saklanır.
 Kaybederseniz yenisini üretmeniz gerekir.
 
-API ile de üretebilirsiniz (oturum token'ıyla):
+API ile de üretebilirsiniz. Panel oturumu **HttpOnly çerezle** taşındığı için
+`/auth/login` yanıtında token dönmez; curl ile bir çerez kavanozu kullanmanız
+gerekir. Panel oturumuyla yapılan state-changing isteklerde `Origin` başlığı
+**zorunludur** (CSRF koruması):
 
 ```bash
-curl -sS -X POST https://panel.example.com:8443/api/v1/me/api-tokenlari \
-  -H "Authorization: Bearer $OTURUM_TOKENI" \
-  -H "Content-Type: application/json" \
+PANEL=https://panel.example.com:8443
+
+# 1) Giriş yap — oturum çerezi kavanoza yazılır
+curl -sS -c cerez.txt -X POST "$PANEL/api/v1/auth/login" \
+  -H "Content-Type: application/json" -H "Origin: $PANEL" \
+  -d '{"kullanici":"admin","parola":"..."}'
+
+# 2) Çerezle API token'ı üret
+curl -sS -b cerez.txt -X POST "$PANEL/api/v1/me/api-tokenlari" \
+  -H "Content-Type: application/json" -H "Origin: $PANEL" \
   -d '{"ad":"yedekleme scripti","gun_sonra":365}'
+
+# 3) Çıkış yap — çerezi geçersiz kıl
+curl -sS -b cerez.txt -X POST "$PANEL/api/v1/auth/cikis" -H "Origin: $PANEL"
+rm -f cerez.txt
 ```
+
+> Bu yalnızca **ilk token'ı almak** içindir. Sürekli otomasyonda oturum çerezi
+> değil, üretilen `scp_…` token'ı kullanılmalıdır: token'ın kendi ömrü, kendi
+> iptali ve kendi kullanım kaydı vardır; ayrıca oturum çerezinin tabi olduğu
+> boşta-kalma zaman aşımından etkilenmez.
 
 ```json
 { "ok": true, "id": 3, "ad": "yedekleme scripti", "token": "scp_1a2b3c…" }

@@ -7,15 +7,10 @@ const baseURL = (import.meta.env.VITE_API_BASE as string) || '/api/v1'
 export const api = axios.create({
   baseURL,
   timeout: 30_000,
-})
-
-api.interceptors.request.use((cfg) => {
-  const tok = useAuth.getState().token
-  if (tok) {
-    cfg.headers = cfg.headers || {}
-    cfg.headers.Authorization = `Bearer ${tok}`
-  }
-  return cfg
+  // Oturum HttpOnly çerezde taşınıyor; JavaScript onu okuyamadığı için elle
+  // Authorization başlığı kurulamaz ve kurulmamalıdır. withCredentials,
+  // tarayıcının çerezi isteğe eklemesini sağlar.
+  withCredentials: true,
 })
 
 api.interceptors.response.use(
@@ -23,7 +18,7 @@ api.interceptors.response.use(
   (err: AxiosError<{ hata?: string }>) => {
     if (err.response?.status === 401) {
       const s = useAuth.getState()
-      if (s.token) s.cikis()
+      if (s.oturumVar) s.cikis()
     }
     return Promise.reject(err)
   },

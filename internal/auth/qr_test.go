@@ -28,13 +28,14 @@ func TestTwoFASetupQR(t *testing.T) {
 	key := []byte("test-jwt-secret-0123456789-abcdef")
 	h := &Handlers{Secret: key, LifetimeSec: 3600}
 
-	tok, err := Issue(key, 3600, 1, "root", "admin", 0)
-	if err != nil {
-		t.Fatalf("Issue: %v", err)
-	}
-
+	// Kimlik, üretimdeki gibi CONTEXT'ten gelir: middleware.RequireAuth token'ı
+	// (çerez ya da API token'ı) doğrulayıp claim'leri oraya koyar. Test eskiden
+	// Authorization başlığı kuruyordu; handler da başlığı yeniden ayrıştırdığı
+	// için geçiyordu, ama o yol üretimde HİÇ kullanılmıyordu — bu yüzden oturum
+	// çereze taşındığında kırılan davranışı test yakalayamadı.
 	req := httptest.NewRequest(http.MethodGet, "/me/2fa/setup", nil)
-	req.Header.Set("Authorization", "Bearer "+tok)
+	req = req.WithContext(ClaimsContext(req.Context(),
+		&Claims{UserID: 1, Username: "root", Role: "admin"}))
 	rec := httptest.NewRecorder()
 	h.TwoFASetup(rec, req)
 

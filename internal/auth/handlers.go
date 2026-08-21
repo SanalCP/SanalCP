@@ -31,9 +31,14 @@ type loginReq struct {
 	Kod       string `json:"kod"`
 }
 
+// loginResp: giriş yanıtı.
+//
+// Token ALANI YOKTUR ve olmamalıdır. Oturum JWT'si yalnız HttpOnly çerezde
+// döner (bkz. auth/cookie.go); yanıt gövdesine de koymak, JavaScript'in
+// erişebildiği bir kopya bırakır ve çereze geçmenin tüm amacını ortadan
+// kaldırırdı. Otomasyonun yolu kişisel API token'larıdır (scp_…, apitoken.go).
 type loginResp struct {
-	Token     string `json:"token"`
-	Bitis     int64  `json:"bitis"`
+	Bitis     int64 `json:"bitis"`
 	Kullanici struct {
 		ID      int64  `json:"id"`
 		Adi     string `json:"adi"`
@@ -269,12 +274,35 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	// güncel bir sürüm kontrolü tetikle (cooldown'lu, bkz. system.SurumKontrolTetikle).
 	system.SurumKontrolTetikle()
 
-	resp := loginResp{Token: tok, Bitis: time.Now().Add(time.Duration(h.LifetimeSec) * time.Second).Unix()}
+	OturumCerezYaz(w, r, tok, h.LifetimeSec)
+	resp := loginResp{Bitis: time.Now().Add(time.Duration(h.LifetimeSec) * time.Second).Unix()}
 	resp.Kullanici.ID = uid
 	resp.Kullanici.Adi = kadi
 	resp.Kullanici.Rol = rol
 	resp.Kullanici.AdSoyad = adSoyad
 	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// Cikis: oturum çerezini geçersiz kılar.
+//
+// Kimlik doğrulama ZORUNLU DEĞİLDİR ve bu bilinçlidir: süresi dolmuş ya da
+// sunucuda geçersizleşmiş bir oturumda da kullanıcının tarayıcısındaki çerez
+// temizlenebilmelidir. Ucun yaptığı tek şey çerezi silmektir, dolayısıyla
+// kimliksiz çağrılması bir yetki kazancı sağlamaz.
+//
+// auth_version'a DOKUNMAZ: onu artırmak kullanıcının TÜM cihazlardaki
+// oturumlarını düşürürdü. "Her yerden çıkış" ayrı ve bilinçli bir işlemdir;
+// tek sekmeden çıkmak onu tetiklememelidir.
+func (h *Handlers) Cikis(w http.ResponseWriter, r *http.Request) {
+	// Denetim kaydı için kimliği en iyi çabayla çöz; başarısız olması çıkışı
+	// engellemez.
+	if raw := OturumCerezDegeri(r); raw != "" {
+		if c, err := Parse(h.Secret, raw); err == nil {
+			WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.cikis", c.Username, true)
+		}
+	}
+	OturumCerezSil(w, r)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"durum": "çıkış yapıldı"})
 }
 
 // WriteAudit: audit_log'a bir girişim kaydeder (login/2FA/parola vb.). Diğer

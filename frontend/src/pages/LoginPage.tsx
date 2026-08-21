@@ -7,8 +7,8 @@ import { api, apiHata } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
+// Yanıtta token YOKTUR — oturum HttpOnly çerezle gelir (bkz. store/auth.ts).
 type LoginResp = {
-  token?: string
   bitis?: number
   kullanici?: { id: number; adi: string; rol: 'admin' | 'reseller' | 'user'; ad_soyad?: string }
   iki_fa_gerekli?: boolean
@@ -42,7 +42,7 @@ export default function LoginPage() {
         setIkiFa(true); setYukleniyor(false)
         return
       }
-      giris(data.token!, data.kullanici!, data.bitis!)
+      giris(data.kullanici!, data.bitis!)
       navigate('/', { replace: true })
     } catch (err) {
       setHata(apiHata(err, t('LoginPage:login_failed')))

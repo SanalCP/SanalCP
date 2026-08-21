@@ -7,26 +7,39 @@ import (
 	"os"
 	"strings"
 
+	"sanalcp/internal/auth"
 	"sanalcp/internal/httpx"
 )
 
-// 🔴 GÜVENLİK (CSRF): Panel oturumu localStorage'daki JWT ile taşınır ve her
-// istekte Authorization başlığına konur. Tarayıcı bu başlığı cross-origin bir
-// isteğe KENDİLİĞİNDEN eklemez, dolayısıyla klasik cookie-CSRF'i bugün yoktur.
-// Ancak state-changing uçların tek savunması bu dolaylı özellikti: ileride
-// cookie'ye geçilirse (bkz. SECURITY_AUDIT 2.1) veya bir eklenti CORS'u
-// gevşetirse, koruma tek hamlede yok olurdu. Bu middleware o zemini kapatır ve
-// aynı zamanda "yanlış origin'den gelen istek" için erken, ucuz bir reddir.
+// 🔴 GÜVENLİK (CSRF): Panel oturumu artık HttpOnly çerezle taşınıyor, yani
+// tarayıcı kimliği her state-changing isteğe KENDİLİĞİNDEN ekliyor. Bu, klasik
+// cookie-CSRF'i gerçek bir yüzey hâline getirir ve bu middleware'i dolaylı bir
+// sertleştirmeden ZORUNLU bir savunmaya çevirir.
+//
+// Tarayıcı katmanında ilk savunma SameSite=Strict'tir (bkz. auth/cookie.go):
+// çerez cross-site bir istekte hiç gönderilmez. Buradaki origin kontrolü onun
+// ikinci katmanıdır — SameSite'a güvenmemek gerekir, çünkü eski bir tarayıcı,
+// bir uzantı ya da ileride SameSite'ı gevşetecek bir değişiklik tek hamlede
+// korumayı kaldırabilir.
 //
 // Kural:
 //   - GET/HEAD/OPTIONS/TRACE muaf — tanım gereği state değiştirmezler.
 //   - Origin varsa host'u panelin host'uyla eşleşmeli, yoksa 403.
 //   - Origin yok ama Referer varsa Referer'ın host'u kontrol edilir.
-//   - İkisi de yoksa istek GEÇER. Bu bilinçlidir: modern tarayıcılar
-//     cross-site fetch/XHR/form POST'larında Origin'i HER ZAMAN gönderir, yani
-//     Origin'siz bir istek tarayıcı kaynaklı değildir — curl, API token'lı
-//     otomasyon (scp_…), git webhook'u. Bunları kırmak paneli kullanılamaz
-//     yapar, karşılığında CSRF savunması eklemez.
+//   - İkisi de yoksa: OTURUM ÇEREZİ VARSA 403, yoksa istek geçer.
+//
+// Son maddedeki ayrım bu tasarımın kilit noktasıdır. Çerez taşıyan bir istek
+// tanım gereği tarayıcı kaynaklıdır; böyle bir istekte Origin'in de Referer'ın
+// da bulunmaması normal değildir, dolayısıyla fail-closed davranılır. Buna
+// karşılık çerezsiz istekler curl, API token'lı otomasyon (scp_…) ve git
+// webhook'udur: tarayıcı kimliği taşımadıkları için CSRF yüzeyleri yoktur,
+// onları kırmak paneli kullanılamaz yapar ve karşılığında hiçbir savunma
+// eklemez.
+//
+// (Çerez öncesi bu son madde koşulsuz "geçer" idi. O sırada güvenliydi, çünkü
+// oturum Authorization başlığındaydı ve tarayıcı o başlığı cross-origin bir
+// isteğe kendiliğinden eklemez. Çereze geçişle birlikte aynı kural açığa
+// dönüşürdü — ikisi ayrılmaz bir çifttir.)
 //
 // Port karşılaştırması KASTEN yapılmaz: nginx vhost'u `proxy_set_header Host
 // $host` kullanır ve $host port taşımaz, oysa tarayıcının gönderdiği Origin
@@ -51,6 +64,12 @@ func CSRFKoruma(next http.Handler) http.Handler {
 			kaynak = r.Header.Get("Referer")
 		}
 		if kaynak == "" {
+			if auth.OturumCerezDegeri(r) != "" {
+				// Oturum çerezi var => istek tarayıcıdan geliyor. Origin'i de
+				// Referer'ı da olmayan bir tarayıcı isteği meşru değildir.
+				httpx.WriteError(w, http.StatusForbidden, "istek kaynağı doğrulanamadı (CSRF koruması)")
+				return
+			}
 			// Tarayıcı kaynaklı değil (curl / API token / webhook) — CSRF yüzeyi yok.
 			next.ServeHTTP(w, r)
 			return

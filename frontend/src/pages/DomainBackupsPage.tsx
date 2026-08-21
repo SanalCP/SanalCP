@@ -198,8 +198,8 @@ export default function DomainBackupsPage() {
   }
 
   function indir(y: Yedek) {
-    const tok = localStorage.getItem('sanal.token') || ''
-    fetch(`/api/v1/domains/${id}/backups/${y.id}/indir`, { headers: { Authorization: `Bearer ${tok}` } })
+    // Oturum HttpOnly çerezde; credentials olmadan tarayıcı çerezi eklemez.
+    fetch(`/api/v1/domains/${id}/backups/${y.id}/indir`, { credentials: 'include' })
       .then(r => r.blob())
       .then(blob => {
         const a = document.createElement('a')

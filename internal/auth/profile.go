@@ -12,14 +12,25 @@ import (
 
 // claims: RequireAuth middleware zaten doğruladı; header'dan tekrar parse ederek
 // (auth→middleware import cycle'ından kaçınmak için) UserID'yi alırız.
-func (h *Handlers) claims(r *http.Request) *Claims {
-	raw := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-	c, err := Parse(h.Secret, raw)
-	if err != nil {
-		return nil
-	}
-	return c
-}
+// claims: isteğin doğrulanmış kimliği. Bu paketteki yedi uç da
+// middleware.RequireAuth'un ARKASINDA (bkz. cmd/server/main.go), dolayısıyla
+// context'teki değer daima doludur ve imza + hesap durumu + rol +
+// auth_version + boşta kalma kontrollerinden geçmiştir.
+//
+// 🔴 Eskiden burada JWT, Authorization başlığından YENİDEN ayrıştırılıyordu.
+// İki ayrı arızası vardı:
+//
+//  1. Oturum HttpOnly çereze taşınınca başlık ortadan kalktı; yedi uç birden
+//     401 "oturum yok" döndü. Bunlardan biri (GET /dashboard-duzen) anasayfa
+//     açılışında çağrıldığı için istemcinin 401 yakalayıcısı kullanıcıyı
+//     giriş yapar yapmaz çıkartıyordu — panele hiç girilemiyordu.
+//  2. Çerezden önce de bozuktu: `scp_…` API token'lı bir istekte RequireAuth
+//     kimliği veritabanından çözüp context'e koyar, ama buradaki ayrıştırma
+//     `scp_…` değerini JWT sanıp başarısız olurdu. Yani API token'ları bu
+//     yedi uca hiçbir zaman erişemiyordu.
+//
+// Kimliğin tek kaynağı context'tir; handler'lar onu yeniden türetmemeli.
+func (h *Handlers) claims(r *http.Request) *Claims { return ClaimsFrom(r) }
 
 // PUT /me — profil bilgileri (ad soyad + e-posta + tercihler)
 func (h *Handlers) ProfilGuncelle(w http.ResponseWriter, r *http.Request) {
