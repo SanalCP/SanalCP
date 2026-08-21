@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.2",
-  "duyuru": "Güvenlik güncellemesi. Panel oturumu HttpOnly çereze taşındı (XSS'te oturum çalınamaz); antivirus eşzamanlılık limiti (PANEL_AV_MAX_CONCURRENT, varsayılan 1); os/exec çıktıları artık 4000 bayta kırpılıyor (uzun hata yanıtları DoS ve iç path sızıntısı kapandı). Backend davranış değişikliği: /auth/login yanıtında token alanı yok — JavaScript tarafı çerezi otomatik taşıyor. Migration gerektirmez; mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "son_surum": "0.9.3",
+  "duyuru": "Güvenlik güncellemesi. /api/v1/eklenti-bundle/{ad}/app.js artık auth-gated (RequireAuth + BayiVeUstu) — HttpOnly çerez taşıyıcıya geçtikten sonra `<script src>` kimlik taşıyabildiği için auth dışı bırakma gerekçesi düştü. 0.9.2 altyapısının (çerez + CSRF) üzerine eklenen katman; migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
   "kritik": true,
   "yayin_tarihi": "2026-08-21"
 }
