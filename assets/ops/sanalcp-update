@@ -71,7 +71,13 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 echo "  $(t "indiriliyor…" "downloading…")"
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar xz -C "$TMP" \
   || die "$(t "indirme başarısız — repo public mi / '$BRANCH' dalı var mı?" "download failed — is the repo public / does branch '$BRANCH' exist?")"
-SRC=$(find "$TMP" -maxdepth 1 -type d -name "*-$BRANCH" | head -1)
+# GitHub tarball'i TEK bir ust dizin icerir. Dal adina gore eslestirme
+# YAPILAMAZ: GitHub dal adindaki "/" karakterini dizin adinda "-" yapar
+# (feat/x -> SanalCP-feat-x). Eski desen "*-$BRANCH" idi ve slash iceren her
+# dal adinda sessizce "assets/sanalcp-server yok" hatasi veriyordu — yani
+# --branch ile guvenli test dagitimi o dallarda hic calismiyordu.
+SRC=$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | head -1)
+[ -n "$SRC" ] || die "$(t "arsiv bosaltilamadi (ust dizin yok)" "archive extraction produced no top-level directory")"
 A="$SRC/assets"
 NEWBIN="$A/sanalcp-server"
 [ -f "$NEWBIN" ] || die "$(t "$A/sanalcp-server yok (repo yapısı beklenenden farklı)" "$A/sanalcp-server missing (repo layout is not what was expected)")"
