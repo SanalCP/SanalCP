@@ -378,7 +378,7 @@ Bu proje **tamamen açık kaynaktır** (MIT). İstersen hazır binary'yi kurmak 
 
 ### Gereksinimler
 
-- **Go 1.23+** (backend)
+- **Go 1.26+** (backend — go.mod dil sürümü 1.25, yayın binary'si 1.26 hattıyla derlenir; 1.24 ve 1.25 hatları 1.27.0 çıkınca destekten düştü)
 - **Node.js 20+** ve **npm** (frontend)
 - Çalıştırma için: MariaDB/MySQL erişimi (backend başlarken migration + admin seed uygular)
 

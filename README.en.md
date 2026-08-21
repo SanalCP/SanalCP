@@ -377,7 +377,7 @@ This project is **fully open source** (MIT). Instead of installing the prebuilt 
 
 ### Requirements
 
-- **Go 1.23+** (backend)
+- **Go 1.26+** (backend — the go.mod language version is 1.25; the release binary is built with the 1.26 line, since the 1.24 and 1.25 lines went out of support when 1.27.0 shipped)
 - **Node.js 20+** and **npm** (frontend)
 - MariaDB/MySQL access to run it (the backend applies migrations + seeds the admin on startup)
 
