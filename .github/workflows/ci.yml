@@ -67,11 +67,14 @@ jobs:
       # 🔴 Tarama, üretimde kullanılan Go sürümüyle yapılmalıdır: stdlib açıkları
       # kullanılan toolchain'in yama sürümüne bağlıdır. Daha yeni bir Go ile
       # taramak stdlib'i yamalı gösterip yanlış bir güvenlik hissi verirdi.
+      # cache=false: 1.26.x cache'i bir önceki koşuda 1.26.5'i çekmişti ve
+      # yamalar çıksa bile aynı sürümle taranıyordu — stdlib'i yamalı görmek
+      # için her koşuda latest (1.26.x serisi) indirilmeli.
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.x'
           check-latest: true
-          cache: true
+          cache: false
 
       # Sürüm pinli; açık VERİTABANI her koşuda canlı çekilir, dolayısıyla pin
       # taramanın güncelliğini etkilemez.
