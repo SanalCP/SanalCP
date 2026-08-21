@@ -31,6 +31,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sanalcp/internal/adlar"
 	"strconv"
 	"strings"
 
@@ -47,7 +48,7 @@ const dizinBayrak = unix.O_DIRECTORY | unix.O_RDONLY | unix.O_CLOEXEC | unix.O_N
 // bileşeni içermemeli — aksi hâlde "../../root" gibi bir değer home kökünden
 // çıkabilirdi.
 func TenantHome(sk string) (string, error) {
-	if !strings.HasPrefix(sk, "c_") || strings.ContainsAny(sk, "/\\") || strings.Contains(sk, "..") {
+	if !adlar.SKGecerli(sk) {
 		return "", fmt.Errorf("jailpath: geçersiz tenant kullanıcısı: %q", sk)
 	}
 	return filepath.Join(HomeKok, sk), nil

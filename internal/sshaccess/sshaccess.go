@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/system"
@@ -52,12 +53,8 @@ type durum struct {
 
 // gecerliSK: yalnızca panel'in oluşturduğu c_<slug> kullanıcılarında işlem
 // yapılmasını garanti eder (komut enjeksiyonu / yanlış hesap koruması).
-func gecerliSK(sk string) bool {
-	if !strings.HasPrefix(sk, "c_") || len(sk) < 3 {
-		return false
-	}
-	return !strings.ContainsAny(sk, "/ .;|&$`\n\r\t\"'")
-}
+// Kural adlar paketinde tektir; buradaki sarmalayıcı yalnız okunabilirlik için.
+func gecerliSK(sk string) bool { return adlar.SKGecerli(sk) }
 
 func currentShell(sk string) string {
 	out, err := exec.Command("getent", "passwd", sk).Output()

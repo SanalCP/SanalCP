@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/cron"
 	"sanalcp/internal/domains"
@@ -486,7 +487,7 @@ func domainRequest(parent *http.Request, method, url string, domainID int64, bod
 // Üye yolu root/homedir/mail/<kaynak-domain>/<local> olduğundan 4 bileşen atılıp
 // hedef /home/<sk>/mail seçilirse her kutu tam da kendi dizinine düşer.
 func restoreMailboxes(archivePath, root, sourceDomain string, locals []string, sk string) error {
-	if !strings.HasPrefix(sk, "c_") || root == "" {
+	if !adlar.SKGecerli(sk) || root == "" {
 		return errors.New("güvensiz hedef")
 	}
 	// Katman 2: sistem tar'ına geçmeden önce arşivi Go stdlib ile ön-tara —
@@ -713,7 +714,7 @@ func contextWithRoute(r *http.Request, rc *chi.Context) context.Context {
 }
 
 func restoreWeb(archivePath, root, sk string) error {
-	if !strings.HasPrefix(sk, "c_") || root == "" {
+	if !adlar.SKGecerli(sk) || root == "" {
 		return errors.New("güvensiz hedef")
 	}
 	// Katman 2: sistem tar'ına geçmeden önce arşivi Go stdlib ile ön-tara —

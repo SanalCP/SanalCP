@@ -9,8 +9,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sanalcp/internal/adlar"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -143,7 +143,7 @@ func tickOnce(db *sql.DB) {
 // retention havuzuna girer, aksi halde düğmeye her basış diskte kalıcı bir
 // yedek bırakırdı.
 func runOneBackup(db *sql.DB, d dueDomain, notlar string) error {
-	if !strings.HasPrefix(d.SK, "c_") {
+	if !adlar.SKGecerli(d.SK) {
 		return fmt.Errorf("güvensiz sk: %s", d.SK)
 	}
 	stamp := time.Now().UTC().Format("20060102-150405")

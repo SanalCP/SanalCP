@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sanalcp/internal/adlar"
 	"strings"
 	"time"
 )
@@ -28,7 +29,7 @@ type backupManifest struct {
 // Layout remains backwards compatible (top-level c_* home), while databases/
 // and manifest.json make selective restore deterministic.
 func createArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, filePath string) (int64, error) {
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return 0, fmt.Errorf("güvensiz sistem kullanıcısı: %s", sk)
 	}
 	stage, err := os.MkdirTemp("", "sanal-backup-*")

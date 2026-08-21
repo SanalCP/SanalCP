@@ -19,6 +19,7 @@ import (
 	"strings"
 	"text/template"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/osfam"
 	"sanalcp/internal/phpsurum"
@@ -565,7 +566,7 @@ func (h *Handlers) PutAyarlar(w http.ResponseWriter, r *http.Request) {
 // debugLogPath: sk icin SABIT debug log yolu (path traversal yok — sk domain
 // kaydindan gelir + c_ prefix dogrulanir; disaridan gelen deger pathe girmez).
 func debugLogPath(sk string) (string, error) {
-	if sk == "" || !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return "", fmt.Errorf("geçersiz sistem kullanıcısı")
 	}
 	return "/home/" + sk + "/.gpanel/php_debug.log", nil

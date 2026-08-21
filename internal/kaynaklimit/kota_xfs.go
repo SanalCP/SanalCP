@@ -41,7 +41,7 @@ func (xfsKota) Aktif() (accounting, enforcement bool) {
 
 // kotaLimitArgs: xfs_quota'ya verilecek arg-slice (saf → birim-test edilebilir).
 // soft = hard*0.95. diskMB veya inode 0 ise o metrik "0" = SINIRSIZ bırakılır
-// (xfs_quota'da bhard/ihard=0 → limit yok). sk çağırandan önce reKotaSK'dan geçmiş olmalı.
+// (xfs_quota'da bhard/ihard=0 → limit yok). sk çağırandan önce adlar.SKGecerli'den geçmiş olmalı.
 func kotaLimitArgs(sk string, diskMB, inode int) []string {
 	diskSoft, diskHard := kotaSoft(diskMB)
 	inodeSoft, inodeHard := kotaSoft(inode)

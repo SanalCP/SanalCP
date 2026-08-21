@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
 
@@ -84,7 +85,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
@@ -137,7 +138,7 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}

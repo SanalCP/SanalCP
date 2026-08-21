@@ -145,7 +145,7 @@ func ext4AktifCoz(quotaonCikti string, mountKotali bool) (accounting, enforcemen
 // 10^3 katları demek olduğu için ASLA kullanılmaz).
 // 0 = o metrik SINIRSIZ — XFS ile aynı semantik (man: "To disable a quota, set the
 // corresponding parameter to 0").
-// sk çağırandan önce reKotaSK'dan geçmiş olmalı; "c_" ön eki setquota'nın
+// sk çağırandan önce adlar.SKGecerli'den geçmiş olmalı; "c_" ön eki setquota'nın
 // "ad salt rakamsa UID say" davranışını da devre dışı bırakır.
 func ext4LimitArgs(sk string, diskMB, inode int) []string {
 	diskSoft, diskHard := kotaSoft(diskMB)

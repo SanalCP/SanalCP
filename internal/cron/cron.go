@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
@@ -61,7 +62,7 @@ func (h *Handlers) lookup(r *http.Request) (string, error) {
 	if isDemo == 1 {
 		return "", errDemo
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return "", errBad
 	}
 	return sk, nil

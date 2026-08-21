@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/osfam"
 
 	"golang.org/x/sys/unix"
@@ -432,7 +433,7 @@ func waitForSocket(path string, timeout time.Duration) bool {
 // otomatik RollbackToSharedFPM ile paylaşılan düzene döner (site düşmez).
 // Döner: aktif per-tenant socket yolu.
 func EnableTenantFPM(db *sql.DB, domainID int64, sk, surum string) (string, error) {
-	if sk == "" || !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return "", fmt.Errorf("geçersiz sistem kullanıcısı: %q", sk)
 	}
 	surum = normalizePHP(surum)
@@ -530,7 +531,7 @@ func EnableTenantFPM(db *sql.DB, domainID int64, sk, surum string) (string, erro
 //  3. per-tenant config artıklarını temizle
 //  4. nginx vhost'u paylaşılan socket'e re-render
 func RollbackToSharedFPM(db *sql.DB, domainID int64, sk, surum string) error {
-	if sk == "" || !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return fmt.Errorf("geçersiz sistem kullanıcısı: %q", sk)
 	}
 	surum = normalizePHP(surum)
@@ -575,7 +576,7 @@ func RollbackToSharedFPM(db *sql.DB, domainID int64, sk, surum string) error {
 // YOK — Deprovision zaten vhost'u siler). Slice ayrı olarak kaynaklimit.SystemdSliceSil
 // ile domain handler'ında silinir.
 func TeardownTenantFPM(sk string) {
-	if sk == "" || !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return
 	}
 	_, _ = exec.Command("systemctl", "disable", "--now", tenantUnitName(sk)).CombinedOutput()
@@ -640,7 +641,7 @@ func EnsureTenantFPMOnStartup() {
 // donuk uygulamak. Idempotent: drift yoksa hicbir sey yapmaz (reload YOK). php-fpm -t ile
 // dogrular; bozuksa eski config'i geri alir. Graceful reload (USR2) → site kesintiye ugramaz.
 func repairTenantPoolDrift(domainID int64, sk, surum string) {
-	if pkgDB == nil || sk == "" || !strings.HasPrefix(sk, "c_") {
+	if pkgDB == nil || !adlar.SKGecerli(sk) {
 		return
 	}
 	cfgDir := tenantCfgDir(sk)
@@ -773,7 +774,7 @@ func renderDebugPrependPHP(sk, orig string) string {
 //
 // Hepsi restorecon ile etiketlenir (Enforcing'de tenant home altinda dogru baglam).
 func writeDebugShim(db *sql.DB, sk string, domainID int64) {
-	if sk == "" || !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return
 	}
 	home := filepath.Join("/home", sk)

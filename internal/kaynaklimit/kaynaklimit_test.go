@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"sanalcp/internal/adlar"
 	"testing"
 )
 
@@ -36,12 +37,15 @@ func TestKotaLimitArgs(t *testing.T) {
 	}
 }
 
-// TestReKotaSK: sistem kullanıcı allowlist'i geçerli c_<slug> kabul eder, injection/geçersiz reddeder.
-func TestReKotaSK(t *testing.T) {
+// TestKotaSKAllowlist: kota komutlarının arg-slice'ına yalnız allowlist'ten
+// geçen sk gider. Kural artık adlar paketinde tektir (eskiden buradaki reKotaSK
+// deseniydi); bu test, kaynaklimit'in o kurala olan BAĞIMLILIĞINI sabitler —
+// adlar gevşetilirse kota tarafı da sessizce gevşemesin diye burada duruyor.
+func TestKotaSKAllowlist(t *testing.T) {
 	valid := []string{"c_foo", "c_reg_kalici_test_local", "c_a1b2c3", "c_x"}
 	for _, v := range valid {
-		if !reKotaSK.MatchString(v) {
-			t.Errorf("reKotaSK geçerli sk'yı reddetti: %q", v)
+		if !adlar.SKGecerli(v) {
+			t.Errorf("allowlist geçerli sk'yı reddetti: %q", v)
 		}
 	}
 	invalid := []string{
@@ -49,8 +53,8 @@ func TestReKotaSK(t *testing.T) {
 		"c_foo`id`", "c_foo\nx", "../c_foo", "c_foo/../bar", "admin",
 	}
 	for _, v := range invalid {
-		if reKotaSK.MatchString(v) {
-			t.Errorf("reKotaSK geçersiz/tehlikeli sk'yı kabul etti: %q", v)
+		if adlar.SKGecerli(v) {
+			t.Errorf("allowlist geçersiz/tehlikeli sk'yı kabul etti: %q", v)
 		}
 	}
 }

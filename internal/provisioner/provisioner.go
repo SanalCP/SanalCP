@@ -19,13 +19,13 @@ import (
 	"text/template"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/nginxconf"
 	"sanalcp/internal/osfam"
 )
 
 var (
-	alanAdiRe = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,251}\.[a-z]{2,24}$`)
-	slugSan   = regexp.MustCompile(`[^a-z0-9]+`)
+	slugSan = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
 // pkgDB: askıya-alma durumunu HER vhost render'ında kontrol edebilmek için
@@ -263,19 +263,23 @@ const SistemPHPSurum = "8.3"
 func SistemPHPHavuzDizin() string { return phpMap[SistemPHPSurum].PoolDir }
 func SistemPHPServis() string     { return phpMap[SistemPHPSurum].Service }
 
+// ValidateDomain: alan adını doğrular. Kural adlar paketinde tektir.
+//
+// adlar.AlanAdiNormalize, yerini aldığı alanAdiRe deseninden DAHA SIKIDIR:
+// o desen boş etiketli "a..com" ve tire ile biten "a-.com" gibi geçersiz DNS
+// adlarını kabul ediyordu, ikisi de nginx server_name'e ve sertifika
+// taleplerine akıyordu. Bu yüzden eskiden kabul edilmiş böyle bir kayıt varsa
+// heal yolları (ssl_heal, HealVhostsOnStartup) onu artık atlar — bu yollarda
+// doğrulama hatası zaten "dokunma" anlamına gelir, veri bozmaz.
 func ValidateDomain(d string) error {
-	d = strings.ToLower(strings.TrimSpace(d))
-	if d == "" {
-		return fmt.Errorf("alan adı boş")
-	}
-	if len(d) > 253 {
-		return fmt.Errorf("alan adı çok uzun")
-	}
-	if !alanAdiRe.MatchString(d) {
-		return fmt.Errorf("geçersiz alan adı biçimi (örnek: example.com)")
-	}
-	return nil
+	_, err := adlar.AlanAdiNormalize(d)
+	return err
 }
+
+// NormalizeDomain: alan adını doğrular ve kanonik biçimini (küçük harfli,
+// kırpılmış, sondaki noktasız) döner. Çağıranların ayrıca ToLower/TrimSpace
+// yapmasına gerek kalmaz.
+func NormalizeDomain(d string) (string, error) { return adlar.AlanAdiNormalize(d) }
 
 func SlugFromDomain(d string) string {
 	s := strings.ToLower(strings.TrimSpace(d))
@@ -1186,7 +1190,7 @@ func Deprovision(alanAdi, sk string) error {
 		}
 	}
 	// WAF per-domain modsec conf'larini temizle (orphan kalmasin).
-	if reWafSK.MatchString(sk) {
+	if adlar.SKGecerli(sk) {
 		_ = os.Remove(filepath.Join(wafDomainsDir, sk+".conf"))
 		_ = os.Remove(filepath.Join(wafDomainsDir, sk+".custom.conf"))
 	}
@@ -1206,7 +1210,7 @@ func Deprovision(alanAdi, sk string) error {
 	}
 	_, _ = exec.Command("systemctl", "reload", "nginx").CombinedOutput()
 
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return fmt.Errorf("güvenlik: c_ prefix'li olmayan kullanıcı silinmez")
 	}
 	// userdel -r AlmaLinux'ta tenant crontab'ını her zaman kaldırmıyor. Aktarım
@@ -1650,7 +1654,7 @@ func HealHomePerms() {
 	var sks []string
 	for rows.Next() {
 		var sk string
-		if rows.Scan(&sk) == nil && strings.HasPrefix(sk, "c_") {
+		if rows.Scan(&sk) == nil && adlar.SKGecerli(sk) {
 			sks = append(sks, sk)
 		}
 	}
@@ -1697,7 +1701,7 @@ func HealHomePerms() {
 //
 // c_ prefix ZORUNLU (sistem/root user'a asla dokunma). Best-effort.
 func SuspendUserRuntime(sk string, suspend bool) {
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return // güvenlik: yalnız tenant user
 	}
 	const suspendStore = "/var/lib/sanalcp/cron-suspended"

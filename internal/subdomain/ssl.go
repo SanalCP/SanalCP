@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
 
@@ -66,7 +67,7 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}

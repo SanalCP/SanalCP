@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
@@ -51,7 +52,7 @@ func (h *Handlers) home(r *http.Request) (string, string, error) {
 	if isDemo == 1 {
 		return "", "", errDemo
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return "", "", errBadUser
 	}
 	return "/home/" + sk, sk, nil

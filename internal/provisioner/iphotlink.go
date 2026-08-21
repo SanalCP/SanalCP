@@ -2,14 +2,9 @@ package provisioner
 
 import (
 	"database/sql"
-	"regexp"
+	"sanalcp/internal/adlar"
 	"strings"
 )
-
-// reHotlinkDomain: hotlink_izinli'deki ekstra referrer domainleri icin savunma-derinligi
-// dogrulamasi (API katmaninda zaten dogrulanir — bu, "nginx valid_referers direktifine
-// dogrudan gomulen bir DB alanindan gelen deger" icin ikinci bir guvenlik katmani).
-var reHotlinkDomain = regexp.MustCompile(`^\*?\.?[a-zA-Z0-9.-]+$`)
 
 // buildIPRules: domain'in ip_erisim_modu + domain_ip_kurallari'ndan server-context
 // allow/deny blogunu uretir (renderAndReload icinde her render'da cagirilir).
@@ -77,8 +72,13 @@ func buildHotlink(sk, alanAdi string) string {
 	if izinli.Valid {
 		for _, d := range strings.Split(izinli.String, ",") {
 			d = strings.TrimSpace(d)
-			if d != "" && reHotlinkDomain.MatchString(d) {
-				extra += " " + d
+			// Savunma derinligi: API katmani zaten dogruluyor, ama bu deger
+			// nginx valid_referers direktifine DOGRUDAN gomuluyor. DB'de eski
+			// bir surumden kalmis kanonik olmayan bir kayit varsa (ornegin
+			// buyuk harfli) normalize edilmis hali yazilir; hic gecerli
+			// olmayan kayit atlanir.
+			if desen, err := adlar.RefererDeseni(d); err == nil {
+				extra += " " + desen
 			}
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
@@ -206,7 +207,7 @@ func (h *Handlers) TumListe(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&id, &sk, &alanAdi, &cert); err != nil {
 			continue
 		}
-		if !strings.HasPrefix(sk, "c_") {
+		if !adlar.SKGecerli(sk) {
 			continue
 		}
 		root := "/home/" + sk + "/public_html"
@@ -345,7 +346,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
@@ -531,7 +532,7 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}

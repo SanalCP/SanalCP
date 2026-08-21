@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
@@ -146,7 +147,7 @@ func (h *Handlers) Tara(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
@@ -216,7 +217,7 @@ func (h *Handlers) Karantina(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
 )
@@ -96,7 +97,7 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// sk guard: yol her zaman BackupRoot/c_* altında kalmalı.
-		if !strings.HasPrefix(t.SK, "c_") || strings.Contains(t.SK, "/") {
+		if !adlar.SKGecerli(t.SK) {
 			continue
 		}
 		hedefler = append(hedefler, t)

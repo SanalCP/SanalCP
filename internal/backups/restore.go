@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
@@ -52,7 +53,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğe geri yükleme yapılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "güvenlik")
 		return
 	}

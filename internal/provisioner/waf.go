@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
+	"sanalcp/internal/adlar"
 	"strings"
 )
 
@@ -30,10 +30,6 @@ const (
 	wafModulePath = "/usr/lib64/nginx/modules/ngx_http_modsecurity_module.so"
 	wafNginxConf  = "/etc/nginx/nginx.conf"
 )
-
-// reWafSK: per-domain modsec conf dosya yolu path-injection guard'i. sk (sistem_kullanici)
-// SlugFromDomain uretimi "c_" + [a-z0-9_]. Eslesmeyen sk icin WAF sessizce atlanir.
-var reWafSK = regexp.MustCompile(`^c_[a-z0-9_]{1,60}$`)
 
 // WAFModulYuklu: ModSecurity modulunun main-context'te YUKLU olup olmadigini bildirir.
 // nginx -t'nin "modsecurity" direktifini taniyabilmesi icin (a) modul .so'su var VE
@@ -104,7 +100,7 @@ func WAFEfektif(db *sql.DB, sk string) (aktif bool, engine string, paranoya int)
 // SecRuleEngine ve paranoia seviyesini per-domain override eder. Bos bir <sk>.custom.conf da
 // olusturulur → gelecekte per-domain ozel kurallar/haric-tutmalar icin hazir yapi (MVP: bos).
 func wafDomainConfYaz(sk, engine string, paranoya int) error {
-	if !reWafSK.MatchString(sk) {
+	if !adlar.SKGecerli(sk) {
 		return fmt.Errorf("gecersiz sk: %q", sk)
 	}
 	if err := os.MkdirAll(wafDomainsDir, 0755); err != nil {
@@ -139,7 +135,7 @@ func wafDomainConfYaz(sk, engine string, paranoya int) error {
 // icinde her render'da cagirilir). Yan etki: WAF aktif+modul yuklu ise per-domain conf'u tazeler,
 // pasif ise temizler. Vhost'u ASLA bozmaz — sorun varsa "" doner.
 func buildModSec(sk string) string {
-	if !reWafSK.MatchString(sk) {
+	if !adlar.SKGecerli(sk) {
 		return "" // path-injection guard
 	}
 	confPath := filepath.Join(wafDomainsDir, sk+".conf")

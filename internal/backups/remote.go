@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"sanalcp/internal/adlar"
 	"time"
 )
 
 func ensureLocalBackup(ctx context.Context, db *sql.DB, domainID int64, sk, fileName, remoteState string) (string, error) {
-	if !strings.HasPrefix(sk, "c_") || filepath.Base(fileName) != fileName {
+	if !adlar.SKGecerli(sk) || filepath.Base(fileName) != fileName {
 		return "", fmt.Errorf("güvensiz yedek yolu")
 	}
 	dir := filepath.Join(BackupRoot, sk)

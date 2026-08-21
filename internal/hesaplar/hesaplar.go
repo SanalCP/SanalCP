@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/secretcrypt"
 
 	"github.com/go-sql-driver/mysql"
@@ -333,7 +334,7 @@ func MySQLDropAllForDomain(db *sql.DB, domainID int64) error {
 // ÇÖZÜLMEDEN doğrudan /etc/shadow'a yazılır, panel süreci parolayı hiçbir
 // zaman görmez.
 func SyncSSHPassword(db *sql.DB, sistemKullanici string) error {
-	if !strings.HasPrefix(sistemKullanici, "c_") {
+	if !adlar.SKGecerli(sistemKullanici) {
 		return fmt.Errorf("güvenlik: c_ prefiksli olmayan kullanıcı")
 	}
 	var pw string
@@ -361,7 +362,7 @@ func SyncSSHPassword(db *sql.DB, sistemKullanici string) error {
 
 // LockSSHPassword: SSH kapatıldığında sistem parolasını kilitler (passwd -l).
 func LockSSHPassword(sistemKullanici string) error {
-	if !strings.HasPrefix(sistemKullanici, "c_") {
+	if !adlar.SKGecerli(sistemKullanici) {
 		return fmt.Errorf("güvenlik: c_ prefiksli olmayan kullanıcı")
 	}
 	out, err := exec.Command("passwd", "-l", sistemKullanici).CombinedOutput()

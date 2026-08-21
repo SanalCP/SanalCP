@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sanalcp/internal/adlar"
 	"strconv"
 	"strings"
 	"time"
@@ -281,7 +282,7 @@ func modeFromStat(m uint32) os.FileMode {
 // tenantKomut: argv'yi tenant kullanıcısı olarak, panel sırları OLMADAN, temiz
 // env ile çalıştıracak komutu hazırlar (archivex.runuserKomut ile aynı desen).
 func tenantKomut(ctx context.Context, sk string, argv ...string) (*exec.Cmd, error) {
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return nil, errors.New("güvenlik: geçersiz tenant kullanıcısı")
 	}
 	full := append([]string{"-u", sk, "--"}, argv...)

@@ -10,10 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/dns"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
@@ -26,8 +26,6 @@ type Handlers struct {
 	DB   *sql.DB
 	IPv4 string
 }
-
-var reAlt = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 type Sub struct {
 	ID       int64  `json:"id"`
@@ -97,7 +95,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}
@@ -110,7 +108,8 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	altAd := strings.ToLower(strings.TrimSpace(req.AltAd))
-	if !reAlt.MatchString(altAd) {
+	// Alt alan tek bir DNS etiketidir; kural adlar paketinde tektir.
+	if !adlar.EtiketGecerli(altAd) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz alt alan (küçük harf/rakam/-)")
 		return
 	}
@@ -312,7 +311,7 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
 		return
 	}

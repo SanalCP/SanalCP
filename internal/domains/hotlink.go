@@ -7,15 +7,11 @@ package domains
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 )
-
-// reHotlinkDomainGirdi: provisioner.reHotlinkDomain ile aynı kısıtlama — API
-// katmanında ilk savunma hattı (ikincisi provisioner'da, DB'den okurken).
-var reHotlinkDomainGirdi = regexp.MustCompile(`^\*?\.?[a-zA-Z0-9.-]+$`)
 
 type HotlinkAyar struct {
 	Aktif  bool     `json:"aktif"`
@@ -65,11 +61,14 @@ func (h *Handlers) HotlinkAyarla(w http.ResponseWriter, r *http.Request) {
 		if d == "" {
 			continue
 		}
-		if !reHotlinkDomainGirdi.MatchString(d) {
-			httpx.WriteError(w, http.StatusBadRequest, "geçersiz izinli domain: "+d)
+		// Kural adlar paketinde tektir; provisioner tarafı DB'den okurken aynı
+		// doğrulamayı ikinci savunma hattı olarak tekrar uygular.
+		desen, err := adlar.RefererDeseni(d)
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "geçersiz izinli domain: "+d+" — "+err.Error())
 			return
 		}
-		clean = append(clean, d)
+		clean = append(clean, desen)
 	}
 	if _, err := h.DB.ExecContext(r.Context(),
 		`UPDATE domains SET hotlink_aktif=?, hotlink_izinli=? WHERE id=?`,

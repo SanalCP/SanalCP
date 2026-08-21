@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sanalcp/internal/adlar"
 	"sort"
 	"strconv"
 	"strings"
@@ -467,7 +468,7 @@ func GuvenliCikarStrip(archivePath, destDir, sk string, strip int) (string, erro
 	if tur == TurBilinmeyen {
 		return "", ErrDesteklenmeyen
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return "", errors.New("güvenlik: geçersiz tenant kullanıcısı")
 	}
 	if strip < 0 {

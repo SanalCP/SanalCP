@@ -10,6 +10,7 @@ import (
 	"io"
 	"path"
 	"regexp"
+	"sanalcp/internal/adlar"
 	"sort"
 	"strings"
 )
@@ -20,7 +21,6 @@ const (
 	maxMetadataBytes  = int64(2 << 20)
 )
 
-var domainRE = regexp.MustCompile(`(?i)^[a-z0-9](?:[a-z0-9-]{0,62}\.)+[a-z]{2,63}$`)
 var localPartRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
 var cronEnvRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\s*=`)
 
@@ -119,9 +119,12 @@ func AnalyzeCPanel(src io.Reader) (Inventory, error) {
 			}
 		case strings.HasPrefix(rel, "dnszones/") && h.Typeflag == tar.TypeReg:
 			name := strings.TrimSuffix(path.Base(rel), path.Ext(rel))
-			if domainRE.MatchString(name) && !dnsSet[name] {
-				dnsSet[name] = true
-				inv.DNSZones = append(inv.DNSZones, strings.ToLower(name))
+			// adlar.AlanAdiNormalize hem doğrular hem kanonikleştirir; küme
+			// artık kanonik ada göre tekilleştiği için "Example.com" ve
+			// "example.com" iki ayrı bölge sayılmaz.
+			if d, err := adlar.AlanAdiNormalize(name); err == nil && !dnsSet[d] {
+				dnsSet[d] = true
+				inv.DNSZones = append(inv.DNSZones, d)
 			}
 		}
 
@@ -265,9 +268,11 @@ func parseMainMetadata(inv *Inventory, body, rel string) {
 		}
 		key := strings.TrimSpace(strings.ToLower(p[0]))
 		value := strings.Trim(strings.TrimSpace(p[1]), `"'`)
-		if (key == "main_domain" || key == "domain") && domainRE.MatchString(value) {
-			inv.PrimaryDomain = strings.ToLower(value)
-			return
+		if key == "main_domain" || key == "domain" {
+			if d, err := adlar.AlanAdiNormalize(value); err == nil {
+				inv.PrimaryDomain = d
+				return
+			}
 		}
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/provisioner"
 )
 
@@ -611,7 +612,7 @@ func HealTenantFPM(ctx context.Context, db *sql.DB) {
 			return
 		default:
 		}
-		if d.sk == "" || !strings.HasPrefix(d.sk, "c_") {
+		if !adlar.SKGecerli(d.sk) {
 			continue
 		}
 		if provisioner.TenantFPMActive(d.sk) {

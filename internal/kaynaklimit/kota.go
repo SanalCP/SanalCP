@@ -26,7 +26,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"regexp"
+	"sanalcp/internal/adlar"
 	"strings"
 	"sync"
 	"time"
@@ -42,11 +42,6 @@ const (
 	varsayilanDiskMB = 5120   // 5 GB
 	varsayilanInode  = 500000 // 500k dosya+dizin
 )
-
-// reKotaSK: sistem kullanıcı allowlist'i. provisioner.SlugFromDomain "c_" + [a-z0-9_] üretir.
-// Kota komutlarının arg-slice'ına YALNIZ buradan geçen sk gider → shell/arg injection kapalı.
-// Ayrıca "c_" ön eki, setquota'nın "salt rakamsa UID say" davranışını da devre dışı bırakır.
-var reKotaSK = regexp.MustCompile(`^c_[a-z0-9_]{1,60}$`)
 
 // kotaBackend: dosya sistemine özgü kota işlemleri.
 //
@@ -179,9 +174,9 @@ func kotaSoft(hard int) (soft, duzeltilmisHard int) {
 // KotaUygula: tenant (c_<sk>) için user disk+inode kotasını uygular.
 // fs'te kota AKTİF DEĞİLSE (reboot bekliyor / desteklenmiyor) → log + return nil (ASLA hata).
 // diskMB/inode 0 = o limiti sınırsız bırak. Komut arg-slice ile çağrılır (shell yok);
-// sk allowlist'ten (reKotaSK) geçer → injection yok.
+// sk allowlist'ten (adlar.SKGecerli) geçer → injection yok.
 func KotaUygula(ctx context.Context, sk string, diskMB, inode int) error {
-	if !reKotaSK.MatchString(sk) {
+	if !adlar.SKGecerli(sk) {
 		return fmt.Errorf("kota: geçersiz sistem kullanıcı biçimi: %q", sk)
 	}
 	b := kotaBackendSec()
@@ -252,7 +247,7 @@ func DomainKotaUygula(ctx context.Context, db *sql.DB, domainID int64) error {
 	if err != nil {
 		return err
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return nil // admin/geçersiz sistem kullanıcı → dokunma
 	}
 	disk, inode := efektifKota(dDisk, dInode, planID.Valid, pDisk, pInode)
@@ -262,7 +257,7 @@ func DomainKotaUygula(ctx context.Context, db *sql.DB, domainID int64) error {
 // KotaDurum: tenant'ın anlık disk(MB)/inode kullanım + limitlerini backend'den okur (UI için).
 // Kota aktif değilse veya sk geçersizse hepsi 0 döner.
 func KotaDurum(sk string) (kullanilanMB, limitMB, kullanilanInode, limitInode int) {
-	if !reKotaSK.MatchString(sk) {
+	if !adlar.SKGecerli(sk) {
 		return 0, 0, 0, 0
 	}
 	b := kotaBackendSec()

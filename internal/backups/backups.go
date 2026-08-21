@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
 	"sanalcp/internal/secretcrypt"
@@ -38,7 +39,7 @@ func Init(b *secretcrypt.Box) { box = b }
 // manuel temizlik (ör. "silinmiş domain yedeğini kalıcı kaldır") için bir yardımcıdır.
 // Guard: sk mutlaka "c_" ile başlamalı ve yol BackupRoot altında olmalı (path-escape koruması).
 func RemoveDomainBackups(sk string) error {
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		return fmt.Errorf("geçersiz kullanıcı: %q", sk)
 	}
 	dir := filepath.Join(BackupRoot, sk)
@@ -246,7 +247,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin yedeği alınamaz")
 		return
 	}
-	if !strings.HasPrefix(sk, "c_") {
+	if !adlar.SKGecerli(sk) {
 		httpx.WriteError(w, http.StatusBadRequest, "güvenlik")
 		return
 	}
