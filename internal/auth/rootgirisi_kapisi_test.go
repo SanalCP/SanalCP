@@ -200,14 +200,16 @@ func TestLogin_RootGirisiAcikkenDogruParolaTokenUretir(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&yanit); err != nil {
 		t.Fatalf("yanıt çözülemedi: %v", err)
 	}
-	if yanit.Token == "" {
-		t.Fatal("200 döndü ama token boş")
+	// Token yanıt GÖVDESİNDE dönmemeli — oturum yalnız HttpOnly çerezde taşınır.
+	if yanit.Token != "" {
+		t.Fatal("yanıt gövdesinde token var; oturum yalnız HttpOnly çerezde dönmeli")
 	}
 	if yanit.Kullanici.ID != 1 || yanit.Kullanici.Adi != "root" || yanit.Kullanici.Rol != "admin" {
 		t.Fatalf("beklenen 1/root/admin, gelen %d/%s/%s",
 			yanit.Kullanici.ID, yanit.Kullanici.Adi, yanit.Kullanici.Rol)
 	}
-	c, err := Parse(secret, yanit.Token)
+	ham := oturumCerezindenToken(t, w)
+	c, err := Parse(secret, ham)
 	if err != nil {
 		t.Fatalf("üretilen token çözülemedi: %v", err)
 	}

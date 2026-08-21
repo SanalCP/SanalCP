@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"sanalcp/internal/auth"
 )
 
 func csrfSunucu() http.Handler {
@@ -61,9 +63,63 @@ func TestCSRFAyniOriginGecer(t *testing.T) {
 }
 
 func TestCSRFBasliksizIstekGecer(t *testing.T) {
-	// curl / API token'lı otomasyon / git webhook: Origin de Referer da yok.
+	// curl / API token'lı otomasyon / git webhook: Origin de Referer da yok,
+	// oturum çerezi de yok. Tarayıcı kimliği taşımadıkları için CSRF yüzeyleri
+	// yoktur; bunları reddetmek paneli kullanılamaz yapar.
 	if kod := istek(t, http.MethodPost, "panel.example.com", nil); kod != http.StatusOK {
 		t.Fatalf("Origin'siz istek reddedildi (otomasyon kırılır): %d", kod)
+	}
+}
+
+// cerezliIstek: oturum çerezi taşıyan bir istek atar.
+func cerezliIstek(t *testing.T, metot, host string, basliklar map[string]string) int {
+	t.Helper()
+	r := httptest.NewRequest(metot, "http://"+host+"/api/v1/domains", nil)
+	r.Host = host
+	for k, v := range basliklar {
+		r.Header.Set(k, v)
+	}
+	r.AddCookie(&http.Cookie{Name: auth.OturumCerezAdi, Value: "oturum-jwt"})
+	w := httptest.NewRecorder()
+	csrfSunucu().ServeHTTP(w, r)
+	return w.Code
+}
+
+// TestCSRFCerezliBasliksizIstekReddedilir: bu değişikliğin kilit noktası.
+//
+// Oturum HttpOnly çerezle taşındığı için tarayıcı kimliği her state-changing
+// isteğe kendiliğinden ekler. Çerez taşıyan bir istek tanım gereği tarayıcı
+// kaynaklıdır; böylesinde ne Origin ne Referer bulunmaması meşru değildir, o
+// yüzden fail-closed davranılmalıdır. Çerezden ÖNCE bu durum koşulsuz
+// geçiyordu ve o hâliyle bırakılsaydı çereze geçiş doğrudan bir CSRF açığı
+// açardı.
+func TestCSRFCerezliBasliksizIstekReddedilir(t *testing.T) {
+	if kod := cerezliIstek(t, http.MethodPost, "panel.example.com", nil); kod != http.StatusForbidden {
+		t.Fatalf("oturum çerezli ama Origin/Referer'sız istek %d döndü, 403 bekleniyordu", kod)
+	}
+}
+
+func TestCSRFCerezliAyniOriginGecer(t *testing.T) {
+	if kod := cerezliIstek(t, http.MethodPost, "panel.example.com", map[string]string{
+		"Origin": "https://panel.example.com",
+	}); kod != http.StatusOK {
+		t.Fatalf("aynı origin'den çerezli istek reddedildi: %d", kod)
+	}
+}
+
+func TestCSRFCerezliYabanciOriginReddedilir(t *testing.T) {
+	if kod := cerezliIstek(t, http.MethodPost, "panel.example.com", map[string]string{
+		"Origin": "https://kotu.example.net",
+	}); kod != http.StatusForbidden {
+		t.Fatalf("yabancı origin'den çerezli istek %d döndü, 403 bekleniyordu", kod)
+	}
+}
+
+// TestCSRFCerezliGuvenliMetotMuaf: GET tanım gereği state değiştirmez; çerez
+// varlığı bunu değiştirmez, aksi hâlde panelin tüm okuma uçları kırılırdı.
+func TestCSRFCerezliGuvenliMetotMuaf(t *testing.T) {
+	if kod := cerezliIstek(t, http.MethodGet, "panel.example.com", nil); kod != http.StatusOK {
+		t.Fatalf("çerezli GET reddedildi: %d", kod)
 	}
 }
 

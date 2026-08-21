@@ -74,12 +74,12 @@ export default function DomainLogsPage() {
     setSatirlar([]) // canlı başlangıçta tail kendi 200 satırı zaten gönderiyor
     const ctrl = new AbortController()
     abortRef.current = ctrl
-    const tok = localStorage.getItem('sanal.token') || ''
 
     ;(async () => {
       try {
+        // Oturum HttpOnly çerezde; credentials olmadan tarayıcı çerezi eklemez.
         const res = await fetch(`/api/v1/domains/${id}/logs/canli?dosya=${aktif}`, {
-          headers: { Authorization: `Bearer ${tok}` },
+          credentials: 'include',
           signal: ctrl.signal,
         })
         if (!res.ok || !res.body) {

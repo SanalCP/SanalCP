@@ -69,8 +69,10 @@ const SunucuDurumuPage = lazy(() => import('@/pages/SunucuDurumuPage'))
 const HesapAktarimiPage = lazy(() => import('@/pages/HesapAktarimiPage'))
 
 function GuardedRoute({ children }: { children: React.ReactNode }) {
-  const token = useAuth((s) => s.token)
-  if (!token) return <Navigate to="/giris" replace />
+  // Yalnız yönlendirme kararı: gerçek yetki her istekte sunucuda, oturum
+  // çerezinden çözülür. Bu bayrağın elle değiştirilmesi hiçbir kapı açmaz.
+  const oturumVar = useAuth((s) => s.oturumVar)
+  if (!oturumVar) return <Navigate to="/giris" replace />
   return <>{children}</>
 }
 

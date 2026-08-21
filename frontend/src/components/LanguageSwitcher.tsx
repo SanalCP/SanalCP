@@ -12,7 +12,7 @@ const NEXT: Record<Lang, Lang> = { tr: 'en', en: 'tr' }
 // oturum varsa tercihi sunucuya da (best-effort) yazar.
 export default function LanguageSwitcher({ className }: { className?: string }) {
   const { i18n } = useTranslation()
-  const token = useAuth((s) => s.token)
+  const oturumVar = useAuth((s) => s.oturumVar)
   const [lang, setLangState] = useState<Lang>(getLang())
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
   function degistir() {
     const yeni = NEXT[lang]
     setLang(yeni)
-    if (token) {
+    if (oturumVar) {
       // PUT /me tüm alanları birlikte yazıyor (kısmi güncelleme desteklemiyor) —
       // önce mevcut profili çekip ad_soyad/eposta/tema'yı sıfırlamadan gönderiyoruz.
       api.get<{ ad_soyad: string; eposta: string; tercih_tema: string }>('/me')

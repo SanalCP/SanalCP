@@ -14,8 +14,18 @@
 # hesaplara ve domainlere dokunmaz; yalnız okuma/403 denemesi yapar.
 set -uo pipefail
 
-URL="${1:-https://localhost:8443}/api/v1"
+PANEL="${1:-https://localhost:8443}"
+URL="$PANEL/api/v1"
+# Oturum artık HttpOnly çerezle taşınıyor ve CSRFKoruma, çerez taşıyan
+# state-changing isteklerde Origin/Referer ZORUNLU kılıyor (fail-closed).
+# Betik tarayıcıyı taklit etmek zorunda: her isteğe panelin kendi origin'i
+# eklenir, yoksa POST/PUT/DELETE testleri yetkiden değil CSRF'ten 403 alır ve
+# "beklenen 403" sınamaları YANLIŞ SEBEPLE geçmiş görünürdü.
+ORIGIN="$PANEL"
 DB=panel
+
+# Bayi başına ayrı çerez kavanozu — iki oturum birbirine karışmamalı.
+JAR_A=$(mktemp); JAR_B=$(mktemp)
 GECEN=0
 KALAN=0
 
@@ -31,7 +41,7 @@ yesil()   { printf '\033[32m%s\033[0m\n' "$1"; }
 bekle() {
   local beklenen="$1" aciklama="$2"; shift 2
   local kod
-  kod=$(curl -sk -o /dev/null -w '%{http_code}' "$@")
+  kod=$(curl -sk -o /dev/null -w '%{http_code}' -H "Origin: $ORIGIN" "$@")
   if [ "$kod" = "$beklenen" ]; then
     yesil "  ✓ $aciklama ($kod)"
     GECEN=$((GECEN+1))
@@ -65,6 +75,7 @@ temizle() {
     UPDATE customers SET owner_user_id=NULL WHERE owner_user_id IN (SELECT id FROM users WHERE username IN ('$BAYI_A','$BAYI_B'));
     DELETE FROM users WHERE username IN ('$BAYI_A','$BAYI_B');
   " "$DB" 2>/dev/null
+  rm -f "$JAR_A" "$JAR_B"
 }
 trap temizle EXIT
 
@@ -104,19 +115,21 @@ if [ "${MUSTERILI_DOMAIN:-0}" -lt 2 ]; then
   kirmizi "       yatay izolasyon testleri anlamlı çalışmaz (en az 2 gerekir)."
 fi
 
+# giris <kullanici> <cerez_kavanozu> — oturum çerezini kavanoza yazar.
+# Yanıt gövdesinde token YOKTUR; başarı ölçütü kavanoza çerez düşmesidir.
 giris() {
-  curl -sk -X POST "$URL/auth/login" -H 'Content-Type: application/json' \
-    -d "{\"kullanici\":\"$1\",\"parola\":\"$PAROLA\"}" |
-    python3 -c 'import sys,json;print(json.load(sys.stdin).get("token",""))'
+  curl -sk -o /dev/null -c "$2" -X POST "$URL/auth/login" \
+    -H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
+    -d "{\"kullanici\":\"$1\",\"parola\":\"$PAROLA\"}"
+  grep -q 'sanalcp_oturum' "$2" 2>/dev/null
 }
 
-TA=$(giris "$BAYI_A"); TB=$(giris "$BAYI_B")
-if [ -z "$TA" ] || [ -z "$TB" ]; then
+if ! giris "$BAYI_A" "$JAR_A" || ! giris "$BAYI_B" "$JAR_B"; then
   kirmizi "test bayileri giriş yapamadı — parola hash'i güncel mi?"
   exit 1
 fi
-AA="Authorization: Bearer $TA"
-AB="Authorization: Bearer $TB"
+AA="$JAR_A"
+AB="$JAR_B"
 
 echo
 echo "== 1. DİKEY: bayi, admin uçlarına erişememeli =="
@@ -124,12 +137,12 @@ echo "== 1. DİKEY: bayi, admin uçlarına erişememeli =="
 # döner ve bu yetki kararı değildir.
 for uc in system/processes admin/system/loglar firewall paketler/kurulu audit \
           system/panel-domain paketler/durum; do
-  bekle 403 "GET /$uc" -H "$AA" "$URL/$uc"
+  bekle 403 "GET /$uc" -b "$AA" "$URL/$uc"
 done
-bekle 403 "POST /system/servis-islem" -X POST -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "POST /system/servis-islem" -X POST -b "$AA" -H 'Content-Type: application/json' \
   -d '{"birim":"nginx","aksiyon":"restart"}' "$URL/system/servis-islem"
-bekle 403 "POST /system/reboot" -X POST -H "$AA" "$URL/system/reboot"
-bekle 403 "POST /plans (plan oluşturma)" -X POST -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "POST /system/reboot" -X POST -b "$AA" "$URL/system/reboot"
+bekle 403 "POST /plans (plan oluşturma)" -X POST -b "$AA" -H 'Content-Type: application/json' \
   -d '{"ad":"zz"}' "$URL/plans"
 
 echo
@@ -137,49 +150,49 @@ echo "== 2. Bayiye AÇIK olması gereken uçlar =="
 for uc in me users customers domains plans php-surumler system/usage system/servisler \
           system/load-history genel/dns genel/ssl genel/mail genel/veritabanlari \
           wordpress/tumu admin/backups/ozet; do
-  bekle 200 "GET /$uc" -H "$AA" "$URL/$uc"
+  bekle 200 "GET /$uc" -b "$AA" "$URL/$uc"
 done
 
 echo
 echo "== 3. YATAY: her bayi yalnız kendi kapsamını görmeli =="
-sayi_bekle 1 "A /domains" -H "$AA" "$URL/domains"
-sayi_bekle 1 "B /domains" -H "$AB" "$URL/domains"
-sayi_bekle 1 "A /customers" -H "$AA" "$URL/customers"
-sayi_bekle 1 "A /genel/dns" -H "$AA" "$URL/genel/dns"
+sayi_bekle 1 "A /domains" -b "$AA" "$URL/domains"
+sayi_bekle 1 "B /domains" -b "$AB" "$URL/domains"
+sayi_bekle 1 "A /customers" -b "$AA" "$URL/customers"
+sayi_bekle 1 "A /genel/dns" -b "$AA" "$URL/genel/dns"
 
 echo
 echo "== 4. YATAY: çapraz erişim reddedilmeli =="
-A_DOM=$(curl -sk -H "$AA" "$URL/domains" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["id"] if d else 0)')
-B_DOM=$(curl -sk -H "$AB" "$URL/domains" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["id"] if d else 0)')
+A_DOM=$(curl -sk -b "$AA" "$URL/domains" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["id"] if d else 0)')
+B_DOM=$(curl -sk -b "$AB" "$URL/domains" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["id"] if d else 0)')
 if [ "$A_DOM" != "0" ] && [ "$B_DOM" != "0" ] && [ "$A_DOM" != "$B_DOM" ]; then
-  bekle 403 "A -> B'nin domaini" -H "$AA" "$URL/domains/$B_DOM"
-  bekle 403 "A -> B'nin DNS'i" -H "$AA" "$URL/domains/$B_DOM/dns"
-  bekle 403 "B -> A'nın domaini" -H "$AB" "$URL/domains/$A_DOM"
-  bekle 200 "A -> kendi domaini" -H "$AA" "$URL/domains/$A_DOM"
+  bekle 403 "A -> B'nin domaini" -b "$AA" "$URL/domains/$B_DOM"
+  bekle 403 "A -> B'nin DNS'i" -b "$AA" "$URL/domains/$B_DOM/dns"
+  bekle 403 "B -> A'nın domaini" -b "$AB" "$URL/domains/$A_DOM"
+  bekle 200 "A -> kendi domaini" -b "$AA" "$URL/domains/$A_DOM"
 else
   kirmizi "  ! çapraz test atlandı (en az 2 farklı müşteriye bağlı domain gerekiyor)"
 fi
 
 echo
 echo "== 5. DİKEY: bayi rol yükseltemez =="
-bekle 403 "bayi admin hesabı açamaz" -X POST -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "bayi admin hesabı açamaz" -X POST -b "$AA" -H 'Content-Type: application/json' \
   -d '{"kullanici_adi":"zz_sahte_admin","parola":"UzunParola123","rol":"admin"}' "$URL/users"
-bekle 403 "bayi bayi hesabı açamaz" -X POST -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "bayi bayi hesabı açamaz" -X POST -b "$AA" -H 'Content-Type: application/json' \
   -d '{"kullanici_adi":"zz_sahte_bayi","parola":"UzunParola123","rol":"reseller"}' "$URL/users"
 
 echo
 echo "== 5b. Bayi KENDİ kotasını okuyamaz/değiştiremez =="
 A_ID=$(mysql -N -B -e "SELECT id FROM users WHERE username='$BAYI_A'" "$DB")
-bekle 403 "bayi kendi limitini okuyamaz" -H "$AA" "$URL/users/$A_ID/limitler"
-bekle 403 "bayi kendi limitini yükseltemez" -X PUT -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "bayi kendi limitini okuyamaz" -b "$AA" "$URL/users/$A_ID/limitler"
+bekle 403 "bayi kendi limitini yükseltemez" -X PUT -b "$AA" -H 'Content-Type: application/json' \
   -d '{"max_customer":9999,"max_domain":9999}' "$URL/users/$A_ID/limitler"
-bekle 403 "bayi başka bayinin limitini göremez" -H "$AA" \
+bekle 403 "bayi başka bayinin limitini göremez" -b "$AA" \
   "$URL/users/$(mysql -N -B -e "SELECT id FROM users WHERE username='$BAYI_B'" "$DB")/limitler"
 
 echo
 echo "== 6. root hesabı dokunulmaz =="
-bekle 403 "bayi root'u silemez" -X DELETE -H "$AA" "$URL/users/1"
-bekle 403 "bayi root'u askıya alamaz" -X POST -H "$AA" -H 'Content-Type: application/json' \
+bekle 403 "bayi root'u silemez" -X DELETE -b "$AA" "$URL/users/1"
+bekle 403 "bayi root'u askıya alamaz" -X POST -b "$AA" -H 'Content-Type: application/json' \
   -d '{"durum":"suspended"}' "$URL/users/1/durum"
 
 echo

@@ -320,6 +320,9 @@ func main() {
 		// Kaba-kuvvet koruması: giriş uçları IP başına hız-sınırlı (bkz. middleware.GirisLimiti)
 		r.With(middleware.GirisLimiti).Post("/auth/login", authH.Login)
 		r.With(middleware.GirisLimiti).Post("/musteri/login", musteriH.Login)
+		// Çıkış RequireAuth'un DIŞINDA: süresi dolmuş bir oturumda da çerez
+		// temizlenebilmeli (gerekçe: auth.Handlers.Cikis).
+		r.Post("/auth/cikis", authH.Cikis)
 		// Panelin sunucu-varsayılan dili — giriş ekranı (henüz auth yok) bunu okur.
 		r.Get("/public/dil", panelAyarH.Dil)
 

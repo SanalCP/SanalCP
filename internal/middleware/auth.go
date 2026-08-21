@@ -34,13 +34,29 @@ const claimsKey ctxKey = 1
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			raw := strings.TrimSpace(r.Header.Get("Authorization"))
-			const p = "Bearer "
-			if !strings.HasPrefix(raw, p) {
-				httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
-				return
+			// Kimlik iki yoldan gelebilir ve ikisi AYRI şeylerdir:
+			//
+			//   1) HttpOnly oturum çerezi — tarayıcıdaki panel oturumu. JWT'yi
+			//      JavaScript'e hiç göstermez; XSS oturumu okuyamaz.
+			//   2) Authorization: Bearer scp_… — otomasyon için kişisel API
+			//      token'ı. Tarayıcı bunu kendiliğinden eklemez, yani CSRF
+			//      yüzeyi yoktur.
+			//
+			// Çerez ÖNCELİKLİDİR: tarayıcıdan gelen bir istekte her ikisi de
+			// varsa, kimliği belirleyen şey oturum olmalıdır. Aksi hâlde bir
+			// saldırgan sayfa kendi API token'ını başlıkla ekleyip kurbanın
+			// oturumunun üstüne yazabilirdi (session fixation'ın tersi).
+			tokenRaw := auth.OturumCerezDegeri(r)
+			cerezden := tokenRaw != ""
+			if !cerezden {
+				raw := strings.TrimSpace(r.Header.Get("Authorization"))
+				const p = "Bearer "
+				if !strings.HasPrefix(raw, p) {
+					httpx.WriteError(w, http.StatusUnauthorized, "yetkilendirme gerekli")
+					return
+				}
+				tokenRaw = raw[len(p):]
 			}
-			tokenRaw := raw[len(p):]
 			// CVE-2025-30204 savunma: dogrulama ONCESI asiri-uzun token reddedilir (pre-auth DoS yuzeyi kucultulur)
 			if len(tokenRaw) > 8192 {
 				httpx.WriteError(w, http.StatusUnauthorized, "geçersiz oturum")
@@ -56,7 +72,11 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 			// interaktif oturumlar içindir; bir yedekleme script'inin "boşta
 			// kaldığı için" kilitlenmesi anlamsız olurdu. Token'ın süresi
 			// kendi bitis_at alanıyla yönetilir.
-			if auth.APITokenMi(tokenRaw) {
+			//
+			// API token'ı yalnız başlıktan kabul edilir. Çerezde scp_… taşımak
+			// meşru bir akış değildir; kabul etmek, API token'larını CSRF'e
+			// açık hâle getirirdi (tarayıcı çerezi kendiliğinden gönderir).
+			if !cerezden && auth.APITokenMi(tokenRaw) {
 				if scopeDB == nil {
 					httpx.WriteError(w, http.StatusServiceUnavailable, "oturum doğrulanamadı")
 					return

@@ -112,8 +112,10 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, true)
 	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
 
+	// Oturum yalnız HttpOnly çerezde döner; yanıt gövdesinde token YOKTUR
+	// (gerekçe: internal/auth/cookie.go ve auth.loginResp).
+	auth.OturumCerezYaz(w, r, tok, 24*3600)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"token":        tok,
 		"bitis":        time.Now().Add(24 * time.Hour).Unix(),
 		"domain_id":    ilkDomainID,
 		"alan_adi":     ilkAlanAdi,

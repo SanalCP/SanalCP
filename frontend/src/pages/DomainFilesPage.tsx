@@ -404,10 +404,10 @@ export default function DomainFilesPage() {
   }
 
   function indir(e: Entry) {
-    const tok = localStorage.getItem('sanal.token') || ''
     const url = `/api/v1/domains/${id}/files/indir?yol=${encodeURIComponent(e.yol)}`
     // Header'lı GET tarayıcıdan; en basit: ayrı fetch + blob
-    fetch(url, { headers: { Authorization: `Bearer ${tok}` } })
+    // Oturum HttpOnly çerezde; credentials olmadan tarayıcı çerezi eklemez.
+    fetch(url, { credentials: 'include' })
       .then(r => r.blob())
       .then(blob => {
         const a = document.createElement('a')
