@@ -24,11 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Üretimde dağıtılan binary ile aynı dil sürümü (go.mod: go 1.24), ama
-      # daima en güncel yama sürümü — stdlib açıkları yalnızca yamayla kapanır.
+      # Üretimde dağıtılan binary ile aynı toolchain hattı, daima en güncel yama
+      # sürümü — stdlib açıkları yalnızca yamayla kapanır. go.mod'un dil sürümü
+      # 1.25.0'dır (bağımlılıklar `go >= 1.25.0` istiyor); binary ise 1.26 ile
+      # derlenir, çünkü 1.24 ve 1.25 hatları 1.27.0 çıkınca destekten düştü.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
           check-latest: true
           cache: true
 
@@ -47,6 +49,12 @@ jobs:
       - name: go build
         run: go build ./...
 
+      # internal/kaynaklimit testleri quotaon/repquota/setquota'yı exec.LookPath ile
+      # arar ve bulamazsa t.Skip eder. Paket kurulu değilken kota yolu CI'da hiç
+      # koşmuyordu — gerçek kapsama için `quota` paketini kuruyoruz.
+      - name: quota araçlarını kur (kota testleri için)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq quota
+
       - name: go test
         run: go test -race -count=1 ./...
 
@@ -61,36 +69,48 @@ jobs:
       # taramak stdlib'i yamalı gösterip yanlış bir güvenlik hissi verirdi.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
           check-latest: true
           cache: true
 
-      # govulncheck@latest artık Go >= 1.25 ister; 1.24 toolchain'i altında
-      # derlenebilen son sürüme pinliyoruz. Açık VERİTABANI her koşuda canlı
-      # çekilir, dolayısıyla pin taramanın güncelliğini etkilemez.
-      #
-      # 🔴 continue-on-error GEÇİCİDİR. 2026-08-20 taramasında bulunan stdlib
-      # açıklarının bir kısmı yalnızca Go 1.25 hattında düzeltilmiştir
-      # ("Fixed in: go1.25.x") — yani 1.24 ile kalındığı sürece bu adım
-      # yamayla yeşile dönemez. Adımı bloklayıcı yapmak CI'yı kalıcı kırmızıda
-      # bırakır ve herkesin görmezden gelmesine yol açardı; bu yüzden şimdilik
-      # raporlayıcı. Go 1.25 geçişi tamamlandığında (go.mod'daki godebug
-      # pinlerinin gözden geçirilmesi dahil) İKİ govulncheck adımından da bu
-      # satır KALDIRILMALIDIR.
+      # Sürüm pinli; açık VERİTABANI her koşuda canlı çekilir, dolayısıyla pin
+      # taramanın güncelliğini etkilemez.
+      - name: govulncheck kur
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+
       - name: govulncheck (kaynak)
-        continue-on-error: true
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
           "$(go env GOPATH)/bin/govulncheck" ./...
 
       # Kaynak taraması yalnızca CI'nın derlediği kodu görür. Kurulumlara giden
       # şey depoda commit'li ÖNCEDEN DERLENMİŞ binary'dir; onu ayrıca tarıyoruz.
       # Binary eski bir Go yama sürümüyle derlendiyse bu adım kırmızı olur —
-      # çözüm güncel toolchain ile yeniden derleyip assets/'i tazelemektir.
+      # çözüm scripts/package-release.sh'yi güncel toolchain ile koşmaktır.
+      #
+      # Binary, package-release.sh'de `-ldflags "-s -w"` ile sembol tablosu
+      # silinerek üretilir. govulncheck binary modunda sembol bulamayınca modül
+      # düzeyine düşer ve golang.org/x/crypto'nun "openpgp paketi bakımsız"
+      # uyarısını (GO-2026-5932, Fixed in: N/A), openpgp binary'de HİÇ
+      # bulunmasa bile raporlar. Bu yüzden o tek kaydı istisna tutuyoruz — ama
+      # istisnanın geçerliliğini önce import grafiğinden doğruluyoruz, böylece
+      # ileride biri gerçekten openpgp'yi import ederse CI susmaz.
       - name: govulncheck (dağıtılan binary)
-        continue-on-error: true
         run: |
-          "$(go env GOPATH)/bin/govulncheck" -mode=binary assets/sanalcp-server
+          set -uo pipefail
+          if go list -deps ./cmd/server | grep -q 'golang.org/x/crypto/openpgp'; then
+            echo "::error::cmd/server artık openpgp'yi import ediyor — GO-2026-5932 istisnası geçersiz"
+            exit 1
+          fi
+          "$(go env GOPATH)/bin/govulncheck" -mode=binary assets/sanalcp-server \
+            > binary-tarama.txt 2>&1 || true
+          cat binary-tarama.txt
+          kalan=$(grep -oE 'GO-[0-9]{4}-[0-9]+' binary-tarama.txt \
+                  | sort -u | grep -v '^GO-2026-5932$' || true)
+          if [ -n "$kalan" ]; then
+            echo "::error::dağıtılan binary'de açık: $kalan"
+            exit 1
+          fi
+          echo "✓ dağıtılan binary temiz (bilinen istisna: GO-2026-5932)"
 
   frontend:
     name: Frontend — tip kontrolü, build, npm audit
