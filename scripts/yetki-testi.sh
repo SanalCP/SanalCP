@@ -154,6 +154,42 @@ for uc in me users customers domains plans php-surumler system/usage system/serv
 done
 
 echo
+echo "== 2b. Oturum-çerezi TEK KAYNAK olan uçlar (HttpOnly çerez döneminde ="
+echo "     Authorization başlığı taşınmaz; eskiyen yeniden-ayrıştırma yolu"
+echo "     'oturum yok' döndürürdü. Bunlar, o sınıftaki yedi ucun kapsama"
+echo "     alınmasıdır.) =="
+# GET /dashboard-duzen — anasayfa açılışında çağrılır; burası 401 dönerse
+# istemci kullanıcıyı giriş yapar yapmaz çıkartır ve panele hiç girilemez.
+bekle 200 "GET /dashboard-duzen" -b "$AA" "$URL/dashboard-duzen"
+# PUT /me — profil alanları. Boş gövde de PUT kabul eder, testin amacı
+# kimliğin doğrulanmış context'ten çözülmesi; 200 = geçti, 401 = kimlik
+# yine header'dan aranıyor demektir.
+bekle 200 "PUT /me (profil)" -X PUT -b "$AA" -H 'Content-Type: application/json' \
+  -d '{"ad_soyad":"ZZ Test Bayi A","eposta":"a@test.invalid","tercih_tema":"system","tercih_dil":"tr"}' \
+  "$URL/me"
+# PUT /dashboard-duzen — düzen kaydet.
+bekle 200 "PUT /dashboard-duzen" -X PUT -b "$AA" -H 'Content-Type: application/json' \
+  -d '{"duzen":"[]"}' "$URL/dashboard-duzen"
+# GET /me/2fa/setup — yeni secret + otpauth URI döner.
+bekle 200 "GET /me/2fa/setup" -b "$AA" "$URL/me/2fa/setup"
+# POST /me/2fa/enable — geçersiz kod 400. Kimlik doğrulanmış ama gövde reddi:
+# 401 yetki kapısından, 400 handler'dan, 200 kabul edilmiş koddan gelir.
+bekle 400 "POST /me/2fa/enable (geçersiz kod)" -X POST -b "$AA" \
+  -H 'Content-Type: application/json' -d '{"secret":"x","kod":"000000"}' \
+  "$URL/me/2fa/enable"
+# POST /me/2fa/disable — aynı ilke.
+bekle 400 "POST /me/2fa/disable (kod yok)" -X POST -b "$AA" \
+  -H 'Content-Type: application/json' -d '{"kod":""}' \
+  "$URL/me/2fa/disable"
+# POST /me/parola — YANLIŞ mevcut parola ile. 401 "mevcut parola hatalı" =
+# kimlik doğrulandı + bcrypt karşılaştırması elendi. 401 BURADAN değil
+# auth kapısından geliyorsa kimlik yine cookie'den değil header'dan
+# aranıyor demektir — aynı sınıf hata. chpasswd / UPDATE users tetiklenmez.
+bekle 401 "POST /me/parola (yanlış mevcut)" -X POST -b "$AA" \
+  -H 'Content-Type: application/json' -d '{"mevcut":"yanlis-parola","yeni":"YeniParola123"}' \
+  "$URL/me/parola"
+
+echo
 echo "== 3. YATAY: her bayi yalnız kendi kapsamını görmeli =="
 sayi_bekle 1 "A /domains" -b "$AA" "$URL/domains"
 sayi_bekle 1 "B /domains" -b "$AB" "$URL/domains"
