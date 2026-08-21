@@ -314,8 +314,12 @@ func main() {
 		})
 	})
 
-	// eklenti frontend bundle: nginx yalnizca /api/ proxyler + <script src> JWT tasiyamaz => auth disi
-	r.Get("/api/v1/eklenti-bundle/{ad}/app.js", eklentiH.Bundle)
+	// eklenti frontend bundle: HttpOnly çerez taşıyıcıya geçildikten sonra
+	// `<script src>` de kimlik taşıyor (credentials:include ile). Auth zorunlu;
+	// müşteri rolü eklenti yükleyemez (BayiVeUstu). nginx /api/ proxy'si
+	// çerezi bu uca da iletir.
+	r.With(middleware.RequireAuth(cfg.JWTSecret), middleware.BayiVeUstu).Get(
+		"/api/v1/eklenti-bundle/{ad}/app.js", eklentiH.Bundle)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Kaba-kuvvet koruması: giriş uçları IP başına hız-sınırlı (bkz. middleware.GirisLimiti)

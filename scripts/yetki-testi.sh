@@ -236,6 +236,10 @@ echo "== 7. Kimliksiz erişim =="
 bekle 401 "token'sız /domains" "$URL/domains"
 bekle 401 "token'sız /users" "$URL/users"
 bekle 401 "geçersiz token" -H 'Authorization: Bearer gecersiz.token.dizisi' "$URL/domains"
+# eklenti bundle: 0.9.2'de auth dışıydı (çerez taşıyıcıya geçince bu açık kapandı).
+# token'sız çağrı 401, bayi 404 (kayıtlı/aktif/UI kontrolü handler'da).
+bekle 401 "token'sız eklenti bundle" "$URL/eklenti-bundle/ornek-eklenti/app.js"
+bekle 404 "bayi mevcut olmayan eklenti" -b "$AA" "$URL/eklenti-bundle/yok-boyle-eklenti/app.js"
 
 echo
 echo "======================================"
