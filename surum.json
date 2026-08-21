@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.1",
-  "duyuru": "Arayüz düzeni iyileştirmeleri ve yeni bir 'Sunucuyu Kapat' düğmesi. Araçlar ve Ayarlar sayfasındaki bakım kartları artık geniş ekranda satırda üç, profil sayfasındaki kartlar ikişerli görünüyor. Domainler, DNS, e-posta, veritabanları, SSL, kullanıcılar ve müşteriler listeleri ilk sütuna göre Türkçe alfabetik sıralanıyor (SSL listesi eskiden sertifika bitişine göre sıralıydı; süresi dolanlar artık listenin başında değil ama özet rozetlerinde görünmeye devam ediyor). Araçlar ve Ayarlar sayfasının başlığındaki yeniden başlat düğmesi turuncuya alındı, yanına kırmızı 'Sunucuyu Kapat' eklendi: bu düğme 'systemctl poweroff' ile YAZILIMSAL kapatma yapar (servisler düzenli durur, dosya sistemleri senkronize edilip sökülür). DİKKAT: yeniden başlatmanın aksine kapatma kendiliğinden geri gelmez — sunucuyu yalnız sağlayıcı panelinizden veya fiziksel olarak yeniden açabilirsiniz. Bu yüzden onay kutusuna KAPAT yazmak gerekir ve düğme yalnız admin rolüne görünür. Mevcut kurulumlarda hiçbir davranış değişmez, migration gerektirmez.",
-  "kritik": false,
-  "yayin_tarihi": "2026-08-20"
+  "son_surum": "0.9.2",
+  "duyuru": "Güvenlik güncellemesi. Panel oturumu HttpOnly çereze taşındı (XSS'te oturum çalınamaz); antivirus eşzamanlılık limiti (PANEL_AV_MAX_CONCURRENT, varsayılan 1); os/exec çıktıları artık 4000 bayta kırpılıyor (uzun hata yanıtları DoS ve iç path sızıntısı kapandı). Backend davranış değişikliği: /auth/login yanıtında token alanı yok — JavaScript tarafı çerezi otomatik taşıyor. Migration gerektirmez; mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "kritik": true,
+  "yayin_tarihi": "2026-08-21"
 }
