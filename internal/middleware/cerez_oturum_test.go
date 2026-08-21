@@ -184,3 +184,75 @@ func TestRequireAuthBosCerezBasligaDuser(t *testing.T) {
 		t.Fatalf("claim'ler çözülemedi: %+v", c)
 	}
 }
+
+// TestRequireAuthKimligiAuthPaketineTasiyor: bu değişikliğin kaçırdığı hatayı
+// yakalayan regresyon testi.
+//
+// internal/auth altındaki yedi uç (profile.go, dashboard.go) kimliği
+// auth.ClaimsFrom ile okur. Middleware kendi özel context anahtarını
+// kullandığı sürece o okuma daima nil dönüyordu ve handler'lar kimliği
+// Authorization başlığından yeniden ayrıştırmak zorundaydı. Oturum çereze
+// taşınınca başlık ortadan kalktı, yedi uç birden 401 "oturum yok" döndü;
+// biri (GET /dashboard-duzen) anasayfa açılışında çağrıldığı için istemcinin
+// 401 yakalayıcısı kullanıcıyı giriş yapar yapmaz çıkartıyordu.
+//
+// Hiçbir test RequireAuth'u gerçek bir handler'a zincirlemediği için kimse
+// görmedi. Bu test tam o zinciri kurar.
+func TestRequireAuthKimligiAuthPaketineTasiyor(t *testing.T) {
+	secret := []byte("test-secret-0123456789-0123456789")
+	gecerliOturumBekle(t, 42, RolBayi, 7)
+
+	token, err := auth.Issue(secret, 3600, 42, "bayi", RolBayi, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard-duzen", nil)
+	req.AddCookie(&http.Cookie{Name: auth.OturumCerezAdi, Value: token})
+	rec := httptest.NewRecorder()
+
+	var handlerGordu *auth.Claims
+	RequireAuth(secret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// auth paketindeki handler'ların kullandığı erişimcinin TA KENDİSİ.
+		handlerGordu = auth.ClaimsFrom(r)
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("kod=%d, 200 bekleniyordu", rec.Code)
+	}
+	if handlerGordu == nil {
+		t.Fatal("auth.ClaimsFrom nil döndü — auth paketindeki uçlar 401 \"oturum yok\" verir")
+	}
+	if handlerGordu.UserID != 42 || handlerGordu.Role != RolBayi {
+		t.Fatalf("handler yanlış kimlik gördü: %+v", handlerGordu)
+	}
+	// middleware.ClaimsFrom ile auth.ClaimsFrom aynı değeri görmeli; ikisi
+	// ayrışırsa yetki katmanı ile handler'lar farklı kullanıcı üzerinde
+	// çalışıyor demektir.
+	if mw := ClaimsFrom(req.WithContext(
+		auth.ClaimsContext(req.Context(), handlerGordu))); mw == nil || mw.UserID != handlerGordu.UserID {
+		t.Fatalf("middleware.ClaimsFrom ile auth.ClaimsFrom ayrışıyor: %+v vs %+v", mw, handlerGordu)
+	}
+}
+
+// TestRequireAuthAPITokenKimligiDeTasiniyor: `scp_…` API token'ıyla gelen
+// istekte de kimlik auth paketine ulaşmalı.
+//
+// Bu, çerezden ÖNCE de bozuktu: RequireAuth kimliği veritabanından çözüp
+// context'e koyuyordu, ama auth handler'ları Authorization başlığındaki
+// `scp_…` değerini JWT sanıp ayrıştırmaya çalışıyor ve nil alıyordu. Yani API
+// token'ları /me, 2FA ve dashboard uçlarına hiçbir zaman erişemiyordu.
+func TestRequireAuthAPITokenKimligiDeTasiniyor(t *testing.T) {
+	secret := []byte("test-secret-0123456789-0123456789")
+	// API token yolu DB'den çözülür; burada yalnız context aktarımını
+	// sınadığımız için claim'i doğrudan yerleştirip erişimciyi doğruluyoruz.
+	c := &auth.Claims{UserID: 7, Username: "otomasyon", Role: RolBayi}
+	req := ClaimsIle(httptest.NewRequest(http.MethodGet, "/api/v1/me", nil), c)
+
+	got := auth.ClaimsFrom(req)
+	if got == nil || got.UserID != 7 {
+		t.Fatalf("auth.ClaimsFrom API token kimliğini görmüyor: %+v", got)
+	}
+	_ = secret
+}

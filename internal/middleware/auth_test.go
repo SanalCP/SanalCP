@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,7 +13,7 @@ import (
 func istekRol(rol string, uid int64) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	c := &auth.Claims{UserID: uid, Username: "t", Role: rol}
-	return r.WithContext(context.WithValue(r.Context(), claimsKey, c))
+	return ClaimsIle(r, c)
 }
 
 func TestAdminOnly(t *testing.T) {

@@ -21,10 +21,6 @@ var scopeDB *sql.DB
 // Init: middleware paketine DB handle'ı verir (müşteri-scope askı kontrolü için).
 func Init(db *sql.DB) { scopeDB = db }
 
-type ctxKey int
-
-const claimsKey ctxKey = 1
-
 // RequireAuth: token'ı doğrular ve claim'leri context'e koyar.
 //
 // Tek token tipi vardır (auth.Claims); rol ayrımı claim içindeki Role
@@ -87,7 +83,7 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 					return
 				}
 				auth.APITokenKullanimIsle(scopeDB, tokenID, httpx.ClientIP(r))
-				ctx := context.WithValue(r.Context(), claimsKey, c)
+				ctx := auth.ClaimsContext(r.Context(), c)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -133,7 +129,7 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 				UPDATE users SET last_activity_at = NOW()
 				 WHERE id = ? AND (last_activity_at IS NULL OR last_activity_at < NOW() - INTERVAL 30 SECOND)`,
 				c.UserID)
-			ctx := context.WithValue(r.Context(), claimsKey, c)
+			ctx := auth.ClaimsContext(r.Context(), c)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -379,32 +375,30 @@ func KapsamSQL(r *http.Request, domainAlias string) (string, []any) {
 	return " WHERE 1 = 0", nil
 }
 
-// ClaimsContext: verilen context'e admin/bayi claim'lerini yerleştirir.
+// Kimlik bağlamı auth paketinde yaşar (bkz. internal/auth/context.go).
+// Buradaki üçlü, çağrı yerlerini kırmamak için ince birer sarmalayıcıdır;
+// anahtarın auth'ta olması, auth paketindeki handler'ların da aynı doğrulanmış
+// kimliği okuyabilmesi için gereklidir — middleware'i import edemezler.
+
+// ClaimsContext: verilen context'e doğrulanmış claim'leri yerleştirir.
 //
 // RequireAuth bunu token doğruladıktan sonra kendisi yapar; bu dışa açık
 // biçim, kimlik bağlamını elle kurması gereken yerler içindir (başka
-// paketlerin yetki testleri gibi — claimsKey paket-özeldir ve dışarıdan
-// erişilemez). Üretim yolunda çağrılmaz.
+// paketlerin yetki testleri gibi). Üretim yolunda çağrılmaz.
 func ClaimsContext(ctx context.Context, c *auth.Claims) context.Context {
-	return context.WithValue(ctx, claimsKey, c)
+	return auth.ClaimsContext(ctx, c)
 }
 
 // ClaimsIle: isteğe kimlik bilgisi iliştirilmiş bir kopyasını döner.
 //
-// Yalnızca TESTLER için — üretimde claims'i RequireAuth, doğrulanmış JWT'den
+// Yalnızca TESTLER için — üretimde claims'i RequireAuth, doğrulanmış oturumdan
 // yazar. Bu fonksiyon bir yetki KAPISI DEĞİLDİR ve hiçbir denetimi atlatmaz:
 // aynı süreçte çalışan kod zaten kendi context'ini kurabilir. Var olma sebebi,
 // handler'ların (ör. domains.sahipBayiCoz) rol davranışının kendi paketinden
-// test edilebilmesi — claimsKey dışa kapalı olduğu için aksi mümkün değil.
+// test edilebilmesi.
 func ClaimsIle(r *http.Request, c *auth.Claims) *http.Request {
-	return r.WithContext(context.WithValue(r.Context(), claimsKey, c))
+	return r.WithContext(auth.ClaimsContext(r.Context(), c))
 }
 
-func ClaimsFrom(r *http.Request) *auth.Claims {
-	v := r.Context().Value(claimsKey)
-	if v == nil {
-		return nil
-	}
-	c, _ := v.(*auth.Claims)
-	return c
-}
+// ClaimsFrom: istekteki doğrulanmış claim'ler (yoksa nil).
+func ClaimsFrom(r *http.Request) *auth.Claims { return auth.ClaimsFrom(r) }

@@ -115,14 +115,11 @@ func TestParolaDegistir_RootGirisiKapaliykenShadowaDokunulmaz(t *testing.T) {
 
 	secret := []byte("test")
 	h := &Handlers{DB: db, Secret: secret, LifetimeSec: 3600}
-	tok, err := Issue(secret, 3600, 1, "root", "admin", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	// Kimlik üretimdeki gibi context'ten gelir (middleware.RequireAuth koyar).
 	govde := strings.NewReader(`{"mevcut":"dogru-parola","yeni":"yeni-parola-12"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/me/parola", govde)
-	req.Header.Set("Authorization", "Bearer "+tok)
+	req = req.WithContext(ClaimsContext(req.Context(),
+		&Claims{UserID: 1, Username: "root", Role: "admin"}))
 	w := httptest.NewRecorder()
 
 	h.ParolaDegistir(w, req)
