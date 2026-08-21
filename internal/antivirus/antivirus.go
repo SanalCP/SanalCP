@@ -1,6 +1,7 @@
 // Package antivirus: per-domain zararlı yazılım taraması (ClamAV + hafif heuristik).
-// Güvenlik: sunucu genelinde TEK tarama (atomic mutex → RAM/OOM koruması, box 3.8G),
-// karantina = aynı-dosya-sistemi rename (fuser/rm YOK), yol domain home'una kilitli.
+// Güvenlik: eşzamanlı tarama sayısı SEMAPHORE ile sınırlı (ClamAV DB ~1.5G RAM →
+// eşzamanlı clamscan × N OOM riski); karantina = aynı-dosya-sistemi rename
+// (fuser/rm YOK), yol domain home'una kilitli.
 package antivirus
 
 import (
@@ -16,7 +17,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"sanalcp/internal/adlar"
@@ -29,8 +29,48 @@ const clamBin = "/usr/bin/clamscan"
 
 type Handlers struct{ DB *sql.DB }
 
-// scanning: 0=boş 1=tarama sürüyor. TÜM sunucu için tek (ClamAV DB ~1.5G RAM → eşzamanlı tarama OOM riski).
-var scanning int32
+// sem: eşzamanlı tarama/freshclam sınırı. ClamAV imza DB'si ~1.5 GB RAM tutar,
+// N tane paralel clamscan = ~1.5N GB → küçük kutularda OOM. Init() main.go'dan
+// bir kez çağrılır; default 1 (env PANEL_AV_MAX_CONCURRENT ile yükseltilebilir).
+// Init çağrılmadan acquire() no-op (kuyruk sınırsız) — bu kasıtlı: testler
+// Init'i çağırmayı unutursa bellek riski yerine sessizlik yaşar.
+var sem chan struct{}
+
+// Init: eşzamanlı tarama sınırını ayarla. <1 değerler 1'e yükseltilir.
+// main()'den bir kez çağrılmalı; testlerde de explicit çağrılır.
+func Init(maxConcurrent int) {
+	if maxConcurrent < 1 {
+		maxConcurrent = 1
+	}
+	sem = make(chan struct{}, maxConcurrent)
+}
+
+// acquire: slot varsa alır (true). Doluysa HEMEN false döner — handler 409
+// vermek için non-blocking istiyor (beklemek HTTP isteğini asılı tutar).
+func acquire() bool {
+	if sem == nil {
+		return true // Init çağrılmamış: sınırsız (test fallback'i)
+	}
+	select {
+	case sem <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+// release: bir slotu iade eder. Her acquire başarılı çağrıya bir tane.
+func release() {
+	if sem == nil {
+		return
+	}
+	<-sem
+}
+
+// MaxConcurrent: Init ile ayarlanan sınır (testler). 0 = Init çağrılmamış.
+func MaxConcurrent() int {
+	return cap(sem)
+}
 
 var errCap = errors.New("dosya-siniri")
 
@@ -156,19 +196,19 @@ func (h *Handlers) Tara(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "public_html bulunamadı")
 		return
 	}
-	if !atomic.CompareAndSwapInt32(&scanning, 0, 1) {
-		httpx.WriteError(w, http.StatusConflict, "sunucuda başka bir tarama sürüyor, lütfen bekleyin")
+	if !acquire() {
+		httpx.WriteError(w, http.StatusConflict, "sunucuda eşzamanlı tarama sınırına ulaşıldı, lütfen bekleyin")
 		return
 	}
 	res, err := h.DB.Exec(`INSERT INTO av_taramalar (domain_id, durum, motor) VALUES (?,?,?)`, id, "calisiyor", motorAdi())
 	if err != nil {
-		atomic.StoreInt32(&scanning, 0)
+		release()
 		httpx.WriteError(w, http.StatusInternalServerError, "tarama kaydı oluşturulamadı")
 		return
 	}
 	sid, _ := res.LastInsertId()
 	go func() {
-		defer atomic.StoreInt32(&scanning, 0)
+		defer release()
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 		defer cancel()
 		taranan, findings := runScan(ctx, root)
@@ -262,11 +302,11 @@ func (h *Handlers) ImzaGuncelle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusServiceUnavailable, "freshclam kurulu değil")
 		return
 	}
-	if !atomic.CompareAndSwapInt32(&scanning, 0, 1) {
+	if !acquire() {
 		httpx.WriteError(w, http.StatusConflict, "başka bir işlem sürüyor, bekleyin")
 		return
 	}
-	defer atomic.StoreInt32(&scanning, 0)
+	defer release()
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "/usr/bin/freshclam").CombinedOutput()

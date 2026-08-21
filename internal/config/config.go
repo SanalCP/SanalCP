@@ -28,6 +28,11 @@ type Config struct {
 	// (ör. PANEL_LISTEN=0.0.0.0) dışarıdan gelen bağlantının RemoteAddr'ı loopback
 	// olamayacağı için XFF/X-Real-IP otomatik olarak yok sayılır (fail-closed).
 	TrustedProxyCIDRs []*net.IPNet
+	// AVMaxConcurrent: aynı anda en fazla kaç clamscan/freshclam çalışabilir.
+	// ClamAV imza DB'si ~1.5 GB RAM tutar; N tane paralel clamscan = ~1.5N GB.
+	// 3.8 GB'lık kutuda default 1 zorunlu, daha büyük bellekli kutularda 2-3
+	// ayarlanabilir. PANEL_AV_MAX_CONCURRENT ile override edilir.
+	AVMaxConcurrent int
 }
 
 func defaultTrustedProxyCIDRs() []*net.IPNet {
@@ -52,6 +57,7 @@ func Load() (*Config, error) {
 		DBDsn:         dsn,
 		Env:           envOr("PANEL_ENV", "production"),
 		JWTLifetime:   envInt("PANEL_JWT_LIFETIME_SEC", 8*3600),
+		AVMaxConcurrent: envInt("PANEL_AV_MAX_CONCURRENT", 1),
 	}
 	secret := strings.TrimSpace(os.Getenv("PANEL_JWT_SECRET"))
 	if len(secret) < 32 {

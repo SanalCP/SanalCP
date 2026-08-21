@@ -261,6 +261,7 @@ func main() {
 	compH := &composer.Handlers{DB: d}
 	korumaH := &sifrekoruma.Handlers{DB: d}
 	avH := &antivirus.Handlers{DB: d}
+	antivirus.Init(cfg.AVMaxConcurrent) // eşzamanlı tarama sınırı (ClamAV RAM/OOM koruması)
 	kopyaH := &sitekopya.Handlers{DB: d}
 	wpH := &wordpress.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
