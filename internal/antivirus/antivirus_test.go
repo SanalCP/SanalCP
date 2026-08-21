@@ -87,6 +87,6 @@ func TestAcquireInitCagirilmadan(t *testing.T) {
 	if !acquire() {
 		t.Fatal("Init yok → acquire false döndü, sınırsız olmalıydı")
 	}
-	release() // nil kanaldan <- yapmamalı — sem==nil koruması var
+	release()                    // nil kanaldan <- yapmamalı — sem==nil koruması var
 	sem = make(chan struct{}, 1) // sonraki testler için geri kur
 }

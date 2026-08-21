@@ -52,11 +52,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("PANEL_DB_DSN zorunlu (varsayılan/zayıf kimlik bilgisiyle sessizce çalışmayı önlemek için sabit kod içinde varsayılan yok)")
 	}
 	c := &Config{
-		ListenAddr:    envOr("PANEL_LISTEN", ":8080"),
-		CLIListenAddr: envOr("PANEL_CLI_LISTEN", "127.0.0.1:8090"),
-		DBDsn:         dsn,
-		Env:           envOr("PANEL_ENV", "production"),
-		JWTLifetime:   envInt("PANEL_JWT_LIFETIME_SEC", 8*3600),
+		ListenAddr:      envOr("PANEL_LISTEN", ":8080"),
+		CLIListenAddr:   envOr("PANEL_CLI_LISTEN", "127.0.0.1:8090"),
+		DBDsn:           dsn,
+		Env:             envOr("PANEL_ENV", "production"),
+		JWTLifetime:     envInt("PANEL_JWT_LIFETIME_SEC", 8*3600),
 		AVMaxConcurrent: envInt("PANEL_AV_MAX_CONCURRENT", 1),
 	}
 	secret := strings.TrimSpace(os.Getenv("PANEL_JWT_SECRET"))
