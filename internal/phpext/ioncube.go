@@ -65,7 +65,7 @@ func (h *Handlers) IonCubeKur(w http.ResponseWriter, r *http.Request) {
 
 	// 3) Extract
 	if out, err := exec.CommandContext(ctx, "tar", "xzf", tarPath, "-C", tmpDir).CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "tar: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "tar", out)
 		return
 	}
 
@@ -96,8 +96,7 @@ func (h *Handlers) IonCubeKur(w http.ResponseWriter, r *http.Request) {
 
 	// 7) FPM reload
 	if out, err := exec.CommandContext(ctx, "systemctl", "reload-or-restart", s.Service).CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError,
-			"fpm reload: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "fpm reload", out)
 		return
 	}
 

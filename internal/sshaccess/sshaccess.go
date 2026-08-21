@@ -134,7 +134,7 @@ func (h *Handlers) Ayarla(w http.ResponseWriter, r *http.Request) {
 		shell = shellAcik
 	}
 	if out, err := exec.Command("usermod", "-s", shell, sk).CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "shell değiştirilemedi: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "shell değiştirilemedi", out)
 		return
 	}
 	if req.Aktif {

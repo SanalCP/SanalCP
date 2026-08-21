@@ -211,7 +211,7 @@ func (h *Handlers) Toggle(w http.ResponseWriter, r *http.Request) {
 	if out, err := exec.Command("systemctl", "reload-or-restart", s.Service).CombinedOutput(); err != nil {
 		// Hata olursa eski adi geri yukle
 		_ = os.Rename(yeni, mevcut)
-		httpx.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("FPM reload: %s: %v", strings.TrimSpace(string(out)), err))
+		httpx.WriteExecError(w, http.StatusInternalServerError, fmt.Sprintf("FPM reload: %v", err), out)
 		return
 	}
 
@@ -291,8 +291,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 		// Hazır paket var, paket yöneticisiyle kur (PECL derlemesine gerek yok).
 		out, err := osfam.PaketKur(ctx, dnfPkg)
 		if err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError,
-				"paket kurulamadi: "+strings.TrimSpace(string(out)))
+			httpx.WriteExecError(w, http.StatusInternalServerError, "paket kurulamadi", []byte(out))
 			return
 		}
 		// FPM reload
@@ -323,8 +322,7 @@ func (h *Handlers) PECLKur(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError,
-			"pecl install fail: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "pecl install fail", out)
 		return
 	}
 

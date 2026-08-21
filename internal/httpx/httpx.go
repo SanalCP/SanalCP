@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,39 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 
 func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, ErrorBody{Hata: msg})
+}
+
+// WriteExecError: msg + exec komutunun bayt çıktısını JSON 500 yanıtına yazar.
+//
+// XSS yok: tüm gövde encoding/json üzerinden geçer; Content-Type
+// application/json olduğu için tarayıcı <script> gibi ifadeleri HTML olarak
+// YORUMLAMAZ. Buradaki asıl iki risk: (1) bilgi sızıntısı — usermod, openssl,
+// acme.sh gibi araçlar iç path/komut/versiyon sızdırır; (2) DoS — bazıları
+// (acme.sh başarısız DNS doğrulamada) 50+ KB hata basar.
+//
+// Bu helper her ikisini de kapatır: çıktı ExecOutMax bayta kırpılır
+// (ExecOutMax ≤ ExecOutHead olmalı, kırpma kesimi sona eklenir). msg boşsa
+// yalnızca çıktı döner.
+//
+// Sınır: 4000 — panel UI'ında tek toast mesajına sığar; çoğu araç 1-2 KB
+// hata verir, geri kalanı tekrardır.
+const ExecOutMax = 4000
+
+func WriteExecError(w http.ResponseWriter, status int, msg string, out []byte) {
+	body := strings.TrimSpace(string(out))
+	if body == "" {
+		WriteError(w, status, msg)
+		return
+	}
+	if len(body) > ExecOutMax {
+		body = body[:ExecOutMax] + "\n... (kırpıldı, toplam " + strconv.Itoa(len(out)) + " bayt)"
+	}
+	full := strings.TrimSpace(msg)
+	if full == "" {
+		WriteError(w, status, body)
+		return
+	}
+	WriteError(w, status, full+": "+body)
 }
 
 type ErrorBody struct {

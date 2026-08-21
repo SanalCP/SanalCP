@@ -122,7 +122,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	// rsync (trailing slash: içeriği kopyala). --delete YOK (yıkıcı değil).
 	if out, err := tenantKomut(ctx, sk, "rsync", "-a", "--no-owner", "--no-group", kaynak+"/", hedef+"/"); err != nil {
 		_ = jailpath.IceriginiSil(home, kopyaRel)
-		httpx.WriteError(w, http.StatusInternalServerError, "kopyalama başarısız: "+strings.TrimSpace(out))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "kopyalama başarısız", []byte(out))
 		return
 	}
 	// Sahiplik domain kullanıcısına

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os/exec"
 	"regexp"
@@ -97,8 +96,7 @@ func (h *Handlers) QueueAction(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError,
-			fmt.Sprintf("kuyruk işlemi: %s", strings.TrimSpace(string(out))))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "kuyruk işlemi", out)
 		return
 	}
 	h.audit(r, "mail.queue."+req.Action, req.QueueID, true)

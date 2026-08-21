@@ -104,8 +104,8 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 		defer issueCancel()
 		if out, err := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", "--issue", "--webroot", "/var/www/_acme",
 			"-d", tamAd, "--keylength", "ec-256").CombinedOutput(); err != nil {
-			httpx.WriteError(w, http.StatusBadRequest,
-				"Let's Encrypt alınamadı (subdomain DNS'i bu sunucuya A kaydıyla yönlendirilmeli): "+strings.TrimSpace(string(out)))
+			httpx.WriteExecError(w, http.StatusBadRequest,
+				"Let's Encrypt alınamadı (subdomain DNS'i bu sunucuya A kaydıyla yönlendirilmeli)", out)
 			return
 		}
 		installCtx, installCancel := context.WithTimeout(r.Context(), 30*time.Second)
@@ -113,14 +113,14 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 		if out, err := exec.CommandContext(installCtx, "/root/.acme.sh/acme.sh", "--install-cert", "-d", tamAd, "--ecc",
 			"--key-file", key, "--fullchain-file", crt,
 			"--reloadcmd", "systemctl reload nginx").CombinedOutput(); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "cert yerleştirilemedi: "+strings.TrimSpace(string(out)))
+			httpx.WriteExecError(w, http.StatusInternalServerError, "cert yerleştirilemedi", out)
 			return
 		}
 	default: // self-signed
 		if out, err := exec.Command("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
 			"-days", "365", "-keyout", key, "-out", crt,
 			"-subj", "/CN="+tamAd, "-addext", "subjectAltName=DNS:"+tamAd).CombinedOutput(); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "openssl: "+strings.TrimSpace(string(out)))
+			httpx.WriteExecError(w, http.StatusInternalServerError, "openssl", out)
 			return
 		}
 	}
@@ -138,7 +138,7 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 		// rollback: HTTP vhost'a dön
 		_ = os.WriteFile(conf, []byte(vhost(tamAd, docroot, socket)), 0o644)
 		_ = exec.Command("systemctl", "reload", "nginx").Run()
-		httpx.WriteError(w, http.StatusInternalServerError, "nginx doğrulanamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "nginx doğrulanamadı", out)
 		return
 	}
 	_ = exec.Command("systemctl", "reload", "nginx").Run()

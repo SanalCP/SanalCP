@@ -180,7 +180,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	if out, err := exec.Command("nginx", "-t").CombinedOutput(); err != nil {
 		_ = os.Remove(conf) // rollback: bozuk conf'u kaldır (çalışan nginx etkilenmez)
 		_ = exec.Command("nginx", "-t").Run()
-		httpx.WriteError(w, http.StatusInternalServerError, "nginx doğrulanamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "nginx doğrulanamadı", out)
 		return
 	}
 	_ = exec.Command("systemctl", "reload", "nginx").Run()
@@ -285,7 +285,7 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 			_ = os.Remove(conf)
 		}
 		_ = exec.Command("systemctl", "reload", "nginx").Run()
-		httpx.WriteError(w, http.StatusInternalServerError, "nginx doğrulanamadı: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "nginx doğrulanamadı", out)
 		return
 	}
 	_ = exec.Command("systemctl", "reload", "nginx").Run()

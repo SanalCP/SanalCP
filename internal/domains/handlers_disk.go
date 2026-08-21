@@ -46,7 +46,7 @@ func (h *Handlers) DiskHesapla(w http.ResponseWriter, r *http.Request) {
 	defer duCancel()
 	out, err := exec.CommandContext(duCtx, "du", "-sb", path).CombinedOutput()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "du: "+strings.TrimSpace(string(out)))
+		httpx.WriteExecError(w, http.StatusInternalServerError, "du", out)
 		return
 	}
 	fields := strings.Fields(string(out))
