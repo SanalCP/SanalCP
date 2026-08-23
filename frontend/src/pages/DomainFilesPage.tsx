@@ -936,6 +936,7 @@ function BaglamMenu({ x, y, ogeler, onKapat }: { x: number; y: number; ogeler: C
     <div
       ref={ref}
       role="menu"
+      tabIndex={-1}
       onKeyDown={menuKey}
       className={`fixed z-[60] min-w-[190px] py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl text-sm ${olculdu ? '' : 'opacity-0'}`}
       style={{ left: pos.x, top: pos.y }}

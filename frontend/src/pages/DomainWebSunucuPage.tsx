@@ -475,6 +475,7 @@ function CheckboxRow({ etiket, aciklama, checked, onChange }:
   return (
     <label className="flex items-start gap-2 cursor-pointer">
       <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+        aria-label={etiket}
         className="mt-1 cursor-pointer" />
       <div>
         <div className="font-mono text-xs font-medium text-slate-900 dark:text-slate-100">{etiket}</div>

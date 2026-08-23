@@ -117,10 +117,16 @@ export default function KodEditor({ yol, icerik, onChange, onKaydet, onKapat }: 
   const baytSayi = new TextEncoder().encode(icerik).length
 
   return (
+    // Backdrop: dekoratif, tıklamayla kapatma UX kolaylığı — klavye erişilebilirliği zaten
+    // Escape ile sağlanıyor (yukarıdaki useEffect), backdrop'a rol/tabIndex eklemek yanlış
+    // semantik olur (arka plan bir buton değil).
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       className={`fixed inset-0 z-50 bg-black/50 flex items-center justify-center ${tamEkran ? '' : 'p-4'}`}
       onClick={onKapat}
     >
+      {/* Yalnız tıklama bubble'ını durdurur (backdrop'a kapatmayı iletmesin) — interaktif değil */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         className={`bg-slate-900 shadow-2xl flex flex-col text-slate-100 ${tamEkran ? 'w-full h-full' : 'w-full h-[85vh] rounded-2xl overflow-hidden'}`}
         onClick={e => e.stopPropagation()}

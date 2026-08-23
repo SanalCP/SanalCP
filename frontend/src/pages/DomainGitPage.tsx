@@ -227,9 +227,9 @@ export default function DomainGitPage() {
 
             {ghConn.yok || !ghConn.login ? (
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Personal Access Token (classic)</label>
+                <label htmlFor="gh-pat" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Personal Access Token (classic)</label>
                 <div className="flex gap-2">
-                  <input type="password" value={ghToken}
+                  <input id="gh-pat" type="password" value={ghToken}
                     onChange={e => setGhToken(e.target.value)}
                     placeholder="ghp_..." autoComplete="off"
                     className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
@@ -260,8 +260,8 @@ export default function DomainGitPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Repo</label>
-                    <select value={ghSelectedRepo} onChange={e => ghLoadBranches(e.target.value)}
+                    <label htmlFor="gh-repo" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Repo</label>
+                    <select id="gh-repo" value={ghSelectedRepo} onChange={e => ghLoadBranches(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-white dark:bg-slate-800">
                       <option value="">— seç —</option>
                       {ghRepos.map(r => (
@@ -273,8 +273,8 @@ export default function DomainGitPage() {
                     <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5 block">{ghRepos.length} repo bulundu</span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
-                    <select value={ghSelectedBranch} onChange={e => setGhSelectedBranch(e.target.value)}
+                    <label htmlFor="gh-branch" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
+                    <select id="gh-branch" value={ghSelectedBranch} onChange={e => setGhSelectedBranch(e.target.value)}
                       disabled={!ghSelectedRepo}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-white dark:bg-slate-800 disabled:bg-slate-50 dark:bg-slate-900">
                       {!ghSelectedBranch && <option value="">— seç —</option>}
@@ -309,21 +309,21 @@ export default function DomainGitPage() {
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-3">{repo ? 'Repo Ayarları' : 'Repo Bağla'}</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Git URL (SSH)</label>
-                <input type="text" value={repoUrl} onChange={e => setRepoUrl(e.target.value)}
+                <label htmlFor="repo-git-url" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Git URL (SSH)</label>
+                <input id="repo-git-url" type="text" value={repoUrl} onChange={e => setRepoUrl(e.target.value)}
                   placeholder="git@github.com:kullanici/repo.git"
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Private repo için SSH URL kullanın; HTTPS ile auth çalışmaz.</p>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
-                  <input type="text" value={branch} onChange={e => setBranch(e.target.value)}
+                  <label htmlFor="repo-branch" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Branch</label>
+                  <input id="repo-branch" type="text" value={branch} onChange={e => setBranch(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Hedef Dizin</label>
-                  <input type="text" value={targetDir} onChange={e => setTargetDir(e.target.value)}
+                  <label htmlFor="repo-target-dir" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Hedef Dizin</label>
+                  <input id="repo-target-dir" type="text" value={targetDir} onChange={e => setTargetDir(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono" />
                 </div>
               </div>
