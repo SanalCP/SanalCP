@@ -102,8 +102,9 @@ func (h *Handlers) SSLKur(w http.ResponseWriter, r *http.Request) {
 		// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
 		issueCtx, issueCancel := context.WithTimeout(r.Context(), 3*time.Minute)
 		defer issueCancel()
-		if out, err := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", "--issue", "--webroot", "/var/www/_acme",
-			"-d", tamAd, "--keylength", "ec-256").CombinedOutput(); err != nil {
+		issueArgs := []string{"--issue", "--webroot", "/var/www/_acme", "-d", tamAd, "--keylength", "ec-256"}
+		issueArgs = append(issueArgs, provisioner.AcmeServerArgs()...)
+		if out, err := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", issueArgs...).CombinedOutput(); err != nil {
 			httpx.WriteExecError(w, http.StatusBadRequest,
 				"Let's Encrypt alınamadı (subdomain DNS'i bu sunucuya A kaydıyla yönlendirilmeli)", out)
 			return
