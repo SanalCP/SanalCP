@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.6",
-  "duyuru": "Bakım güncellemesi. Frontend'e ESLint (flat config) kuruldu ve CI'ye lint job eklendi; bu süreçte gerçek erişilebilirlik sorunları düzeltildi (klavye desteği eksik tıklanabilir alanlar, label-input eşleştirmeleri). Kullanıcı akışlarında davranış değişikliği yok. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "son_surum": "0.9.7",
+  "duyuru": "Şifre belirlenen tüm ekranlara (hesap parolası, veritabanı parola sıfırlama, e-posta kutusu, dizin şifre koruma) güvenli şifre üretme ve göster/gizle özelliği eklendi. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez. Mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
   "kritik": false,
   "yayin_tarihi": "2026-08-23"
 }
