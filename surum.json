@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.3",
-  "duyuru": "Güvenlik güncellemesi. /api/v1/eklenti-bundle/{ad}/app.js artık auth-gated (RequireAuth + BayiVeUstu) — HttpOnly çerez taşıyıcıya geçtikten sonra `<script src>` kimlik taşıyabildiği için auth dışı bırakma gerekçesi düştü. 0.9.2 altyapısının (çerez + CSRF) üzerine eklenen katman; migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
-  "kritik": true,
-  "yayin_tarihi": "2026-08-21"
+  "son_surum": "0.9.4",
+  "duyuru": "Performans güncellemesi. /admin/backups/temizle ucundaki N+1 sorgu deseni giderildi — toplu yedek temizliği artık domain başına ayrı SELECT/DELETE yerine tek SELECT...IN(...) ve tek DELETE...IN(...) kullanıyor. Sunucu ölçeğinde çok sayıda domain/yedek olan kurulumlarda bu uç artık çok daha hızlı. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "kritik": false,
+  "yayin_tarihi": "2026-08-23"
 }
