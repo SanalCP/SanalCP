@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.4",
-  "duyuru": "Performans güncellemesi. /admin/backups/temizle ucundaki N+1 sorgu deseni giderildi — toplu yedek temizliği artık domain başına ayrı SELECT/DELETE yerine tek SELECT...IN(...) ve tek DELETE...IN(...) kullanıyor. Sunucu ölçeğinde çok sayıda domain/yedek olan kurulumlarda bu uç artık çok daha hızlı. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "son_surum": "0.9.5",
+  "duyuru": "Let's Encrypt HTTP-01 kurulumuna ACME_STAGING=1 ortam değişkeni eklendi — sertifika akışı staging sunucusuyla test edilebilir (LE rate-limit'e takılmadan). Panel kullanıcı akışını etkilemez, varsayılan davranış (prod API) değişmedi. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
   "kritik": false,
   "yayin_tarihi": "2026-08-23"
 }
