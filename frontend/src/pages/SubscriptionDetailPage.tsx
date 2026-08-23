@@ -118,6 +118,9 @@ export default function SubscriptionDetailPage() {
           </button>
           {menuAcik && (
             <>
+              {/* Backdrop: dropdown'ı dışarı tıklayınca kapatır, dekoratif — gerçek menü
+                  öğeleri aşağıda native <button>, zaten klavye erişilebilir. */}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div className="fixed inset-0 z-10" onClick={() => setMenuAcik(false)} />
               <div className="absolute left-0 mt-1 z-20 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-1 text-sm">
                 <button

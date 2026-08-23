@@ -180,14 +180,21 @@ function Sat({ e, d, mono, onKopya, kopya }: { e: string; d: string; mono?: bool
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
       <dt className="text-slate-500 dark:text-slate-500 text-xs uppercase tracking-wider">{e}</dt>
-      <dd
-        onClick={() => aktif && onKopya!(d)}
-        className={`text-right flex items-center gap-2 group ${aktif ? 'cursor-pointer' : ''}`}
-        title={aktif ? t('DomainConnectionPage:click_to_copy_title') : ''}
-      >
-        <span className={`${mono ? 'font-mono text-xs' : 'text-sm'} ${aktif ? 'text-slate-800 dark:text-slate-200 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 transition' : 'text-slate-800 dark:text-slate-200'}`}>
-          {d}
-        </span>
+      <dd className="text-right flex items-center gap-2 group">
+        {aktif ? (
+          <button
+            type="button"
+            onClick={() => onKopya!(d)}
+            className="flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
+            title={t('DomainConnectionPage:click_to_copy_title')}
+          >
+            <span className={`${mono ? 'font-mono text-xs' : 'text-sm'} text-slate-800 dark:text-slate-200 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 transition`}>
+              {d}
+            </span>
+          </button>
+        ) : (
+          <span className={mono ? 'font-mono text-xs' : 'text-sm'}>{d}</span>
+        )}
         {kopyalandi && (
           <span className="text-[10px] uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-medium animate-pulse">
             {t('DomainConnectionPage:copied')}

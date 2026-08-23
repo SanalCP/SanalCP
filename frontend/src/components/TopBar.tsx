@@ -387,6 +387,9 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
 
           {menuAcikProfil && (
             <>
+              {/* Backdrop: dropdown'ı dışarı tıklayınca kapatır, dekoratif — gerçek menü
+                  öğeleri aşağıda native <button>, zaten klavye erişilebilir. */}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div className="fixed inset-0 z-40" onClick={() => setMenuAcik(false)} />
               <div className="absolute right-0 mt-1 w-56 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50 py-1">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">

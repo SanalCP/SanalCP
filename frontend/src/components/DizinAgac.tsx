@@ -101,7 +101,10 @@ function TreeNode({
     <div>
       <div
         ref={satirRef}
+        role="button"
+        tabIndex={0}
         onClick={() => onSec(yol)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSec(yol) } }}
         className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer transition ${
           seciliMi ? 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300' : 'hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
         }`}

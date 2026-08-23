@@ -923,15 +923,16 @@ function KopyaSatir({ e, v, kopyala, parola }: { e: string; v: string; kopyala: 
   return (
     <div className="flex items-center gap-2 text-xs py-1">
       <span className="w-24 text-slate-500 dark:text-slate-500 shrink-0">{e}</span>
-      <code
+      <button
+        type="button"
         onClick={tikla}
-        className={`flex-1 font-mono px-2 py-1 rounded border cursor-pointer select-all transition ${
+        className={`flex-1 text-left font-mono px-2 py-1 rounded border cursor-pointer select-all transition ${
           kopyalandi ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-400 text-slate-800 dark:text-slate-200'
         }`}
         title={t('DomainsPage:result_modal.copy_hint')}
       >
         {parola && !acik ? '••••••••••' : v}
-      </code>
+      </button>
       {parola && (
         <button type="button" onClick={() => setAcik(s => !s)}
           className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">

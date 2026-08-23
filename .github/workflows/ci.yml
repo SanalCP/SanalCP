@@ -116,7 +116,7 @@ jobs:
           echo "✓ dağıtılan binary temiz (bilinen istisna: GO-2026-5932)"
 
   frontend:
-    name: Frontend — tip kontrolü, build, npm audit
+    name: Frontend — lint, tip kontrolü, build, npm audit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -132,6 +132,9 @@ jobs:
 
       - name: npm ci
         run: npm ci
+
+      - name: lint
+        run: npm run lint
 
       # `npm run build` = `tsc -b && vite build` — tip kontrolü buraya dahildir.
       - name: build

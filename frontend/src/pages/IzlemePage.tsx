@@ -373,7 +373,7 @@ function SunucuLoglari() {
       .catch((e: any) => setHata(apiHata(e)))
       .finally(() => setYuk(false))
   }
-  useEffect(() => { yukle(kaynak, son) /* eslint-disable-next-line */ }, [kaynak, son])
+  useEffect(() => { yukle(kaynak, son) }, [kaynak, son])
   const gorunen = useMemo(() => {
     const q = arama.trim().toLowerCase()
     return q ? satirlar.filter(s => s.toLowerCase().includes(q)) : satirlar

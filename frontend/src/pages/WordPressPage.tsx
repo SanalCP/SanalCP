@@ -34,7 +34,6 @@ export default function WordPressPage() {
       if (r.data?.length) setDomainId(r.data[0].id)
     }).catch(e => setHata(apiHata(e)))
     tumListele()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function tumListele() {
