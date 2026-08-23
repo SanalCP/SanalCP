@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.5",
-  "duyuru": "Let's Encrypt HTTP-01 kurulumuna ACME_STAGING=1 ortam değişkeni eklendi — sertifika akışı staging sunucusuyla test edilebilir (LE rate-limit'e takılmadan). Panel kullanıcı akışını etkilemez, varsayılan davranış (prod API) değişmedi. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "son_surum": "0.9.6",
+  "duyuru": "Bakım güncellemesi. Frontend'e ESLint (flat config) kuruldu ve CI'ye lint job eklendi; bu süreçte gerçek erişilebilirlik sorunları düzeltildi (klavye desteği eksik tıklanabilir alanlar, label-input eşleştirmeleri). Kullanıcı akışlarında davranış değişikliği yok. Migration gerektirmez, mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
   "kritik": false,
   "yayin_tarihi": "2026-08-23"
 }
