@@ -50,5 +50,8 @@
   "home": "Home",
   "yes_active": "Yes",
   "no_inactive": "No",
-  "processing": "Processing…"
+  "processing": "Processing…",
+  "show_password": "Show",
+  "hide_password": "Hide",
+  "generate_password": "Generate"
 }

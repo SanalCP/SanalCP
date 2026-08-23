@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import ParolaGirdisi from '@/components/ParolaGirdisi'
 import { useAuth } from '@/store/auth'
 import { setLang, type Lang } from '@/i18n'
 
@@ -239,8 +240,14 @@ export default function SettingsPage() {
             <form onSubmit={parolaDegistir} className="space-y-4">
               <Girdi etiket={t('SettingsPage:password.current')} type="password" value={mevcut} onChange={e => setMevcut(e.target.value)} autoComplete="current-password" />
               <div className="grid sm:grid-cols-2 gap-4">
-                <Girdi etiket={t('SettingsPage:password.new')} type="password" value={yeni} onChange={e => setYeni(e.target.value)} autoComplete="new-password" />
-                <Girdi etiket={t('SettingsPage:password.new_repeat')} type="password" value={yeni2} onChange={e => setYeni2(e.target.value)} autoComplete="new-password" />
+                <label className="block">
+                  <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('SettingsPage:password.new')}</span>
+                  <ParolaGirdisi value={yeni} onChange={setYeni} onUret={p => { setYeni(p); setYeni2(p) }} autoComplete="new-password" />
+                </label>
+                <label className="block">
+                  <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('SettingsPage:password.new_repeat')}</span>
+                  <ParolaGirdisi value={yeni2} onChange={setYeni2} autoComplete="new-password" />
+                </label>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <button type="submit" disabled={paYuk || !mevcut || !yeni} className={btn}>{paYuk ? t('SettingsPage:password.changing') : t('SettingsPage:password.change')}</button>

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import ParolaGirdisi from '@/components/ParolaGirdisi'
 
 type Kayit = { id: number; yol: string; kullanici: string; created_at: string }
 
@@ -83,8 +84,10 @@ export default function DomainSifreKorumaPage() {
             </label>
             <label className="block">
               <span className="text-xs text-slate-500 dark:text-slate-400">{t('DomainSifreKorumaPage:password_label')}</span>
-              <input value={parola} onChange={e => setParola(e.target.value)} required type="password" placeholder="••••••••"
-                className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+              <div className="mt-1">
+                <ParolaGirdisi value={parola} onChange={setParola} placeholder="••••••••" required
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+              </div>
             </label>
           </div>
           <p className="text-[11px] text-slate-400 mt-2">{t('DomainSifreKorumaPage:dir_help')}</p>

@@ -50,5 +50,8 @@
   "home": "Anasayfa",
   "yes_active": "Evet",
   "no_inactive": "Hayır",
-  "processing": "İşleniyor…"
+  "processing": "İşleniyor…",
+  "show_password": "Göster",
+  "hide_password": "Gizle",
+  "generate_password": "Oluştur"
 }

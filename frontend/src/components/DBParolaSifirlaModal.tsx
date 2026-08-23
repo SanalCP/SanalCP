@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Modal from './Modal'
+import ParolaGirdisi from './ParolaGirdisi'
 
 type DB = { id: number; db_adi: string; db_kullanici: string }
 
@@ -44,12 +45,10 @@ export default function DBParolaSifirlaModal({ db, onKapat, onTamam }: {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DBParolaSifirlaModal:custom_password_label')}</label>
-            <input
-              type="text"
+            <ParolaGirdisi
               value={ozelPw}
-              onChange={e => setOzelPw(e.target.value)}
+              onChange={setOzelPw}
               placeholder={t('DBParolaSifirlaModal:custom_password_placeholder')}
-              className="ta-input w-full font-mono"
             />
           </div>
           {hata && <div className="ta-form-error">{hata}</div>}

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import ParolaGirdisi from '@/components/ParolaGirdisi'
 
 type Domain = { id: number; alan_adi: string; ssl?: boolean }
 type Mailbox = { id: number; local_part: string; email: string; status: string; created_at: string }
@@ -398,12 +399,12 @@ export default function DomainMailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
             <form onSubmit={ekle} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainMailPage:mailbox.add_title')}</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <input value={localPart} onChange={e => setLocalPart(e.target.value)} required placeholder={t('DomainMailPage:mailbox.local_part_placeholder')}
                   className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <span className="text-slate-500 dark:text-slate-400 text-sm">@{domain?.alan_adi}</span>
-                <input value={parola} onChange={e => setParola(e.target.value)} type="password" placeholder={t('DomainMailPage:mailbox.password_placeholder')}
-                  className="w-56 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+                <ParolaGirdisi value={parola} onChange={setParola} placeholder={t('DomainMailPage:mailbox.password_placeholder')}
+                  className="w-40 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <button disabled={isleniyor || !localPart} className="px-3 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
                   {isleniyor ? t('DomainMailPage:mailbox.adding') : t('common:add')}
                 </button>
