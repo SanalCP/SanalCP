@@ -1364,6 +1364,7 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 		args = append(args, "-d", h)
 	}
 	args = append(args, "--keylength", "2048")
+	args = append(args, AcmeServerArgs()...)
 	// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
 	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
 	issueCtx, issueCancel := context.WithTimeout(ctx, 3*time.Minute)
