@@ -109,9 +109,20 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 		esik = time.Now().AddDate(0, 0, -req.Gun)
 	}
 
+	domainIDs := make([]int64, len(hedefler))
+	for i, t := range hedefler {
+		domainIDs[i] = t.ID
+	}
+	bilinenTumu, err := tumBilinenKayitlar(r.Context(), h.DB, domainIDs)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "yedek kayıtları okunamadı")
+		return
+	}
+
+	var silinecekIDler []int64
 	sonuc := TemizlikSonuc{Onizleme: req.Onizleme}
 	for _, t := range hedefler {
-		adaylar, err := h.temizlikAdaylari(r.Context(), t.ID, t.SK, req.Mod, esik)
+		adaylar, err := temizlikAdaylari(t.ID, t.SK, req.Mod, esik, bilinenTumu[t.ID])
 		if err != nil {
 			log.Printf("backup temizlik domain=%d: %v", t.ID, err)
 			continue
@@ -129,8 +140,13 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 			_ = os.Remove(filepath.Join(BackupRoot, t.SK, a.Dosya))
 			if a.BackupID != 0 {
 				deleteRemoteBestEffort(h.DB, t.ID, a.Dosya, a.UzakDurum)
-				_, _ = h.DB.Exec(`DELETE FROM backups WHERE id=?`, a.BackupID)
+				silinecekIDler = append(silinecekIDler, a.BackupID)
 			}
+		}
+	}
+	if len(silinecekIDler) > 0 {
+		if err := topluSil(r.Context(), h.DB, silinecekIDler); err != nil {
+			log.Printf("backup temizlik: DB kayıtları silinemedi: %v", err)
 		}
 	}
 	if !req.Onizleme {
@@ -140,6 +156,70 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, sonuc)
 }
 
+// dbKayit: backups tablosundaki bir yedek satırının temizlik için gereken alanları.
+type dbKayit struct {
+	ID        int64
+	Tip       string
+	UzakDurum string
+	BoyutB    int64
+	Olusturma int64
+}
+
+// tumBilinenKayitlar: verilen domainlerin TÜM backups kayıtlarını TEK sorguda
+// çeker ve domain_id'ye göre gruplar. domainID başına ayrı SELECT atmak yerine
+// (N+1) burada toplu okunur; Temizle bunu bir kez çağırır, temizlikAdaylari
+// artık DB'ye dokunmaz.
+func tumBilinenKayitlar(ctx context.Context, db *sql.DB, domainIDs []int64) (map[int64]map[string]dbKayit, error) {
+	out := map[int64]map[string]dbKayit{}
+	if len(domainIDs) == 0 {
+		return out, nil
+	}
+	placeholders := strings.Repeat("?,", len(domainIDs))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]any, len(domainIDs))
+	for i, id := range domainIDs {
+		args[i] = id
+	}
+	rows, err := db.QueryContext(ctx,
+		`SELECT domain_id, id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP(created_at)
+		 FROM backups WHERE domain_id IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var domainID int64
+		var k dbKayit
+		var dosya string
+		var ts sql.NullInt64
+		if err := rows.Scan(&domainID, &k.ID, &k.Tip, &dosya, &k.UzakDurum, &k.BoyutB, &ts); err != nil {
+			continue
+		}
+		k.Olusturma = ts.Int64
+		if out[domainID] == nil {
+			out[domainID] = map[string]dbKayit{}
+		}
+		out[domainID][dosya] = k
+	}
+	return out, rows.Err()
+}
+
+// topluSil: silinen yedeklerin DB kayıtlarını TEK DELETE...IN(...) ile temizler
+// (domain başına ayrı ayrı Exec yerine).
+func topluSil(ctx context.Context, db *sql.DB, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	_, err := db.ExecContext(ctx, `DELETE FROM backups WHERE id IN (`+placeholders+`)`, args...)
+	return err
+}
+
 // temizlikAdaylari: bir domain için silinecek dosyaları toplar.
 //
 // Hem DB kayıtlarını hem de diskteki YETİM dosyaları kapsar. Yetimler önemli:
@@ -147,34 +227,13 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 // bir dosya sayıda görünür. Yalnız DB'yi temizleseydik "tüm otomatik yedekleri
 // sil" dedikten sonra sayaç sıfırlanmaz, kullanıcı işlemin çalışmadığını
 // sanırdı.
-func (h *Handlers) temizlikAdaylari(ctx context.Context, domainID int64, sk, mod string,
-	esik time.Time) ([]temizlikAday, error) {
-
-	rows, err := h.DB.QueryContext(ctx,
-		`SELECT id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP(created_at)
-		 FROM backups WHERE domain_id=?`, domainID)
-	if err != nil {
-		return nil, err
+//
+// bilinen: bu domain'e ait backups kayıtları (tumBilinenKayitlar'dan, dosya
+// adına göre) — domain başına ayrı sorgu atmamak için çağıran taraf hazırlar.
+func temizlikAdaylari(domainID int64, sk, mod string, esik time.Time, bilinen map[string]dbKayit) ([]temizlikAday, error) {
+	if bilinen == nil {
+		bilinen = map[string]dbKayit{}
 	}
-	type dbKayit struct {
-		ID        int64
-		Tip       string
-		UzakDurum string
-		BoyutB    int64
-		Olusturma int64
-	}
-	bilinen := map[string]dbKayit{}
-	for rows.Next() {
-		var k dbKayit
-		var dosya string
-		var ts sql.NullInt64
-		if err := rows.Scan(&k.ID, &k.Tip, &dosya, &k.UzakDurum, &k.BoyutB, &ts); err != nil {
-			continue
-		}
-		k.Olusturma = ts.Int64
-		bilinen[dosya] = k
-	}
-	rows.Close()
 
 	// Diskteki dosyalar: boyut ve (DB kaydı yoksa) yaş buradan okunur.
 	diskte := map[string]os.FileInfo{}
