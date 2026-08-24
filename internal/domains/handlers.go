@@ -921,6 +921,7 @@ func (h *Handlers) ListDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
+	demoPanel := middleware.DemoPaneliMi(r)
 	out := make([]DBAccount, 0)
 	for rows.Next() {
 		var d DBAccount
@@ -930,6 +931,8 @@ func (h *Handlers) ListDatabases(w http.ResponseWriter, r *http.Request) {
 		if dec, err := hesaplar.DecryptDBPassword(d.DBParola); err == nil {
 			d.DBParola = dec
 		}
+		// DEMO: gerçek DB parolası demo panelde asla dönmez.
+		d.DBParola = middleware.Maskele(demoPanel, d.DBParola)
 		out = append(out, d)
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
