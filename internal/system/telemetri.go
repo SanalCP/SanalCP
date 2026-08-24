@@ -11,6 +11,8 @@ package system
 // hiçbir yerde hata gösterilmez (surumkontrol.go'daki felsefeyle aynı).
 
 import (
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -110,4 +112,27 @@ func firestoreURL(kimlik string) string {
 		q.Set("key", k)
 	}
 	return base + "?" + q.Encode()
+}
+
+// ipTespitEt — kendi genel IP'sini öğrenir (self-report, bağlantıdan otomatik
+// tespit DEĞİL — bkz. spec'teki "IP tespiti" kararı). Hata = boş döner.
+func ipTespitEt() string {
+	cli := &http.Client{Timeout: 10 * time.Second}
+	resp, err := cli.Get(ipUC())
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 256))
+	if err != nil {
+		return ""
+	}
+	ip := strings.TrimSpace(string(b))
+	if !ipBicimGecerliMi(ip) {
+		return ""
+	}
+	return ip
 }

@@ -1,6 +1,8 @@
 package system
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -71,5 +73,35 @@ func TestFirestoreURL(t *testing.T) {
 		if !strings.Contains(u, "updateMask.fieldPaths="+alan) {
 			t.Errorf("URL, %q için updateMask içermiyor: %s", alan, u)
 		}
+	}
+}
+
+func TestIpTespitEt(t *testing.T) {
+	sunucu := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("203.0.113.7"))
+	}))
+	defer sunucu.Close()
+
+	old := os.Getenv("PANEL_IP_UC")
+	os.Setenv("PANEL_IP_UC", sunucu.URL)
+	defer os.Setenv("PANEL_IP_UC", old)
+
+	if got := ipTespitEt(); got != "203.0.113.7" {
+		t.Errorf("ipTespitEt() = %q, beklenen 203.0.113.7", got)
+	}
+}
+
+func TestIpTespitEtHataDurumu(t *testing.T) {
+	sunucu := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer sunucu.Close()
+
+	old := os.Getenv("PANEL_IP_UC")
+	os.Setenv("PANEL_IP_UC", sunucu.URL)
+	defer os.Setenv("PANEL_IP_UC", old)
+
+	if got := ipTespitEt(); got != "" {
+		t.Errorf("ipTespitEt() hata durumunda %q döndü, beklenen boş", got)
 	}
 }
