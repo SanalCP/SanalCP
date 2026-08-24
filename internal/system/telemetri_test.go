@@ -119,8 +119,8 @@ func TestTelemetriGonderVeri(t *testing.T) {
 	defer sunucu.Close()
 
 	for k, v := range map[string]string{
-		"PANEL_FIREBASE_UC":          sunucu.URL,
-		"PANEL_FIREBASE_PROJE":       "test-proje",
+		"PANEL_FIREBASE_UC":           sunucu.URL,
+		"PANEL_FIREBASE_PROJE":        "test-proje",
 		"PANEL_FIREBASE_API_ANAHTARI": "test-anahtar",
 	} {
 		old := os.Getenv(k)
@@ -147,8 +147,8 @@ func TestTelemetriGonderVeri(t *testing.T) {
 
 func TestTelemetriGonderVeriAgHatasi(t *testing.T) {
 	for k, v := range map[string]string{
-		"PANEL_FIREBASE_UC":          "http://127.0.0.1:1", // hiçbir şey dinlemiyor
-		"PANEL_FIREBASE_PROJE":       "test-proje",
+		"PANEL_FIREBASE_UC":           "http://127.0.0.1:1", // hiçbir şey dinlemiyor
+		"PANEL_FIREBASE_PROJE":        "test-proje",
 		"PANEL_FIREBASE_API_ANAHTARI": "test-anahtar",
 	} {
 		old := os.Getenv(k)

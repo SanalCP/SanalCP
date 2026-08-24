@@ -6,14 +6,23 @@ package system
 // veya kritik güvenlik duyurusu varsa arayüzde gösterir. Bugüne kadar müşterilere
 // acil yama duyurusu yapacak HİÇBİR kanalımız yoktu — asıl kazanç bu.
 //
-// 🔒 GİZLİLİK — bilerek verilmiş kararlar:
-//   - İstek DÜZ bir GET'tir: sorgu dizesi YOK, gövde YOK, özel başlık YOK.
-//     Domain adı, hostname, IP, müşteri verisi, lisans — HİÇBİRİ gönderilmez.
-//   - Kurulum kimliği ÜRETİLİR (/etc/sanalcp/kurulum-kimlik) ama
-//     GÖNDERİLMEZ. Şu anki uç statik bir dosya; kimliği sayan kimse yok, dolayısıyla
-//     göndermek karşılıksız bir kimlik sızıntısı olurdu. Kimliği şimdiden üretiyoruz
-//     ki ileride sayım ucuna geçilirse kurulumların kararlı kimliği hazır olsun.
-//   - PANEL_SURUM_KONTROL=0 → hiç istek atılmaz (goroutine hiç başlamaz).
+// 🔒 GİZLİLİK — bilerek verilmiş kararlar (BU DOSYADAKİ surumGetir() içindir,
+// yani yayın manifestini (surum.json) çeken GET isteği için — telemetri PATCH'i
+// için aşağıdaki nota bakın):
+//   - surumGetir()'in isteği DÜZ bir GET'tir: sorgu dizesi YOK, gövde YOK,
+//     özel başlık YOK. Domain adı, hostname, IP, müşteri verisi, lisans —
+//     HİÇBİRİ bu istekle gönderilmez.
+//   - Kurulum kimliği (/etc/sanalcp/kurulum-kimlik, bkz. KurulumKimligi())
+//     bu isteğe DAHİL DEĞİLDİR.
+//   - PANEL_SURUM_KONTROL=0 → hiç istek atılmaz (goroutine hiç başlamaz,
+//     ne surum.json GET'i ne telemetri PATCH'i).
+//
+//   AYRICA — telemetri.go'daki telemetriGonder(): aynı döngüde, surumGetir()
+//   ile aynı turda çalışır ve kurulum kimliğini, kaynak IP'yi, mevcut sürümü,
+//   OS ailesini ve panel dilini Firestore'a PATCH eder. Bu, PANEL_SURUM_KONTROL
+//   dışında ayrıca telemetriHazirMi() ile kapılıdır: Firebase proje/anahtarı
+//   yapılandırılmadan (PANEL_FIREBASE_PROJE / PANEL_FIREBASE_API_ANAHTARI boşken)
+//   sessizce no-op'tur. Ayrıntı için telemetri.go'nun başındaki nota bakın.
 //
 // AĞ HATASI = SESSİZ. İnternet yoksa panel etkilenmez; durum "kontrol edilemedi"
 // olarak kalır, hiçbir yerde hata patlatmaz.
@@ -151,7 +160,9 @@ func SurumBaslat(mevcutSurum, buildTarihi string) {
 	surumAcik = surumKontrolAcikMi()
 	surumMu.Unlock()
 
-	// Kimliği kapalıyken de üret: ileride sayıma geçilirse kurulum kimliği hazır olur.
+	// Kimliği kapalıyken de üret: sayım ucu (telemetri.go / telemetriGonder)
+	// artık var, ama PANEL_SURUM_KONTROL=0 iken de kurulum kimliği dosyası
+	// (ör. /system/surum-kontrol üzerinden) hazır bulunsun.
 	_ = KurulumKimligi()
 
 	if !surumKontrolAcikMi() {
@@ -295,7 +306,10 @@ func SurumKontrolYenile(w http.ResponseWriter, r *http.Request) {
 	SurumKontrolDurum(w, r)
 }
 
-// SurumKontrolDurum — arayüz için mevcut durum.
+// SurumKontrolDurum — arayüz için mevcut durum. BayiVeUstu ile kısıtlı
+// (bkz. cmd/server/main.go); yanıt ayrıca bu kurulumun lisans/telemetri
+// kimliğini (kurulum_kimlik) taşır — müşteri kapsamına asla verilmemeli,
+// bkz. KurulumKimligi() üzerindeki gizlilik notu.
 func SurumKontrolDurum(w http.ResponseWriter, r *http.Request) {
 	surumMu.RLock()
 	mevcut, y, son, hata, acik := surumMevcut, surumYayin, surumSon, surumHata, surumAcik
@@ -318,6 +332,7 @@ func SurumKontrolDurum(w http.ResponseWriter, r *http.Request) {
 		"kritik":         y.Kritik && guncellemeVar,
 		"yayin_tarihi":   y.YayinTarihi,
 		"hata":           hata,
+		"kurulum_kimlik": KurulumKimligi(),
 	}
 	if !son.IsZero() {
 		cevap["son_kontrol"] = son.UTC().Format(time.RFC3339)
@@ -335,8 +350,7 @@ func SurumBilgi(w http.ResponseWriter, r *http.Request) {
 	mevcut, buildTarihi := surumMevcut, surumBuildTarihi
 	surumMu.RUnlock()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"mevcut":         mevcut,
-		"build_tarihi":   buildTarihi,
-		"kurulum_kimlik": KurulumKimligi(),
+		"mevcut":       mevcut,
+		"build_tarihi": buildTarihi,
 	})
 }

@@ -44,10 +44,14 @@ func TestSurumOnbellekGuvenilirMi(t *testing.T) {
 	}
 }
 
-func TestSurumBilgiKurulumKimligiIcerir(t *testing.T) {
-	r := httptest.NewRequest(http.MethodGet, "/system/surum", nil)
+// TestSurumKontrolDurumKurulumKimligiIcerir — kurulum_kimlik'in rol kısıtlı
+// (BayiVeUstu, bkz. cmd/server/main.go) /system/surum-kontrol yanıtında
+// bulunduğunu doğrular. Önceden bu alan rol kısıtı OLMAYAN /system/surum'da
+// (SurumBilgi) idi — son inceleme bulgusu üzerine buraya taşındı.
+func TestSurumKontrolDurumKurulumKimligiIcerir(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/system/surum-kontrol", nil)
 	w := httptest.NewRecorder()
-	SurumBilgi(w, r)
+	SurumKontrolDurum(w, r)
 
 	var body map[string]any
 	if err := json.NewDecoder(w.Result().Body).Decode(&body); err != nil {
@@ -59,5 +63,23 @@ func TestSurumBilgiKurulumKimligiIcerir(t *testing.T) {
 	kimlik, _ := body["kurulum_kimlik"].(string)
 	if len(kimlik) < 16 {
 		t.Errorf("kurulum_kimlik beklenmedik: %q", kimlik)
+	}
+}
+
+// TestSurumBilgiKurulumKimligiIcermez — /system/surum rol kısıtı olmadan
+// TÜM oturum açmış kullanıcılara (müşteri dahil) açık; kurulum_kimlik gibi
+// kurulumun lisans/telemetri kimliğini taşıyan bir alan bu uca ASLA
+// sızmamalı (bkz. surumkontrol.go'daki KurulumKimligi() gizlilik notu).
+func TestSurumBilgiKurulumKimligiIcermez(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/system/surum", nil)
+	w := httptest.NewRecorder()
+	SurumBilgi(w, r)
+
+	var body map[string]any
+	if err := json.NewDecoder(w.Result().Body).Decode(&body); err != nil {
+		t.Fatalf("yanıt parse edilemedi: %v", err)
+	}
+	if _, varMi := body["kurulum_kimlik"]; varMi {
+		t.Errorf("SurumBilgi (/system/surum, rol kısıtsız) kurulum_kimlik içermemeli: %v", body)
 	}
 }

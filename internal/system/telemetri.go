@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	ipUCVarsayilan       = "https://api.ipify.org?format=text"
+	ipUCVarsayilan           = "https://api.ipify.org?format=text"
 	firestoreTabanVarsayilan = "https://firestore.googleapis.com/v1"
 	// Gerçek Firebase projesi/anahtarı henüz sağlanmadı — bkz. Task 2 sonundaki
 	// "Devreye Alma Notu". Boş bırakıldıkça telemetriGonder() sessizce no-op'tur.

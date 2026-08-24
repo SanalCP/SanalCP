@@ -2,7 +2,29 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
-type SurumBilgi = { mevcut: string; build_tarihi?: string; kurulum_kimlik: string }
+type SurumBilgi = { mevcut?: string; build_tarihi?: string; kurulum_kimlik: string }
+
+function panoYaz(text: string): boolean {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => {})
+    return true
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.top = '0'
+    ta.style.left = '0'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    return true
+  } catch { return false }
+}
 
 export default function LisansBilgisi() {
   const { t } = useTranslation(['LisansBilgisi'])
@@ -12,7 +34,7 @@ export default function LisansBilgisi() {
 
   const yukle = useCallback(async () => {
     try {
-      const { data } = await api.get<SurumBilgi>('/system/surum')
+      const { data } = await api.get<SurumBilgi>('/system/surum-kontrol')
       setBilgi(data)
     } catch (e) {
       setHata(apiHata(e, t('LisansBilgisi:load_failed')))
@@ -21,11 +43,12 @@ export default function LisansBilgisi() {
 
   useEffect(() => { void yukle() }, [yukle])
 
-  async function kopyala() {
+  function kopyala() {
     if (!bilgi?.kurulum_kimlik) return
-    await navigator.clipboard.writeText(bilgi.kurulum_kimlik)
-    setKopyalandi(true)
-    setTimeout(() => setKopyalandi(false), 2000)
+    if (panoYaz(bilgi.kurulum_kimlik)) {
+      setKopyalandi(true)
+      setTimeout(() => setKopyalandi(false), 2000)
+    }
   }
 
   return (
