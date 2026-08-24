@@ -44,14 +44,20 @@ func main() {
 		log.Fatalf("dsn ve parola zorunlu")
 	}
 
-	db, err := sql.Open("mysql", *dsn)
+	if err := run(*dsn, *tabanURL, *kullanici, *parola); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
+func run(dsn, tabanURL, kullanici, parola string) error {
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatalf("db aç: %v", err)
+		return fmt.Errorf("db aç: %v", err)
 	}
 	defer db.Close()
 
 	if err := demoBayragiAyarla(db, 0); err != nil {
-		log.Fatalf("bayrak kapatılamadı: %v", err)
+		return fmt.Errorf("bayrak kapatılamadı: %v", err)
 	}
 	defer func() {
 		if err := demoBayragiAyarla(db, 1); err != nil {
@@ -64,12 +70,12 @@ func main() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // self-signed, loopback
 	}}
 
-	if err := girisYap(istemci, *tabanURL, *kullanici, *parola); err != nil {
-		log.Fatalf("giriş: %v", err)
+	if err := girisYap(istemci, tabanURL, kullanici, parola); err != nil {
+		return fmt.Errorf("giriş: %v", err)
 	}
 
 	for _, ad := range ornekDomainler {
-		if err := domainOlustur(istemci, *tabanURL, ad); err != nil {
+		if err := domainOlustur(istemci, tabanURL, ad); err != nil {
 			log.Printf("UYARI: %s oluşturulamadı: %v", ad, err)
 			continue
 		}
@@ -78,6 +84,7 @@ func main() {
 
 	fmt.Println("tohumlama tamam. Şimdi tek seferlik dump al:")
 	fmt.Println("  mysqldump --single-transaction --databases panel | gzip -c > /var/backups/sanalcp/demo/demoseed.sql.gz")
+	return nil
 }
 
 func demoBayragiAyarla(db *sql.DB, deger int) error {
