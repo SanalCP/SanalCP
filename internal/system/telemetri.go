@@ -27,10 +27,13 @@ import (
 const (
 	ipUCVarsayilan           = "https://api.ipify.org?format=text"
 	firestoreTabanVarsayilan = "https://firestore.googleapis.com/v1"
-	// Gerçek Firebase projesi/anahtarı henüz sağlanmadı — bkz. Task 2 sonundaki
-	// "Devreye Alma Notu". Boş bırakıldıkça telemetriGonder() sessizce no-op'tur.
-	firebaseProjeVarsayilan   = ""
-	firebaseAnahtarVarsayilan = ""
+	// Firebase projesi 2026-08-24'te kuruldu (bkz. docs/superpowers/plans/
+	// 2026-08-24-panel-lisans-telemetri.md, "Devreye Alma Notu"). Web API key
+	// Firebase'in tasarımı gereği gizli değildir — erişim firestore.rules ile
+	// sağlanır (bkz. o dosya). Boş bırakılırsa telemetriGonder() sessizce
+	// no-op'tur (bkz. telemetriHazirMi).
+	firebaseProjeVarsayilan   = "sanalcp-telemetri"
+	firebaseAnahtarVarsayilan = "AIzaSyCfQf1pE-BPGT07HGRtnFvOrTP3rB4I8jk"
 
 	ilkZamanYol          = "/etc/sanalcp/kurulum-ilk-zaman"
 	telemetriGovdeSiniri = 8 << 10
