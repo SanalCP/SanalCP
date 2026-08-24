@@ -1,0 +1,7 @@
+{
+  "label": "License Number",
+  "desc": "The unique identifier for this installation. You can share it when opening a support request.",
+  "copy": "Copy",
+  "copied": "Copied",
+  "load_failed": "Could not read the license number"
+}

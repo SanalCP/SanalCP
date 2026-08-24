@@ -1,0 +1,7 @@
+{
+  "label": "Lisans Numarası",
+  "desc": "Bu kurulumu tanımlayan benzersiz numara. Destek talebi açarken paylaşabilirsiniz.",
+  "copy": "Kopyala",
+  "copied": "Kopyalandı",
+  "load_failed": "Lisans numarası okunamadı"
+}
