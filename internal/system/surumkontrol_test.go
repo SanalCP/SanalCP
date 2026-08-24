@@ -1,6 +1,9 @@
 package system
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -38,5 +41,23 @@ func TestSurumOnbellekGuvenilirMi(t *testing.T) {
 	}
 	if surumOnbellekGuvenilirMi("", "0.3.7") {
 		t.Error("bu alanı hiç içermeyen eski biçimli önbellek güvenilmez sayılmalı")
+	}
+}
+
+func TestSurumBilgiKurulumKimligiIcerir(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/system/surum", nil)
+	w := httptest.NewRecorder()
+	SurumBilgi(w, r)
+
+	var body map[string]any
+	if err := json.NewDecoder(w.Result().Body).Decode(&body); err != nil {
+		t.Fatalf("yanıt parse edilemedi: %v", err)
+	}
+	// KurulumKimligi() dosya yazımı başarısız olsa bile (test ortamında
+	// /etc/sanalcp'e yazma izni olmayabilir) rastgele üretilmiş değeri
+	// döndürür — bkz. surumkontrol.go, bu yüzden test izole dizin gerektirmez.
+	kimlik, _ := body["kurulum_kimlik"].(string)
+	if len(kimlik) < 16 {
+		t.Errorf("kurulum_kimlik beklenmedik: %q", kimlik)
 	}
 }

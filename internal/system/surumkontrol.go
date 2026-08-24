@@ -331,7 +331,8 @@ func SurumBilgi(w http.ResponseWriter, r *http.Request) {
 	mevcut, buildTarihi := surumMevcut, surumBuildTarihi
 	surumMu.RUnlock()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"mevcut":       mevcut,
-		"build_tarihi": buildTarihi,
+		"mevcut":         mevcut,
+		"build_tarihi":   buildTarihi,
+		"kurulum_kimlik": KurulumKimligi(),
 	})
 }
