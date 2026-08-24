@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -32,6 +33,12 @@ type Handlers struct {
 
 // GET /system/processes?n=15&sirala=cpu|mem
 func Processes(w http.ResponseWriter, r *http.Request) {
+	// DEMO: ps çıktısı diğer cron/ops komutlarının tam komut satırını (ve
+	// olası sırlarını) sızdırabilir — ham metin, tek alan gibi maskelenemez.
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+		return
+	}
 	n := 15
 	if s := r.URL.Query().Get("n"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v > 0 && v <= 100 {

@@ -12,6 +12,15 @@
 # olmalı (bkz. o script'in son satırdaki mysqldump komutu).
 set -euo pipefail
 
+# Bu script assets/ops/* içinde olduğu için sanalcp-install.sh ve
+# sanalcp-update TÜM kurulumlara (gerçek üretim sunucuları dahil) kopyalar —
+# başlıktaki "yalnız demo_modu_acik=1'de çalışır" varsayımını kod
+# zorlamıyordu. Gerçek panelde çalıştırılırsa systemctl stop + panel
+# şemasının tamamının dump'tan geri yüklenmesi geri döndürülemez veri kaybına
+# yol açar; bu yüzden bayrağı burada kendimiz doğruluyoruz.
+mysql -N -B panel -e 'SELECT demo_modu_acik FROM panel_ayarlari WHERE id=1' 2>/dev/null | grep -qx 1 ||
+  { echo "HATA: demo modu kapalı — bu script yalnız demo VPS'inde çalışır" >&2; exit 1; }
+
 DUMP=/var/backups/sanalcp/demo/demoseed.sql.gz
 [ -f "$DUMP" ] || { echo "HATA: tohum dump'ı yok: $DUMP (önce scripts/demo_seed.go çalıştırılmalı)" >&2; exit 1; }
 

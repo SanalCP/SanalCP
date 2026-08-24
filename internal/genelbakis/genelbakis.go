@@ -245,6 +245,7 @@ ORDER BY d.alan_adi, a.db_name`
 	}
 	defer rows.Close()
 
+	demoPanel := middleware.DemoPaneliMi(r)
 	out := make([]DBSatir, 0)
 	for rows.Next() {
 		var s DBSatir
@@ -254,6 +255,8 @@ ORDER BY d.alan_adi, a.db_name`
 		if dec, err := hesaplar.DecryptDBPassword(s.DBParola); err == nil {
 			s.DBParola = dec
 		}
+		// DEMO: gerçek DB parolası demo panelde asla dönmez.
+		s.DBParola = middleware.Maskele(demoPanel, s.DBParola)
 		out = append(out, s)
 	}
 

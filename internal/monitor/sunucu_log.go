@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 	"sanalcp/internal/osfam"
 )
 
@@ -35,6 +36,12 @@ var logKaynakSira = []string{"panel", "nginx", "mariadb", "named", "sshd", "cron
 
 // SunucuLog: GET /admin/system/loglar?kaynak=panel&son=200 — journald sunucu günlükleri.
 func (h *Handlers) SunucuLog(w http.ResponseWriter, r *http.Request) {
+	// DEMO: ham journal/log içeriği, tek bir JSON alanı gibi kısmi
+	// maskelenemez — tamamen kapatılır (bkz. files.Download emsali).
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+		return
+	}
 	kaynak := r.URL.Query().Get("kaynak")
 	if kaynak == "" {
 		kaynak = "panel"

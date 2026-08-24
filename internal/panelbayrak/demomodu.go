@@ -3,7 +3,37 @@ package panelbayrak
 import (
 	"context"
 	"database/sql"
+	"sync"
+	"time"
 )
+
+// demoModuOnbellekSuresi: DemoModuAcik'in DB sonucunu ne kadar süre önbellekte
+// tutacağı. DemoSaltOkunur her istekte (kimlik doğrulamadan ÖNCE, /healthz ve
+// 404'ler dahil) bu fonksiyonu çağırır — önbellek olmadan her anonim istek bir
+// DB round-trip'ine dönüşür (bkz. kod incelemesi bulgusu: istek seli = DB sorgu
+// seli). 5 saniye, scripts/demo_seed.go'nun bayrağı çalışırken değiştirmesinin
+// neredeyse anında fark edilmesi için yeterince kısa.
+const demoModuOnbellekSuresi = 5 * time.Second
+
+var (
+	demoModuOnbellekKilit sync.Mutex
+	demoModuOnbellekDeger bool
+	demoModuOnbellekAn    time.Time
+	demoModuOnbellekDolu  bool
+)
+
+// OnbellekSifirla: yalnız testler için — paket-seviyeli önbelleği temizler.
+//
+// demomodu_test.go VE internal/middleware/demo_test.go (panelbayrak.DemoModuAcik'i
+// scopeDB üzerinden dolaylı çağırır) her testin başında bunu çağırmalı; aksi
+// halde process-level önbellek testler arası sızar ve sqlmock'un "her testte
+// tam bir sorgu bekleniyor" varsayımını bozar (üçüncü+ test, yeni mock yerine
+// önbellekteki eski değeri sessizce kullanır).
+func OnbellekSifirla() {
+	demoModuOnbellekKilit.Lock()
+	defer demoModuOnbellekKilit.Unlock()
+	demoModuOnbellekDolu = false
+}
 
 // DemoModuAcik — panel demo modunda mı? (bkz. migrations/0070)
 //
@@ -17,6 +47,28 @@ import (
 // süreliğine açık kalması riskini taşır — o sunucuda gerçek müşteri
 // verisi olmadığı için kabul edilebilir.
 func DemoModuAcik(ctx context.Context, db *sql.DB) bool {
+	demoModuOnbellekKilit.Lock()
+	if demoModuOnbellekDolu && time.Since(demoModuOnbellekAn) < demoModuOnbellekSuresi {
+		deger := demoModuOnbellekDeger
+		demoModuOnbellekKilit.Unlock()
+		return deger
+	}
+	demoModuOnbellekKilit.Unlock()
+
+	acik := demoModuAcikDBdenOku(ctx, db)
+
+	demoModuOnbellekKilit.Lock()
+	demoModuOnbellekDeger = acik
+	demoModuOnbellekAn = time.Now()
+	demoModuOnbellekDolu = true
+	demoModuOnbellekKilit.Unlock()
+
+	return acik
+}
+
+// demoModuAcikDBdenOku: önbelleksiz gerçek okuma — fail-open semantiği
+// (nil db / sorgu hatası / satır yok → false) değişmeden korunur.
+func demoModuAcikDBdenOku(ctx context.Context, db *sql.DB) bool {
 	if db == nil {
 		return false
 	}
