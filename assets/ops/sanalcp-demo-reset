@@ -1,0 +1,27 @@
+#!/bin/bash
+# SanalCP DEMO — gecelik sıfırlama.
+#
+# Yalnız demo_modu_acik=1 olan kurulumda systemd timer ile çalışır (bkz.
+# sanalcp-demo-reset.timer). API yazmaları zaten middleware.DemoSaltOkunur
+# tarafından bloklanır (bkz. internal/middleware/demo.go); bu script'in asıl
+# işi zamanla biriken disk/log/sayaç durumunu (SSL süre sayacı, kota
+# göstergesi, journal büyümesi) temizlemek ve tohum durumunu SQL dump'tan
+# geri yüklemek.
+#
+# ÖN KOŞUL: scripts/demo_seed.go bir kez çalıştırılmış ve dump'ı alınmış
+# olmalı (bkz. o script'in son satırdaki mysqldump komutu).
+set -euo pipefail
+
+DUMP=/var/backups/sanalcp/demo/demoseed.sql.gz
+[ -f "$DUMP" ] || { echo "HATA: tohum dump'ı yok: $DUMP (önce scripts/demo_seed.go çalıştırılmalı)" >&2; exit 1; }
+
+systemctl stop sanalcp
+
+zcat "$DUMP" | mysql panel
+
+journalctl --vacuum-time=1h >/dev/null 2>&1 || true
+find /var/log/sanalcp -maxdepth 1 -type f -mtime +0 -delete 2>/dev/null || true
+
+systemctl start sanalcp
+
+echo "demo reset tamam: $(date -u +%FT%TZ)"

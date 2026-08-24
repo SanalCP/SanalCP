@@ -1,0 +1,7 @@
+[Unit]
+Description=SanalCP demo panel gecelik sifirlama
+After=network.target mariadb.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanalcp-demo-reset
