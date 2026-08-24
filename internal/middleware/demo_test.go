@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	"sanalcp/internal/panelbayrak"
 )
 
 func sqlmockRows(deger int) *sqlmock.Rows {
@@ -33,6 +35,7 @@ func TestDemoIleVeDemoPaneliMi(t *testing.T) {
 }
 
 func TestDemoSaltOkunur_BayrakKapaliYazmaSerbest(t *testing.T) {
+	panelbayrak.OnbellekSifirla() // DemoModuAcik'in 5sn'lik önbelleği testler arası sızmasın
 	mock := mockDB(t)
 	mock.ExpectQuery(demoModuSorgu).
 		WillReturnRows(sqlmockRows(0))
@@ -48,6 +51,7 @@ func TestDemoSaltOkunur_BayrakKapaliYazmaSerbest(t *testing.T) {
 }
 
 func TestDemoSaltOkunur_BayrakAcikGetSerbest(t *testing.T) {
+	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
 	mock.ExpectQuery(demoModuSorgu).
 		WillReturnRows(sqlmockRows(1))
@@ -63,6 +67,7 @@ func TestDemoSaltOkunur_BayrakAcikGetSerbest(t *testing.T) {
 }
 
 func TestDemoSaltOkunur_BayrakAcikYazmaEngellenir(t *testing.T) {
+	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
 	mock.ExpectQuery(demoModuSorgu).
 		WillReturnRows(sqlmockRows(1))
@@ -79,6 +84,7 @@ func TestDemoSaltOkunur_BayrakAcikYazmaEngellenir(t *testing.T) {
 
 func TestDemoSaltOkunur_BeyazListeGecer(t *testing.T) {
 	for _, yol := range []string{"/api/v1/auth/login", "/api/v1/auth/cikis"} {
+		panelbayrak.OnbellekSifirla()
 		mock := mockDB(t)
 		mock.ExpectQuery(demoModuSorgu).
 			WillReturnRows(sqlmockRows(1))
@@ -95,6 +101,7 @@ func TestDemoSaltOkunur_BeyazListeGecer(t *testing.T) {
 }
 
 func TestDemoSaltOkunur_ContextTasinir(t *testing.T) {
+	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
 	mock.ExpectQuery(demoModuSorgu).
 		WillReturnRows(sqlmockRows(1))

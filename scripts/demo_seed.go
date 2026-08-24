@@ -27,7 +27,10 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -65,6 +68,21 @@ func run(dsn, tabanURL, kullanici, parola string) error {
 		}
 	}()
 
+	// SIGINT/SIGTERM (örn. operatör çok-dakikalık domain oluşturma döngüsü
+	// sırasında Ctrl-C basarsa) Go'nun defer zincirini ATLAR — process anında
+	// sonlanır, yukarıdaki defer hiç çalışmaz ve demo panel kalıcı olarak
+	// yazma-açık kalır. Bayrağı burada elle geri çeviriyoruz.
+	sinyal := make(chan os.Signal, 1)
+	signal.Notify(sinyal, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		s := <-sinyal
+		log.Printf("sinyal alındı (%v), demo bayrağı geri açılıyor...", s)
+		if err := demoBayragiAyarla(db, 1); err != nil {
+			log.Printf("UYARI: bayrak geri açılamadı, elle kontrol et: UPDATE panel_ayarlari SET demo_modu_acik=1 WHERE id=1; (%v)", err)
+		}
+		os.Exit(1)
+	}()
+
 	jar, _ := cookiejar.New(nil)
 	istemci := &http.Client{Jar: jar, Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // self-signed, loopback
@@ -74,12 +92,23 @@ func run(dsn, tabanURL, kullanici, parola string) error {
 		return fmt.Errorf("giriş: %v", err)
 	}
 
+	basarili := 0
 	for _, ad := range ornekDomainler {
 		if err := domainOlustur(istemci, tabanURL, ad); err != nil {
 			log.Printf("UYARI: %s oluşturulamadı: %v", ad, err)
 			continue
 		}
 		fmt.Printf("oluşturuldu: %s\n", ad)
+		basarili++
+	}
+
+	// Hiçbir domain oluşmadıysa "tamam" demek yanıltıcı: operatör boş bir
+	// dump alıp sanalcp-demo-reset'e her gece o boş durumu geri
+	// yükletebilir. Sessizce 0-satırlık bir "başarı" raporlamak yerine
+	// açıkça hata veriyoruz.
+	if basarili == 0 {
+		fmt.Fprintln(os.Stderr, "HATA: hiçbir örnek domain oluşturulamadı, dump ALMA — önce sorunu çöz")
+		return fmt.Errorf("tohumlama başarısız: 0/%d domain oluşturuldu", len(ornekDomainler))
 	}
 
 	fmt.Println("tohumlama tamam. Şimdi tek seferlik dump al:")
