@@ -302,6 +302,12 @@ func main() {
 	// taşımayan istekler (curl, API token'lı otomasyon, git webhook) etkilenmez;
 	// gerekçenin tamamı middleware.CSRFKoruma'nın başındaki yorumda.
 	r.Use(middleware.CSRFKoruma)
+	// 🔴 GÜVENLİK: demo.sanalcp.com gibi ayrı, salt-okunur bir demo kurulumunda
+	// panel_ayarlari.demo_modu_acik=1 iken TÜM yazan istekleri (login/cikis
+	// hariç) engeller. Route'lardan ÖNCE eklendiği için git-webhook/pma-redeem
+	// gibi RequireAuth dışındaki uçlar da kapsanır (bkz. internal/middleware/demo.go).
+	// Bayrak varsayılan kapalıdır; kapalıyken bu satır no-op'tur.
+	r.Use(middleware.DemoSaltOkunur)
 
 	r.Post("/api/v1/git-webhook/{secret}", gitH.Webhook)
 	r.Post("/api/v1/internal/pma-redeem", pmaH.Bozdur)
