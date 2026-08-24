@@ -127,7 +127,10 @@ func SurumKontrolTetikle() {
 	if !surumTetikleGerekliMi(son, time.Now()) {
 		return
 	}
-	go surumGetir()
+	go func() {
+		surumGetir()
+		telemetriGonder()
+	}()
 }
 
 // surumTetikleGerekliMi: saf karar fonksiyonu (test edilebilir) — son kontrol
@@ -163,6 +166,7 @@ func SurumBaslat(mevcutSurum, buildTarihi string) {
 		time.Sleep(surumRastgele(10*time.Second, 60*time.Second))
 		for {
 			surumGetir()
+			telemetriGonder()
 			// Periyoda ±2 saat serpiştirme — aynı sebep.
 			time.Sleep(surumPeriyot + surumRastgele(-2*time.Hour, 2*time.Hour))
 		}
