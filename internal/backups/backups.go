@@ -319,6 +319,12 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
+	// DEMO: yedek arşivi tüm tenant dosya ağacını (dolayıyla sırlarını) içerir
+	// — ham gzip akışı JSON alanı gibi kısmi maskelenemez, tamamen kapatılır.
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda yedek indirilemez")
+		return
+	}
 	// Büyük yedek indirmeleri sunucunun kısa varsayılan yazma zaman aşımını
 	// (bkz. cmd/server/main.go) aşabilir — bu uç için istisna açılır.
 	httpx.ExtendDeadline(w, 30*time.Minute)
