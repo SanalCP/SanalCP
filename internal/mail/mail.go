@@ -371,6 +371,8 @@ func (h *Handlers) ParolaGoster(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusGone, "gösterim süresi doldu veya parola zaten görüntülendi")
 		return
 	}
+	// DEMO: gerçek posta kutusu parolası demo panelde asla dönmez.
+	parola = middleware.Maskele(middleware.DemoPaneliMi(r), parola)
 	w.Header().Set("Cache-Control", "no-store, private")
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"parola": parola})
 }
