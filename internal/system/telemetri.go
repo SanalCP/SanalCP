@@ -17,8 +17,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"sanalcp/internal/osfam"
 )
 
 const (
@@ -160,4 +163,42 @@ func telemetriGonderVeri(kimlik, surum, ip, osAile, dil, ilkZaman string) error 
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, telemetriGovdeSiniri))
 	return nil
+}
+
+// kurulumIlkZamani — bu kurulumun ilk telemetri gönderiminin zamanı. Yoksa
+// üretir ve KALICI olarak diske yazar (KurulumKimligi() ile birebir aynı
+// desen) — her PATCH'te AYNI değer gönderilir, böylece Firestore Rules'daki
+// "ilk_kurulum_zamani immutable" kısıtı Go tarafından da doğal olarak sağlanır.
+func kurulumIlkZamani() string {
+	if b, err := os.ReadFile(ilkZamanYol); err == nil {
+		if s := strings.TrimSpace(string(b)); s != "" {
+			return s
+		}
+	}
+	zaman := time.Now().UTC().Format(time.RFC3339)
+	_ = os.MkdirAll(filepath.Dir(ilkZamanYol), 0o755)
+	_ = os.WriteFile(ilkZamanYol, []byte(zaman+"\n"), 0o600)
+	return zaman
+}
+
+// telemetriGonder — surumkontrol.go'daki goroutine döngüsünde surumGetir()
+// ile aynı turda çağrılır (bkz. Task 2). Kapalıysa (PANEL_SURUM_KONTROL=0)
+// çağrı yeri zaten hiç çağırmaz. Firebase henüz devreye alınmadıysa
+// (telemetriHazirMi==false) sessizce no-op'tur.
+func telemetriGonder() {
+	if !telemetriHazirMi(firebaseProje(), firebaseAnahtar()) {
+		return
+	}
+	kimlik := KurulumKimligi()
+	if kimlik == "" {
+		return // rastgele üretim başarısız oldu (bkz. KurulumKimligi)
+	}
+	_ = telemetriGonderVeri(
+		kimlik,
+		surumMevcutOku(),
+		ipTespitEt(),
+		osfam.Mevcut().ID,
+		panelDili(),
+		kurulumIlkZamani(),
+	)
 }
