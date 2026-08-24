@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// SanalCP kurulum telemetrisi — bkz.
+// docs/superpowers/specs/2026-08-24-panel-lisans-telemetri-design.md
+//
+// Okuma tamamen kapalı: yalnız proje sahibi Firebase Console / Admin SDK
+// üzerinden görür. Yazma yalnız kendi doküman ID'sine (kurulum_kimlik),
+// whitelist'li alanlarla. ilk_kurulum_zamani ilk yazımdan sonra değişmez.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /kurulumlar/{kurulumId} {
+      allow read: if false;
+      allow delete: if false;
+
+      allow create: if request.resource.data.keys().hasOnly([
+                        'kurulum_kimlik', 'mevcut_surum', 'kaynak_ip',
+                        'osfam', 'panel_dili',
+                        'ilk_kurulum_zamani', 'son_gorulme_zamani'
+                      ])
+                      && request.resource.data.kurulum_kimlik == kurulumId
+                      && request.resource.data.kurulum_kimlik is string
+                      && request.resource.data.kurulum_kimlik.size() >= 16;
+
+      allow update: if request.resource.data.keys().hasOnly([
+                        'kurulum_kimlik', 'mevcut_surum', 'kaynak_ip',
+                        'osfam', 'panel_dili',
+                        'ilk_kurulum_zamani', 'son_gorulme_zamani'
+                      ])
+                      && request.resource.data.kurulum_kimlik == resource.data.kurulum_kimlik
+                      && request.resource.data.ilk_kurulum_zamani == resource.data.ilk_kurulum_zamani;
+    }
+  }
+}
