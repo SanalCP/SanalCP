@@ -11,6 +11,7 @@ package system
 // hiçbir yerde hata gösterilmez (surumkontrol.go'daki felsefeyle aynı).
 
 import (
+	"os"
 	"strings"
 )
 
@@ -41,4 +42,38 @@ func ipBicimGecerliMi(s string) bool {
 		return false
 	}
 	return !strings.ContainsAny(s, " \t\n\"<>")
+}
+
+func ipUC() string {
+	if v := strings.TrimSpace(os.Getenv("PANEL_IP_UC")); v != "" {
+		return v
+	}
+	return ipUCVarsayilan
+}
+
+func firestoreTaban() string {
+	if v := strings.TrimSpace(os.Getenv("PANEL_FIREBASE_UC")); v != "" {
+		return v
+	}
+	return firestoreTabanVarsayilan
+}
+
+func firebaseProje() string {
+	if v := strings.TrimSpace(os.Getenv("PANEL_FIREBASE_PROJE")); v != "" {
+		return v
+	}
+	return firebaseProjeVarsayilan
+}
+
+func firebaseAnahtar() string {
+	if v := strings.TrimSpace(os.Getenv("PANEL_FIREBASE_API_ANAHTARI")); v != "" {
+		return v
+	}
+	return firebaseAnahtarVarsayilan
+}
+
+// telemetriHazirMi: saf karar fonksiyonu — proje veya anahtar boşsa (henüz
+// devreye alınmamış) telemetriGonder() sessizce no-op olur.
+func telemetriHazirMi(proje, anahtar string) bool {
+	return proje != "" && anahtar != ""
 }

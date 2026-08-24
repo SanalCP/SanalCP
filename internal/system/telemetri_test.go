@@ -19,3 +19,18 @@ func TestIpBicimGecerliMi(t *testing.T) {
 		}
 	}
 }
+
+func TestTelemetriHazirMi(t *testing.T) {
+	if telemetriHazirMi("", "") {
+		t.Error("proje ve anahtar boşken hazır olmamalı")
+	}
+	if telemetriHazirMi("proje", "") {
+		t.Error("anahtar boşken hazır olmamalı")
+	}
+	if telemetriHazirMi("", "anahtar") {
+		t.Error("proje boşken hazır olmamalı")
+	}
+	if !telemetriHazirMi("proje", "anahtar") {
+		t.Error("ikisi de doluyken hazır olmalı")
+	}
+}
