@@ -11,6 +11,8 @@ package system
 // hiçbir yerde hata gösterilmez (surumkontrol.go'daki felsefeyle aynı).
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -135,4 +137,27 @@ func ipTespitEt() string {
 		return ""
 	}
 	return ip
+}
+
+// telemetriGonderVeri — asıl ağ çağrısı. Girdileri parametre olarak alır ki
+// testler gerçek IP tespiti / dosya sistemi olmadan mock sunucularla
+// çalışabilsin. Hata döner (telemetriGonder bu hatayı yutar).
+func telemetriGonderVeri(kimlik, surum, ip, osAile, dil, ilkZaman string) error {
+	govde, err := json.Marshal(firestoreDegerleriOlustur(kimlik, surum, ip, osAile, dil, ilkZaman))
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPatch, firestoreURL(kimlik), bytes.NewReader(govde))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	cli := &http.Client{Timeout: 20 * time.Second}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, telemetriGovdeSiniri))
+	return nil
 }

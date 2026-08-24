@@ -1,6 +1,7 @@
 package system
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -103,5 +104,58 @@ func TestIpTespitEtHataDurumu(t *testing.T) {
 
 	if got := ipTespitEt(); got != "" {
 		t.Errorf("ipTespitEt() hata durumunda %q döndü, beklenen boş", got)
+	}
+}
+
+func TestTelemetriGonderVeri(t *testing.T) {
+	var alinanYol, alinanMetod string
+	var alinanGovde map[string]any
+	sunucu := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		alinanYol = r.URL.Path + "?" + r.URL.RawQuery
+		alinanMetod = r.Method
+		_ = json.NewDecoder(r.Body).Decode(&alinanGovde)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sunucu.Close()
+
+	for k, v := range map[string]string{
+		"PANEL_FIREBASE_UC":          sunucu.URL,
+		"PANEL_FIREBASE_PROJE":       "test-proje",
+		"PANEL_FIREBASE_API_ANAHTARI": "test-anahtar",
+	} {
+		old := os.Getenv(k)
+		os.Setenv(k, v)
+		defer os.Setenv(k, old)
+	}
+
+	err := telemetriGonderVeri("kimlik123", "0.9.7", "1.2.3.4", "almalinux", "tr", "2026-01-01T00:00:00Z")
+	if err != nil {
+		t.Fatalf("telemetriGonderVeri hata döndü: %v", err)
+	}
+	if alinanMetod != http.MethodPatch {
+		t.Errorf("metod = %s, beklenen PATCH", alinanMetod)
+	}
+	if !strings.Contains(alinanYol, "/kurulumlar/kimlik123") {
+		t.Errorf("yol beklenmedik: %s", alinanYol)
+	}
+	alanlar, _ := alinanGovde["fields"].(map[string]any)
+	kimlik, _ := alanlar["kurulum_kimlik"].(map[string]any)
+	if kimlik["stringValue"] != "kimlik123" {
+		t.Errorf("gövdedeki kurulum_kimlik = %#v", alanlar["kurulum_kimlik"])
+	}
+}
+
+func TestTelemetriGonderVeriAgHatasi(t *testing.T) {
+	for k, v := range map[string]string{
+		"PANEL_FIREBASE_UC":          "http://127.0.0.1:1", // hiçbir şey dinlemiyor
+		"PANEL_FIREBASE_PROJE":       "test-proje",
+		"PANEL_FIREBASE_API_ANAHTARI": "test-anahtar",
+	} {
+		old := os.Getenv(k)
+		os.Setenv(k, v)
+		defer os.Setenv(k, old)
+	}
+	if err := telemetriGonderVeri("kimlik123", "0.9.7", "", "", "", "2026-01-01T00:00:00Z"); err == nil {
+		t.Error("ulaşılamayan sunucuda hata dönmeli (panel bunu YUTAR, ama iç fonksiyon hatayı görmeli)")
 	}
 }
