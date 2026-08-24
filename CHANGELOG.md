@@ -11,6 +11,18 @@ sayfa altbilgisinden görebilirsiniz.
 
 ---
 
+## 0.9.x — Lisans numarası
+
+**0.9.8** (2026-08-24)
+
+Araçlar ve Ayarlar sayfasına, kurulumu tanımlayan bir lisans numarası kartı eklendi.
+
+- **Araçlar ve Ayarlar**: "Sunucu bakımı" bölümüne yeni bir kart eklendi — kurulumun
+  benzersiz kimliğini gösterir, kopyala düğmesi vardır. Destek talebinde paylaşmak
+  için kullanılabilir.
+- Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez. Mevcut
+  kurulumlarda tek `sanalcp-update` yeterli.
+
 ## 0.9.x — Panel girişi root'tan ayrıldı
 
 **0.9.1** (2026-08-20)
