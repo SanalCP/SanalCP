@@ -18,6 +18,7 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/sys/unix"
@@ -174,6 +175,11 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 
 // Dosya icerigini ham olarak donder (download)
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
+	// DEMO: ham dosya akışı JSON alanı gibi kısmi maskelenemez — tamamen kapatılır.
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda dosya indirilemez")
+		return
+	}
 	home, _, err := h.home(r)
 	if err != nil {
 		httpx.WriteError(w, statusFromErr(err), err.Error())
@@ -249,9 +255,15 @@ func (h *Handlers) Read(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"yol":    rel,
-		"icerik": string(data),
+		"icerik": icerikGoster(middleware.DemoPaneliMi(r), data),
 		"boyut":  boyut,
 	})
+}
+
+// icerikGoster: demo panelde dosya içeriği (kaynak kod, .env, wp-config.php
+// vb. sır taşıyabilir) yerine sabit bir maske döner.
+func icerikGoster(demoPanel bool, data []byte) string {
+	return middleware.Maskele(demoPanel, string(data))
 }
 
 // statusFromFsErr: symlink-güvenli dosya işlemlerinin errno'sunu HTTP durumuna
