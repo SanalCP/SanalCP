@@ -11,8 +11,10 @@ package system
 // hiçbir yerde hata gösterilmez (surumkontrol.go'daki felsefeyle aynı).
 
 import (
+	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -76,4 +78,36 @@ func firebaseAnahtar() string {
 // devreye alınmamış) telemetriGonder() sessizce no-op olur.
 func telemetriHazirMi(proje, anahtar string) bool {
 	return proje != "" && anahtar != ""
+}
+
+// firestoreDegerleriOlustur — Firestore REST doküman alan haritasını kurar.
+func firestoreDegerleriOlustur(kimlik, surum, ip, osAile, dil, ilkZaman string) map[string]any {
+	deger := func(s string) map[string]any { return map[string]any{"stringValue": s} }
+	return map[string]any{
+		"fields": map[string]any{
+			"kurulum_kimlik":     deger(kimlik),
+			"mevcut_surum":       deger(surum),
+			"kaynak_ip":          deger(ip),
+			"osfam":              deger(osAile),
+			"panel_dili":         deger(dil),
+			"ilk_kurulum_zamani": map[string]any{"timestampValue": ilkZaman},
+			"son_gorulme_zamani": map[string]any{"timestampValue": time.Now().UTC().Format(time.RFC3339)},
+		},
+	}
+}
+
+// firestoreURL — PATCH hedefi. Firestore'un PATCH ucu, doküman yoksa
+// oluşturur (create), varsa günceller (update) — Rules bu ikisini otomatik
+// ayırt eder, Go tarafında ayrı dallanma gerekmez.
+func firestoreURL(kimlik string) string {
+	base := firestoreTaban() + "/projects/" + firebaseProje() +
+		"/databases/(default)/documents/kurulumlar/" + url.PathEscape(kimlik)
+	q := url.Values{}
+	for _, alan := range telemetriAlanlar {
+		q.Add("updateMask.fieldPaths", alan)
+	}
+	if k := firebaseAnahtar(); k != "" {
+		q.Set("key", k)
+	}
+	return base + "?" + q.Encode()
 }
