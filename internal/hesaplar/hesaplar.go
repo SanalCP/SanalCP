@@ -362,6 +362,26 @@ func MySQLGrantExistingUser(db *sql.DB, domainID int64, dbName, dbUser string) e
 	return err
 }
 
+// MySQLRevokeUser: kullanicinin bir DB uzerindeki erisimini kaldirir (DB'nin
+// kendisine DOKUNMAZ). dropUser=true ise kullanici MariaDB'den tamamen silinir
+// (baska hicbir DB'de kullanilmiyorsa cagiran bunu ONCEDEN kontrol etmelidir);
+// false ise yalniz bu DB uzerindeki GRANT geri alinir, kullanici yasamaya devam eder.
+func MySQLRevokeUser(db *sql.DB, dbName, dbUser string, dropUser bool) error {
+	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
+		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
+	}
+	stmts := []string{fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%s`.* FROM '%s'@'localhost'", dbName, dbUser)}
+	if dropUser {
+		stmts = append(stmts, fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser))
+	}
+	stmts = append(stmts, "FLUSH PRIVILEGES")
+	if err := rootExecAll(stmts...); err != nil {
+		return err
+	}
+	_, err := db.Exec(`DELETE FROM db_accounts WHERE db_name=? AND db_user=?`, dbName, dbUser)
+	return err
+}
+
 // MySQLDropAllForDomain: domain silinince ona ait tum DB'leri kaldir
 func MySQLDropAllForDomain(db *sql.DB, domainID int64) error {
 	rows, err := db.Query(`SELECT db_name, db_user FROM db_accounts WHERE domain_id=?`, domainID)

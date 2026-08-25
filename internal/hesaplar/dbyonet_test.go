@@ -16,3 +16,12 @@ func TestMySQLGrantExistingUserGecersizKimlikleriReddeder(t *testing.T) {
 		t.Error("noktalı virgüllü kullanıcı adı reddedilmeliydi")
 	}
 }
+
+func TestMySQLRevokeUserGecersizKimlikleriReddeder(t *testing.T) {
+	if err := MySQLRevokeUser(nil, "kötü-db", "gecerli_user", false); err == nil {
+		t.Error("tire içeren DB adı reddedilmeliydi")
+	}
+	if err := MySQLRevokeUser(nil, "gecerli_db", "kotu user", true); err == nil {
+		t.Error("boşluklu kullanıcı adı reddedilmeliydi")
+	}
+}
