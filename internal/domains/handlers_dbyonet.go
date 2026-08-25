@@ -3,8 +3,11 @@ package domains
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -91,4 +94,74 @@ func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
 		dbAdi).Scan(&out.Charset, &out.Collation)
 
 	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+type dbIsimDegistirReq struct {
+	YeniSonek string `json:"yeni_sonek"`
+}
+
+// DatabaseIsimDegistir: PUT /domains/{id}/databases/{dbAdi}/isim
+func (h *Handlers) DatabaseIsimDegistir(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	eskiAd := chi.URLParam(r, "dbAdi")
+
+	var sk string
+	var isDemo int
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).Scan(&sk, &isDemo)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "domain sorgu: "+err.Error())
+		return
+	}
+	if isDemo == 1 {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin veritabanı adı değiştirilemez")
+		return
+	}
+
+	var req dbIsimDegistirReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz istek gövdesi")
+		return
+	}
+	if !hesaplar.GecerliDBSonek(req.YeniSonek) {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz veritabanı soneki (yalnız küçük harf/rakam/alt-çizgi, 1-32 karakter)")
+		return
+	}
+	yeniAd := sk + "_" + req.YeniSonek
+	if !hesaplar.GecerliDBKimlik(yeniAd) {
+		httpx.WriteError(w, http.StatusBadRequest, "veritabanı adı çok uzun (önek + sonek ≤64 karakter olmalı)")
+		return
+	}
+
+	kullanicilar, err := dbKullanicilariGetir(r.Context(), h.DB, id, eskiAd)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı sorgu: "+err.Error())
+		return
+	}
+	if len(kullanicilar) == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+		return
+	}
+
+	var cakisma int
+	_ = h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM db_accounts WHERE db_name=?`, yeniAd).Scan(&cakisma)
+	if cakisma > 0 {
+		httpx.WriteError(w, http.StatusConflict, "bu isimde bir veritabanı zaten var: "+yeniAd)
+		return
+	}
+
+	httpx.ExtendDeadline(w, 15*time.Minute)
+	if err := hesaplar.MySQLRenameDB(r.Context(), h.DB, id, eskiAd, yeniAd, kullanicilar); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "isim değiştirme: "+err.Error())
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "eski_ad": eskiAd, "yeni_ad": yeniAd,
+		"uyari": "Veritabanı adını kullanan uygulama ayar dosyalarınızı (örn. wp-config.php) elle güncellemeniz gerekir.",
+	})
 }

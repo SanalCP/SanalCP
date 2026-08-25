@@ -3,6 +3,7 @@ package domains
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -70,6 +71,65 @@ func TestDatabaseGrupDetayBulunamayanDB404Doner(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("404 bekleniyordu, %d geldi", w.Code)
+	}
+}
+
+func TestDatabaseIsimDegistirGecersizSonekiReddeder(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT sistem_kullanici, is_demo FROM domains WHERE id=\?`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"sistem_kullanici", "is_demo"}).AddRow("sk", 0))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Put("/domains/{id}/databases/{dbAdi}/isim", h.DatabaseIsimDegistir)
+
+	body := strings.NewReader(`{"yeni_sonek":"Buyuk Harf Ve Bosluk"}`)
+	req := httptest.NewRequest(http.MethodPut, "/domains/7/databases/sk_blog/isim", body)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("400 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDatabaseIsimDegistirCakismaVarsa409Doner(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT sistem_kullanici, is_demo FROM domains WHERE id=\?`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"sistem_kullanici", "is_demo"}).AddRow("sk", 0))
+	mock.ExpectQuery(`SELECT DISTINCT db_user FROM db_accounts WHERE domain_id=\? AND db_name=\?`).
+		WithArgs(int64(7), "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"db_user"}).AddRow("sk_blog"))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM db_accounts WHERE db_name=\?`).
+		WithArgs("sk_yeni").
+		WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Put("/domains/{id}/databases/{dbAdi}/isim", h.DatabaseIsimDegistir)
+
+	body := strings.NewReader(`{"yeni_sonek":"yeni"}`)
+	req := httptest.NewRequest(http.MethodPut, "/domains/7/databases/sk_blog/isim", body)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("409 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
 	}
 }
 
