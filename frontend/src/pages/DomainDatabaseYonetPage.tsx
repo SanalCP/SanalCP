@@ -5,6 +5,8 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import DBParolaSifirlaModal from '@/components/DBParolaSifirlaModal'
+import { uretGucluParola } from '@/lib/parola'
 
 type DBKullanici = { id: number; db_kullanici: string; db_parola: string; olusturulma: string }
 export type DBGrupDetay = {
@@ -26,6 +28,20 @@ export default function DomainDatabaseYonetPage() {
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [isimDegistirAcik, setIsimDegistirAcik] = useState(false)
+  const [kullaniciEkleAcik, setKullaniciEkleAcik] = useState(false)
+  const [silinecekKullanici, setSilinecekKullanici] = useState<DBKullanici | null>(null)
+  const [pwResetFor, setPwResetFor] = useState<DBKullanici | null>(null)
+
+  async function kullaniciSil() {
+    if (!silinecekKullanici || !id || !dbAdi) return
+    try {
+      await api.delete(`/domains/${id}/databases/${encodeURIComponent(dbAdi)}/kullanicilar/${silinecekKullanici.id}`)
+      setSilinecekKullanici(null)
+      yukle()
+    } catch (e) {
+      alert(apiHata(e, t('DomainDatabaseYonetPage:user_delete_failed')))
+    }
+  }
 
   function yukle() {
     if (!id || !dbAdi) return
@@ -78,6 +94,25 @@ export default function DomainDatabaseYonetPage() {
               <button onClick={() => setIsimDegistirAcik(true)} className="ta-secondary-button">{t('DomainDatabaseYonetPage:rename_button')}</button>
             </div>
           </div>
+
+          <div className="ta-card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainDatabaseYonetPage:users')}</h3>
+              <button onClick={() => setKullaniciEkleAcik(true)} className="ta-secondary-button text-xs">{t('DomainDatabaseYonetPage:add_user')}</button>
+            </div>
+            <div className="space-y-2">
+              {detay.kullanicilar.map(k => (
+                <KullaniciSatiri
+                  key={k.id}
+                  kullanici={k}
+                  sonKullanici={detay.kullanicilar.length <= 1}
+                  onSifreDegistir={() => setPwResetFor(k)}
+                  onSil={() => setSilinecekKullanici(k)}
+                  t={t}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -89,6 +124,33 @@ export default function DomainDatabaseYonetPage() {
           onTamam={(yeniAd) => { setIsimDegistirAcik(false); window.location.href = `/abonelikler/${id}/veritabanlari/${encodeURIComponent(yeniAd)}` }}
         />
       )}
+
+      {kullaniciEkleAcik && id && dbAdi && (
+        <KullaniciEkleModal
+          domainId={id}
+          dbAdi={dbAdi}
+          onKapat={() => setKullaniciEkleAcik(false)}
+          onTamam={() => { setKullaniciEkleAcik(false); yukle() }}
+        />
+      )}
+
+      {pwResetFor && dbAdi && (
+        <DBParolaSifirlaModal
+          db={{ id: pwResetFor.id, db_adi: dbAdi, db_kullanici: pwResetFor.db_kullanici }}
+          onKapat={() => setPwResetFor(null)}
+          onTamam={() => { setPwResetFor(null); yukle() }}
+        />
+      )}
+
+      <ConfirmDialog
+        acik={!!silinecekKullanici}
+        baslik={t('DomainDatabaseYonetPage:user_delete_title')}
+        mesaj={t('DomainDatabaseYonetPage:user_delete_msg', { ad: silinecekKullanici?.db_kullanici })}
+        tehlikeli
+        onayMetni={t('DomainDatabaseYonetPage:user_delete_confirm')}
+        onOnay={kullaniciSil}
+        onIptal={() => setSilinecekKullanici(null)}
+      />
     </div>
   )
 }
@@ -152,5 +214,116 @@ function IsimDegistirModal({ domainId, eskiAd, onKapat, onTamam }: {
         onIptal={() => setOnaySoruluyor(false)}
       />
     </>
+  )
+}
+
+function KullaniciSatiri({ kullanici, sonKullanici, onSifreDegistir, onSil, t }: {
+  kullanici: DBKullanici; sonKullanici: boolean
+  onSifreDegistir: () => void; onSil: () => void
+  t: (k: string, opts?: Record<string, unknown>) => string
+}) {
+  const [goster, setGoster] = useState(false)
+  const [kopya, setKopya] = useState(false)
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-sm text-slate-800 dark:text-slate-200">{kullanici.db_kullanici}</span>
+        <button onClick={() => setGoster(!goster)} className="font-mono text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded">
+          {goster ? kullanici.db_parola : '••••••••'}
+        </button>
+        {goster && (
+          <button
+            onClick={() => { navigator.clipboard.writeText(kullanici.db_parola); setKopya(true); setTimeout(() => setKopya(false), 1500) }}
+            className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 rounded"
+          >
+            {kopya ? '✓' : '⧉'}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <button onClick={onSifreDegistir} className="text-xs text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 px-2 py-1 rounded">{t('DomainDatabaseYonetPage:change_password')}</button>
+        <button
+          onClick={onSil}
+          disabled={sonKullanici}
+          title={sonKullanici ? t('DomainDatabaseYonetPage:last_user_hint') : undefined}
+          className="text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 px-2 py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t('common:delete')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
+  domainId: string; dbAdi: string; onKapat: () => void; onTamam: () => void
+}) {
+  const { t } = useTranslation(['DomainDatabaseYonetPage', 'common'])
+  const [tip, setTip] = useState<'yeni' | 'mevcut'>('yeni')
+  const [sonek, setSonek] = useState('')
+  const [mevcutKullanici, setMevcutKullanici] = useState('')
+  const [parola, setParola] = useState('')
+  const [isleniyor, setIsleniyor] = useState(false)
+  const [hata, setHata] = useState<string | null>(null)
+
+  async function ekle() {
+    setIsleniyor(true); setHata(null)
+    try {
+      const body = tip === 'yeni'
+        ? { kullanici_tipi: 'yeni', kullanici_sonek: sonek, parola }
+        : { kullanici_tipi: 'mevcut', mevcut_kullanici: mevcutKullanici }
+      await api.post(`/domains/${domainId}/databases/${encodeURIComponent(dbAdi)}/kullanicilar`, body)
+      onTamam()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainDatabaseYonetPage:add_user_failed')))
+    } finally {
+      setIsleniyor(false)
+    }
+  }
+
+  return (
+    <Modal acik={true} baslik={t('DomainDatabaseYonetPage:add_user_modal_title')} onKapat={onKapat} genislik="md">
+      <div className="space-y-4">
+        <div className="flex gap-4">
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+            <input type="radio" checked={tip === 'yeni'} onChange={() => setTip('yeni')} className="accent-brand-600" />
+            {t('DomainDatabaseYonetPage:new_user_radio')}
+          </label>
+          <label className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+            <input type="radio" checked={tip === 'mevcut'} onChange={() => setTip('mevcut')} className="accent-brand-600" />
+            {t('DomainDatabaseYonetPage:existing_user_radio')}
+          </label>
+        </div>
+
+        {tip === 'yeni' ? (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabaseYonetPage:user_suffix_label')}</label>
+              <input value={sonek} onChange={e => setSonek(e.target.value.toLowerCase())} placeholder="ikincikullanici" className="ta-input ta-input-sm w-full font-mono" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabaseYonetPage:password_label')}</label>
+              <div className="flex gap-2">
+                <input type="text" value={parola} onChange={e => setParola(e.target.value)} placeholder={t('DomainDatabaseYonetPage:password_placeholder')} className="ta-input ta-input-sm w-full font-mono" />
+                <button type="button" onClick={() => setParola(uretGucluParola())} className="ta-secondary-button whitespace-nowrap text-xs">{t('DomainDatabaseYonetPage:generate')}</button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabaseYonetPage:existing_user_label')}</label>
+            <input value={mevcutKullanici} onChange={e => setMevcutKullanici(e.target.value)} placeholder="sk_baska_kullanici" className="ta-input ta-input-sm w-full font-mono" />
+          </div>
+        )}
+
+        {hata && <div className="ta-form-error">{hata}</div>}
+        <div className="ta-form-actions">
+          <button onClick={onKapat} disabled={isleniyor} className="ta-secondary-button">{t('common:cancel')}</button>
+          <button onClick={ekle} disabled={isleniyor || (tip === 'yeni' ? !sonek : !mevcutKullanici)} className="ta-primary-button">
+            {isleniyor ? t('DomainDatabaseYonetPage:adding') : t('DomainDatabaseYonetPage:add_user')}
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
