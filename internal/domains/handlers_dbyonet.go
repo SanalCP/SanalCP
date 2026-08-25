@@ -1,12 +1,17 @@
 package domains
 
 import (
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"sanalcp/internal/hesaplar"
@@ -339,4 +344,63 @@ func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) 
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "silinen_kullanici": dbUser})
+}
+
+// DatabaseYedekle: GET /domains/{id}/databases/{dbAdi}/yedek
+// mysqldump çıktısını gzip'leyip indirme yanıtı olarak döner. Önce geçici bir
+// dosyaya yazılır (backups.Indir deseniyle aynı) — mysqldump ortasında hata
+// verirse yanıt başlamadan 500 dönebiliriz, yarım/bozuk dosya indirtmeyiz.
+func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	dbAdi := chi.URLParam(r, "dbAdi")
+
+	var varMi int
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
+	if varMi == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+		return
+	}
+
+	httpx.ExtendDeadline(w, 15*time.Minute)
+	tmp, err := os.CreateTemp("", "sanal-db-yedek-*.sql.gz")
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	gz := gzip.NewWriter(tmp)
+	cmd := exec.CommandContext(r.Context(), "mysqldump",
+		"--single-transaction", "--routines", "--triggers", "--events", dbAdi)
+	cmd.Stdout = gz
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	runErr := cmd.Run()
+	closeErr := gz.Close()
+	_ = tmp.Close()
+	if runErr != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "mysqldump: "+strings.TrimSpace(stderr.String()))
+		return
+	}
+	if closeErr != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, closeErr.Error())
+		return
+	}
+
+	f, err := os.Open(tmpPath)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer f.Close()
+	st, _ := f.Stat()
+	dosya := dbAdi + "-" + time.Now().UTC().Format("20060102-150405") + ".sql.gz"
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+dosya+`"`)
+	if st != nil {
+		w.Header().Set("Content-Length", strconv.FormatInt(st.Size(), 10))
+	}
+	_, _ = io.Copy(w, f)
 }
