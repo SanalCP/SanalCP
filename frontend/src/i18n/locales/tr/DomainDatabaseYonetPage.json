@@ -1,0 +1,17 @@
+{
+  "breadcrumb_databases": "Veritabanları",
+  "back_to_list": "Listeye dön",
+  "general_info": "Genel Bilgi",
+  "size": "Boyut",
+  "server": "Sunucu",
+  "charset": "Karakter Seti",
+  "collation": "Sıralama (Collation)",
+  "rename_button": "İsim Değiştir",
+  "rename_modal_title": "Veritabanı İsmini Değiştir",
+  "rename_warning": "Bu işlem, veritabanı adını kullanan uygulama yapılandırma dosyalarınızı (örn. WordPress wp-config.php) OTOMATİK güncellemez — işlem sonrası bu dosyaları elle güncellemeniz gerekir, aksi halde siteniz çalışmaz.",
+  "new_suffix_label": "Yeni isim soneki",
+  "rename_confirm_title": "İsim değişikliği uygulansın mı?",
+  "rename_confirm_msg": "Bu işlem geri alınamaz ve uygulama yapılandırma dosyalarınızı bozabilir. Devam etmeden önce uyarıyı okuduğunuzdan emin olun.",
+  "rename_confirm_button": "Evet, ismi değiştir",
+  "rename_failed": "İsim değiştirme başarısız"
+}

@@ -1,0 +1,17 @@
+{
+  "breadcrumb_databases": "Databases",
+  "back_to_list": "Back to list",
+  "general_info": "General Info",
+  "size": "Size",
+  "server": "Server",
+  "charset": "Charset",
+  "collation": "Collation",
+  "rename_button": "Rename",
+  "rename_modal_title": "Rename Database",
+  "rename_warning": "This does NOT automatically update application config files that reference the database name (e.g. WordPress wp-config.php) — you must update them manually afterward, or your site will break.",
+  "new_suffix_label": "New name suffix",
+  "rename_confirm_title": "Apply the rename?",
+  "rename_confirm_msg": "This cannot be undone and may break application config files. Make sure you've read the warning before continuing.",
+  "rename_confirm_button": "Yes, rename it",
+  "rename_failed": "Rename failed"
+}
