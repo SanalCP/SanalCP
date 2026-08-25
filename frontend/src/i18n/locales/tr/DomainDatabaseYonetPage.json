@@ -47,5 +47,8 @@
   "optimizing": "Optimize ediliyor…",
   "repair_button": "Onar",
   "repairing": "Onarılıyor…",
-  "maintenance_failed": "İşlem başarısız"
+  "maintenance_failed": "İşlem başarısız",
+  "pma_open_title": "phpMyAdmin'de yeni sekmede aç",
+  "pma_button": "🔓 phpMyAdmin",
+  "pma_token_failed": "phpMyAdmin token alınamadı"
 }

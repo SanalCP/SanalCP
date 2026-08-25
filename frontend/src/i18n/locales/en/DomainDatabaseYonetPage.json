@@ -47,5 +47,8 @@
   "optimizing": "Optimizing…",
   "repair_button": "Repair",
   "repairing": "Repairing…",
-  "maintenance_failed": "Operation failed"
+  "maintenance_failed": "Operation failed",
+  "pma_open_title": "Open in phpMyAdmin in a new tab",
+  "pma_button": "🔓 phpMyAdmin",
+  "pma_token_failed": "Could not get phpMyAdmin token"
 }

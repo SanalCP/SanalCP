@@ -43,6 +43,19 @@ export default function DomainDatabaseYonetPage() {
     }
   }
 
+  // phpMyAdmin erişimi: liste sayfasından kaldırıldı, spec gereği burada duruyor
+  // (tablo seviyesi yönetim panelde YOK — pma bunun karşılığı). Uç herhangi bir
+  // db_accounts.id kabul eder; bu DB'nin ilk kullanıcısı yeterli.
+  async function pmaAc() {
+    if (!detay || detay.kullanicilar.length === 0) return
+    try {
+      const { data } = await api.post<{ signon_url: string }>(`/databases/${detay.kullanicilar[0].id}/pma-token`)
+      window.open(data.signon_url, '_blank', 'noopener')
+    } catch (e) {
+      alert(apiHata(e, t('DomainDatabaseYonetPage:pma_token_failed')))
+    }
+  }
+
   function yukle() {
     if (!id || !dbAdi) return
     setYuk(true); setHata(null)
@@ -68,12 +81,23 @@ export default function DomainDatabaseYonetPage() {
 
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 font-mono">{dbAdi}</h1>
-        <Link
-          to={`/abonelikler/${id}/veritabanlari`}
-          className="text-sm text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-        >
-          ← {t('DomainDatabaseYonetPage:back_to_list')}
-        </Link>
+        <div className="flex items-center gap-3">
+          {detay && detay.kullanicilar.length > 0 && (
+            <button
+              onClick={pmaAc}
+              title={t('DomainDatabaseYonetPage:pma_open_title')}
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded"
+            >
+              {t('DomainDatabaseYonetPage:pma_button')}
+            </button>
+          )}
+          <Link
+            to={`/abonelikler/${id}/veritabanlari`}
+            className="text-sm text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+          >
+            ← {t('DomainDatabaseYonetPage:back_to_list')}
+          </Link>
+        </div>
       </div>
 
       {hata && <div className="mb-4 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
