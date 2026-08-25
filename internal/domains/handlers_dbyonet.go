@@ -404,3 +404,70 @@ func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _ = io.Copy(w, f)
 }
+
+const maxDBRestoreBytes = 200 * 1024 * 1024 // 200 MB
+
+// DatabaseGeriYukle: POST /domains/{id}/databases/{dbAdi}/geri-yukle (multipart, alan adı "dosya")
+// .sql veya .sql.gz kabul eder; mevcut tabloları EZEBİLİR (frontend'de tehlikeli-onay zorunlu).
+func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	dbAdi := chi.URLParam(r, "dbAdi")
+
+	var varMi int
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
+	if varMi == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+		return
+	}
+
+	httpx.ExtendDeadline(w, 15*time.Minute)
+	httpx.ExtendBodyLimit(w, r, maxDBRestoreBytes)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if httpx.GovdeSinirAsildi(err) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "yükleme boyutu sınırı aştı (max 200 MB)")
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "form parse: "+err.Error())
+		return
+	}
+	file, fh, err := r.FormFile("dosya")
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "dosya alanı bulunamadı: "+err.Error())
+		return
+	}
+	defer file.Close()
+	if fh.Size > maxDBRestoreBytes {
+		httpx.WriteError(w, http.StatusRequestEntityTooLarge, "dosya çok büyük (max 200 MB)")
+		return
+	}
+
+	ad := strings.ToLower(fh.Filename)
+	var reader io.Reader = file
+	switch {
+	case strings.HasSuffix(ad, ".gz"):
+		gzr, err := gzip.NewReader(file)
+		if err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "gzip açılamadı: "+err.Error())
+			return
+		}
+		defer gzr.Close()
+		reader = gzr
+	case strings.HasSuffix(ad, ".sql"):
+		// duz metin, reader zaten dogru
+	default:
+		httpx.WriteError(w, http.StatusBadRequest, "yalnız .sql veya .sql.gz kabul edilir")
+		return
+	}
+
+	cmd := exec.CommandContext(r.Context(), "mysql", dbAdi)
+	cmd.Stdin = reader
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "mysql: "+strings.TrimSpace(stderr.String()))
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": dbAdi + " geri yüklendi"})
+}
