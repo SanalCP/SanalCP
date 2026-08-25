@@ -452,11 +452,8 @@ package domains
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -545,8 +542,6 @@ func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 ```
-
-Not: bu adımda `errors`, `encoding/json`, `strings` import'ları henüz kullanılmıyor (Task 5-10'da kullanılacak) — Go derleyicisi kullanılmayan import'ta hata verir, bu yüzden bu ilk taslakta yalnız fiilen kullanılanları bırak: `context`, `database/sql`, `net/http`, `strconv`, `sanalcp/internal/hesaplar`, `sanalcp/internal/httpx`, `github.com/go-chi/chi/v5`. Diğerleri Task 5'te eklenecek.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1172,7 +1167,7 @@ func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-Import bloğuna `"compress/gzip"`, `"io"`, `"os"`, `"os/exec"` ekle.
+Import bloğuna `"compress/gzip"`, `"io"`, `"os"`, `"os/exec"`, `"strings"`, `"time"` ekle (bu fonksiyon `strings.Builder`/`strings.TrimSpace` ve `httpx.ExtendDeadline`/`time.Now` kullanıyor).
 
 - [ ] **Step 3: Verify it compiles**
 
@@ -2451,10 +2446,9 @@ function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
 
 - [ ] **Step 2: i18n anahtarlarını ekle**
 
-`frontend/src/i18n/locales/tr/DomainDatabaseYonetPage.json`'a ekle (kapanış `}`'dan önce):
+`frontend/src/i18n/locales/tr/DomainDatabaseYonetPage.json`'daki son alan `"rename_failed": "İsim değiştirme başarısız"` satırının sonuna `,` ekle, ardından kapanış `}`'dan hemen önce şu alanları ekle (geçerli, tek düz JSON nesnesi olarak):
 
 ```json
-  ,
   "users": "Kullanıcılar",
   "add_user": "Kullanıcı Ekle",
   "add_user_failed": "Kullanıcı ekleme başarısız",
@@ -2475,9 +2469,7 @@ function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
   "user_delete_failed": "Kullanıcı kaldırma başarısız"
 ```
 
-(Not: JSON'a eklerken sondaki virgül kurallarına dikkat et — mevcut son alanın (`rename_failed`) sonuna `,` ekleyip yukarıdaki blok virgülsüz devam etsin; üstteki `,` satırı yalnız gösterim kolaylığı, gerçek dosyada tek bir düz JSON nesnesi olmalı.)
-
-`frontend/src/i18n/locales/en/DomainDatabaseYonetPage.json`'a aynı yapıda İngilizce karşılıklarını ekle:
+`frontend/src/i18n/locales/en/DomainDatabaseYonetPage.json`'daki son alanın (`"rename_failed": "Rename failed"`) sonuna aynı şekilde `,` ekleyip aynı yapıda İngilizce karşılıklarını ekle:
 
 ```json
   "users": "Users",
@@ -2627,7 +2619,7 @@ function GeriYukleModal({ domainId, dbAdi, onKapat, onTamam }: {
       const form = new FormData()
       form.append('dosya', dosya)
       const { data } = await api.post(`/domains/${domainId}/databases/${encodeURIComponent(dbAdi)}/geri-yukle`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 0, // buyuk geri yukleme: client tarafinda iptal etme (backend 15dk sinir) — DomainFilesPage.tsx upload deseniyle ayni
       })
       onTamam(data.sonuc)
     } catch (e) {
