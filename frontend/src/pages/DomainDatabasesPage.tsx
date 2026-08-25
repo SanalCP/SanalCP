@@ -7,7 +7,6 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import Modal from '@/components/Modal'
-import DBParolaSifirlaModal from '@/components/DBParolaSifirlaModal'
 import { T } from '@/lib/tablo'
 import { uretGucluParola } from '@/lib/parola'
 
@@ -16,6 +15,7 @@ type DB = {
   id: number; domain_id: number; db_adi: string; db_kullanici: string;
   db_host: string; db_parola: string; olusturulma: string
 }
+type DBGrup = { db_adi: string; ilkId: number; kullaniciSayisi: number; olusturulma: string }
 
 export default function DomainDatabasesPage() {
   const { t } = useTranslation(['DomainDatabasesPage', 'common'])
@@ -24,11 +24,8 @@ export default function DomainDatabasesPage() {
   const [dbler, setDbler] = useState<DB[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
-  const [silinecek, setSilinecek] = useState<DB | null>(null)
-  const [pwResetFor, setPwResetFor] = useState<DB | null>(null)
+  const [silinecek, setSilinecek] = useState<DBGrup | null>(null)
   const [ekleAcik, setEkleAcik] = useState(false)
-  const [paroliGoster, setParolaGoster] = useState<Record<number, boolean>>({})
-  const [kopya, setKopya] = useState<number | null>(null)
 
   function yukle() {
     if (!id) return
@@ -38,37 +35,37 @@ export default function DomainDatabasesPage() {
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
   }
-  async function pmaAc(d: DB) {
-    try {
-      const { data } = await api.post<{ signon_url: string }>(`/databases/${d.id}/pma-token`)
-      window.open(data.signon_url, '_blank', 'noopener')
-    } catch (e) {
-      alert(apiHata(e, t('DomainDatabasesPage:pma_token_failed')))
-    }
-  }
 
   useEffect(() => {
     if (id) api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     yukle()
   }, [id])
 
-  async function sil() {
-    if (!silinecek) return
-    try { await api.delete(`/databases/${silinecek.id}`); setSilinecek(null); yukle() }
-    catch (e) { alert(apiHata(e, t('DomainDatabasesPage:delete_failed'))) }
-  }
+  // db_adi'na gore grupla: ayni DB'ye birden fazla kullanici baglanabilir
+  // (bkz. Yonet sayfasi "kullanici ekle"), listede tek satir kalir.
+  const gruplar = useMemo<DBGrup[]>(() => {
+    const map = new Map<string, DBGrup>()
+    for (const d of dbler) {
+      const mevcut = map.get(d.db_adi)
+      if (mevcut) {
+        mevcut.kullaniciSayisi++
+      } else {
+        map.set(d.db_adi, { db_adi: d.db_adi, ilkId: d.id, kullaniciSayisi: 1, olusturulma: d.olusturulma })
+      }
+    }
+    return Array.from(map.values())
+  }, [dbler])
 
-  function kopyala(d: DB) {
-    navigator.clipboard.writeText(d.db_parola)
-    setKopya(d.id)
-    setTimeout(() => setKopya(null), 1500)
-  }
-
-  // Domain'in mevcut DB-kullanıcıları (mevcut-kullanıcı seçimi için, benzersiz).
   const mevcutKullanicilar = useMemo(
     () => Array.from(new Set(dbler.map(d => d.db_kullanici))),
     [dbler],
   )
+
+  async function sil() {
+    if (!silinecek) return
+    try { await api.delete(`/databases/${silinecek.ilkId}`); setSilinecek(null); yukle() }
+    catch (e) { alert(apiHata(e, t('DomainDatabasesPage:delete_failed'))) }
+  }
 
   return (
     <div className="w-full px-6 py-5">
@@ -84,52 +81,34 @@ export default function DomainDatabasesPage() {
       <div className="flex items-center gap-2 mb-4">
         <button onClick={() => setEkleAcik(true)} className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-md">{t('DomainDatabasesPage:new_database')}</button>
         <button onClick={yukle} className="px-3 py-2 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-md">↻ {t('DomainDatabasesPage:refresh')}</button>
-        <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{dbler.length} {t('DomainDatabasesPage:count_suffix')}</span>
+        <span className="ml-auto text-sm text-slate-500 dark:text-slate-500">{gruplar.length} {t('DomainDatabasesPage:count_suffix')}</span>
       </div>
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
         {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div> :
-         dbler.length === 0 ? <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-500">{t('DomainDatabasesPage:no_databases')}</div> :
+         gruplar.length === 0 ? <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-500">{t('DomainDatabasesPage:no_databases')}</div> :
         <table className={T.tablo}>
           <thead className={`${T.baslikGrubu} bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700`}>
             <tr>
               <th className={T.baslik}>{t('DomainDatabasesPage:col_database')}</th>
-              <th className={T.baslik}>{t('DomainDatabasesPage:col_user')}</th>
-              <th className={T.baslik}>{t('DomainDatabasesPage:col_server')}</th>
-              <th className={T.baslik}>{t('DomainDatabasesPage:col_password')}</th>
+              <th className={T.baslik}>{t('DomainDatabasesPage:col_user_count')}</th>
               <th className={T.baslik}>{t('DomainDatabasesPage:col_created')}</th>
               <th className={`${T.baslik} text-right`}>{t('DomainDatabasesPage:col_actions')}</th>
             </tr>
           </thead>
           <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800`}>
-            {dbler.map(d => (
-              <tr key={d.id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800`}>
-                <td className={T.hucreBaslik}><span className="font-mono lg:text-sm text-base">{d.db_adi}</span></td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_user')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{d.db_kullanici}</span></td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_server')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{d.db_host}:3306</span></td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_password')}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setParolaGoster({ ...paroliGoster, [d.id]: !paroliGoster[d.id] })}
-                      className="font-mono text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded"
-                      title={paroliGoster[d.id] ? t('DomainDatabasesPage:password_hide') : t('DomainDatabasesPage:password_show')}
-                    >
-                      {paroliGoster[d.id] ? d.db_parola : '••••••••'}
-                    </button>
-                    {paroliGoster[d.id] && (
-                      <button onClick={() => kopyala(d)} className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 rounded" title={t('DomainDatabasesPage:copy')}>
-                        {kopya === d.id ? '✓' : '⧉'}
-                      </button>
-                    )}
-                  </div>
+            {gruplar.map(g => (
+              <tr key={g.db_adi} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800`}>
+                <td className={T.hucreBaslik}><span className="font-mono lg:text-sm text-base">{g.db_adi}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_user_count')}>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{g.kullaniciSayisi}</span>
                 </td>
-                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_created')}><span className="text-sm text-slate-600 dark:text-slate-400">{d.olusturulma}</span></td>
+                <td className={T.hucre} data-etiket={t('DomainDatabasesPage:col_created')}><span className="text-sm text-slate-600 dark:text-slate-400">{g.olusturulma}</span></td>
                 <td className={T.hucreAksiyon}>
-                  <button onClick={() => pmaAc(d)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded" title={t('DomainDatabasesPage:pma_open_title')}>{t('DomainDatabasesPage:pma_button')}</button>
-                  <button onClick={() => setPwResetFor(d)} className="text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 px-2 py-1 rounded">{t('DomainDatabasesPage:reset_password')}</button>
-                  <button onClick={() => setSilinecek(d)} className="text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 px-2 py-1 rounded">{t('common:delete')}</button>
+                  <Link to={`/abonelikler/${id}/veritabanlari/${encodeURIComponent(g.db_adi)}`} className="text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 px-2 py-1 rounded">{t('DomainDatabasesPage:manage')}</Link>
+                  <button onClick={() => setSilinecek(g)} className="text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 px-2 py-1 rounded">{t('common:delete')}</button>
                 </td>
               </tr>
             ))}
@@ -145,14 +124,6 @@ export default function DomainDatabasesPage() {
           onKapat={() => setEkleAcik(false)}
           onTamam={() => { setEkleAcik(false); yukle() }}
           t={t}
-        />
-      )}
-
-      {pwResetFor && (
-        <DBParolaSifirlaModal
-          db={pwResetFor}
-          onKapat={() => setPwResetFor(null)}
-          onTamam={() => { setPwResetFor(null); yukle() }}
         />
       )}
 
@@ -255,7 +226,6 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Otomatik toggle */}
           <label className="flex items-center gap-3 cursor-pointer select-none">
             <input type="checkbox" checked={otomatik} onChange={e => setOtomatik(e.target.checked)} className="h-4 w-4 accent-brand-600" />
             <span className="text-sm text-slate-700 dark:text-slate-300">
@@ -265,7 +235,6 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
 
           {!otomatik && (
             <div className="space-y-5 pt-1">
-              {/* DB adı */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabasesPage:db_name_label')}</label>
                 <div className="flex items-stretch">
@@ -275,7 +244,6 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
                 <p className="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono">→ {dbAdiOnizleme}</p>
               </div>
 
-              {/* DB kullanıcısı */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">{t('DomainDatabasesPage:db_user_label')}</label>
                 <div className="flex gap-4 mb-2">
@@ -304,7 +272,6 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
                 )}
               </div>
 
-              {/* Parola (yalnız yeni kullanıcı için) */}
               {kullaniciTipi === 'yeni' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainDatabasesPage:password_label')} <span className="text-slate-400 dark:text-slate-500">{t('DomainDatabasesPage:password_optional')}</span></label>
@@ -340,4 +307,3 @@ function SonucSatir({ e, v, t }: { e: string; v: string; t: (k: string, opts?: R
     </div>
   )
 }
-
