@@ -168,3 +168,128 @@ func (h *Handlers) DatabaseIsimDegistir(w http.ResponseWriter, r *http.Request) 
 		"uyari": "Veritabanı adını kullanan uygulama ayar dosyalarınızı (örn. wp-config.php) elle güncellemeniz gerekir.",
 	})
 }
+
+type dbKullaniciEkleReq struct {
+	KullaniciTipi   string `json:"kullanici_tipi"` // "yeni" | "mevcut"
+	KullaniciSonek  string `json:"kullanici_sonek"`
+	MevcutKullanici string `json:"mevcut_kullanici"`
+	Parola          string `json:"parola"`
+}
+
+// DatabaseKullaniciEkle: POST /domains/{id}/databases/{dbAdi}/kullanicilar
+// Kota kontrolü YOK — yeni DB değil, mevcut DB'ye ek kullanıcı (bkz. spec kararı).
+func (h *Handlers) DatabaseKullaniciEkle(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	dbAdi := chi.URLParam(r, "dbAdi")
+
+	var sk string
+	var isDemo int
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).Scan(&sk, &isDemo)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "domain sorgu: "+err.Error())
+		return
+	}
+	if isDemo == 1 {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğe kullanıcı eklenemez")
+		return
+	}
+
+	var dbVarMi int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&dbVarMi); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı sorgu: "+err.Error())
+		return
+	}
+	if dbVarMi == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+		return
+	}
+
+	var req dbKullaniciEkleReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz istek gövdesi")
+		return
+	}
+
+	var dbKullanici, parola string
+	mevcutModu := req.KullaniciTipi == "mevcut"
+
+	if mevcutModu {
+		if req.MevcutKullanici == "" || !hesaplar.GecerliDBKimlik(req.MevcutKullanici) {
+			httpx.WriteError(w, http.StatusBadRequest, "geçersiz mevcut kullanıcı")
+			return
+		}
+		var sahip int
+		if err := h.DB.QueryRowContext(r.Context(),
+			`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_user=?`, id, req.MevcutKullanici).Scan(&sahip); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı sorgu: "+err.Error())
+			return
+		}
+		if sahip == 0 {
+			httpx.WriteError(w, http.StatusBadRequest, "seçilen kullanıcı bu domaine ait değil")
+			return
+		}
+		dbKullanici = req.MevcutKullanici
+	} else {
+		if req.KullaniciSonek == "" || !hesaplar.GecerliDBSonek(req.KullaniciSonek) {
+			httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı soneki (yalnız küçük harf/rakam/alt-çizgi, 1-32 karakter)")
+			return
+		}
+		dbKullanici = sk + "_" + req.KullaniciSonek
+		if !hesaplar.GecerliDBKimlik(dbKullanici) {
+			httpx.WriteError(w, http.StatusBadRequest, "kullanıcı adı çok uzun (önek + sonek ≤64 karakter olmalı)")
+			return
+		}
+		if req.Parola == "" {
+			parola = hesaplar.RandomParola(24)
+		} else {
+			if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
+				httpx.WriteError(w, http.StatusBadRequest, neden)
+				return
+			}
+			parola = req.Parola
+		}
+	}
+
+	var zatenVar int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=? AND db_user=?`, id, dbAdi, dbKullanici).Scan(&zatenVar); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "erişim sorgu: "+err.Error())
+		return
+	}
+	if zatenVar > 0 {
+		httpx.WriteError(w, http.StatusConflict, "bu kullanıcının zaten bu veritabanına erişimi var")
+		return
+	}
+
+	if mevcutModu {
+		if err := hesaplar.MySQLGrantExistingUser(h.DB, id, dbAdi, dbKullanici); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı ekleme: "+err.Error())
+			return
+		}
+		var encParola string
+		_ = h.DB.QueryRowContext(r.Context(),
+			`SELECT db_pass_plain FROM db_accounts WHERE db_user=? LIMIT 1`, dbKullanici).Scan(&encParola)
+		if dec, err := hesaplar.DecryptDBPassword(encParola); err == nil {
+			parola = dec
+		}
+	} else {
+		if err := hesaplar.MySQLGrantNewUser(h.DB, id, dbAdi, dbKullanici, parola); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı ekleme: "+err.Error())
+			return
+		}
+	}
+
+	var yeniID int64
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT id FROM db_accounts WHERE domain_id=? AND db_name=? AND db_user=?`, id, dbAdi, dbKullanici).Scan(&yeniID)
+
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
+		"ok": true, "id": yeniID, "db_kullanici": dbKullanici, "db_parola": parola,
+	})
+}
