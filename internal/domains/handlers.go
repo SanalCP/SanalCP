@@ -1132,8 +1132,13 @@ func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, u := range kullanicilar {
 		var baskaYerde int
-		_ = h.DB.QueryRowContext(r.Context(),
-			`SELECT COUNT(*) FROM db_accounts WHERE db_user=? AND db_name<>?`, u, dbName).Scan(&baskaYerde)
+		// Hata yutulursa baskaYerde 0 kalır ve dropUser=true olur — başka bir
+		// DB'de hâlâ kullanılan MariaDB hesabı DROP edilebilirdi. Kapalı düş.
+		if err := h.DB.QueryRowContext(r.Context(),
+			`SELECT COUNT(*) FROM db_accounts WHERE db_user=? AND db_name<>?`, u, dbName).Scan(&baskaYerde); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı kullanım sorgu: "+err.Error())
+			return
+		}
 		if err := hesaplar.MySQLRevokeUser(h.DB, dbName, u, baskaYerde == 0); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı temizliği: "+err.Error())
 			return
