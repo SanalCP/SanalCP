@@ -2,6 +2,8 @@
   "plan_resources": "Plan & Resources",
   "service_plan": "Service Plan",
   "disk": "Disk",
+  "inode": "Inode",
+  "unit_inode": "inodes",
   "traffic_monthly": "Traffic (monthly)",
   "database": "Database",
   "ftp_account": "FTP Account",

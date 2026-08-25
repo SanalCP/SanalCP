@@ -13,6 +13,11 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.10** (2026-08-25)
+
+Domain detayında "Paket ve Kaynaklar" kartına inode kullanım/limit göstergesi
+eklendi. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez.
+
 **0.9.9** (2026-08-25)
 
 Arka plan ağ isteklerinde küçük bir düzeltme. Kullanıcı akışlarında davranış

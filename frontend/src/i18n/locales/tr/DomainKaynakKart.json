@@ -2,6 +2,8 @@
   "plan_resources": "Paket ve Kaynaklar",
   "service_plan": "Hizmet Planı",
   "disk": "Disk",
+  "inode": "Inode",
+  "unit_inode": "inode",
   "traffic_monthly": "Trafik (aylık)",
   "database": "Veritabanı",
   "ftp_account": "FTP Hesabı",

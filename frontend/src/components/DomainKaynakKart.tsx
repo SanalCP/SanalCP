@@ -8,7 +8,7 @@ type Limit = { kullanim: number; limit: number }
 export type Ozet = {
   alan_adi: string; sk: string; plan_adi: string; php_surum: string
   ipv4: string; ssl_aktif: boolean; ssl_bitis?: string
-  disk_mb: Limit; trafik_mb: Limit
+  disk_mb: Limit; trafik_mb: Limit; inode_kullanim: number; inode_limit: number
   db_sayisi: Limit; ftp_sayisi: Limit; eposta_sayi: Limit; domain_sayi: Limit
   dns_kayit: number; cron_is: number
   yedek_sayisi: number; yedek_mb: number
@@ -61,6 +61,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
         </div>
 
         <Bar etiket={t('DomainKaynakKart:disk')} k={ozet.disk_mb.kullanim} l={ozet.disk_mb.limit} birim="MB" renk="indigo" />
+        <Bar etiket={t('DomainKaynakKart:inode')} k={ozet.inode_kullanim} l={ozet.inode_limit} birim={t('DomainKaynakKart:unit_inode')} renk="cyan" />
         <Bar etiket={t('DomainKaynakKart:traffic_monthly')} k={ozet.trafik_mb.kullanim} l={ozet.trafik_mb.limit} birim="MB" renk="sky" />
         <Bar etiket={t('DomainKaynakKart:database')} k={ozet.db_sayisi.kullanim} l={ozet.db_sayisi.limit} birim="DB" renk="emerald" />
         <Bar etiket={t('DomainKaynakKart:ftp_account')} k={ozet.ftp_sayisi.kullanim} l={ozet.ftp_sayisi.limit} birim={t('DomainKaynakKart:unit_account')} renk="amber" />
@@ -117,6 +118,7 @@ function Bar({ etiket, k, l, birim, renk }: { etiket: string; k: number; l: numb
     indigo:  'from-indigo-400 to-indigo-600',
     sky:     'from-sky-400 to-sky-600',
     emerald: 'from-emerald-400 to-emerald-600',
+    cyan:    'from-cyan-400 to-cyan-600',
     amber:   'from-amber-400 to-amber-600',
     rose:    'from-rose-400 to-rose-600',
     violet:  'from-violet-400 to-violet-600',
