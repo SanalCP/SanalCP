@@ -236,6 +236,48 @@ func TestDatabaseKullaniciEkleZatenErisimiVarsa409(t *testing.T) {
 	}
 }
 
+func TestSonKullaniciMi(t *testing.T) {
+	if !sonKullaniciMi(1) {
+		t.Error("1 kullanıcı = son kullanıcı olmalı")
+	}
+	if !sonKullaniciMi(0) {
+		t.Error("0 kullanıcı = son kullanıcı (veri tutarsızlığına karşı güvenli taraf) olmalı")
+	}
+	if sonKullaniciMi(2) {
+		t.Error("2 kullanıcı = son kullanıcı DEĞİL")
+	}
+}
+
+func TestDatabaseKullaniciSilSonKullaniciysa409(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT db_user FROM db_accounts WHERE id=\? AND domain_id=\? AND db_name=\?`).
+		WithArgs(int64(101), int64(7), "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"db_user"}).AddRow("sk_blog"))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM db_accounts WHERE domain_id=\? AND db_name=\?`).
+		WithArgs(int64(7), "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Delete("/domains/{id}/databases/{dbAdi}/kullanicilar/{dbid}", h.DatabaseKullaniciSil)
+
+	req := httptest.NewRequest(http.MethodDelete, "/domains/7/databases/sk_blog/kullanicilar/101", nil)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("409 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (func() bool {
 		for i := 0; i+len(sub) <= len(s); i++ {

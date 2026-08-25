@@ -293,3 +293,50 @@ func (h *Handlers) DatabaseKullaniciEkle(w http.ResponseWriter, r *http.Request)
 		"ok": true, "id": yeniID, "db_kullanici": dbKullanici, "db_parola": parola,
 	})
 }
+
+func sonKullaniciMi(toplamKullanici int) bool { return toplamKullanici <= 1 }
+
+// DatabaseKullaniciSil: DELETE /domains/{id}/databases/{dbAdi}/kullanicilar/{dbid}
+// DB'yi SİLMEZ — yalnız bu kullanıcının erişimini kaldırır. Son kullanıcıysa
+// 409 döner (DB'yi silmek için domain sil ucu kullanılmalı).
+func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	dbAdi := chi.URLParam(r, "dbAdi")
+	dbid, _ := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
+
+	var dbUser string
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT db_user FROM db_accounts WHERE id=? AND domain_id=? AND db_name=?`, dbid, id, dbAdi).Scan(&dbUser)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "kullanıcı kaydı bulunamadı")
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma: "+err.Error())
+		return
+	}
+
+	var toplam int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&toplam); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı sayısı sorgu: "+err.Error())
+		return
+	}
+	if sonKullaniciMi(toplam) {
+		httpx.WriteError(w, http.StatusConflict, "bu veritabanının tek kullanıcısı — silmek için veritabanının kendisini silin")
+		return
+	}
+
+	var baskaYerde int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE db_user=? AND db_name<>?`, dbUser, dbAdi).Scan(&baskaYerde); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı kullanım sorgu: "+err.Error())
+		return
+	}
+	if err := hesaplar.MySQLRevokeUser(h.DB, dbAdi, dbUser, baskaYerde == 0); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı silme: "+err.Error())
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "silinen_kullanici": dbUser})
+}
