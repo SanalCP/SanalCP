@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.12** (2026-08-25)
+
+0.9.11'deki Veritabanı Yönet sayfasında kod incelemesinden kalan küçük
+tutarlılık ve sağlamlaştırma düzeltmeleri: isim değiştirmede güvenli sıra
+(metadata güncellemesi geri dönüşü olmayan silmeden önce), yedek geri
+yüklemede eşzamanlılık sınırı ve büyük dosya kesme davranışı, birkaç
+sessizce yutulan hata artık düzgün yanıt dönüyor. Kullanıcı akışlarında
+davranış değişikliği yok, migration gerektirmez.
+
 **0.9.11** (2026-08-25)
 
 Domain > Veritabanları ekranına, her veritabanı için ayrı bir "Yönet" sayfası

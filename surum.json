@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.11",
-  "duyuru": "Veritabanları ekranına 'Yönet' sayfası eklendi: çoklu kullanıcı yönetimi, isim değiştirme, tek tık yedekleme/geri yükleme, optimize/onar. Kullanıcı akışlarında geriye dönük kırılma yok, migration gerektirmez.",
+  "son_surum": "0.9.12",
+  "duyuru": "Veritabanı Yönet sayfasında kod incelemesinden kalan küçük tutarlılık/sağlamlaştırma düzeltmeleri. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez.",
   "kritik": false,
   "yayin_tarihi": "2026-08-25"
 }
