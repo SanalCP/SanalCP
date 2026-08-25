@@ -1,6 +1,7 @@
 package domains
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"database/sql"
@@ -16,6 +17,7 @@ import (
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/sqlimport"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -407,19 +409,54 @@ func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
 
 const maxDBRestoreBytes = 200 * 1024 * 1024 // 200 MB
 
+// maxDBRestoreAcikBayt: gzip açıldıktan SONRAKİ akış için üst sınır (gzip bomb
+// savunması). 200 MB'lık bir .gz teoride terabaytlarca veriye açılabilir; sınır
+// cömert tutulur çünkü meşru bir dump'ın bu kadar büyümesi beklenmez.
+const maxDBRestoreAcikBayt = 5 * 1024 * 1024 * 1024 // 5 GiB
+
 // DatabaseGeriYukle: POST /domains/{id}/databases/{dbAdi}/geri-yukle (multipart, alan adı "dosya")
 // .sql veya .sql.gz kabul eder; mevcut tabloları EZEBİLİR (frontend'de tehlikeli-onay zorunlu).
+//
+// 🔴 Dump hedef veritabanının KENDİ düşük yetkili kullanıcısıyla uygulanır
+// (internal/sqlimport). Panel root çalıştığı için `mysql <db>` ile
+// root@localhost'a akıtmak, dump'ın içine konacak `CREATE USER ... GRANT ALL`
+// ya da `USE mysql; ...` ifadeleriyle DB sunucusunun tamamını müşteriye
+// devretmek olurdu — `mysql <db>` yalnız VARSAYILAN şemayı seçer, yetki sınırı
+// KOYMAZ (bkz. internal/sqlimport paket açıklaması ve internal/iceaktarim).
 func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
 
-	var varMi int
-	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
-	if varMi == 0 {
-		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+	var isDemo int
+	err := h.DB.QueryRowContext(r.Context(), `SELECT is_demo FROM domains WHERE id=?`, id).Scan(&isDemo)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "domain sorgu: "+err.Error())
+		return
+	}
+	if isDemo == 1 {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğe geri yükleme yapılamaz")
+		return
+	}
+
+	// Hedefin kendi kimliği; no-rows aynı zamanda "bu DB bu domaine ait mi"
+	// varlık denetimidir (iceaktarim.dbHedefi ile aynı sorgu).
+	hedef, err := h.dbGeriYukleHedefi(r, id, dbAdi)
+	if err != nil {
+		httpx.WriteError(w, hedefDurumKodu(err), err.Error())
+		return
+	}
+
+	// Tek tenant'ın paralel geri yüklemelerle sunucuyu tüketmesini engelle
+	// (files.Upload / iceaktarim.SQLYukle deseni); kota doluysa beklemeden 429.
+	birak, ok := httpx.YuklemeSlotVeyaHata(w, "db-restore:"+strconv.FormatInt(id, 10)+":"+dbAdi)
+	if !ok {
+		return
+	}
+	defer birak()
 
 	httpx.ExtendDeadline(w, 15*time.Minute)
 	httpx.ExtendBodyLimit(w, r, maxDBRestoreBytes)
@@ -442,34 +479,68 @@ func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ad := strings.ToLower(fh.Filename)
-	var reader io.Reader = file
-	switch {
-	case strings.HasSuffix(ad, ".gz"):
-		gzr, err := gzip.NewReader(file)
-		if err != nil {
-			httpx.WriteError(w, http.StatusBadRequest, "gzip açılamadı: "+err.Error())
+	// Uzantıya DEĞİL, magic byte'a bakılır (iceaktarim.dumpAkisi ile aynı):
+	// kullanıcı .sql adıyla gzip yükleyebilir, o zaman uzantı denetimi ham
+	// ikili veriyi mysql'e akıtırdı.
+	br := bufio.NewReaderSize(file, 64<<10)
+	sihir, perr := br.Peek(2)
+	if perr != nil && perr != io.EOF {
+		httpx.WriteError(w, http.StatusBadRequest, "dosya okunamadı: "+perr.Error())
+		return
+	}
+	var reader io.Reader = br
+	if len(sihir) == 2 && sihir[0] == 0x1f && sihir[1] == 0x8b {
+		gzr, gerr := gzip.NewReader(br)
+		if gerr != nil {
+			httpx.WriteError(w, http.StatusBadRequest, "gzip açılamadı: "+gerr.Error())
 			return
 		}
 		defer gzr.Close()
 		reader = gzr
-	case strings.HasSuffix(ad, ".sql"):
-		// duz metin, reader zaten dogru
-	default:
-		httpx.WriteError(w, http.StatusBadRequest, "yalnız .sql veya .sql.gz kabul edilir")
-		return
 	}
+	// Açılmış akışı sınırla: küçük ama kötü niyetli bir .gz sınırsız büyüyemesin.
+	// Sınıra takılırsa akış kesilir ve mysql sözdizimi hatasıyla düşer — bu uç
+	// durum için kabul edilebilir (asıl güvenlik düşük yetkili bağlantıdan gelir).
+	reader = io.LimitReader(reader, maxDBRestoreAcikBayt+1)
 
-	cmd := exec.CommandContext(r.Context(), "mysql", dbAdi)
-	cmd.Stdin = reader
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "mysql: "+strings.TrimSpace(stderr.String()))
+	if err := sqlimport.Uygula(r.Context(), hedef, reader); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": dbAdi + " geri yüklendi"})
+}
+
+// errDBBulunamadi: hedef kimlik araması no-rows ile döndüğünde (varlık denetimi).
+var errDBBulunamadi = errors.New("veritabanı bulunamadı")
+
+func hedefDurumKodu(err error) int {
+	if errors.Is(err, errDBBulunamadi) {
+		return http.StatusNotFound
+	}
+	return http.StatusInternalServerError
+}
+
+// dbGeriYukleHedefi: hedef veritabanının BU domaine ait olduğunu doğrular ve o
+// veritabanının kendi (düşük yetkili) kimlik bilgilerini döner.
+// iceaktarim.dbHedefi ile aynı sorgu — dump root'a DEĞİL bu kimliğe akıtılır.
+func (h *Handlers) dbGeriYukleHedefi(r *http.Request, domainID int64, dbAdi string) (sqlimport.Hedef, error) {
+	var kullanici, sifreli, host string
+	err := h.DB.QueryRowContext(r.Context(),
+		`SELECT db_user, db_pass_plain, COALESCE(db_host,'localhost')
+		   FROM db_accounts WHERE domain_id=? AND db_name=?`, domainID, dbAdi).
+		Scan(&kullanici, &sifreli, &host)
+	if errors.Is(err, sql.ErrNoRows) {
+		return sqlimport.Hedef{}, errDBBulunamadi
+	}
+	if err != nil {
+		return sqlimport.Hedef{}, errors.New("veritabanı bilgisi okunamadı")
+	}
+	parola, err := hesaplar.DecryptDBPassword(sifreli)
+	if err != nil {
+		return sqlimport.Hedef{}, errors.New("veritabanı parolası çözülemedi")
+	}
+	return sqlimport.Hedef{DBAdi: dbAdi, Kullanici: kullanici, Parola: parola, Host: host}, nil
 }
 
 // DatabaseOptimize: POST /domains/{id}/databases/{dbAdi}/optimize
