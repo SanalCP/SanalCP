@@ -553,6 +553,16 @@ func (h *Handlers) DatabaseOnar(w http.ResponseWriter, r *http.Request) {
 	h.mysqlcheckCalistir(w, r, "--repair")
 }
 
+// mysqlcheckIkiliAdi: MariaDB 11 (Debian trixie ve sonrası) paketleri
+// `mysqlcheck` symlink'ini kaldırdı, araç artık `mariadb-check`. RHEL/MariaDB
+// 10.x kurulumlarında `mysqlcheck` hâlâ var — hangisi varsa o kullanılır.
+func mysqlcheckIkiliAdi() string {
+	if _, err := exec.LookPath("mysqlcheck"); err == nil {
+		return "mysqlcheck"
+	}
+	return "mariadb-check"
+}
+
 func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, bayrak string) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
@@ -566,9 +576,14 @@ func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, ba
 	}
 
 	httpx.ExtendDeadline(w, 15*time.Minute)
-	out, err := exec.CommandContext(r.Context(), "mysqlcheck", bayrak, dbAdi).CombinedOutput()
+	out, err := exec.CommandContext(r.Context(), mysqlcheckIkiliAdi(), bayrak, dbAdi).CombinedOutput()
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "mysqlcheck: "+strings.TrimSpace(string(out)))
+		// İkili hiç yoksa out boş kalır; o zaman mesaj "mysqlcheck: " olurdu.
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		httpx.WriteError(w, http.StatusInternalServerError, "mysqlcheck: "+msg)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": string(out)})
