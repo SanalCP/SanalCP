@@ -11,6 +11,7 @@ export type DBGrupDetay = {
   db_adi: string; db_host: string; charset: string; collation: string
   boyut_mb: number; kullanicilar: DBKullanici[]
 }
+type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 
 function fmtBoyut(mb: number): string {
   if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB'
@@ -20,6 +21,7 @@ function fmtBoyut(mb: number): string {
 export default function DomainDatabaseYonetPage() {
   const { t } = useTranslation(['DomainDatabaseYonetPage', 'common'])
   const { id, dbAdi } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [detay, setDetay] = useState<DBGrupDetay | null>(null)
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -35,12 +37,15 @@ export default function DomainDatabaseYonetPage() {
   }
 
   useEffect(yukle, [id, dbAdi])
+  useEffect(() => {
+    if (id) api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
+  }, [id])
 
   return (
     <div className="w-full px-6 py-5">
       <Breadcrumb items={[
         { etiket: t('common:home'), href: '/' }, { etiket: t('common:domain'), href: '/domainler' },
-        { etiket: t('common:domain'), href: `/abonelikler/${id}` },
+        { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
         { etiket: t('DomainDatabaseYonetPage:breadcrumb_databases'), href: `/abonelikler/${id}/veritabanlari` },
         { etiket: dbAdi || '...' },
       ]} />
