@@ -471,3 +471,34 @@ func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": dbAdi + " geri yüklendi"})
 }
+
+// DatabaseOptimize: POST /domains/{id}/databases/{dbAdi}/optimize
+func (h *Handlers) DatabaseOptimize(w http.ResponseWriter, r *http.Request) {
+	h.mysqlcheckCalistir(w, r, "--optimize")
+}
+
+// DatabaseOnar: POST /domains/{id}/databases/{dbAdi}/onar
+func (h *Handlers) DatabaseOnar(w http.ResponseWriter, r *http.Request) {
+	h.mysqlcheckCalistir(w, r, "--repair")
+}
+
+func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, bayrak string) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	dbAdi := chi.URLParam(r, "dbAdi")
+
+	var varMi int
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
+	if varMi == 0 {
+		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
+		return
+	}
+
+	httpx.ExtendDeadline(w, 15*time.Minute)
+	out, err := exec.CommandContext(r.Context(), "mysqlcheck", bayrak, dbAdi).CombinedOutput()
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "mysqlcheck: "+strings.TrimSpace(string(out)))
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": string(out)})
+}
