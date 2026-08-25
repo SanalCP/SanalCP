@@ -31,5 +31,21 @@
   "user_delete_title": "Remove user",
   "user_delete_msg": "\"{{ad}}\"'s access to this database will be removed.",
   "user_delete_confirm": "Yes, remove",
-  "user_delete_failed": "Failed to remove user"
+  "user_delete_failed": "Failed to remove user",
+  "maintenance": "Maintenance",
+  "backup_button": "Backup (download .sql.gz)",
+  "backing_up": "Backing up…",
+  "backup_failed": "Backup failed",
+  "restore_button": "Restore",
+  "restore_modal_title": "Restore Database",
+  "restore_warning": "Tables in the uploaded file will OVERWRITE existing tables. This cannot be undone.",
+  "restore_confirm_title": "Apply the restore?",
+  "restore_confirm_msg": "Existing data will be replaced with your uploaded file. This cannot be undone.",
+  "restore_confirm_button": "Yes, restore",
+  "restore_failed": "Restore failed",
+  "optimize_button": "Optimize",
+  "optimizing": "Optimizing…",
+  "repair_button": "Repair",
+  "repairing": "Repairing…",
+  "maintenance_failed": "Operation failed"
 }

@@ -31,5 +31,21 @@
   "user_delete_title": "Kullanıcıyı kaldır",
   "user_delete_msg": "\"{{ad}}\" kullanıcısının bu veritabanına erişimi kaldırılacak.",
   "user_delete_confirm": "Evet, kaldır",
-  "user_delete_failed": "Kullanıcı kaldırma başarısız"
+  "user_delete_failed": "Kullanıcı kaldırma başarısız",
+  "maintenance": "Bakım",
+  "backup_button": "Yedekle (.sql.gz indir)",
+  "backing_up": "Yedekleniyor…",
+  "backup_failed": "Yedekleme başarısız",
+  "restore_button": "Geri Yükle",
+  "restore_modal_title": "Veritabanını Geri Yükle",
+  "restore_warning": "Yüklediğiniz dosyadaki tablolar mevcut tabloların ÜZERİNE YAZILIR. Bu işlem geri alınamaz.",
+  "restore_confirm_title": "Geri yükleme uygulansın mı?",
+  "restore_confirm_msg": "Mevcut veriler yüklediğiniz dosyayla değiştirilecek. Bu işlem geri alınamaz.",
+  "restore_confirm_button": "Evet, geri yükle",
+  "restore_failed": "Geri yükleme başarısız",
+  "optimize_button": "Optimize Et",
+  "optimizing": "Optimize ediliyor…",
+  "repair_button": "Onar",
+  "repairing": "Onarılıyor…",
+  "maintenance_failed": "İşlem başarısız"
 }

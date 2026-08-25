@@ -113,6 +113,8 @@ export default function DomainDatabaseYonetPage() {
               ))}
             </div>
           </div>
+
+          <BakimKarti domainId={id!} dbAdi={dbAdi!} t={t} />
         </div>
       ) : null}
 
@@ -325,5 +327,132 @@ function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
         </div>
       </div>
     </Modal>
+  )
+}
+
+function BakimKarti({ domainId, dbAdi, t }: { domainId: string; dbAdi: string; t: (k: string, opts?: Record<string, unknown>) => string }) {
+  const [isleniyor, setIsleniyor] = useState<string | null>(null)
+  const [sonucMetni, setSonucMetni] = useState<string | null>(null)
+  const [hata, setHata] = useState<string | null>(null)
+  const [geriYukleAcik, setGeriYukleAcik] = useState(false)
+
+  function yedekle() {
+    setIsleniyor('yedek'); setHata(null)
+    fetch(`/api/v1/domains/${domainId}/databases/${encodeURIComponent(dbAdi)}/yedek`, { credentials: 'include' })
+      .then(async r => {
+        if (!r.ok) throw new Error(await r.text())
+        return r.blob()
+      })
+      .then(blob => {
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `${dbAdi}.sql.gz`
+        a.click()
+      })
+      .catch(() => setHata(t('DomainDatabaseYonetPage:backup_failed')))
+      .finally(() => setIsleniyor(null))
+  }
+
+  async function mysqlcheckCalistir(uc: 'optimize' | 'onar') {
+    setIsleniyor(uc); setHata(null); setSonucMetni(null)
+    try {
+      const { data } = await api.post(`/domains/${domainId}/databases/${encodeURIComponent(dbAdi)}/${uc}`)
+      setSonucMetni(data.sonuc)
+    } catch (e) {
+      setHata(apiHata(e, t('DomainDatabaseYonetPage:maintenance_failed')))
+    } finally {
+      setIsleniyor(null)
+    }
+  }
+
+  return (
+    <div className="ta-card p-5">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainDatabaseYonetPage:maintenance')}</h3>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={yedekle} disabled={!!isleniyor} className="ta-secondary-button">
+          {isleniyor === 'yedek' ? t('DomainDatabaseYonetPage:backing_up') : t('DomainDatabaseYonetPage:backup_button')}
+        </button>
+        <button onClick={() => setGeriYukleAcik(true)} disabled={!!isleniyor} className="ta-secondary-button">
+          {t('DomainDatabaseYonetPage:restore_button')}
+        </button>
+        <button onClick={() => mysqlcheckCalistir('optimize')} disabled={!!isleniyor} className="ta-secondary-button">
+          {isleniyor === 'optimize' ? t('DomainDatabaseYonetPage:optimizing') : t('DomainDatabaseYonetPage:optimize_button')}
+        </button>
+        <button onClick={() => mysqlcheckCalistir('onar')} disabled={!!isleniyor} className="ta-secondary-button">
+          {isleniyor === 'onar' ? t('DomainDatabaseYonetPage:repairing') : t('DomainDatabaseYonetPage:repair_button')}
+        </button>
+      </div>
+
+      {hata && <div className="mt-3 ta-form-error">{hata}</div>}
+      {sonucMetni && (
+        <pre className="mt-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">
+          {sonucMetni}
+        </pre>
+      )}
+
+      {geriYukleAcik && (
+        <GeriYukleModal
+          domainId={domainId}
+          dbAdi={dbAdi}
+          onKapat={() => setGeriYukleAcik(false)}
+          onTamam={(msg) => { setGeriYukleAcik(false); setSonucMetni(msg); setHata(null) }}
+        />
+      )}
+    </div>
+  )
+}
+
+function GeriYukleModal({ domainId, dbAdi, onKapat, onTamam }: {
+  domainId: string; dbAdi: string; onKapat: () => void; onTamam: (sonuc: string) => void
+}) {
+  const { t } = useTranslation(['DomainDatabaseYonetPage', 'common'])
+  const [dosya, setDosya] = useState<File | null>(null)
+  const [isleniyor, setIsleniyor] = useState(false)
+  const [hata, setHata] = useState<string | null>(null)
+  const [onaySoruluyor, setOnaySoruluyor] = useState(false)
+
+  async function yukle() {
+    if (!dosya) return
+    setIsleniyor(true); setHata(null)
+    try {
+      const form = new FormData()
+      form.append('dosya', dosya)
+      const { data } = await api.post(`/domains/${domainId}/databases/${encodeURIComponent(dbAdi)}/geri-yukle`, form, {
+        timeout: 0, // buyuk geri yukleme: client tarafinda iptal etme (backend 15dk sinir) — DomainFilesPage.tsx upload deseniyle ayni
+      })
+      onTamam(data.sonuc)
+    } catch (e) {
+      setHata(apiHata(e, t('DomainDatabaseYonetPage:restore_failed')))
+      setOnaySoruluyor(false)
+    } finally {
+      setIsleniyor(false)
+    }
+  }
+
+  return (
+    <>
+      <Modal acik={!onaySoruluyor} baslik={t('DomainDatabaseYonetPage:restore_modal_title')} onKapat={onKapat} genislik="md">
+        <div className="space-y-4">
+          <div className="ta-form-error !bg-amber-50 dark:!bg-amber-900/20 !border-amber-200 dark:!border-amber-800 !text-amber-800 dark:!text-amber-200">
+            {t('DomainDatabaseYonetPage:restore_warning')}
+          </div>
+          <input type="file" accept=".sql,.gz" onChange={e => setDosya(e.target.files?.[0] ?? null)} className="ta-input ta-input-sm w-full" />
+          {hata && <div className="ta-form-error">{hata}</div>}
+          <div className="ta-form-actions">
+            <button onClick={onKapat} disabled={isleniyor} className="ta-secondary-button">{t('common:cancel')}</button>
+            <button onClick={() => setOnaySoruluyor(true)} disabled={isleniyor || !dosya} className="ta-primary-button">{t('DomainDatabaseYonetPage:restore_button')}</button>
+          </div>
+        </div>
+      </Modal>
+      <ConfirmDialog
+        acik={onaySoruluyor}
+        baslik={t('DomainDatabaseYonetPage:restore_confirm_title')}
+        mesaj={t('DomainDatabaseYonetPage:restore_confirm_msg')}
+        tehlikeli
+        onayMetni={t('DomainDatabaseYonetPage:restore_confirm_button')}
+        onOnay={yukle}
+        onIptal={() => setOnaySoruluyor(false)}
+      />
+    </>
   )
 }
