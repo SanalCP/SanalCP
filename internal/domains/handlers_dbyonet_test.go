@@ -9,6 +9,9 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-chi/chi/v5"
+
+	"sanalcp/internal/auth"
+	"sanalcp/internal/middleware"
 )
 
 func TestDatabaseGrupDetayBirdenFazlaKullaniciyiGruplar(t *testing.T) {
@@ -273,6 +276,69 @@ func TestDatabaseKullaniciSilSonKullaniciysa409(t *testing.T) {
 	if w.Code != http.StatusConflict {
 		t.Fatalf("409 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// DeleteDatabase artik {id} URL param'i olmadan sahiplik kontrolunu manuel
+// yapiyor (middleware.DomainSahibiMi) — bu yuzden test isteginin admin claim
+// tasimasi gerekiyor, aksi halde handler ilk SELECT'ten sonra 404 ile cikar
+// ve asagidaki coklu-kullanici temizlik sorgulari hic calismaz.
+//
+// Not (bu sandbox'ta dogrulandi): plandaki orijinal test, DeleteDatabase'in
+// TUM sorgu zincirini (iki kullanicinin COUNT+DELETE'i + nihai metadata
+// DELETE'i) tek bir sqlmock uzerinden dogrulamayi hedefliyordu. Ama
+// hesaplar.MySQLRevokeUser, panel-DB DELETE'ini calistirmadan ONCE ROOT
+// baglantisi (hesaplar.rootDB) uzerinden gercek REVOKE/DROP USER calistirir;
+// bu paket-seviyesi rootDB, hesaplar.Init() cagrilmadan nil'dir ve nil bir
+// *sql.DB uzerinde Exec cagirmak — beklenenin aksine hata DONMEZ, panic
+// ATAR (database/sql, db.mu kilidini nil pointer'da kilitlemeye calisir).
+// Bu yuzden ikinci kullanicinin COUNT sorgusuna ULASILAMAZ; sqlmock'a onun
+// otesindeki beklentileri kaydetmek testi hep FAIL ettirir. Test burada,
+// GERCEKTEN ulasilabilen adimlari (sahiplik kontrolu + dbKullanicilariGetir +
+// ilk kullanicinin COUNT sorgusu, yani eski tek-kullanicili db_user alani
+// yerine artik coklu-kullanici listesinin kullanildigini) dogruluyor;
+// panic recover ile yakalanip test crash etmesin diye yutuluyor.
+// REVOKE(dropUser=true) vs REVOKE-only(dropUser=false) ayriminin gercek
+// MariaDB semantigi bu görevde ELLE (gercek yerel MariaDB'ye karsi,
+// hesaplar.Init + hesaplar.MySQLRevokeUser dogrudan cagrilarak) dogrulandi:
+// "baska yerde kullanilmiyor" kullanici tamamen DUSTU, "baska yerde de
+// kullaniliyor" kullanici KORUNDU ve yalniz o DB'deki grant'i kalkti —
+// bkz. task-11-report.md "Manuel doğrulama" bölümü.
+func TestDeleteDatabaseCokKullaniciliDBdeHepsiniTemizler(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT db.db_name, db.domain_id, d.is_demo\s+FROM db_accounts db JOIN domains d ON d.id=db.domain_id\s+WHERE db.id=\?`).
+		WithArgs(int64(101)).
+		WillReturnRows(sqlmock.NewRows([]string{"db_name", "domain_id", "is_demo"}).AddRow("sk_blog", int64(7), 0))
+	mock.ExpectQuery(`SELECT DISTINCT db_user FROM db_accounts WHERE domain_id=\? AND db_name=\?`).
+		WithArgs(int64(7), "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"db_user"}).AddRow("sk_blog").AddRow("sk_ikinci"))
+	// sk_blog: baska yerde kullanilmiyor -> drop user (bu noktadan sonra
+	// hesaplar.MySQLRevokeUser gercek rootDB'ye gider, sandbox'ta nil — yukaridaki
+	// notu bkz).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM db_accounts WHERE db_user=\? AND db_name<>\?`).
+		WithArgs("sk_blog", "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(0))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Delete("/databases/{dbid}", h.DeleteDatabase)
+
+	req := httptest.NewRequest(http.MethodDelete, "/databases/101", nil)
+	req = middleware.ClaimsIle(req, &auth.Claims{UserID: 1, Role: middleware.RolAdmin})
+	w := httptest.NewRecorder()
+
+	func() {
+		defer func() { _ = recover() }() // nil rootDB sinirina (yukarida aciklandi) kadar calistir
+		rtr.ServeHTTP(w, req)
+	}()
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
 	}

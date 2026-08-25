@@ -1095,13 +1095,24 @@ func (h *Handlers) CreateDatabase(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	dbid, _ := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
-	var dbName, dbUser string
+	var dbName string
+	var domainID int64
 	var isDemo int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT db.db_name, db.db_user, d.is_demo
+		`SELECT db.db_name, db.domain_id, d.is_demo
 		 FROM db_accounts db JOIN domains d ON d.id=db.domain_id
-		 WHERE db.id=?`, dbid).Scan(&dbName, &dbUser, &isDemo)
+		 WHERE db.id=?`, dbid).Scan(&dbName, &domainID, &isDemo)
 	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma: "+err.Error())
+		return
+	}
+	// IDOR korumasi: bu route'ta {id} domain param'i yok, MusteriScope
+	// uygulanamaz — pma.TokenIste'deki gibi manuel kontrol (bkz. Task 11).
+	if !middleware.DomainSahibiMi(r, domainID) {
 		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
 		return
 	}
@@ -1109,17 +1120,26 @@ func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin DB'si silinemez")
 		return
 	}
-	// Kullanıcı başka DB'lerde de kullanılıyorsa (mevcut-kullanıcı modu) sadece DB'yi
-	// düşür — kullanıcıyı koru (aksi halde paylaşan diğer DB'lerin erişimi kırılır).
-	var paylasim int
-	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM db_accounts WHERE db_user=? AND db_name<>?`, dbUser, dbName).Scan(&paylasim)
-	if paylasim > 0 {
-		if err := hesaplar.MySQLDropDBKeepUser(h.DB, dbName); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "DB silme: "+err.Error())
+
+	// Coklu-kullanicili DB: HER kullanicinin erisimini ayri ayri temizle (baska
+	// DB'de kullaniliyorsa yalniz revoke, degilse DROP USER) — tek bir dbid'nin
+	// kullanicisina odaklanip digerlerini MariaDB'de "hayalet grant" olarak
+	// birakmamak icin (bkz. spec: coklu-kullanici destegiyle bu artik sik durum).
+	kullanicilar, err := dbKullanicilariGetir(r.Context(), h.DB, domainID, dbName)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı sorgu: "+err.Error())
+		return
+	}
+	for _, u := range kullanicilar {
+		var baskaYerde int
+		_ = h.DB.QueryRowContext(r.Context(),
+			`SELECT COUNT(*) FROM db_accounts WHERE db_user=? AND db_name<>?`, u, dbName).Scan(&baskaYerde)
+		if err := hesaplar.MySQLRevokeUser(h.DB, dbName, u, baskaYerde == 0); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı temizliği: "+err.Error())
 			return
 		}
-	} else if err := hesaplar.MySQLDropDB(h.DB, dbName, dbUser); err != nil {
+	}
+	if err := hesaplar.MySQLDropDBKeepUser(h.DB, dbName); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB silme: "+err.Error())
 		return
 	}

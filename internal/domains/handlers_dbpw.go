@@ -9,6 +9,7 @@ import (
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -35,17 +36,22 @@ func (h *Handlers) SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var dbName, dbUser string
+	var domainID int64
 	var isDemo int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT db.db_name, db.db_user, d.is_demo
+		`SELECT db.db_name, db.db_user, db.domain_id, d.is_demo
 		 FROM db_accounts db JOIN domains d ON d.id=db.domain_id
-		 WHERE db.id=?`, dbid).Scan(&dbName, &dbUser, &isDemo)
+		 WHERE db.id=?`, dbid).Scan(&dbName, &dbUser, &domainID, &isDemo)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
 		return
 	}
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "okuma: "+err.Error())
+		return
+	}
+	if !middleware.DomainSahibiMi(r, domainID) {
+		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
 		return
 	}
 	if isDemo == 1 {

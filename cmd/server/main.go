@@ -505,8 +505,11 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/ftp/password", domainsH.SetFTPPassword)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/databases", domainsH.ListDatabases)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/databases", domainsH.CreateDatabase)
-				r.With(middleware.AdminOnly).Delete("/databases/{dbid}", domainsH.DeleteDatabase)
-				r.With(middleware.AdminOnly).Put("/databases/{dbid}/password", domainsH.SetDatabasePassword)
+				// {id} domain param'i olmadigi icin MusteriScope uygulanamaz;
+				// sahiplik handler icinde middleware.DomainSahibiMi ile manuel
+				// kontrol edilir (bkz. Task 11, pma.TokenIste ile ayni desen).
+				r.Delete("/databases/{dbid}", domainsH.DeleteDatabase)
+				r.Put("/databases/{dbid}/password", domainsH.SetDatabasePassword)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/files", filesH.List)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/files/oku", filesH.Read)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/files/indir", filesH.Download)
