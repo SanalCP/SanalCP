@@ -13,6 +13,11 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.9** (2026-08-25)
+
+Arka plan ağ isteklerinde küçük bir düzeltme. Kullanıcı akışlarında davranış
+değişikliği yok, migration gerektirmez.
+
 **0.9.8** (2026-08-24)
 
 Araçlar ve Ayarlar sayfasına, kurulumu tanımlayan bir lisans numarası kartı eklendi.

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.8",
-  "duyuru": "Araçlar ve Ayarlar sayfasına, kurulumu tanımlayan bir lisans numarası kartı eklendi. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez. Mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
+  "son_surum": "0.9.9",
+  "duyuru": "Arka plan ağ isteklerinde küçük bir düzeltme. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez. Mevcut kurulumlarda tek 'sanalcp-update' yeterli.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-24"
+  "yayin_tarihi": "2026-08-25"
 }

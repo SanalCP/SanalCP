@@ -12,8 +12,11 @@ package system
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -122,10 +125,27 @@ func firestoreURL(kimlik string) string {
 	return base + "?" + q.Encode()
 }
 
+// ipv4Istemci — googleapis.com bazı ağlarda (bu sandbox VE cloud.sanalcp.com
+// dahil, 2026-08-25'te canlı doğrulandı) IPv6 kaynaklı isteklere Firestore
+// Rules'a hiç ulaşmadan ham bir Google ağ geçidi 403'ü döndürüyor; aynı
+// istek IPv4 ile sorunsuz çalışıyor. Firestore ve IP tespiti SADECE IPv4
+// kullanır — Happy Eyeballs burada işe yaramaz çünkü IPv6 bağlantı KURULUYOR,
+// yalnızca uygulama katmanında reddediliyor.
+func ipv4Istemci(zamanAsimi time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: zamanAsimi,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "tcp4", addr)
+			},
+		},
+	}
+}
+
 // ipTespitEt — kendi genel IP'sini öğrenir (self-report, bağlantıdan otomatik
 // tespit DEĞİL — bkz. spec'teki "IP tespiti" kararı). Hata = boş döner.
 func ipTespitEt() string {
-	cli := &http.Client{Timeout: 10 * time.Second}
+	cli := ipv4Istemci(10 * time.Second)
 	resp, err := cli.Get(ipUC())
 	if err != nil {
 		return ""
@@ -158,13 +178,16 @@ func telemetriGonderVeri(kimlik, surum, ip, osAile, dil, ilkZaman string) error 
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	cli := &http.Client{Timeout: 20 * time.Second}
+	cli := ipv4Istemci(20 * time.Second)
 	resp, err := cli.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, telemetriGovdeSiniri))
+	govdeMetni, _ := io.ReadAll(io.LimitReader(resp.Body, telemetriGovdeSiniri))
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("firestore PATCH %d: %s", resp.StatusCode, strings.TrimSpace(string(govdeMetni)))
+	}
 	return nil
 }
 
