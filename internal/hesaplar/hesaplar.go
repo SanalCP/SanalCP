@@ -311,6 +311,57 @@ func MySQLDropDBKeepUser(db *sql.DB, dbName string) error {
 	return err
 }
 
+// MySQLGrantNewUser: var olan bir DB'ye YENİ bir kullanıcı olustur + GRANT ver
+// (CREATE DATABASE YAPMAZ — DB zaten var olmalı). db_accounts'a yeni satır ekler.
+func MySQLGrantNewUser(db *sql.DB, domainID int64, dbName, dbUser, dbPass string) error {
+	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
+		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
+	}
+	if err := rootExecAll(
+		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
+		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return err
+	}
+	encPass, encErr := box.Encrypt(dbPass)
+	if encErr != nil {
+		return fmt.Errorf("db parola şifreleme: %w", encErr)
+	}
+	_, err := db.Exec(
+		`INSERT INTO db_accounts(domain_id, db_name, db_user, db_pass_plain, db_host)
+		 VALUES(?,?,?,?, 'localhost')`,
+		domainID, dbName, dbUser, encPass)
+	return err
+}
+
+// MySQLGrantExistingUser: var olan bir DB'ye, ZATEN var olan bir kullanıcıya GRANT ver
+// (CREATE/ALTER USER YOK → parola korunur). Çağıran, dbUser'ın bu domaine ait olduğunu
+// ÖNCEDEN doğrulamalıdır (sahiplik + önek). Çağıran ayrıca db_accounts'tan mevcut
+// parolayı okuyup yanıtta gösterebilir (bu fonksiyon parolayı döndürmez).
+func MySQLGrantExistingUser(db *sql.DB, domainID int64, dbName, dbUser string) error {
+	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
+		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
+	}
+	var pass string
+	if err := db.QueryRow(
+		`SELECT db_pass_plain FROM db_accounts WHERE db_user=? LIMIT 1`, dbUser).Scan(&pass); err != nil {
+		return fmt.Errorf("mevcut kullanıcı parolası bulunamadı: %w", err)
+	}
+	if err := rootExecAll(
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		"FLUSH PRIVILEGES",
+	); err != nil {
+		return err
+	}
+	_, err := db.Exec(
+		`INSERT INTO db_accounts(domain_id, db_name, db_user, db_pass_plain, db_host)
+		 VALUES(?,?,?,?, 'localhost')`,
+		domainID, dbName, dbUser, pass)
+	return err
+}
+
 // MySQLDropAllForDomain: domain silinince ona ait tum DB'leri kaldir
 func MySQLDropAllForDomain(db *sql.DB, domainID int64) error {
 	rows, err := db.Query(`SELECT db_name, db_user FROM db_accounts WHERE domain_id=?`, domainID)
