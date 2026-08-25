@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.11** (2026-08-25)
+
+Domain > Veritabanları ekranına, her veritabanı için ayrı bir "Yönet" sayfası
+eklendi:
+
+- **Genel bilgi**: boyut, karakter seti/sıralama, isim değiştirme (uygulama
+  yapılandırma dosyalarınızı elle güncellemeniz gerekebileceğine dair uyarıyla).
+- **Kullanıcılar**: aynı veritabanına birden fazla kullanıcı bağlanabilir —
+  ekleme, şifre değiştirme, kaldırma (tek kullanıcıysa korumalı).
+- **Bakım**: tek tıkla gzip yedekleme, .sql/.sql.gz'den geri yükleme, optimize
+  ve onar.
+
+phpMyAdmin erişimi bu yeni sayfaya taşındı. Kullanıcı akışlarında geriye dönük
+kırılma yok, migration gerektirmez.
+
 **0.9.10** (2026-08-25)
 
 Domain detayında "Paket ve Kaynaklar" kartına inode kullanım/limit göstergesi
