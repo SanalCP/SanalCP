@@ -258,6 +258,9 @@ func TestDatabaseKullaniciSilSonKullaniciysa409(t *testing.T) {
 	}
 	defer db.Close()
 
+	mock.ExpectQuery(`SELECT is_demo FROM domains WHERE id=\?`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"is_demo"}).AddRow(0))
 	mock.ExpectQuery(`SELECT db_user FROM db_accounts WHERE id=\? AND domain_id=\? AND db_name=\?`).
 		WithArgs(int64(101), int64(7), "sk_blog").
 		WillReturnRows(sqlmock.NewRows([]string{"db_user"}).AddRow("sk_blog"))
@@ -276,6 +279,61 @@ func TestDatabaseKullaniciSilSonKullaniciysa409(t *testing.T) {
 	if w.Code != http.StatusConflict {
 		t.Fatalf("409 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// Bulgu 5: demo abonelikte bakım/silme uçları 403 döner (DatabaseIsimDegistir
+// ile aynı koruma; kardeş handler'larda eksikti).
+func TestDatabaseKullaniciSilDemoAbonelikte403(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT is_demo FROM domains WHERE id=\?`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"is_demo"}).AddRow(1))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Delete("/domains/{id}/databases/{dbAdi}/kullanicilar/{dbid}", h.DatabaseKullaniciSil)
+
+	req := httptest.NewRequest(http.MethodDelete, "/domains/7/databases/sk_blog/kullanicilar/101", nil)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("403 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// Bulgu 4: exec'e giden dbAdi GecerliDBKimlik'ten geçmeli — geçersiz ad
+// mysqldump/mysqlcheck çalıştırılmadan 400 ile reddedilir.
+func TestDatabaseYedekleGecersizDBAdiniReddeder(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Get("/domains/{id}/databases/{dbAdi}/yedek", h.DatabaseYedekle)
+
+	req := httptest.NewRequest(http.MethodGet, "/domains/7/databases/sk%20blog;drop/yedek", nil)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("400 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+	// Hiçbir sorgu çalışmamalı: doğrulama en başta.
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
 	}
