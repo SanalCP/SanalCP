@@ -1,6 +1,9 @@
 package hesaplar
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestMySQLGrantNewUserGecersizKimlikleriReddeder(t *testing.T) {
 	if err := MySQLGrantNewUser(nil, 1, "gecerli_db", "kotu ad", "Parola1234567!"); err == nil {
@@ -22,6 +25,19 @@ func TestMySQLRevokeUserGecersizKimlikleriReddeder(t *testing.T) {
 		t.Error("tire içeren DB adı reddedilmeliydi")
 	}
 	if err := MySQLRevokeUser(nil, "gecerli_db", "kotu user", true); err == nil {
+		t.Error("boşluklu kullanıcı adı reddedilmeliydi")
+	}
+}
+
+func TestMySQLRenameDBGecersizKimlikleriReddeder(t *testing.T) {
+	ctx := context.Background()
+	if err := MySQLRenameDB(ctx, nil, 1, "kötü-db", "yeni_db", []string{"kullanici1"}); err == nil {
+		t.Error("tire içeren eski DB adı reddedilmeliydi")
+	}
+	if err := MySQLRenameDB(ctx, nil, 1, "eski_db", "kötü-db", []string{"kullanici1"}); err == nil {
+		t.Error("tire içeren yeni DB adı reddedilmeliydi")
+	}
+	if err := MySQLRenameDB(ctx, nil, 1, "eski_db", "yeni_db", []string{"kotu user"}); err == nil {
 		t.Error("boşluklu kullanıcı adı reddedilmeliydi")
 	}
 }

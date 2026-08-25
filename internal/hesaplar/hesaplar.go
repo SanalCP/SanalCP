@@ -382,6 +382,76 @@ func MySQLRevokeUser(db *sql.DB, dbName, dbUser string, dropUser bool) error {
 	return err
 }
 
+// MySQLRenameDB: MySQL'de native RENAME DATABASE yok — CREATE + mysqldump|mysql
+// taşıma (view/trigger/routine/event de taşınır, RENAME TABLE döngüsünün aksine)
+// + grant taşıma + DROP ile taklit edilir. Herhangi bir adım basarisiz olursa
+// yeni DB best-effort silinir, eski DB adim 4'e kadar DOKUNULMAMIŞ kalır.
+func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeniAd string, kullanicilar []string) error {
+	if !GecerliDBKimlik(eskiAd) || !GecerliDBKimlik(yeniAd) {
+		return fmt.Errorf("güvenlik: geçersiz veritabanı adı")
+	}
+	for _, u := range kullanicilar {
+		if !GecerliDBKimlik(u) {
+			return fmt.Errorf("güvenlik: geçersiz kullanıcı adı")
+		}
+	}
+
+	temizle := func() { _ = rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", yeniAd)) }
+
+	if err := rootExecAll(
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", yeniAd),
+	); err != nil {
+		return err
+	}
+
+	dump := exec.CommandContext(ctx, "mysqldump", "--single-transaction", "--routines", "--triggers", "--events", eskiAd)
+	restore := exec.CommandContext(ctx, "mysql", yeniAd)
+	pipe, err := dump.StdoutPipe()
+	if err != nil {
+		temizle()
+		return fmt.Errorf("pipe: %w", err)
+	}
+	restore.Stdin = pipe
+	var dumpErr, restoreErr strings.Builder
+	dump.Stderr = &dumpErr
+	restore.Stderr = &restoreErr
+
+	if err := restore.Start(); err != nil {
+		temizle()
+		return fmt.Errorf("mysql start: %w", err)
+	}
+	if err := dump.Run(); err != nil {
+		_ = restore.Wait()
+		temizle()
+		return fmt.Errorf("mysqldump %s: %s: %w", eskiAd, strings.TrimSpace(dumpErr.String()), err)
+	}
+	if err := restore.Wait(); err != nil {
+		temizle()
+		return fmt.Errorf("mysql %s: %s: %w", yeniAd, strings.TrimSpace(restoreErr.String()), err)
+	}
+
+	grants := make([]string, 0, len(kullanicilar)*2+1)
+	for _, u := range kullanicilar {
+		grants = append(grants,
+			fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", yeniAd, u),
+			fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%s`.* FROM '%s'@'localhost'", eskiAd, u))
+	}
+	grants = append(grants, "FLUSH PRIVILEGES")
+	if err := rootExecAll(grants...); err != nil {
+		temizle()
+		return fmt.Errorf("grant/revoke: %w", err)
+	}
+
+	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", eskiAd)); err != nil {
+		return fmt.Errorf("yeni veritabanı aktif ama eski silinemedi (elle temizleyin): %w", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`UPDATE db_accounts SET db_name=? WHERE db_name=? AND domain_id=?`, yeniAd, eskiAd, domainID); err != nil {
+		return fmt.Errorf("metadata güncelleme: %w", err)
+	}
+	return nil
+}
+
 // MySQLDropAllForDomain: domain silinince ona ait tum DB'leri kaldir
 func MySQLDropAllForDomain(db *sql.DB, domainID int64) error {
 	rows, err := db.Query(`SELECT db_name, db_user FROM db_accounts WHERE domain_id=?`, domainID)
