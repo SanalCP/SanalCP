@@ -148,7 +148,10 @@ func (h *Handlers) DatabaseIsimDegistir(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var cakisma int
-	_ = h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM db_accounts WHERE db_name=?`, yeniAd).Scan(&cakisma)
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM db_accounts WHERE db_name=?`, yeniAd).Scan(&cakisma); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "çakışma sorgusu: "+err.Error())
+		return
+	}
 	if cakisma > 0 {
 		httpx.WriteError(w, http.StatusConflict, "bu isimde bir veritabanı zaten var: "+yeniAd)
 		return
