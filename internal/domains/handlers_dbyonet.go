@@ -303,6 +303,25 @@ func (h *Handlers) DatabaseKullaniciEkle(w http.ResponseWriter, r *http.Request)
 
 func sonKullaniciMi(toplamKullanici int) bool { return toplamKullanici <= 1 }
 
+// demoAboneMi: domainin demo abonelik olup olmadığını döner. Hata durumunda
+// yanıtı KENDİ yazar ve ok=false döner (çağıran hemen return etmeli).
+// DatabaseIsimDegistir/DatabaseKullaniciEkle zaten is_demo'yu kendi domains
+// sorgularında okuyor; yalnız db_accounts'a bakan kardeş handler'lar bu ayrı
+// sorguyu kullanır.
+func (h *Handlers) demoAboneMi(w http.ResponseWriter, r *http.Request, domainID int64) (demo bool, ok bool) {
+	var isDemo int
+	err := h.DB.QueryRowContext(r.Context(), `SELECT is_demo FROM domains WHERE id=?`, domainID).Scan(&isDemo)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return false, false
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "domain sorgu: "+err.Error())
+		return false, false
+	}
+	return isDemo == 1, true
+}
+
 // DatabaseKullaniciSil: DELETE /domains/{id}/databases/{dbAdi}/kullanicilar/{dbid}
 // DB'yi SİLMEZ — yalnız bu kullanıcının erişimini kaldırır. Son kullanıcıysa
 // 409 döner (DB'yi silmek için domain sil ucu kullanılmalı).
@@ -310,6 +329,13 @@ func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) 
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
 	dbid, _ := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
+
+	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
+		return
+	} else if demoMu {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin kullanıcısı silinemez")
+		return
+	}
 
 	var dbUser string
 	err := h.DB.QueryRowContext(r.Context(),
@@ -355,6 +381,18 @@ func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) 
 func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
+	// exec'e giden HER identifier bundan geçmeli (plan: Global Constraints).
+	if !hesaplar.GecerliDBKimlik(dbAdi) {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz veritabanı adı")
+		return
+	}
+
+	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
+		return
+	} else if demoMu {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin yedeği alınamaz")
+		return
+	}
 
 	var varMi int
 	_ = h.DB.QueryRowContext(r.Context(),
@@ -427,17 +465,9 @@ func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
 
-	var isDemo int
-	err := h.DB.QueryRowContext(r.Context(), `SELECT is_demo FROM domains WHERE id=?`, id).Scan(&isDemo)
-	if errors.Is(err, sql.ErrNoRows) {
-		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
 		return
-	}
-	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "domain sorgu: "+err.Error())
-		return
-	}
-	if isDemo == 1 {
+	} else if demoMu {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğe geri yükleme yapılamaz")
 		return
 	}
@@ -566,6 +596,18 @@ func mysqlcheckIkiliAdi() string {
 func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, bayrak string) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	dbAdi := chi.URLParam(r, "dbAdi")
+	// exec'e giden HER identifier bundan geçmeli (plan: Global Constraints).
+	if !hesaplar.GecerliDBKimlik(dbAdi) {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz veritabanı adı")
+		return
+	}
+
+	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
+		return
+	} else if demoMu {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin veritabanı optimize/onar edilemez")
+		return
+	}
 
 	var varMi int
 	_ = h.DB.QueryRowContext(r.Context(),
