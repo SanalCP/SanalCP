@@ -49,6 +49,12 @@ func TestDatabaseGrupDetayBirdenFazlaKullaniciyiGruplar(t *testing.T) {
 	if !contains(body, `"db_adi":"sk_blog"`) || !contains(body, "sk_ikinci") {
 		t.Errorf("iki kullanıcı da yanıtta olmalıydı: %s", body)
 	}
+	if !contains(body, `"boyut_mb":2.5`) {
+		t.Errorf("boyut_mb 2.5 olmalıydı: %s", body)
+	}
+	if !contains(body, `"charset":"utf8mb4"`) || !contains(body, `"collation":"utf8mb4_unicode_ci"`) {
+		t.Errorf("charset/collation yanıtta olmalıydı: %s", body)
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
 	}
@@ -199,6 +205,9 @@ func TestDatabaseKullaniciEkleMevcutKullaniciDomaineAitDegilse400(t *testing.T) 
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("400 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -397,6 +406,63 @@ func TestDeleteDatabaseCokKullaniciliDBdeHepsiniTemizler(t *testing.T) {
 		rtr.ServeHTTP(w, req)
 	}()
 
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestDatabaseGrupDetayGecersizIDReddeder(t *testing.T) {
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Get("/domains/{id}/databases/{dbAdi}", h.DatabaseGrupDetay)
+
+	req := httptest.NewRequest(http.MethodGet, "/domains/sayi-degil/databases/sk_blog", nil)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("geçersiz id için 400 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDatabaseIsimDegistirFizikselSemaCakismasindaReddeder(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT sistem_kullanici, is_demo FROM domains WHERE id=\?`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"sistem_kullanici", "is_demo"}).AddRow("sk", 0))
+	mock.ExpectQuery(`SELECT DISTINCT db_user FROM db_accounts WHERE domain_id=\? AND db_name=\?`).
+		WithArgs(int64(7), "sk_blog").
+		WillReturnRows(sqlmock.NewRows([]string{"db_user"}).AddRow("sk_blog"))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM db_accounts WHERE db_name=\?`).
+		WithArgs("sk_yeni").
+		WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(0))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM information_schema.schemata WHERE schema_name=\?`).
+		WithArgs("sk_yeni").
+		WillReturnRows(sqlmock.NewRows([]string{"c"}).AddRow(1))
+
+	h := &Handlers{DB: db}
+	rtr := chi.NewRouter()
+	rtr.Put("/domains/{id}/databases/{dbAdi}/isim", h.DatabaseIsimDegistir)
+
+	body := strings.NewReader(`{"yeni_sonek":"yeni"}`)
+	req := httptest.NewRequest(http.MethodPut, "/domains/7/databases/sk_blog/isim", body)
+	w := httptest.NewRecorder()
+	rtr.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("409 bekleniyordu, %d geldi: %s", w.Code, w.Body.String())
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)
 	}

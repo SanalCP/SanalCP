@@ -103,7 +103,9 @@ func TestHedefDogrula(t *testing.T) {
 		{DBAdi: "a`b", Kullanici: "u", Parola: "x"},
 		{DBAdi: "mysql; DROP", Kullanici: "u", Parola: "x"},
 		{DBAdi: "a", Kullanici: "u'--", Parola: "x"},
-		{DBAdi: "a", Kullanici: "u", Parola: ""}, // parolasız → root'a düşme riski
+		{DBAdi: "a", Kullanici: "u", Parola: ""},                           // parolasız → root'a düşme riski
+		{DBAdi: "a", Kullanici: "u", Parola: "x\ninjected=evil", Host: ""}, // parolada satır sonu → option-file enjeksiyonu
+		{DBAdi: "a", Kullanici: "u", Parola: "x", Host: "localhost\r\ninjected=evil"},
 	}
 	for _, h := range kotu {
 		if err := h.dogrula(); err == nil {

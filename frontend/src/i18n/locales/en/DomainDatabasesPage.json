@@ -12,7 +12,7 @@
   "col_actions": "Actions",
   "delete": "Delete",
   "delete_dialog_title": "Delete database",
-  "delete_dialog_msg": "Database \"{{ad}}\" and its user will be permanently deleted. This cannot be undone!",
+  "delete_dialog_msg": "Database \"{{ad}}\" and all its users will be permanently deleted. This cannot be undone!",
   "delete_confirm": "Yes, delete",
   "delete_failed": "Could not delete",
   "new_db_modal_title": "New Database",

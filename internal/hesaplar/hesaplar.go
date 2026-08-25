@@ -442,12 +442,17 @@ func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeni
 		return fmt.Errorf("grant/revoke: %w", err)
 	}
 
-	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", eskiAd)); err != nil {
-		return fmt.Errorf("yeni veritabanı aktif ama eski silinemedi (elle temizleyin): %w", err)
-	}
+	// UPDATE, geri dönüşü olmayan DROP'tan ÖNCE: bu sırada başarısız olursa
+	// eski DB'ye hiç dokunulmamış olur (tam kurtarılabilir). Ters sırada
+	// (önce DROP, sonra UPDATE) UPDATE patlarsa fiziksel DB yeni adda ama
+	// panel eski adı gösterirdi — DB paneldan tamamen "kaybolurdu".
 	if _, err := db.ExecContext(ctx,
 		`UPDATE db_accounts SET db_name=? WHERE db_name=? AND domain_id=?`, yeniAd, eskiAd, domainID); err != nil {
-		return fmt.Errorf("metadata güncelleme: %w", err)
+		temizle()
+		return fmt.Errorf("metadata güncelleme (eski veritabanına dokunulmadı): %w", err)
+	}
+	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", eskiAd)); err != nil {
+		return fmt.Errorf("yeni veritabanı aktif ama eski silinemedi (elle temizleyin): %w", err)
 	}
 	return nil
 }

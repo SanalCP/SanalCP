@@ -87,6 +87,12 @@ func (h Hedef) dogrula() error {
 	if h.Parola == "" {
 		return fmt.Errorf("%w: parola boş", ErrGecersizHedef)
 	}
+	// Parola/Host, DBAdi/Kullanici gibi bir kimlik regex'iyle sınırlı değil —
+	// defaultsDosya bunları [client] option-file'ına yazıyor, satır sonu
+	// karakteri değerin dışına taşıp yeni option satırı enjekte edebilirdi.
+	if strings.ContainsAny(h.Parola, "\r\n") || strings.ContainsAny(h.Host, "\r\n") {
+		return fmt.Errorf("%w: parola veya host geçersiz karakter içeriyor", ErrGecersizHedef)
+	}
 	return nil
 }
 

@@ -59,7 +59,11 @@ type dbGrupDetay struct {
 
 // DatabaseGrupDetay: GET /domains/{id}/databases/{dbAdi}
 func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
 
 	rows, err := h.DB.QueryContext(r.Context(),
@@ -82,6 +86,11 @@ func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
 		out.DBHost = host
 		if dec, err := hesaplar.DecryptDBPassword(k.DBParola); err == nil {
 			k.DBParola = dec
+		} else {
+			// Çözülemeyen şifreli metni ASLA "parola" diye istemciye dönme
+			// (pma.TokenIste aynı durumda 500 döner, burada göstergeyi
+			// boş bırakmak yeterli — kart zaten diğer kullanıcıları listeler).
+			k.DBParola = ""
 		}
 		out.Kullanicilar = append(out.Kullanicilar, k)
 	}
@@ -109,12 +118,16 @@ type dbIsimDegistirReq struct {
 
 // DatabaseIsimDegistir: PUT /domains/{id}/databases/{dbAdi}/isim
 func (h *Handlers) DatabaseIsimDegistir(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	eskiAd := chi.URLParam(r, "dbAdi")
 
 	var sk string
 	var isDemo int
-	err := h.DB.QueryRowContext(r.Context(),
+	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).Scan(&sk, &isDemo)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
@@ -163,6 +176,20 @@ func (h *Handlers) DatabaseIsimDegistir(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteError(w, http.StatusConflict, "bu isimde bir veritabanı zaten var: "+yeniAd)
 		return
 	}
+	// Panel metadata'sında (db_accounts) kayıt olmasa da MariaDB'de fiziksel
+	// olarak bir şema kalmış olabilir (ör. başarısız/yarım kalmış önceki bir
+	// rename'den) — yalnız db_accounts'a bakmak bu artığı gözden kaçırıp
+	// CREATE DATABASE IF NOT EXISTS + dump'ı onun ÜZERİNE birleştirebilirdi.
+	var semaVarMi int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name=?`, yeniAd).Scan(&semaVarMi); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "şema çakışma sorgusu: "+err.Error())
+		return
+	}
+	if semaVarMi > 0 {
+		httpx.WriteError(w, http.StatusConflict, "bu isimde bir MariaDB şeması zaten var (panelin bilmediği): "+yeniAd)
+		return
+	}
 
 	httpx.ExtendDeadline(w, 15*time.Minute)
 	if err := hesaplar.MySQLRenameDB(r.Context(), h.DB, id, eskiAd, yeniAd, kullanicilar); err != nil {
@@ -186,12 +213,16 @@ type dbKullaniciEkleReq struct {
 // DatabaseKullaniciEkle: POST /domains/{id}/databases/{dbAdi}/kullanicilar
 // Kota kontrolü YOK — yeni DB değil, mevcut DB'ye ek kullanıcı (bkz. spec kararı).
 func (h *Handlers) DatabaseKullaniciEkle(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
 
 	var sk string
 	var isDemo int
-	err := h.DB.QueryRowContext(r.Context(),
+	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT sistem_kullanici, is_demo FROM domains WHERE id=?`, id).Scan(&sk, &isDemo)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
@@ -281,7 +312,7 @@ func (h *Handlers) DatabaseKullaniciEkle(w http.ResponseWriter, r *http.Request)
 		}
 		var encParola string
 		_ = h.DB.QueryRowContext(r.Context(),
-			`SELECT db_pass_plain FROM db_accounts WHERE db_user=? LIMIT 1`, dbKullanici).Scan(&encParola)
+			`SELECT db_pass_plain FROM db_accounts WHERE domain_id=? AND db_user=? LIMIT 1`, id, dbKullanici).Scan(&encParola)
 		if dec, err := hesaplar.DecryptDBPassword(encParola); err == nil {
 			parola = dec
 		}
@@ -326,9 +357,17 @@ func (h *Handlers) demoAboneMi(w http.ResponseWriter, r *http.Request, domainID 
 // DB'yi SİLMEZ — yalnız bu kullanıcının erişimini kaldırır. Son kullanıcıysa
 // 409 döner (DB'yi silmek için domain sil ucu kullanılmalı).
 func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
-	dbid, _ := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
+	dbid, err := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı kaydı id")
+		return
+	}
 
 	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
 		return
@@ -338,7 +377,7 @@ func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var dbUser string
-	err := h.DB.QueryRowContext(r.Context(),
+	err = h.DB.QueryRowContext(r.Context(),
 		`SELECT db_user FROM db_accounts WHERE id=? AND domain_id=? AND db_name=?`, dbid, id, dbAdi).Scan(&dbUser)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "kullanıcı kaydı bulunamadı")
@@ -379,7 +418,11 @@ func (h *Handlers) DatabaseKullaniciSil(w http.ResponseWriter, r *http.Request) 
 // dosyaya yazılır (backups.Indir deseniyle aynı) — mysqldump ortasında hata
 // verirse yanıt başlamadan 500 dönebiliriz, yarım/bozuk dosya indirtmeyiz.
 func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
 	// exec'e giden HER identifier bundan geçmeli (plan: Global Constraints).
 	if !hesaplar.GecerliDBKimlik(dbAdi) {
@@ -395,8 +438,11 @@ func (h *Handlers) DatabaseYedekle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var varMi int
-	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı sorgu: "+err.Error())
+		return
+	}
 	if varMi == 0 {
 		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
 		return
@@ -462,7 +508,11 @@ const maxDBRestoreAcikBayt = 5 * 1024 * 1024 * 1024 // 5 GiB
 // devretmek olurdu — `mysql <db>` yalnız VARSAYILAN şemayı seçer, yetki sınırı
 // KOYMAZ (bkz. internal/sqlimport paket açıklaması ve internal/iceaktarim).
 func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
 
 	if demoMu, ok := h.demoAboneMi(w, r, id); !ok {
@@ -481,8 +531,10 @@ func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Tek tenant'ın paralel geri yüklemelerle sunucuyu tüketmesini engelle
-	// (files.Upload / iceaktarim.SQLYukle deseni); kota doluysa beklemeden 429.
-	birak, ok := httpx.YuklemeSlotVeyaHata(w, "db-restore:"+strconv.FormatInt(id, 10)+":"+dbAdi)
+	// (files.Upload / iceaktarim.SQLYukle deseni) — anahtar TENANT bazında
+	// (dbAdi'ye göre değil), aksi halde çok-DB'li bir tenant her DB için ayrı
+	// slot alıp genel sınırı aşabilirdi.
+	birak, ok := httpx.YuklemeSlotVeyaHata(w, "db-restore:"+strconv.FormatInt(id, 10))
 	if !ok {
 		return
 	}
@@ -529,16 +581,36 @@ func (h *Handlers) DatabaseGeriYukle(w http.ResponseWriter, r *http.Request) {
 		reader = gzr
 	}
 	// Açılmış akışı sınırla: küçük ama kötü niyetli bir .gz sınırsız büyüyemesin.
-	// Sınıra takılırsa akış kesilir ve mysql sözdizimi hatasıyla düşer — bu uç
-	// durum için kabul edilebilir (asıl güvenlik düşük yetkili bağlantıdan gelir).
-	reader = io.LimitReader(reader, maxDBRestoreAcikBayt+1)
+	// sayan, gerçekte kaç bayt okunduğunu tutar — LimitReader sınıra TAKILIP
+	// akışı sessizce kesebilir; bu durumda mysql'e giden ifade tam da bir
+	// deyim sınırında kesilmiş olabilir ve "başarıyla" tamamlanabilir. Bu,
+	// yarım kalmış bir geri yüklemeyi 200 OK gibi göstermek demektir —
+	// okunan bayt sınırı aştıysa import başarılı görünse bile hata döneriz.
+	sayan := &sayanOkuyucu{Reader: io.LimitReader(reader, maxDBRestoreAcikBayt+1)}
 
-	if err := sqlimport.Uygula(r.Context(), hedef, reader); err != nil {
+	if err := sqlimport.Uygula(r.Context(), hedef, sayan); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if sayan.okunan > maxDBRestoreAcikBayt {
+		httpx.WriteError(w, http.StatusBadRequest,
+			"açılmış dosya boyut sınırını aştı, geri yükleme yarım kalmış olabilir — dosyayı küçültüp tekrar deneyin")
 		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": dbAdi + " geri yüklendi"})
+}
+
+// sayanOkuyucu: sarmaladığı Reader'dan gerçekte kaç bayt okunduğunu sayar.
+type sayanOkuyucu struct {
+	io.Reader
+	okunan int64
+}
+
+func (s *sayanOkuyucu) Read(p []byte) (int, error) {
+	n, err := s.Reader.Read(p)
+	s.okunan += int64(n)
+	return n, err
 }
 
 // errDBBulunamadi: hedef kimlik araması no-rows ile döndüğünde (varlık denetimi).
@@ -558,7 +630,7 @@ func (h *Handlers) dbGeriYukleHedefi(r *http.Request, domainID int64, dbAdi stri
 	var kullanici, sifreli, host string
 	err := h.DB.QueryRowContext(r.Context(),
 		`SELECT db_user, db_pass_plain, COALESCE(db_host,'localhost')
-		   FROM db_accounts WHERE domain_id=? AND db_name=?`, domainID, dbAdi).
+		   FROM db_accounts WHERE domain_id=? AND db_name=? ORDER BY id LIMIT 1`, domainID, dbAdi).
 		Scan(&kullanici, &sifreli, &host)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sqlimport.Hedef{}, errDBBulunamadi
@@ -594,7 +666,11 @@ func mysqlcheckIkiliAdi() string {
 }
 
 func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, bayrak string) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz domain id")
+		return
+	}
 	dbAdi := chi.URLParam(r, "dbAdi")
 	// exec'e giden HER identifier bundan geçmeli (plan: Global Constraints).
 	if !hesaplar.GecerliDBKimlik(dbAdi) {
@@ -610,22 +686,27 @@ func (h *Handlers) mysqlcheckCalistir(w http.ResponseWriter, r *http.Request, ba
 	}
 
 	var varMi int
-	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi)
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, id, dbAdi).Scan(&varMi); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı sorgu: "+err.Error())
+		return
+	}
 	if varMi == 0 {
 		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
 		return
 	}
 
 	httpx.ExtendDeadline(w, 15*time.Minute)
-	out, err := exec.CommandContext(r.Context(), mysqlcheckIkiliAdi(), bayrak, dbAdi).CombinedOutput()
+	ikili := mysqlcheckIkiliAdi()
+	out, err := exec.CommandContext(r.Context(), ikili, bayrak, dbAdi).CombinedOutput()
 	if err != nil {
-		// İkili hiç yoksa out boş kalır; o zaman mesaj "mysqlcheck: " olurdu.
+		// İkili hiç yoksa out boş kalır; mesaj GERÇEKTE çalışan ikilinin
+		// adını taşır (mysqlcheck yerine mariadb-check çalışmış olabilir).
 		msg := strings.TrimSpace(string(out))
 		if msg == "" {
 			msg = err.Error()
 		}
-		httpx.WriteError(w, http.StatusInternalServerError, "mysqlcheck: "+msg)
+		httpx.WriteError(w, http.StatusInternalServerError, ikili+": "+msg)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "sonuc": string(out)})

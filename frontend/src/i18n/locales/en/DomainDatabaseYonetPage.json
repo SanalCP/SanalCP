@@ -21,6 +21,7 @@
   "new_user_radio": "New user",
   "existing_user_radio": "Existing user",
   "user_suffix_label": "Username suffix",
+  "validation_user_suffix": "Username suffix: only lowercase letters/digits/underscore, 1-32 characters",
   "existing_user_label": "Existing username (belonging to this domain)",
   "password_label": "Password",
   "password_placeholder": "At least 12 characters, letters+digits",

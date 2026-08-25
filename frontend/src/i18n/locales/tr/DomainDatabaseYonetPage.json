@@ -21,6 +21,7 @@
   "new_user_radio": "Yeni kullanıcı",
   "existing_user_radio": "Mevcut kullanıcı",
   "user_suffix_label": "Kullanıcı adı soneki",
+  "validation_user_suffix": "Kullanıcı soneki: yalnız küçük harf/rakam/alt-çizgi, 1-32 karakter",
   "existing_user_label": "Mevcut kullanıcı adı (bu domaine ait)",
   "password_label": "Parola",
   "password_placeholder": "En az 12 karakter, harf+rakam",

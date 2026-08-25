@@ -12,7 +12,7 @@
   "col_actions": "İşlemler",
   "delete": "Sil",
   "delete_dialog_title": "Veritabanını sil",
-  "delete_dialog_msg": "\"{{ad}}\" veritabanı ve kullanıcısı kalıcı silinecek. Bu işlem geri alınamaz!",
+  "delete_dialog_msg": "\"{{ad}}\" veritabanı ve ona bağlı tüm kullanıcılar kalıcı silinecek. Bu işlem geri alınamaz!",
   "delete_confirm": "Evet, sil",
   "delete_failed": "Silme başarısız",
   "new_db_modal_title": "Yeni Veritabanı",

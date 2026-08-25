@@ -15,6 +15,8 @@ export type DBGrupDetay = {
 }
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 
+const SONEK_RE = /^[a-z0-9_]{1,32}$/
+
 function fmtBoyut(mb: number): string {
   if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB'
   return mb.toFixed(1) + ' MB'
@@ -259,7 +261,7 @@ function KullaniciSatiri({ kullanici, sonKullanici, onSifreDegistir, onSil, t }:
         </button>
         {goster && (
           <button
-            onClick={() => { navigator.clipboard.writeText(kullanici.db_parola); setKopya(true); setTimeout(() => setKopya(false), 1500) }}
+            onClick={() => { navigator.clipboard.writeText(kullanici.db_parola).then(() => { setKopya(true); setTimeout(() => setKopya(false), 1500) }).catch(() => {}) }}
             className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 rounded"
           >
             {kopya ? '✓' : '⧉'}
@@ -293,6 +295,10 @@ function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
   const [hata, setHata] = useState<string | null>(null)
 
   async function ekle() {
+    if (tip === 'yeni' && !SONEK_RE.test(sonek)) {
+      setHata(t('DomainDatabaseYonetPage:validation_user_suffix'))
+      return
+    }
     setIsleniyor(true); setHata(null)
     try {
       const body = tip === 'yeni'
@@ -368,10 +374,12 @@ function BakimKarti({ domainId, dbAdi, t }: { domainId: string; dbAdi: string; t
         return r.blob()
       })
       .then(blob => {
+        const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = URL.createObjectURL(blob)
+        a.href = url
         a.download = `${dbAdi}.sql.gz`
         a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
       })
       .catch(() => setHata(t('DomainDatabaseYonetPage:backup_failed')))
       .finally(() => setIsleniyor(null))
