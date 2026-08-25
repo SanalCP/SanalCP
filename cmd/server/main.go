@@ -505,6 +505,14 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/ftp/password", domainsH.SetFTPPassword)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/databases", domainsH.ListDatabases)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/databases", domainsH.CreateDatabase)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/databases/{dbAdi}", domainsH.DatabaseGrupDetay)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/databases/{dbAdi}/isim", domainsH.DatabaseIsimDegistir)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/databases/{dbAdi}/kullanicilar", domainsH.DatabaseKullaniciEkle)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/databases/{dbAdi}/kullanicilar/{dbid}", domainsH.DatabaseKullaniciSil)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/databases/{dbAdi}/yedek", domainsH.DatabaseYedekle)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/databases/{dbAdi}/geri-yukle", domainsH.DatabaseGeriYukle)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/databases/{dbAdi}/optimize", domainsH.DatabaseOptimize)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/databases/{dbAdi}/onar", domainsH.DatabaseOnar)
 				// {id} domain param'i olmadigi icin MusteriScope uygulanamaz;
 				// sahiplik handler icinde middleware.DomainSahibiMi ile manuel
 				// kontrol edilir (bkz. Task 11, pma.TokenIste ile ayni desen).
