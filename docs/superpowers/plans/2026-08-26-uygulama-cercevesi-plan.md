@@ -748,7 +748,14 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	if sreq.DBSil {
 		if dbName, bulundu := u.DBAdiOku(dir); bulundu {
 			if ok, err := h.dbSahipMi(r.Context(), dbName, domID); err == nil && ok {
-				_, _ = h.DB.Exec("DROP DATABASE IF EXISTS `" + dbName + "`")
+				// h.DB panel bağlantısı yalnız GRANT ALL ON panel.* yetkisine sahip —
+				// gerçek DROP DATABASE yetkisi yalnız hesaplar paketinin root
+				// bağlantısında (rootExecAll). hesaplar.MySQLDropDBKeepUser bunu doğru
+				// yapar + db_accounts satırını temizler (kullanıcıya dokunmaz — "mevcut
+				// kullanıcı" modunda aynı kullanıcı başka DB'de de olabilir; bu ihtimal
+				// Kur akışında tek DB'ye tek özel kullanıcı oluşturulduğu için bu türde
+				// pratikte oluşmaz, ama fonksiyon davranışı bilinçli olarak muhafazakâr).
+				_ = hesaplar.MySQLDropDBKeepUser(h.DB, dbName)
 			}
 		}
 	}
