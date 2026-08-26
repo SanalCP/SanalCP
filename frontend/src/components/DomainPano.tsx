@@ -24,6 +24,7 @@ const ICONS = {
   imunify:   'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622',
   ssh:       'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   wordpress: 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5-2.5 3-6 3-9s-.5-6.5-3-9m0 18c-2.5-2.5-3-6-3-9s.5-6.5 3-9M3.6 9h16.8M3.6 15h16.8',
+  prestashop: 'M12 3l7 4v10l-7 4-7-4V7l7-4z',
   subdomain: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064',
   ekdomain:  'M9 12h6m-6 4h3m-3-8h6M5 6h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z',
   dns:       'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
@@ -54,7 +55,7 @@ export default function DomainPano({ domain }: { domain: Domain }) {
   return (
     <div>
       <Grup baslik={t('DomainPano:groups.apps')}>
-        <ToolCard etiket={t('DomainPano:items.wordpress')} aciklama={t('DomainPano:items.wordpress_desc')} ikon={ICONS.wordpress} renk="sky" onClick={git('wordpress')} />
+        <ToolCard etiket={t('DomainPano:items.apps')} aciklama={t('DomainPano:items.apps_desc')} ikon={ICONS.wordpress} renk="sky" onClick={git('uygulamalar')} />
       </Grup>
 
       <Grup baslik={t('DomainPano:groups.domain_dns')}>

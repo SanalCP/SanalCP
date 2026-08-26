@@ -8,8 +8,8 @@
     "security": "Security"
   },
   "items": {
-    "wordpress": "WordPress",
-    "wordpress_desc": "1-click install · management",
+    "apps": "Applications",
+    "apps_desc": "1-click install · management",
     "dns": "DNS Management",
     "dns_desc": "A, MX, TXT, CNAME records",
     "subdomains": "Subdomains",

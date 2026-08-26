@@ -153,7 +153,7 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
       { to: y('/composer'),      etiket: t('DashboardLayout:items.composer'),     ikon: ICONS.composer },
       { to: y('/performans'),    etiket: t('DashboardLayout:items.performance'),  ikon: ICONS.izleme },
       { to: y('/redis'),         etiket: t('DashboardLayout:items.redis_cache'),  ikon: ICONS.redis },
-      { to: y('/wordpress'),     etiket: t('DashboardLayout:items.wordpress'),    ikon: ICONS.wp },
+      { to: y('/uygulamalar'),   etiket: t('DashboardLayout:items.apps'),         ikon: ICONS.wp },
     ]},
     { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
       { to: y('/dns'),           etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },

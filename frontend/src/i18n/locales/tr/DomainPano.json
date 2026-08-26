@@ -8,8 +8,8 @@
     "security": "Güvenlik"
   },
   "items": {
-    "wordpress": "WordPress",
-    "wordpress_desc": "1-tıkla kurulum · yönetim",
+    "apps": "Uygulamalar",
+    "apps_desc": "1-tıkla kurulum · yönetim",
     "dns": "DNS Yönetimi",
     "dns_desc": "A, MX, TXT, CNAME kayıtları",
     "subdomains": "Subdomainler",
