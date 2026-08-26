@@ -132,8 +132,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	temizle := func(asama string, err error) {
-		_, _ = h.DB.Exec("DROP DATABASE IF EXISTS `" + dbName + "`")
-		_, _ = h.DB.Exec("DROP USER IF EXISTS '" + dbUser + "'@'localhost'")
+		_ = hesaplar.MySQLDropDB(h.DB, dbName, dbUser)
 		if req.AltDizin != "" {
 			_ = os.RemoveAll(hedef)
 		}
