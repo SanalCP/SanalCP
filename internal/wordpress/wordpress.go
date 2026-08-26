@@ -61,8 +61,14 @@ func (h *Handlers) domain(r *http.Request) (id int64, sk, alanAdi string, ssl, d
 // wp <args> komutunu domain kullanıcısı olarak çalıştırır (HOME set, shell yok).
 // php'yi doğrudan -d memory_limit=512M ile çağır (ham .phar shebang'i WP_CLI_PHP_ARGS'ı
 // okumaz; arşiv çıkarımı 128M default'a takılır).
+//
+// 🔴 TMPDIR açıkça sk'nın home'una sabitlenir: panel süreci kendi TMPDIR'ını
+// (/var/lib/sanalcp/tmp, mod 0700, root sahipli — bkz. cmd/server/main.go
+// geciciDizinAyarla) tüm alt süreçlere miras bırakır. runuser env resetlemez,
+// dolayısıyla domain kullanıcısı wp-cli indirme zip'ini root'a ait dizine
+// yazmaya çalışır ve "Permission denied" alır (`wp core update` hatası).
 func wpKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
-	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
+	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk, "TMPDIR=/home/" + sk,
 		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
 	cmd := exec.CommandContext(ctx, "runuser", full...)
 	return cmd.CombinedOutput()
@@ -83,7 +89,7 @@ func wpKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
 // dahil) STDOUT'a basar; --quiet bunu susturur, hata mesajları STDERR'de kalır.
 // Çağıranlar --quiet'i argümanlara eklemek zorundadır.
 func wpKomutStdin(ctx context.Context, sk, stdin string, args ...string) ([]byte, error) {
-	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
+	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk, "TMPDIR=/home/" + sk,
 		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
 	cmd := exec.CommandContext(ctx, "runuser", full...)
 	cmd.Stdin = strings.NewReader(stdin)
@@ -297,7 +303,7 @@ func (h *Handlers) incele(ctx context.Context, a wpAday) TumKurulum {
 // wpStdout: wp-cli'yi domain kullanıcısı olarak, context-timeout ile çalıştırır; SADECE stdout döner
 // (stderr yutulur → JSON çıktısı deprecation-warning ile bozulmaz).
 func wpStdout(ctx context.Context, sk string, args ...string) ([]byte, error) {
-	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk,
+	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk, "TMPDIR=/home/" + sk,
 		"/usr/bin/php", "-d", "memory_limit=512M", wpBin}, args...)
 	cmd := exec.CommandContext(ctx, "runuser", full...)
 	var out bytes.Buffer
