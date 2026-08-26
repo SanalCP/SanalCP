@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.13",
-  "duyuru": "WordPress güncelleme hatası düzeltildi: wp-cli indirme dizini artık domain kullanıcısının home'una yazıyor, root'a ait geçici dizinden kaynaklanan \"Permission denied\" hatası giderildi.",
+  "son_surum": "0.9.14",
+  "duyuru": "Uygulama kurulum çerçevesi: tek 'Uygulamalar' menüsü altında WordPress ve PrestaShop için 1-tık kur / güncelle / sil akışı. Registry tabanlı sürücü mimarisi sayesinde ileride Joomla, Drupal, OpenCart, Nextcloud eklenebilir. Tüm DB işlemleri root yetki yoluna taşındı (orphan row riski giderildi).",
   "kritik": false,
   "yayin_tarihi": "2026-08-26"
 }
