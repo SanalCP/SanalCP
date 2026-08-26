@@ -117,6 +117,9 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 		"--fixtures=0",
 		"--license=0",
 	}
+	// TODO: PrestaShop 9.x CLI çıktısında doğrulandı; sürüm güncellemesinde bu
+	// string değişirse burayı yeni mesaja güncelle (substring match olduğu için
+	// eşleşmeme tüm kurulumu rollback ettirip orphan DB bırakır).
 	out, err := psKomut(ctx, i.SK, args...)
 	if err != nil || !strings.Contains(string(out), "Installation successful") {
 		msg := strings.TrimSpace(string(out))
