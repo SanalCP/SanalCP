@@ -1,6 +1,6 @@
 {
   "son_surum": "0.9.14",
-  "duyuru": "Uygulama kurulum çerçevesi: tek 'Uygulamalar' menüsü altında WordPress ve PrestaShop için 1-tık kur / güncelle / sil akışı. Registry tabanlı sürücü mimarisi sayesinde ileride Joomla, Drupal, OpenCart, Nextcloud eklenebilir. Tüm DB işlemleri root yetki yoluna taşındı (orphan row riski giderildi).",
+  "duyuru": "Uygulama kurulum çerçevesi: tek 'Uygulamalar' menüsü altında WordPress için 1-tık kur / güncelle / sil akışı. Registry tabanlı sürücü mimarisi sayesinde ileride Joomla, Drupal, OpenCart, Nextcloud eklenebilir. Tüm DB işlemleri root yetki yoluna taşındı (orphan row riski giderildi). Not: PrestaShop indirme kaynağı (download.prestashop.com) şu an Cloudflare 522 verdiği için 0.9.14'te geçici olarak devre dışı — düzelince geri açılacak.",
   "kritik": false,
   "yayin_tarihi": "2026-08-26"
 }
