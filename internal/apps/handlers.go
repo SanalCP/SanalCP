@@ -170,3 +170,108 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		"surum": sonuc.Surum, "db_adi": dbName, "ekstra": sonuc.Ekstra,
 	})
 }
+
+// DELETE /domains/{id}/apps/{tur}  {dizin, db_sil}
+func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
+	tur := chi.URLParam(r, "tur")
+	u, bulunduTur := Bul(tur)
+	if !bulunduTur {
+		httpx.WriteError(w, http.StatusNotFound, "bilinmeyen uygulama türü")
+		return
+	}
+	domID, sk, _, _, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	if !adlar.SKGecerli(sk) {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı")
+		return
+	}
+	var sreq struct {
+		Dizin string `json:"dizin"`
+		DBSil bool   `json:"db_sil"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&sreq)
+	dir, err := cozDizin(sk, sreq.Dizin, u.MarkerDosya())
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	root := "/home/" + sk + "/public_html"
+	if dir == root {
+		httpx.WriteError(w, http.StatusBadRequest, "kök dizindeki kurulum panelden silinemez (tüm site gider); Dosya Yöneticisi'nden kaldırın")
+		return
+	}
+	if sreq.DBSil {
+		if dbName, bulundu := u.DBAdiOku(dir); bulundu {
+			if ok, err := h.dbSahipMi(r.Context(), dbName, domID); err == nil && ok {
+				// h.DB panel bağlantısı yalnız GRANT ALL ON panel.* yetkisine sahip —
+				// gerçek DROP DATABASE yetkisi yalnız hesaplar paketinin root
+				// bağlantısında (rootExecAll). hesaplar.MySQLDropDBKeepUser bunu doğru
+				// yapar + db_accounts satırını temizler (kullanıcıya dokunmaz — "mevcut
+				// kullanıcı" modunda aynı kullanıcı başka DB'de de olabilir; bu ihtimal
+				// Kur akışında tek DB'ye tek özel kullanıcı oluşturulduğu için bu türde
+				// pratikte oluşmaz, ama fonksiyon davranışı bilinçli olarak muhafazakâr).
+				_ = hesaplar.MySQLDropDBKeepUser(h.DB, dbName)
+			}
+		}
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "silinemedi")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// dbSahipMi: dbName GERÇEKTEN bu domain'e ait mi? (db_accounts sahiplik kontrolü)
+func (h *Handlers) dbSahipMi(ctx context.Context, dbName string, domainID int64) (bool, error) {
+	var n int
+	err := h.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM db_accounts WHERE db_name=? AND domain_id=?`, dbName, domainID).Scan(&n)
+	return n > 0, err
+}
+
+// POST /domains/{id}/apps/{tur}/guncelle  {dizin}
+func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
+	tur := chi.URLParam(r, "tur")
+	u, bulunduTur := Bul(tur)
+	if !bulunduTur {
+		httpx.WriteError(w, http.StatusNotFound, "bilinmeyen uygulama türü")
+		return
+	}
+	if !u.GuncelleDesteklenir() {
+		httpx.WriteError(w, http.StatusBadRequest, "bu uygulama için güncelleme desteklenmiyor")
+		return
+	}
+	_, sk, _, _, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	var greq struct {
+		Dizin string `json:"dizin"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&greq)
+	dir, err := cozDizin(sk, greq.Dizin, u.MarkerDosya())
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	if err := u.Guncelle(ctx, sk, dir); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+err.Error())
+		return
+	}
+	bilgi, _ := u.Bilgi(ctx, sk, dir, "")
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "surum": bilgi.Surum})
+}
