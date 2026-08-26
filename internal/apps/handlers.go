@@ -16,6 +16,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -274,4 +275,168 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 	}
 	bilgi, _ := u.Bilgi(ctx, sk, dir, "")
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "surum": bilgi.Surum})
+}
+
+// GET /domains/{id}/apps
+func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
+	_, sk, alanAdi, ssl, _, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	root := "/home/" + sk + "/public_html"
+	dizinler := []string{root}
+	if entries, err := os.ReadDir(root); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				dizinler = append(dizinler, filepath.Join(root, e.Name()))
+			}
+		}
+	}
+	type satir struct {
+		Tur string `json:"tur"`
+		Ad  string `json:"ad"`
+		Kurulum
+	}
+	out := []satir{}
+	for _, u := range Hepsi() {
+		for _, dir := range dizinler {
+			if _, err := os.Stat(filepath.Join(dir, u.MarkerDosya())); err != nil {
+				continue
+			}
+			rel := strings.TrimPrefix(strings.TrimPrefix(dir, root), "/")
+			url := scheme(ssl) + alanAdi
+			if rel != "" {
+				url += "/" + rel
+			}
+			k, err := u.Bilgi(ctx, sk, dir, url)
+			if err != nil {
+				continue
+			}
+			k.Dizin = "/" + rel
+			if k.Dizin == "/" {
+				k.Dizin = "/ (kök)"
+			}
+			out = append(out, satir{Tur: u.Slug(), Ad: u.Ad(), Kurulum: k})
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// GET /domains/{id}/apps/turler
+func (h *Handlers) Turler(w http.ResponseWriter, r *http.Request) {
+	type turBilgi struct {
+		Slug    string     `json:"slug"`
+		Ad      string     `json:"ad"`
+		Alanlar []FormAlan `json:"form_alanlari"`
+	}
+	out := []turBilgi{}
+	for _, u := range Hepsi() {
+		out = append(out, turBilgi{Slug: u.Slug(), Ad: u.Ad(), Alanlar: u.FormAlanlari()})
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+// TumKurulum: tüm domainlerdeki tek bir kurulumun özeti (aggregate tablo satırı).
+type TumKurulum struct {
+	DomainID      int64  `json:"domain_id"`
+	AlanAdi       string `json:"alan_adi"`
+	Tur           string `json:"tur"`
+	TurAdi        string `json:"tur_adi"`
+	Dizin         string `json:"dizin"`
+	Surum         string `json:"surum"`
+	SonSurum      string `json:"son_surum"`
+	Durum         string `json:"durum"`
+	KurulumTarihi string `json:"kurulum_tarihi"`
+	SiteURL       string `json:"site_url"`
+	AdminURL      string `json:"admin_url"`
+}
+
+type aday struct {
+	domainID    int64
+	sk, alanAdi string
+	ssl         bool
+	u           Uygulama
+	dir, root   string
+}
+
+// GET /apps/tumu — TÜM domainlerdeki kurulu uygulamaları tarar. BayiVeUstu.
+func (h *Handlers) TumListe(w http.ResponseWriter, r *http.Request) {
+	kosul, arg := middleware.KapsamSQL(r, "d")
+	rows, err := h.DB.QueryContext(r.Context(),
+		`SELECT d.id, d.sistem_kullanici, d.alan_adi, COALESCE(d.cert_path,'') FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "domainler listelenemedi")
+		return
+	}
+	var adaylar []aday
+	for rows.Next() {
+		var id int64
+		var sk, alanAdi, cert string
+		if err := rows.Scan(&id, &sk, &alanAdi, &cert); err != nil {
+			continue
+		}
+		if !adlar.SKGecerli(sk) {
+			continue
+		}
+		root := "/home/" + sk + "/public_html"
+		dizinler := []string{root}
+		if entries, err := os.ReadDir(root); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					dizinler = append(dizinler, filepath.Join(root, e.Name()))
+				}
+			}
+		}
+		for _, u := range Hepsi() {
+			for _, dir := range dizinler {
+				if _, err := os.Stat(filepath.Join(dir, u.MarkerDosya())); err != nil {
+					continue
+				}
+				adaylar = append(adaylar, aday{id, sk, alanAdi, cert != "", u, dir, root})
+			}
+		}
+	}
+	_ = rows.Err()
+	rows.Close()
+
+	out := make([]TumKurulum, len(adaylar))
+	sem := make(chan struct{}, 4)
+	var wg sync.WaitGroup
+	for i := range adaylar {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, a aday) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			out[i] = h.incele(r.Context(), a)
+		}(i, adaylar[i])
+	}
+	wg.Wait()
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+func (h *Handlers) incele(ctx context.Context, a aday) TumKurulum {
+	rel := strings.TrimPrefix(strings.TrimPrefix(a.dir, a.root), "/")
+	dizinEt := "/" + rel
+	if dizinEt == "/" {
+		dizinEt = "/ (kök)"
+	}
+	tk := TumKurulum{DomainID: a.domainID, AlanAdi: a.alanAdi, Tur: a.u.Slug(), TurAdi: a.u.Ad(), Dizin: dizinEt, Durum: "bilinmiyor"}
+	url := scheme(a.ssl) + a.alanAdi
+	if rel != "" {
+		url += "/" + rel
+	}
+	k, err := a.u.Bilgi(ctx, a.sk, a.dir, url)
+	if err != nil {
+		return tk
+	}
+	tk.Surum, tk.SonSurum, tk.Durum, tk.KurulumTarihi, tk.SiteURL, tk.AdminURL =
+		k.Surum, k.SonSurum, k.Durum, k.KurulumTarihi, k.SiteURL, k.AdminURL
+	if tk.Durum == "" {
+		tk.Durum = "bilinmiyor"
+	}
+	return tk
 }

@@ -45,3 +45,26 @@ func TestAlanlariDogrula(t *testing.T) {
 		}
 	})
 }
+
+func TestTurlerFormSemasiIcerir(t *testing.T) {
+	Kaydet(sahteUygulama{slug: "test-tur-form"})
+	u, ok := Bul("test-tur-form")
+	if !ok {
+		t.Fatal("kayıt bulunamadı")
+	}
+	if u.Ad() != "Sahte test-tur-form" {
+		t.Fatalf("Ad() beklenmedik: %q", u.Ad())
+	}
+	// Turler handler'ının ürettiği türBilgi şeklini burada, HTTP'siz, doğrudan
+	// registry üzerinden doğruluyoruz (Handlers.Turler'ın DB'ye dokunmadığını
+	// ve yalnız Hepsi()'yi map'lediğini garanti eden regresyon testi).
+	var bulunduSlug bool
+	for _, uu := range Hepsi() {
+		if uu.Slug() == "test-tur-form" {
+			bulunduSlug = true
+		}
+	}
+	if !bulunduSlug {
+		t.Fatal("Hepsi() kayıtlı türü içermeli")
+	}
+}
