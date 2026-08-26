@@ -18,6 +18,7 @@
     "analytics": "Analytics"
   },
   "items": {
+    "apps": "Apps",
     "domains": "Domains",
     "dns_management": "DNS Management",
     "mail_accounts": "Email Accounts",

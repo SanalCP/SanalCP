@@ -79,7 +79,7 @@ function nav(t: TFunction): NavGroup[] {
     { to: '/hizmet-planlari',      etiket: t('DashboardLayout:items.service_plans'), ikon: ICONS.plan },
   ]},
   { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
-    { to: '/wordpress',            etiket: t('DashboardLayout:items.wordpress'),     ikon: ICONS.wp },
+    { to: '/uygulamalar',          etiket: t('DashboardLayout:items.apps'),          ikon: ICONS.wp },
     { to: '/eklentiler',           etiket: t('DashboardLayout:items.plugins'),       ikon: ICONS.eklenti },
   ]},
   { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
@@ -125,7 +125,7 @@ function bayiNav(t: TFunction): NavGroup[] {
     { to: '/ssl',            etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
   ]},
   { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
-    { to: '/wordpress',      etiket: t('DashboardLayout:items.wordpress'), ikon: ICONS.wp },
+    { to: '/uygulamalar',    etiket: t('DashboardLayout:items.apps'), ikon: ICONS.wp },
   ]},
   { baslik: t('DashboardLayout:groups.my_accounts'), baslikKey: 'my_accounts', items: [
     { to: '/bayi-ozet',      etiket: t('DashboardLayout:items.resource_summary'), ikon: ICONS.istatistik },

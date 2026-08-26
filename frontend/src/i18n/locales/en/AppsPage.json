@@ -1,0 +1,22 @@
+{
+  "breadcrumb_title": "Apps",
+  "title": "Apps",
+  "subtitle": "View and manage all 1-click app installations on the server.",
+  "update_warning_title": "{{count}} installation(s) have an update available.",
+  "update_warning_desc": "Older versions may contain known security vulnerabilities — please update as soon as possible.",
+  "installed_title": "Installed Apps",
+  "refresh": "↻ Refresh",
+  "scanning": "Scanning installations…",
+  "no_installations": "No app installations found on the server.",
+  "col_domain": "Domain",
+  "col_app": "App",
+  "col_path": "Path",
+  "col_version": "Version",
+  "col_status": "Status",
+  "col_actions": "Actions",
+  "status_update_to": "Update available → v{{version}}",
+  "status_current": "Up to date",
+  "status_unknown": "Unknown",
+  "admin_link": "Admin",
+  "manage_link": "Manage"
+}

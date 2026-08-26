@@ -18,6 +18,7 @@
     "analytics": "Analiz"
   },
   "items": {
+    "apps": "Uygulamalar",
     "domains": "Domainler",
     "dns_management": "DNS Yönetimi",
     "mail_accounts": "E-posta Hesapları",

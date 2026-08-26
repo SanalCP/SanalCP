@@ -47,7 +47,7 @@ const PHPSurumleriPage = lazy(() => import('@/pages/PHPSurumleriPage'))
 const AraclarAyarlarPage = lazy(() => import('@/pages/AraclarAyarlarPage'))
 const DNSSablonuPage = lazy(() => import('@/pages/DNSSablonuPage'))
 const ServislerPage = lazy(() => import('@/pages/ServislerPage'))
-const WordPressPage = lazy(() => import('@/pages/WordPressPage'))
+const AppsPage = lazy(() => import('@/pages/AppsPage'))
 const FirewallPage = lazy(() => import('@/pages/FirewallPage'))
 const BackupYonetimiPage = lazy(() => import('@/pages/BackupYonetimiPage'))
 const DomainWordPressPage = lazy(() => import('@/pages/DomainWordPressPage'))
@@ -151,7 +151,8 @@ export default function App() {
         <Route path="araclar-ayarlar" element={<AraclarAyarlarPage />} />
         <Route path="istatistikler" element={<IstatistiklerPage />} />
         <Route path="eklentiler" element={<YakindaPage baslik={t('YakindaPage:eklentiler.title')} ikon="🧩" aciklama={t('YakindaPage:eklentiler.description')} ozellikler={t('YakindaPage:eklentiler.features', { returnObjects: true }) as string[]} />} />
-        <Route path="wordpress" element={<WordPressPage />} />
+        <Route path="uygulamalar" element={<AppsPage />} />
+        <Route path="wordpress" element={<Navigate to="/uygulamalar" replace />} />
         <Route path="firewall" element={<FirewallPage />} />
         <Route path="backup-yonetimi" element={<BackupYonetimiPage />} />
         <Route path="hesap-aktarimi" element={<HesapAktarimiPage />} />

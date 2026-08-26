@@ -1,0 +1,22 @@
+{
+  "breadcrumb_title": "Uygulamalar",
+  "title": "Uygulamalar",
+  "subtitle": "Sunucudaki tüm 1-tık uygulama kurulumlarını görüntüleyin ve yönetin.",
+  "update_warning_title": "{{count}} kurulumda güncelleme mevcut.",
+  "update_warning_desc": "Eski sürümler bilinen güvenlik açıkları içerebilir — en kısa sürede güncelleyin.",
+  "installed_title": "Kurulu Uygulamalar",
+  "refresh": "↻ Yenile",
+  "scanning": "Kurulumlar taranıyor…",
+  "no_installations": "Sunucuda hiç uygulama kurulumu bulunamadı.",
+  "col_domain": "Domain",
+  "col_app": "Uygulama",
+  "col_path": "Dizin",
+  "col_version": "Sürüm",
+  "col_status": "Durum",
+  "col_actions": "İşlemler",
+  "status_update_to": "Güncelleme var → v{{version}}",
+  "status_current": "Güncel",
+  "status_unknown": "Bilinmiyor",
+  "admin_link": "Yönetim",
+  "manage_link": "Yönet"
+}
