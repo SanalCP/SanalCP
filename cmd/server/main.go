@@ -18,6 +18,7 @@ import (
 
 	"sanalcp/internal/accounts"
 	"sanalcp/internal/antivirus"
+	"sanalcp/internal/apps"
 	"sanalcp/internal/auth"
 	"sanalcp/internal/backups"
 	"sanalcp/internal/bayipaketleri"
@@ -264,6 +265,7 @@ func main() {
 	antivirus.Init(cfg.AVMaxConcurrent) // eşzamanlı tarama sınırı (ClamAV RAM/OOM koruması)
 	kopyaH := &sitekopya.Handlers{DB: d}
 	wpH := &wordpress.Handlers{DB: d}
+	appsH := &apps.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
 	wafH := &waf.Handlers{DB: d}
 	redisH := &redis.Handlers{DB: d}
@@ -473,6 +475,14 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/wordpress/onar", wpH.Onar)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/wordpress/arac", wpH.AracIslem)
 				r.With(middleware.BayiVeUstu).Get("/wordpress/tumu", wpH.TumListe)
+				// Uygulama Kurulum Çerçevesi — WordPress dahil tüm türler için ortak uçlar.
+				// /wordpress/* uçları YUKARIDA aynen kalır, bu bloğa dokunmaz.
+				r.With(middleware.MusteriScope).Get("/domains/{id}/apps", appsH.Liste)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/apps/turler", appsH.Turler)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/apps/{tur}/kur", appsH.Kur)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/apps/{tur}/guncelle", appsH.Guncelle)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/apps/{tur}", appsH.Sil)
+				r.With(middleware.BayiVeUstu).Get("/apps/tumu", appsH.TumListe)
 				r.With(middleware.AdminOnly).Get("/firewall", fwH.Liste)
 				r.With(middleware.AdminOnly).Post("/firewall", fwH.Ekle)
 				r.With(middleware.AdminOnly).Post("/firewall/sablon", fwH.Sablon)
