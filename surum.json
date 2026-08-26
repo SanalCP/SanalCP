@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.12",
-  "duyuru": "Veritabanı Yönet sayfasında kod incelemesinden kalan küçük tutarlılık/sağlamlaştırma düzeltmeleri. Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez.",
+  "son_surum": "0.9.13",
+  "duyuru": "WordPress güncelleme hatası düzeltildi: wp-cli indirme dizini artık domain kullanıcısının home'una yazıyor, root'a ait geçici dizinden kaynaklanan \"Permission denied\" hatası giderildi.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-25"
+  "yayin_tarihi": "2026-08-26"
 }
