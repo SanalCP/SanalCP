@@ -957,7 +957,7 @@ type aday struct {
 
 // GET /apps/tumu — TÜM domainlerdeki kurulu uygulamaları tarar. BayiVeUstu.
 func (h *Handlers) TumListe(w http.ResponseWriter, r *http.Request) {
-	kosul, arg := middlewareKapsamSQL(r)
+	kosul, arg := middleware.KapsamSQL(r, "d")
 	rows, err := h.DB.QueryContext(r.Context(),
 		`SELECT d.id, d.sistem_kullanici, d.alan_adi, COALESCE(d.cert_path,'') FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
@@ -1032,12 +1032,6 @@ func (h *Handlers) incele(ctx context.Context, a aday) TumKurulum {
 		tk.Durum = "bilinmiyor"
 	}
 	return tk
-}
-
-// middlewareKapsamSQL: middleware.KapsamSQL'in ince sarmalayıcısı (import döngüsünden
-// kaçınmak için değil — sadece bu dosyada tek satırlık çağrıyı isimlendirmek için).
-func middlewareKapsamSQL(r *http.Request) (string, []any) {
-	return middleware.KapsamSQL(r, "d")
 }
 ```
 
