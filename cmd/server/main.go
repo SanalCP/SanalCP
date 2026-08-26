@@ -58,6 +58,7 @@ import (
 	"sanalcp/internal/phpsurum"
 	"sanalcp/internal/plans"
 	"sanalcp/internal/pma"
+	_ "sanalcp/internal/prestashop"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/redis"
 	"sanalcp/internal/secretcrypt"
