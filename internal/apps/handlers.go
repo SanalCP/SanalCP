@@ -162,16 +162,25 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	slug := randSlug()
-	dbOnEk := u.DBOnEki()
-	dbName := dbOnEk + "_" + slug
-	dbUser := dbOnEk + "u_" + slug
-	dbPass := hesaplar.RandomParola(24)
-	if err := hesaplar.MySQLCreateDB(h.DB, id, dbName, dbUser, dbPass); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı oluşturulamadı: "+err.Error())
-		return
+	dbName, dbUser, dbPass := "", "", ""
+	dbGerekli := true
+	if v, ok := u.(VeritabaniGereksinimli); ok {
+		dbGerekli = v.VeritabaniGerekli()
+	}
+	if dbGerekli {
+		dbOnEk := u.DBOnEki()
+		dbName = dbOnEk + "_" + slug
+		dbUser = dbOnEk + "u_" + slug
+		dbPass = hesaplar.RandomParola(24)
+		if err := hesaplar.MySQLCreateDB(h.DB, id, dbName, dbUser, dbPass); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "veritabanı oluşturulamadı: "+err.Error())
+			return
+		}
 	}
 	temizle := func(asama string, err error) {
-		_ = hesaplar.MySQLDropDB(h.DB, dbName, dbUser)
+		if dbName != "" {
+			_ = hesaplar.MySQLDropDB(h.DB, dbName, dbUser)
+		}
 		if req.AltDizin != "" {
 			_ = os.RemoveAll(hedef)
 		}

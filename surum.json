@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.14",
-  "duyuru": "Uygulama kurulum çerçevesi: tek 'Uygulamalar' menüsü altında WordPress için 1-tık kur / güncelle / sil akışı. Registry tabanlı sürücü mimarisi sayesinde ileride Joomla, Drupal, OpenCart, Nextcloud eklenebilir. Tüm DB işlemleri root yetki yoluna taşındı (orphan row riski giderildi). Not: PrestaShop indirme kaynağı (download.prestashop.com) şu an Cloudflare 522 verdiği için 0.9.14'te geçici olarak devre dışı — düzelince geri açılacak.",
+  "son_surum": "0.9.15",
+  "duyuru": "Uygulamalar kataloğu genişletildi: Joomla, PrestaShop, Drupal, OpenCart, Matomo ve Grav için kurulum ve yaşam döngüsü desteği eklendi. Grav veritabanı gerektirmeden kurulabilir; güvenli arşiv çıkarma, bütünlük doğrulama ve yönetici hesabı oluşturma akışlarıyla gelir. Nextcloud sonraki sürümler için planda tutuluyor.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-26"
+  "yayin_tarihi": "2026-08-27"
 }

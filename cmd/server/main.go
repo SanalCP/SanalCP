@@ -37,6 +37,7 @@ import (
 	"sanalcp/internal/git"
 	githubpkg "sanalcp/internal/github"
 	"sanalcp/internal/gocis"
+	_ "sanalcp/internal/grav"
 	"sanalcp/internal/guvenlikduvari"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"

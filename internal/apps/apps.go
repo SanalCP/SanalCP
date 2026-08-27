@@ -94,6 +94,12 @@ type PHPMaksimumlu interface {
 	MaksimumPHPSurum() string
 }
 
+// VeritabaniGereksinimli, varsayılan MySQL hazırlama davranışını değiştiren
+// opsiyonel kabiliyettir. Grav gibi dosya tabanlı uygulamalar false döndürür.
+type VeritabaniGereksinimli interface {
+	VeritabaniGerekli() bool
+}
+
 var (
 	kayitliMu sync.RWMutex
 	kayitli   = map[string]Uygulama{}
