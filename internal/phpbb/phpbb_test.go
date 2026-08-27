@@ -8,7 +8,7 @@ import (
 
 func TestSurucuVeOkuyucular(t *testing.T) {
 	s := Surucu{}
-	if s.Slug() != "phpbb" || s.MinimumPHPSurum() != "7.4" || s.MaksimumPHPSurum() != "8.4" {
+	if s.Slug() != "phpbb" || s.MarkerDosya() != "phpbb/class_loader.php" || s.MinimumPHPSurum() != "7.4" || s.MaksimumPHPSurum() != "8.4" {
 		t.Fatal("phpBB özellikleri hatalı")
 	}
 	d := t.TempDir()

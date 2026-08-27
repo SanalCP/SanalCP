@@ -8,7 +8,7 @@ import (
 
 func TestSurucuOzellikleri(t *testing.T) {
 	s := Surucu{}
-	if s.Slug() != "opencart" || s.MarkerDosya() != "config.php" || s.MinimumPHPSurum() != "8.1" {
+	if s.Slug() != "opencart" || s.MarkerDosya() != "system/framework.php" || s.MinimumPHPSurum() != "8.1" {
 		t.Fatal("OpenCart sürücü özellikleri hatalı")
 	}
 	if s.GuncelleDesteklenir() {

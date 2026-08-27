@@ -21,7 +21,7 @@ type Surucu struct{}
 func (Surucu) Slug() string              { return "opencart" }
 func (Surucu) Ad() string                { return "OpenCart" }
 func (Surucu) DBOnEki() string           { return "opencart" }
-func (Surucu) MarkerDosya() string       { return "config.php" }
+func (Surucu) MarkerDosya() string       { return "system/framework.php" }
 func (Surucu) GuncelleDesteklenir() bool { return false }
 func (Surucu) MinimumPHPSurum() string   { return "8.1" }
 

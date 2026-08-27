@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.16",
-  "duyuru": "Uygulamalar kataloğuna Nextcloud, MediaWiki ve phpBB eklendi. Resmî paket bütünlük doğrulaması, güvenli arşiv çıkarma ve otomatik yönetici/veritabanı kurulumu sunulur. Nextcloud verileri web kökü dışında tutulur, cron ve WebDAV yapılandırması otomatik hazırlanır.",
+  "son_surum": "0.9.17",
+  "duyuru": "Uygulama tespiti düzeltildi: genel config.php dosyaları artık OpenCart veya phpBB kurulumu olarak algılanmıyor. OpenCart ve phpBB yalnız kendilerine özgü çekirdek dosyaları bulunduğunda Uygulamalar listesinde gösterilir.",
   "kritik": false,
   "yayin_tarihi": "2026-08-27"
 }

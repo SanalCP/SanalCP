@@ -23,7 +23,7 @@ type Surucu struct{}
 func (Surucu) Slug() string              { return "phpbb" }
 func (Surucu) Ad() string                { return "phpBB" }
 func (Surucu) DBOnEki() string           { return "phpbb" }
-func (Surucu) MarkerDosya() string       { return "config.php" }
+func (Surucu) MarkerDosya() string       { return "phpbb/class_loader.php" }
 func (Surucu) GuncelleDesteklenir() bool { return false }
 func (Surucu) MinimumPHPSurum() string   { return "7.4" }
 func (Surucu) MaksimumPHPSurum() string  { return "8.4" }
