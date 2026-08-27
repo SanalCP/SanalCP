@@ -4,108 +4,217 @@ package prestashop
 import (
 	"archive/zip"
 	"context"
+	"crypto/md5" // #nosec G501 -- resmî API yalnız MD5 yayımlıyor; TLS ve alan adı allowlist'i de zorunlu.
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
-// psSonSurum: PrestaShop/PrestaShop reposunun GitHub API'sindeki en güncel
-// release tag'ini çeker (ör. "9.1.5"). WP-CLI'nin "core download"unun her
-// zaman en güncel sürümü indirmesiyle aynı felsefe.
-func psSonSurum(ctx context.Context) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		"https://api.github.com/repos/PrestaShop/PrestaShop/releases/latest", nil)
-	if err != nil {
-		return "", err
+const (
+	psReleaseAPI      = "https://api.prestashop-project.org/prestashop/stable"
+	psMaksPaketBoyutu = int64(256 << 20)
+	psMaksAcilanBoyut = int64(1024 << 20)
+	psMaksDosyaSayisi = 100000
+)
+
+type psReleaseBilgi struct{ Surum, URL, MD5, PHPMin, PHPMax string }
+
+var psReleaseCache struct {
+	sync.Mutex
+	bilgi psReleaseBilgi
+	zaman time.Time
+}
+
+func psRelease(ctx context.Context) (psReleaseBilgi, error) {
+	psReleaseCache.Lock()
+	defer psReleaseCache.Unlock()
+	if psReleaseCache.bilgi.Surum != "" && time.Since(psReleaseCache.zaman) < 10*time.Minute {
+		return psReleaseCache.bilgi, nil
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, psReleaseAPI, nil)
+	if err != nil {
+		return psReleaseBilgi{}, err
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("PrestaShop sürüm bilgisi alınamadı: %w", err)
+		return psReleaseBilgi{}, fmt.Errorf("PrestaShop sürüm bilgisi alınamadı: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("PrestaShop sürüm bilgisi alınamadı: GitHub API HTTP %d", resp.StatusCode)
+		return psReleaseBilgi{}, fmt.Errorf("PrestaShop sürüm bilgisi alınamadı: HTTP %d", resp.StatusCode)
 	}
-	var body struct {
-		TagName string `json:"tag_name"`
+	var b struct {
+		Version string `json:"version"`
+		URL     string `json:"zip_download_url"`
+		MD5     string `json:"zip_md5"`
+		PHPMin  string `json:"php_min_version"`
+		PHPMax  string `json:"php_max_version"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil || body.TagName == "" {
-		return "", fmt.Errorf("PrestaShop sürüm bilgisi ayrıştırılamadı")
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&b); err != nil {
+		return psReleaseBilgi{}, fmt.Errorf("PrestaShop sürüm bilgisi ayrıştırılamadı: %w", err)
 	}
-	return body.TagName, nil
+	if !psResmiURL(b.URL) || b.Version == "" || len(b.MD5) != 32 {
+		return psReleaseBilgi{}, fmt.Errorf("PrestaShop dağıtım metadata'sı geçersiz")
+	}
+	if _, err := hex.DecodeString(b.MD5); err != nil {
+		return psReleaseBilgi{}, fmt.Errorf("PrestaShop paket özeti geçersiz")
+	}
+	rel := psReleaseBilgi{b.Version, b.URL, strings.ToLower(b.MD5), b.PHPMin, b.PHPMax}
+	psReleaseCache.bilgi, psReleaseCache.zaman = rel, time.Now()
+	return rel, nil
 }
 
-// psIndirVeAc: PrestaShop kurulum paketini indirir ve hedef dizine açar.
-//
-// 🔴 URL KALIBI DOĞRULANMADI (bkz. Task 8 notu, plan dosyası) — ilk canlı
-// kurulumda başarısız olursa TEK değişecek yer burasıdır.
+func psResmiURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Hostname() == "api.prestashop-project.org" &&
+		strings.HasPrefix(u.EscapedPath(), "/assets/prestashop-classic/")
+}
+
+func psSonSurum(ctx context.Context) (string, error) {
+	r, err := psRelease(ctx)
+	return r.Surum, err
+}
+
+// psIndirVeAc resmî classic paketi indirir, bütünlüğünü doğrular ve dış
+// dağıtım sarmalındaki prestashop.zip içeriğini hedefe güvenle açar.
 func psIndirVeAc(ctx context.Context, surum, hedef string) error {
-	url := fmt.Sprintf("https://download.prestashop.com/download/releases/prestashop_%s.zip", surum)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	rel, err := psRelease(ctx)
+	if err != nil {
+		return err
+	}
+	if rel.Surum != surum {
+		return fmt.Errorf("PrestaShop sürümü indirme sırasında değişti: %s → %s", surum, rel.Surum)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rel.URL, nil)
 	if err != nil {
 		return err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("PrestaShop kaynağı indirilemedi (%s): %w", url, err)
+		return fmt.Errorf("PrestaShop paketi indirilemedi: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("PrestaShop kaynağı indirilemedi: %s → HTTP %d", url, resp.StatusCode)
+		return fmt.Errorf("PrestaShop paketi indirilemedi: HTTP %d", resp.StatusCode)
+	}
+	if resp.ContentLength > psMaksPaketBoyutu {
+		return fmt.Errorf("PrestaShop paketi boyut sınırını aşıyor")
 	}
 	tmp, err := os.CreateTemp("", "prestashop-*.zip")
 	if err != nil {
 		return fmt.Errorf("geçici dosya oluşturulamadı: %w", err)
 	}
-	defer os.Remove(tmp.Name())
-	defer tmp.Close()
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
-		return fmt.Errorf("indirilen dosya yazılamadı: %w", err)
+	ad := tmp.Name()
+	defer os.Remove(ad)
+	h := md5.New() // #nosec G401 -- resmî API uyumluluğu; URL ayrıca allowlist'li.
+	n, kopyaErr := io.Copy(io.MultiWriter(tmp, h), io.LimitReader(resp.Body, psMaksPaketBoyutu+1))
+	kapatErr := tmp.Close()
+	if kopyaErr != nil {
+		return fmt.Errorf("PrestaShop paketi yazılamadı: %w", kopyaErr)
 	}
-	if err := tmp.Close(); err != nil {
-		return err
+	if kapatErr != nil {
+		return kapatErr
 	}
-	return psZipAc(tmp.Name(), hedef)
+	if n > psMaksPaketBoyutu {
+		return fmt.Errorf("PrestaShop paketi boyut sınırını aşıyor")
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); got != rel.MD5 {
+		return fmt.Errorf("PrestaShop paket bütünlük doğrulaması başarısız")
+	}
+	return psDagitimZipAc(ad, hedef)
 }
 
-// psZipAc: zip'i hedef dizine açar. Zip içeriği ya doğrudan kökte (index.php,
-// install/, ...) ya da tek bir ortak üst dizin altında paketlenmiş olabilir —
-// ikinci durumda o üst dizin soyulur. zip-slip'e karşı korumalıdır.
+func psDagitimZipAc(disZip, hedef string) error {
+	zr, err := zip.OpenReader(disZip)
+	if err != nil {
+		return fmt.Errorf("PrestaShop dağıtım zip'i açılamadı: %w", err)
+	}
+	defer zr.Close()
+	var ic *zip.File
+	for _, f := range zr.File {
+		if f.Name == "prestashop.zip" && !f.FileInfo().IsDir() {
+			ic = f
+			break
+		}
+	}
+	if ic == nil || ic.UncompressedSize64 > uint64(psMaksPaketBoyutu) {
+		return fmt.Errorf("PrestaShop dağıtımında geçerli prestashop.zip bulunamadı")
+	}
+	r, err := ic.Open()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	tmp, err := os.CreateTemp("", "prestashop-inner-*.zip")
+	if err != nil {
+		return err
+	}
+	ad := tmp.Name()
+	defer os.Remove(ad)
+	n, kopyaErr := io.Copy(tmp, io.LimitReader(r, psMaksPaketBoyutu+1))
+	kapatErr := tmp.Close()
+	if kopyaErr != nil {
+		return kopyaErr
+	}
+	if kapatErr != nil {
+		return kapatErr
+	}
+	if n > psMaksPaketBoyutu || uint64(n) != ic.UncompressedSize64 {
+		return fmt.Errorf("iç PrestaShop paketi boyutu geçersiz")
+	}
+	return psZipAc(ad, hedef)
+}
+
 func psZipAc(zipYolu, hedef string) error {
 	zr, err := zip.OpenReader(zipYolu)
 	if err != nil {
 		return fmt.Errorf("zip açılamadı: %w", err)
 	}
 	defer zr.Close()
-
+	if len(zr.File) > psMaksDosyaSayisi {
+		return fmt.Errorf("PrestaShop zip dosya sayısı sınırını aşıyor")
+	}
 	onEk := ortakUstDizin(zr.File)
-	hedefTemiz := filepath.Clean(hedef)
-
+	kok := filepath.Clean(hedef)
+	var toplam int64
 	for _, f := range zr.File {
-		rel := strings.TrimPrefix(f.Name, onEk)
-		if rel == "" {
+		if f.UncompressedSize64 > uint64(psMaksAcilanBoyut) {
+			return fmt.Errorf("PrestaShop açılmış boyut sınırını aşıyor")
+		}
+		toplam += int64(f.UncompressedSize64)
+		if toplam > psMaksAcilanBoyut {
+			return fmt.Errorf("PrestaShop açılmış boyut sınırını aşıyor")
+		}
+		rel := filepath.Clean(strings.TrimPrefix(f.Name, onEk))
+		if rel == "." {
 			continue
 		}
-		hedefYol := filepath.Join(hedef, rel)
-		if hedefYol != hedefTemiz && !strings.HasPrefix(hedefYol, hedefTemiz+string(os.PathSeparator)) {
+		if filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || f.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("güvensiz zip girdisi: %s", f.Name)
+		}
+		yol := filepath.Join(kok, rel)
+		if yol != kok && !strings.HasPrefix(yol, kok+string(os.PathSeparator)) {
 			return fmt.Errorf("güvensiz zip girdisi: %s", f.Name)
 		}
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(hedefYol, 0o755); err != nil {
+			if err := os.MkdirAll(yol, 0o755); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(hedefYol), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(yol), 0o755); err != nil {
 			return err
 		}
-		if err := psDosyaCikar(f, hedefYol); err != nil {
+		if err := psDosyaCikar(f, yol); err != nil {
 			return err
 		}
 	}
@@ -113,31 +222,32 @@ func psZipAc(zipYolu, hedef string) error {
 }
 
 func psDosyaCikar(f *zip.File, hedefYol string) error {
-	rc, err := f.Open()
+	r, err := f.Open()
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer r.Close()
 	out, err := os.OpenFile(hedefYol, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	_, err = io.Copy(out, rc)
-	return err
+	_, kopyaErr := io.Copy(out, io.LimitReader(r, int64(f.UncompressedSize64)))
+	kapatErr := out.Close()
+	if kopyaErr != nil {
+		return kopyaErr
+	}
+	return kapatErr
 }
 
-// ortakUstDizin: tüm zip girdileri tek bir ortak üst dizin altındaysa o dizin
-// adını ("ad/" formatında) döner, yoksa boş string (kökte açılır) döner.
 func ortakUstDizin(files []*zip.File) string {
 	if len(files) == 0 {
 		return ""
 	}
-	ilkParca := strings.SplitN(files[0].Name, "/", 2)
-	if len(ilkParca) != 2 {
+	ilk := strings.SplitN(files[0].Name, "/", 2)
+	if len(ilk) != 2 {
 		return ""
 	}
-	aday := ilkParca[0] + "/"
+	aday := ilk[0] + "/"
 	for _, f := range files {
 		if !strings.HasPrefix(f.Name, aday) {
 			return ""
@@ -146,13 +256,8 @@ func ortakUstDizin(files []*zip.File) string {
 	return aday
 }
 
-// psKomut: PHP'yi domain kullanıcısı olarak, WordPress modülündeki wpKomut ile
-// birebir aynı runuser+env+TMPDIR deseniyle çalıştırır (bkz. internal/wordpress/
-// wordpress.go — TMPDIR=/home/sk, root'a ait /var/lib/sanalcp/tmp izin hatasından
-// kaçınmak için).
 func psKomut(ctx context.Context, sk string, args ...string) ([]byte, error) {
 	full := append([]string{"-u", sk, "--", "env", "HOME=/home/" + sk, "TMPDIR=/home/" + sk,
 		"/usr/bin/php"}, args...)
-	cmd := exec.CommandContext(ctx, "runuser", full...)
-	return cmd.CombinedOutput()
+	return exec.CommandContext(ctx, "runuser", full...).CombinedOutput()
 }

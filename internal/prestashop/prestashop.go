@@ -3,6 +3,7 @@ package prestashop
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,6 +24,8 @@ func (Surucu) Ad() string                { return "PrestaShop" }
 func (Surucu) DBOnEki() string           { return "prestashop" }
 func (Surucu) MarkerDosya() string       { return filepath.Join("config", "settings.inc.php") }
 func (Surucu) GuncelleDesteklenir() bool { return false } // spec kararı: resmi CLI güncelleyici yok
+func (Surucu) MinimumPHPSurum() string   { return "8.1" }
+func (Surucu) MaksimumPHPSurum() string  { return "8.5" }
 
 func (Surucu) FormAlanlari() []apps.FormAlan {
 	return []apps.FormAlan{
@@ -98,13 +101,20 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	}
 
 	adminParola := hesaplar.RandomParola(18)
+	baseURI := psBaseURI(i.URL)
+	ssl := "0"
+	if i.SSL {
+		ssl = "1"
+	}
 	args := []string{
 		filepath.Join(i.Hedef, "install", "index_cli.php"),
 		"--domain=" + i.AlanAdi,
+		"--base_uri=" + baseURI,
 		"--db_server=localhost",
 		"--db_name=" + i.DBAdi,
 		"--db_user=" + i.DBKullanici,
 		"--db_password=" + i.DBParola,
+		"--db_create=0",
 		"--prefix=ps_",
 		"--name=" + i.Alanlar["magaza_adi"],
 		"--email=" + i.Alanlar["admin_email"],
@@ -115,11 +125,12 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 		"--country=tr",
 		"--all_languages=0",
 		"--fixtures=0",
+		"--ssl=" + ssl,
+		"--rewrite=1",
 		"--license=0",
 	}
-	// TODO: PrestaShop 9.x CLI çıktısında doğrulandı; sürüm güncellemesinde bu
-	// string değişirse burayı yeni mesaja güncelle (substring match olduğu için
-	// eşleşmeme tüm kurulumu rollback ettirip orphan DB bırakır).
+	// Resmî PrestaShop 9 CLI sözleşmesi başarıda "Installation successful!"
+	// üretir. Substring kontrolü noktalama değişikliklerine toleranslıdır.
 	out, err := psKomut(ctx, i.SK, args...)
 	if err != nil || !strings.Contains(string(out), "Installation successful") {
 		msg := strings.TrimSpace(string(out))
@@ -140,17 +151,38 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	}, nil
 }
 
+func psBaseURI(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Path == "" {
+		return "/"
+	}
+	p := "/" + strings.Trim(u.EscapedPath(), "/")
+	if p == "/" {
+		return p
+	}
+	return p + "/"
+}
+
 func (Surucu) Bilgi(ctx context.Context, sk, dizin, url string) (apps.Kurulum, error) {
 	adminDizin := psAdminDizinBul(dizin)
 	kurulumTarihi := ""
 	if fi, err := os.Stat(filepath.Join(dizin, "config", "settings.inc.php")); err == nil {
 		kurulumTarihi = fi.ModTime().Format("2006-01-02")
 	}
-	return apps.Kurulum{
+	k := apps.Kurulum{
 		Surum: psSurumDosyadanOku(dizin), Durum: "bilinmiyor",
 		SiteURL: url, AdminURL: url + "/" + adminDizin,
 		KurulumTarihi: kurulumTarihi,
-	}, nil
+	}
+	if rel, err := psRelease(ctx); err == nil {
+		k.SonSurum = rel.Surum
+		if k.Surum == rel.Surum {
+			k.Durum = "guncel"
+		} else if k.Surum != "" {
+			k.Durum = "eski"
+		}
+	}
+	return k, nil
 }
 
 func (Surucu) Guncelle(ctx context.Context, sk, dizin string) error {

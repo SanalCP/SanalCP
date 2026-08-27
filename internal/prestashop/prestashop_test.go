@@ -20,6 +20,9 @@ func TestSurucuTemelBilgiler(t *testing.T) {
 	if s.GuncelleDesteklenir() != false {
 		t.Fatal("PrestaShop güncelleme DESTEKLENMEMELİ (resmi CLI güncelleyici yok — spec kararı)")
 	}
+	if s.MinimumPHPSurum() != "8.1" || s.MaksimumPHPSurum() != "8.5" {
+		t.Fatalf("PHP aralığı yanlış: %s-%s", s.MinimumPHPSurum(), s.MaksimumPHPSurum())
+	}
 	var eposta bool
 	for _, fa := range s.FormAlanlari() {
 		if fa.Anahtar == "admin_email" && fa.Tur == "email" && fa.Zorunlu {
@@ -88,5 +91,17 @@ func TestPsAdminDizinBulBulunamazsaVarsayilan(t *testing.T) {
 	d := t.TempDir()
 	if got := psAdminDizinBul(d); got != "admin" {
 		t.Fatalf("psAdminDizinBul boş dizinde 'admin' dönmeli, döndü: %q", got)
+	}
+}
+
+func TestPsBaseURI(t *testing.T) {
+	for _, tc := range []struct{ raw, want string }{
+		{"https://ornek.test", "/"},
+		{"https://ornek.test/magaza", "/magaza/"},
+		{"https://ornek.test/alt/dizin/", "/alt/dizin/"},
+	} {
+		if got := psBaseURI(tc.raw); got != tc.want {
+			t.Errorf("psBaseURI(%q) = %q, beklenen %q", tc.raw, got, tc.want)
+		}
 	}
 }

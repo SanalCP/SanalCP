@@ -81,6 +81,19 @@ type Uygulama interface {
 	DBAdiOku(dizin string) (dbAdi string, bulundu bool)
 }
 
+// PHPGereksinimli, yalnız belirli bir PHP veya üstünde çalışabilen sürücülerin
+// opsiyonel olarak uyguladığı kabiliyettir. Ortak handler, DB/dosya oluşturmadan
+// önce domain'in seçili PHP sürümünü denetler.
+type PHPGereksinimli interface {
+	MinimumPHPSurum() string
+}
+
+// PHPMaksimumlu, henüz daha yeni PHP ana/minör sürümlerini desteklemeyen
+// uygulamaların opsiyonel üst sınır bildirimidir.
+type PHPMaksimumlu interface {
+	MaksimumPHPSurum() string
+}
+
 var (
 	kayitliMu sync.RWMutex
 	kayitli   = map[string]Uygulama{}

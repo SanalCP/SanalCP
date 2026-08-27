@@ -69,7 +69,7 @@ yol haritasındadırlar:
 |---|---|
 | **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
 | **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
-| **WordPress dışı uygulama kurucu** | Tek tık kurulum yalnızca WordPress için. |
+| **Geniş uygulama kataloğu** | Tek tık kurulum WordPress, Joomla ve PrestaShop için; diğer PHP uygulamaları sırada. |
 
 > **WHMCS modülü yok ve planlanmıyor** — WHMCS ücretli bir üründür, biz ücretsiz kalmayı
 > tercih ediyoruz. Panel MIT lisanslı olduğu ve tam bir yönetim API'si sunduğu için
@@ -206,7 +206,7 @@ Roller:
 ## Panel özellikleri
 
 - Domain / subdomain yönetimi, DNS düzenleme, toplu işlemler
-- Tek-tık **WordPress** kurulumu + WP-CLI
+- Tek-tık **WordPress**, **Joomla** ve **PrestaShop** kurulumu; sürüm algılama ve desteklenen uygulamalarda panelden çekirdek güncelleme
 - Per-tenant **Redis object cache** (tek tıkla aç/kapa, WP'ye otomatik bağlama)
 - **E-posta barındırma**: domain başına posta kutusu, SMTP AUTH ile kimlik doğrulamalı gönderim (PHPMailer/uygulama entegrasyonu için), DKIM/SPF/DMARC otomatik DNS kaydı, webmail arayüzü — ayrıntı için aşağıya bakın
 - **Özel vhost modu** (admin): şablonun tek-root sınırını aşan yönlendirme ihtiyaçları için domain başına tam nginx vhost düzenleme — ayrıntı için aşağıya bakın

@@ -46,6 +46,40 @@ func (h *Handlers) domain(r *http.Request) (id int64, sk, alanAdi string, ssl, d
 	return id, sk, alanAdi, cert != "", isDemo == 1, true
 }
 
+func (h *Handlers) phpGereksiniminiDogrula(ctx context.Context, domainID int64, u Uygulama) string {
+	minG, minVar := u.(PHPGereksinimli)
+	maxG, maxVar := u.(PHPMaksimumlu)
+	if !minVar && !maxVar {
+		return ""
+	}
+	var mevcut string
+	if err := h.DB.QueryRowContext(ctx, `SELECT COALESCE(php_surum,'') FROM domains WHERE id=?`, domainID).Scan(&mevcut); err != nil {
+		return "domain PHP sürümü okunamadı"
+	}
+	if minVar && strings.TrimSpace(minG.MinimumPHPSurum()) != "" && !surumEnAz(mevcut, minG.MinimumPHPSurum()) {
+		return u.Ad() + " en az PHP " + minG.MinimumPHPSurum() + " gerektirir (domain: " + mevcut + ")"
+	}
+	if maxVar && strings.TrimSpace(maxG.MaksimumPHPSurum()) != "" && !surumEnAz(maxG.MaksimumPHPSurum(), mevcut) {
+		return u.Ad() + " en fazla PHP " + maxG.MaksimumPHPSurum() + " destekler (domain: " + mevcut + ")"
+	}
+	return ""
+}
+
+func surumEnAz(mevcut, minimum string) bool {
+	parcala := func(s string) (int, int, bool) {
+		p := strings.SplitN(strings.TrimSpace(s), ".", 3)
+		if len(p) < 2 {
+			return 0, 0, false
+		}
+		maj, e1 := strconv.Atoi(p[0])
+		min, e2 := strconv.Atoi(p[1])
+		return maj, min, e1 == nil && e2 == nil
+	}
+	mMaj, mMin, mok := parcala(mevcut)
+	gMaj, gMin, gok := parcala(minimum)
+	return mok && gok && (mMaj > gMaj || (mMaj == gMaj && mMin >= gMin))
+}
+
 // alanlariDogrula: FormAlanlari şemasına göre girdiyi doğrular + kırpar. Hata boşsa geçerli.
 func alanlariDogrula(alanlar []FormAlan, girdi map[string]string) (map[string]string, string) {
 	temiz := map[string]string{}
@@ -77,6 +111,10 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 	}
 	if demo {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	if msg := h.phpGereksiniminiDogrula(r.Context(), id, u); msg != "" {
+		httpx.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 	if !adlar.SKGecerli(sk) {
@@ -249,13 +287,17 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "bu uygulama için güncelleme desteklenmiyor")
 		return
 	}
-	_, sk, _, _, demo, ok := h.domain(r)
+	id, sk, _, _, demo, ok := h.domain(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
 	if demo {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	if msg := h.phpGereksiniminiDogrula(r.Context(), id, u); msg != "" {
+		httpx.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 	var greq struct {
@@ -328,13 +370,22 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 // GET /domains/{id}/apps/turler
 func (h *Handlers) Turler(w http.ResponseWriter, r *http.Request) {
 	type turBilgi struct {
-		Slug    string     `json:"slug"`
-		Ad      string     `json:"ad"`
-		Alanlar []FormAlan `json:"form_alanlari"`
+		Slug        string     `json:"slug"`
+		Ad          string     `json:"ad"`
+		MinimumPHP  string     `json:"minimum_php,omitempty"`
+		MaksimumPHP string     `json:"maksimum_php,omitempty"`
+		Alanlar     []FormAlan `json:"form_alanlari"`
 	}
 	out := []turBilgi{}
 	for _, u := range Hepsi() {
-		out = append(out, turBilgi{Slug: u.Slug(), Ad: u.Ad(), Alanlar: u.FormAlanlari()})
+		bilgi := turBilgi{Slug: u.Slug(), Ad: u.Ad(), Alanlar: u.FormAlanlari()}
+		if g, ok := u.(PHPGereksinimli); ok {
+			bilgi.MinimumPHP = g.MinimumPHPSurum()
+		}
+		if g, ok := u.(PHPMaksimumlu); ok {
+			bilgi.MaksimumPHP = g.MaksimumPHPSurum()
+		}
+		out = append(out, bilgi)
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }

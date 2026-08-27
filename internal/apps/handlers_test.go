@@ -68,3 +68,17 @@ func TestTurlerFormSemasiIcerir(t *testing.T) {
 		t.Fatal("Hepsi() kayıtlı türü içermeli")
 	}
 }
+
+func TestSurumEnAz(t *testing.T) {
+	for _, tc := range []struct {
+		mevcut, minimum string
+		beklenen        bool
+	}{
+		{"8.3", "8.3", true}, {"8.4", "8.3", true}, {"9.0", "8.3", true},
+		{"8.2", "8.3", false}, {"7.4", "8.3", false}, {"bozuk", "8.3", false},
+	} {
+		if got := surumEnAz(tc.mevcut, tc.minimum); got != tc.beklenen {
+			t.Errorf("surumEnAz(%q, %q) = %v, beklenen %v", tc.mevcut, tc.minimum, got, tc.beklenen)
+		}
+	}
+}
