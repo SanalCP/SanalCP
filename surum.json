@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.17",
-  "duyuru": "Uygulama tespiti düzeltildi: genel config.php dosyaları artık OpenCart veya phpBB kurulumu olarak algılanmıyor. OpenCart ve phpBB yalnız kendilerine özgü çekirdek dosyaları bulunduğunda Uygulamalar listesinde gösterilir.",
+  "son_surum": "0.9.18",
+  "duyuru": "Uygulama yükleyici sayfasındaki uygulama kartlarında gerçek uygulama ikonları (WordPress, PrestaShop, Joomla, Drupal, Grav, OpenCart, phpBB, Nextcloud, Matomo, MediaWiki) gösteriliyor. Ayrıca sekiz domain alt sayfasında (Antivirus, Composer, Ek Alanlar, Erişim Kontrol, İçe Aktarım, Kopya, Şifre Koruma, Subdomainler) breadcrumb'ta eksik olan domain bağlantısı eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-27"
 }
