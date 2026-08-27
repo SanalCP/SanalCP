@@ -371,9 +371,9 @@ server {
     if ($query_string != "") { set $skip_cache 1; }
     if ($request_uri ~* "/wp-admin/|/wp-login.php|/cart/|/checkout/|/my-account/|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
     if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") { set $skip_cache 1; }
-{{end}}    location ~ \.php$ {
-        try_files $uri =404;
+{{end}}    location ~ \.php(?:$|/) {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        try_files $fastcgi_script_name =404;
         fastcgi_pass unix:{{.PHPSocket}};
         fastcgi_index index.php;
         include fastcgi_params;
@@ -455,9 +455,9 @@ server {
     if ($query_string != "") { set $skip_cache 1; }
     if ($request_uri ~* "/wp-admin/|/wp-login.php|/cart/|/checkout/|/my-account/|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
     if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") { set $skip_cache 1; }
-{{end}}    location ~ \.php$ {
-        try_files $uri =404;
+{{end}}    location ~ \.php(?:$|/) {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        try_files $fastcgi_script_name =404;
         fastcgi_pass unix:{{.PHPSocket}};
         fastcgi_index index.php;
         include fastcgi_params;

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.15",
-  "duyuru": "Uygulamalar kataloğu genişletildi: Joomla, PrestaShop, Drupal, OpenCart, Matomo ve Grav için kurulum ve yaşam döngüsü desteği eklendi. Grav veritabanı gerektirmeden kurulabilir; güvenli arşiv çıkarma, bütünlük doğrulama ve yönetici hesabı oluşturma akışlarıyla gelir. Nextcloud sonraki sürümler için planda tutuluyor.",
+  "son_surum": "0.9.16",
+  "duyuru": "Uygulamalar kataloğuna Nextcloud, MediaWiki ve phpBB eklendi. Resmî paket bütünlük doğrulaması, güvenli arşiv çıkarma ve otomatik yönetici/veritabanı kurulumu sunulur. Nextcloud verileri web kökü dışında tutulur, cron ve WebDAV yapılandırması otomatik hazırlanır.",
   "kritik": false,
   "yayin_tarihi": "2026-08-27"
 }

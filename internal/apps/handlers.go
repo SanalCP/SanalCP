@@ -196,7 +196,11 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		url += "/" + req.AltDizin
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	zamanAsimi := 5 * time.Minute
+	if z, ok := u.(KurulumZamanAsimli); ok && z.KurulumZamanAsimi() > zamanAsimi {
+		zamanAsimi = z.KurulumZamanAsimi()
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), zamanAsimi)
 	defer cancel()
 	sonuc, err := u.Kur(ctx, KurulumIstek{
 		DomainID: id, SK: sk, AlanAdi: alanAdi, SSL: ssl,
@@ -254,6 +258,14 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 	if dir == root {
 		httpx.WriteError(w, http.StatusBadRequest, "kök dizindeki kurulum panelden silinemez (tüm site gider); Dosya Yöneticisi'nden kaldırın")
 		return
+	}
+	if h, ok := u.(SilmeOncesiHazirlayici); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		if err := h.SilmeOncesi(ctx, sk, dir); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "uygulama verileri temizlenemedi: "+err.Error())
+			return
+		}
 	}
 	if sreq.DBSil {
 		if dbName, bulundu := u.DBAdiOku(dir); bulundu {

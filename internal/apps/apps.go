@@ -6,6 +6,7 @@ package apps
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 // FormAlan: bir uygulama türünün kurulum formunda istediği tek bir alan
@@ -98,6 +99,18 @@ type PHPMaksimumlu interface {
 // opsiyonel kabiliyettir. Grav gibi dosya tabanlı uygulamalar false döndürür.
 type VeritabaniGereksinimli interface {
 	VeritabaniGerekli() bool
+}
+
+// KurulumZamanAsimli, büyük dağıtım paketleri için ortak 5 dakikalık kurulum
+// sınırını güvenli biçimde yükseltir.
+type KurulumZamanAsimli interface {
+	KurulumZamanAsimi() time.Duration
+}
+
+// SilmeOncesiHazirlayici, uygulamanın web kökü dışındaki kendine ait verilerini
+// ortak katman kurulum dizinini silmeden önce kaldırmasına izin verir.
+type SilmeOncesiHazirlayici interface {
+	SilmeOncesi(ctx context.Context, sk, dizin string) error
 }
 
 var (
