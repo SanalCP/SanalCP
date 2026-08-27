@@ -57,6 +57,9 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	if err != nil {
 		return apps.KurulumSonuc{}, err
 	}
+	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
+		return apps.KurulumSonuc{}, komutHatasi("Joomla dosya izinleri", out, err)
+	}
 	adminParola := hesaplar.RandomParola(18)
 	args := []string{
 		filepath.Join(i.Hedef, "installation", "joomla.php"), "install",

@@ -68,7 +68,7 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 |---|---|
 | **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
 | **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
-| **Broad application catalog** | One-click installation supports WordPress, Joomla, and PrestaShop; more PHP applications are planned. |
+| **Broad application catalog** | One-click installation supports WordPress, Joomla, PrestaShop, Drupal, OpenCart, and Matomo; more PHP applications are planned. |
 
 > **There is no WHMCS module and none is planned** — WHMCS is a paid product and we prefer to
 > stay free. Since the panel is MIT licensed and ships a full management API
@@ -205,7 +205,7 @@ Roles:
 ## Panel features
 
 - Domain / subdomain management, DNS editing, bulk operations
-- One-click **WordPress**, **Joomla**, and **PrestaShop** installation, version detection, and core updates where supported
+- One-click **WordPress**, **Joomla**, **PrestaShop**, **Drupal**, **OpenCart**, and **Matomo** installation, version detection, and core updates where supported
 - Per-tenant **Redis object cache** (toggle on/off, auto-wires into WordPress)
 - **Email hosting**: a mailbox per domain, authenticated SMTP sending (for PHPMailer / application integrations), automatic DKIM/SPF/DMARC DNS records, webmail — see below for details
 - **Custom vhost mode** (admin only): full nginx vhost editing per domain, for routing needs the template's single-root model can't express — see below for details

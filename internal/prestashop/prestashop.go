@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -98,6 +99,13 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	}
 	if err := psIndirVeAc(ctx, surum, i.Hedef); err != nil {
 		return apps.KurulumSonuc{}, err
+	}
+	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return apps.KurulumSonuc{}, fmt.Errorf("PrestaShop dosya izinleri: %s", msg)
 	}
 
 	adminParola := hesaplar.RandomParola(18)
