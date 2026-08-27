@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
+type Domain = { id: number; alan_adi: string }
 type Sub = { id: number; alt_ad: string; tam_ad: string; php_surum: string; docroot: string; created_at: string; php_sabit?: boolean }
 
 export default function DomainSubdomainlerPage() {
   const { t } = useTranslation(['DomainSubdomainlerPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [liste, setListe] = useState<Sub[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -19,6 +21,7 @@ export default function DomainSubdomainlerPage() {
   function yukle() {
     if (!id) return
     setYuk(true)
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<Sub[]>(`/domains/${id}/subdomain`).then(r => setListe(r.data || [])).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
   }
   useEffect(yukle, [id])
@@ -81,6 +84,7 @@ export default function DomainSubdomainlerPage() {
       <Breadcrumb items={[
         { etiket: t('common:home'), href: '/' },
         { etiket: t('common:domain'), href: '/domainler' },
+        { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
         { etiket: t('DomainSubdomainlerPage:breadcrumb_title') },
       ]} />
       <div className="flex items-center gap-3 mb-1">

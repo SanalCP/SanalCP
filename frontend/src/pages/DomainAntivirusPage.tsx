@@ -5,6 +5,7 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
 
+type Domain = { id: number; alan_adi: string }
 type Bulgu = { dosya: string; imza: string; motor: string; karantina: number }
 type Tarama = { id: number; durum: string; motor: string; taranan: number; enfekte: number; baslangic: string; bitis: string }
 type Durum = { clamav: boolean; imza_tarihi: string; kullanici: string; son_tarama: Tarama | null; bulgular: Bulgu[] }
@@ -12,12 +13,18 @@ type Durum = { clamav: boolean; imza_tarihi: string; kullanici: string; son_tara
 export default function DomainAntivirusPage() {
   const { t } = useTranslation(['DomainAntivirusPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [d, setD] = useState<Durum | null>(null)
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [tarariyor, setTarariyor] = useState(false)
   const [imzaYuk, setImzaYuk] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
+  }, [id])
 
   const startPoll = useCallback((sid: number) => {
     setTarariyor(true)
@@ -76,6 +83,7 @@ export default function DomainAntivirusPage() {
         <Breadcrumb items={[
           { etiket: t('common:home'), href: '/' },
           { etiket: t('DomainAntivirusPage:breadcrumb.domains'), href: '/domainler' },
+          { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
           { etiket: t('DomainAntivirusPage:breadcrumb.antivirus') },
         ]} />
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainAntivirusPage:title')}</h1>

@@ -23,6 +23,8 @@ type ArsivOzet = {
 
 type DB = { id: number; db_adi: string; db_user: string }
 
+type Domain = { id: number; alan_adi: string }
+
 type ConfigSonuc = {
   db_adi: string
   guncellemeler: { yol: string; tur: string; alanlar: string[]; uygulandi: boolean; not?: string }[]
@@ -46,6 +48,7 @@ export default function DomainIceAktarimPage() {
 
   const [hata, setHata] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
+  const [domain, setDomain] = useState<Domain | null>(null)
 
   // --- 1. Site dosyaları ---
   const [arsiv, setArsiv] = useState<File | null>(null)
@@ -71,6 +74,7 @@ export default function DomainIceAktarimPage() {
 
   useEffect(() => {
     if (!id) return
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<DB[]>(`/domains/${id}/databases`)
       .then(r => {
         setDBler(r.data || [])
@@ -164,6 +168,7 @@ export default function DomainIceAktarimPage() {
       <Breadcrumb items={[
         { etiket: t('common:home'), href: '/' },
         { etiket: t('common:domain'), href: '/domainler' },
+        { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
         { etiket: t('DomainIceAktarimPage:title') },
       ]} />
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainIceAktarimPage:title')}</h1>

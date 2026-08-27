@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
+type Domain = { id: number; alan_adi: string }
 type Kopya = { ad: string; boyut_mb: number; tarih: string }
 
 export default function DomainKopyaPage() {
   const { t } = useTranslation(['DomainKopyaPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [liste, setListe] = useState<Kopya[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -17,6 +19,7 @@ export default function DomainKopyaPage() {
 
   function yukle() {
     if (!id) return
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<Kopya[]>(`/domains/${id}/kopya`).then(r => setListe(r.data || [])).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
   }
   useEffect(yukle, [id])
@@ -44,6 +47,7 @@ export default function DomainKopyaPage() {
         <Breadcrumb items={[
           { etiket: t('common:home'), href: '/' },
           { etiket: t('common:domain'), href: '/domainler' },
+          { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
           { etiket: t('DomainKopyaPage:title') },
         ]} />
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainKopyaPage:title')}</h1>

@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
+type Domain = { id: number; alan_adi: string }
 type Ek = { id: number; alan_adi: string; parked: boolean; docroot: string; php_surum: string; ssl_aktif: boolean; created_at: string }
 type Yonlendirme = { aktif: boolean; hedef_url?: string; kod?: number }
 
 export default function DomainEkAlanlarPage() {
   const { t } = useTranslation(['DomainEkAlanlarPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [liste, setListe] = useState<Ek[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -27,10 +29,12 @@ export default function DomainEkAlanlarPage() {
     if (!id) return
     setYuk(true)
     Promise.all([
+      api.get<Domain>(`/domains/${id}`),
       api.get<Ek[]>(`/domains/${id}/ek`),
       api.get<Yonlendirme>(`/domains/${id}/yonlendirme`),
     ])
-      .then(([e, y]) => {
+      .then(([d, e, y]) => {
+        setDomain(d.data)
         setListe(e.data || [])
         setYonlendirme(y.data)
         if (y.data.aktif) { setHedefUrl(y.data.hedef_url || ''); setKod(y.data.kod || 301) }
@@ -82,6 +86,7 @@ export default function DomainEkAlanlarPage() {
       <Breadcrumb items={[
         { etiket: t('common:home'), href: '/' },
         { etiket: t('common:domain'), href: '/domainler' },
+        { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
         { etiket: t('DomainEkAlanlarPage:breadcrumb_title') },
       ]} />
       <div className="flex items-center gap-3 mb-1">

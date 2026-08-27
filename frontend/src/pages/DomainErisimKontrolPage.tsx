@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
+type Domain = { id: number; alan_adi: string }
 type Hotlink = { aktif: boolean; izinli?: string[] }
 type IPKural = { id: number; ip_cidr: string; created_at: string }
 type IPMod = 'kapali' | 'engelle' | 'izin_ver'
@@ -11,6 +12,7 @@ type IPMod = 'kapali' | 'engelle' | 'izin_ver'
 export default function DomainErisimKontrolPage() {
   const { t } = useTranslation(['DomainErisimKontrolPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -28,10 +30,12 @@ export default function DomainErisimKontrolPage() {
     if (!id) return
     setYuk(true)
     Promise.all([
+      api.get<Domain>(`/domains/${id}`),
       api.get<Hotlink>(`/domains/${id}/hotlink`),
       api.get<{ mod: IPMod; kurallar: IPKural[] }>(`/domains/${id}/ip-kurallari`),
     ])
-      .then(([h, i]) => {
+      .then(([d, h, i]) => {
+        setDomain(d.data)
         setHotlink(h.data)
         setHotlinkIzinliMetin((h.data.izinli || []).join(', '))
         setIpMod(i.data.mod || 'kapali')
@@ -86,6 +90,7 @@ export default function DomainErisimKontrolPage() {
       <Breadcrumb items={[
         { etiket: t('common:home'), href: '/' },
         { etiket: t('DomainErisimKontrolPage:breadcrumb.domains'), href: '/domainler' },
+        { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
         { etiket: t('DomainErisimKontrolPage:breadcrumb.access_control') },
       ]} />
       <div className="flex items-center gap-3 mb-1">

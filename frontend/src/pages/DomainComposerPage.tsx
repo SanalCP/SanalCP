@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 
+type Domain = { id: number; alan_adi: string }
 type Durum = { kurulu: boolean; surum: string; composer_json: boolean; kullanici: string; dizin: string }
 
 export default function DomainComposerPage() {
   const { t } = useTranslation(['DomainComposerPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [d, setD] = useState<Durum | null>(null)
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -19,6 +21,7 @@ export default function DomainComposerPage() {
   function yukle() {
     if (!id) return
     setYuk(true)
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<Durum>(`/domains/${id}/composer`).then(r => setD(r.data)).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
   }
   useEffect(yukle, [id])
@@ -45,6 +48,7 @@ export default function DomainComposerPage() {
         <Breadcrumb items={[
           { etiket: t('common:home'), href: '/' },
           { etiket: t('common:domain'), href: '/domainler' },
+          { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
           { etiket: t('DomainComposerPage:breadcrumb_title') },
         ]} />
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainComposerPage:title')}</h1>

@@ -5,11 +5,13 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ParolaGirdisi from '@/components/ParolaGirdisi'
 
+type Domain = { id: number; alan_adi: string }
 type Kayit = { id: number; yol: string; kullanici: string; created_at: string }
 
 export default function DomainSifreKorumaPage() {
   const { t } = useTranslation(['DomainSifreKorumaPage', 'common'])
   const { id } = useParams()
+  const [domain, setDomain] = useState<Domain | null>(null)
   const [liste, setListe] = useState<Kayit[]>([])
   const [yuk, setYuk] = useState(true)
   const [hata, setHata] = useState<string | null>(null)
@@ -22,6 +24,7 @@ export default function DomainSifreKorumaPage() {
   function yukle() {
     if (!id) return
     setYuk(true)
+    api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     api.get<Kayit[]>(`/domains/${id}/koruma`)
       .then(r => setListe(r.data || [])).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
   }
@@ -58,6 +61,7 @@ export default function DomainSifreKorumaPage() {
         <Breadcrumb items={[
           { etiket: t('common:home'), href: '/' },
           { etiket: t('common:domain'), href: '/domainler' },
+          { etiket: domain?.alan_adi || '...', href: `/abonelikler/${id}` },
           { etiket: t('DomainSifreKorumaPage:breadcrumb_title') },
         ]} />
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainSifreKorumaPage:title')}</h1>
