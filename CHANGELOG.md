@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.19** (2026-08-27)
+
+Yeni domain oluşturma akışına **Reverse Proxy** site tipi eklendi:
+
+- Sunucuda `127.0.0.1` üzerinde çalışan Node.js, Next.js ve benzeri uygulamalar
+  alan adına HTTP veya HTTPS upstream ile bağlanabilir.
+- WebSocket yükseltmesi, gerçek istemci IP'si ve `X-Forwarded-*` başlıkları
+  desteklenir.
+- Hedef protokolü, portu ve WebSocket ayarı domainin Web Sunucusu sayfasından
+  sonradan değiştirilebilir; `nginx -t` başarısız olursa eski hedef korunur.
+- Proxy hedefi iç ağ erişimi ve SSRF riskine karşı yalnız loopback ile sınırlıdır;
+  panelin kullandığı `8080`, `8443` ve `10080` portları engellenir.
+- Reverse Proxy hesaplarında gereksiz MySQL veritabanı oluşturulmaz. Migration
+  `0070_reverse_proxy.sql` mevcut domainleri değiştirmeden yeni proxy alanlarını ekler.
+
 **0.9.12** (2026-08-25)
 
 0.9.11'deki Veritabanı Yönet sayfasında kod incelemesinden kalan küçük
@@ -410,4 +425,3 @@ aşamadır (14 Temmuz 2026 – ilk yayın).
   tam duyarlı (responsive) mobil arayüz.
 - Günlük panel veritabanı yedeği ve güncellemede fail-closed dump; güncelleme
   başarısız olursa binary + veritabanı otomatik geri alınır.
-

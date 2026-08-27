@@ -28,6 +28,7 @@ type Ayarlar = {
 
 type Yanit = { alan_adi: string; ayarlar: Ayarlar }
 type VhostOzelYanit = { ozel: boolean; icerik: string; alan_adi: string }
+type ProxyAyar = { aktif: boolean; scheme: 'http'|'https'; host: string; port: number; websocket: boolean }
 
 function backendBilgi(t: TFunction): Record<string, { ad: string; ikon: string; aciklama: string; renk: string }> {
   return {
@@ -48,6 +49,12 @@ function backendBilgi(t: TFunction): Record<string, { ad: string; ikon: string; 
       ikon: '📄',
       aciklama: t('DomainWebSunucuPage:backend_static_desc'),
       renk: 'slate',
+    },
+    'reverse-proxy': {
+      ad: t('DomainWebSunucuPage:backend_proxy'),
+      ikon: '↪️',
+      aciklama: t('DomainWebSunucuPage:backend_proxy_desc'),
+      renk: 'amber',
     },
   }
 }
@@ -85,6 +92,8 @@ export default function DomainWebSunucuPage() {
   const [mevcutBackendler, setMevcutBackendler] = useState<string[]>(['php-fpm', 'apache', 'static'])
   const [apacheNotu, setApacheNotu] = useState<string | null>(null)
   const [backendDegistiriliyor, setBackendDegistiriliyor] = useState(false)
+  const [proxy, setProxy] = useState<ProxyAyar | null>(null)
+  const [proxyKaydediliyor, setProxyKaydediliyor] = useState(false)
 
   const [vhostOzel, setVhostOzel] = useState<VhostOzelYanit | null>(null)
   const [vhostOzelIcerikDuzenle, setVhostOzelIcerikDuzenle] = useState('')
@@ -104,7 +113,7 @@ export default function DomainWebSunucuPage() {
       setBackend(b.data.backend)
       // Sunucunun gerçekten sunabildiği backend'ler. Eski panellerde bu alan
       // yoksa üçünü de kabul et (geriye dönük uyum).
-      setMevcutBackendler(b.data.mevcutlar ?? ['php-fpm', 'apache', 'static'])
+      setMevcutBackendler(Array.from(new Set([...(b.data.mevcutlar ?? ['php-fpm', 'apache', 'static']), b.data.backend])))
       setApacheNotu(b.data.apache_notu ?? null)
     }).catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
@@ -112,6 +121,7 @@ export default function DomainWebSunucuPage() {
       setVhostOzel(v.data)
       setVhostOzelIcerikDuzenle(v.data.icerik)
     }).catch(() => {})
+    api.get<ProxyAyar>(`/domains/${id}/reverse-proxy`).then(v => setProxy(v.data)).catch(() => setProxy(null))
   }
   useEffect(yukle, [id])
 
@@ -157,6 +167,18 @@ export default function DomainWebSunucuPage() {
     } finally {
       setBackendDegistiriliyor(false)
     }
+  }
+
+  async function proxyKaydet() {
+    if (!proxy) return
+    setProxyKaydediliyor(true); setHata(null); setBasari(null)
+    try {
+      await api.put(`/domains/${id}/reverse-proxy`, proxy)
+      setBasari(t('DomainWebSunucuPage:proxy_saved'))
+      setTimeout(() => setBasari(null), 4000)
+    } catch (e) {
+      setHata(apiHata(e, t('DomainWebSunucuPage:proxy_save_failed')))
+    } finally { setProxyKaydediliyor(false) }
   }
 
   async function kaydet() {
@@ -206,8 +228,8 @@ export default function DomainWebSunucuPage() {
           </div>
           {backendDegistiriliyor && <span className="text-xs text-slate-400 dark:text-slate-500">{t('DomainWebSunucuPage:applying')}</span>}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['php-fpm','apache','static'] as const).map(k => {
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          {(['php-fpm','apache','static','reverse-proxy'] as const).map(k => {
             const b = BACKEND_BILGI[k]
             const aktif = backend === k
             // Seçeneği GİZLEMİYORUZ: kullanıcı Apache'yi arıyor olabilir.
@@ -218,6 +240,7 @@ export default function DomainWebSunucuPage() {
               emerald: aktif ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-emerald-500/20' : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 dark:bg-emerald-900/20',
               indigo:  aktif ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20'    : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20',
               slate:   aktif ? 'border-slate-500 bg-slate-100 dark:bg-slate-800 ring-2 ring-slate-400/20'      : 'border-slate-200 dark:border-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800',
+              amber:   aktif ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 ring-2 ring-amber-500/20' : 'border-slate-200 dark:border-slate-700',
             }
             return (
               <button key={k} type="button"
@@ -243,6 +266,31 @@ export default function DomainWebSunucuPage() {
           })}
         </div>
       </div>
+
+      {backend === 'reverse-proxy' && proxy?.aktif && (
+        <div className="mb-6 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainWebSunucuPage:proxy_title')}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">{t('DomainWebSunucuPage:proxy_desc')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label className="block text-xs text-slate-500 mb-1">{t('DomainWebSunucuPage:proxy_scheme')}</label>
+              <select value={proxy.scheme} onChange={e => setProxy({...proxy, scheme: e.target.value as 'http'|'https'})}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-900"><option value="http">http</option><option value="https">https</option></select></div>
+            <div><label className="block text-xs text-slate-500 mb-1">{t('DomainWebSunucuPage:proxy_host')}</label>
+              <input value="127.0.0.1" disabled className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-slate-50 dark:bg-slate-900" /></div>
+            <div><label className="block text-xs text-slate-500 mb-1">{t('DomainWebSunucuPage:proxy_port')}</label>
+              <input type="number" min={1024} max={65535} value={proxy.port} onChange={e => setProxy({...proxy, port: Number(e.target.value)})}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono" /></div>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 mt-4">
+            <input type="checkbox" checked={proxy.websocket} onChange={e => setProxy({...proxy, websocket: e.target.checked})} />
+            {t('DomainWebSunucuPage:proxy_websocket')}
+          </label>
+          <button onClick={proxyKaydet} disabled={proxyKaydediliyor}
+            className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium rounded-md">
+            {proxyKaydediliyor ? t('DomainWebSunucuPage:applying') : t('DomainWebSunucuPage:proxy_save')}
+          </button>
+        </div>
+      )}
 
       <div className="mb-5 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-200">
         {t('DomainWebSunucuPage:hsts_notice')}

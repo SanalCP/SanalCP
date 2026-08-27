@@ -26,6 +26,7 @@ type Plan = { id: number; ad: string; disk_kota_mb?: number }
 type PHPVer = { surum: string; aciklama?: string }
 type OlusturmaSonuc = {
   id: number
+  site_tipi?: string
   alan_adi: string; sistem_kullanici: string; ftp_user: string; ftp_host: string
   db_host: string; db_user: string; db_adi: string
   olusturulan_parolalar: { ftp: string; db: string }
@@ -102,7 +103,10 @@ export default function DomainsPage() {
   const [wpYonlendir, setWpYonlendir] = useState<{ id: number; alanAdi: string } | null>(null)
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
-  const [fSiteTipi, setFSiteTipi] = useState<'php'|'wordpress'|'statik'>('php')
+  const [fSiteTipi, setFSiteTipi] = useState<'php'|'wordpress'|'statik'|'reverse_proxy'>('php')
+  const [fProxyScheme, setFProxyScheme] = useState<'http'|'https'>('http')
+  const [fProxyPort, setFProxyPort] = useState('3000')
+  const [fProxyWebSocket, setFProxyWebSocket] = useState(true)
   // Bayi seçimi yalnız admin'e gösterilir; '' = doğrudan admin'e ait (varsayılan).
   const [bayiler, setBayiler] = useState<{ id: number; kullanici_adi: string; ad_soyad?: string }[]>([])
   const [fBayi, setFBayi] = useState<number | ''>('')
@@ -173,7 +177,7 @@ export default function DomainsPage() {
     // varsayılan plan = "Başlangıç" (yoksa ilk plan, o da yoksa boş) — veri geldiyse hemen ata,
     // gelmediyse modalVeriYukle tamamlanınca atanır.
     const varsayilan = planlar.find(p => p.ad === 'Başlangıç') || planlar[0]
-    setFAlanAdi(''); setFPHPSurum('8.3'); setFSiteTipi('php'); setFBayi(''); setAdim(null); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
+    setFAlanAdi(''); setFPHPSurum('8.3'); setFSiteTipi('php'); setFProxyScheme('http'); setFProxyPort('3000'); setFProxyWebSocket(true); setFBayi(''); setAdim(null); setFPlanID(varsayilan ? varsayilan.id : ''); setFSSL(false); setFWWW(false)
     setOlusturAcik(true)
     modalVeriYukle() // lazy: plan/php sürümleri henüz gelmediyse şimdi çek (listeyi bloklamaz)
   }
@@ -189,6 +193,12 @@ export default function DomainsPage() {
     setOlusturuluyor(true)
     try {
       const body: any = { alan_adi: alanAdi, php_surum: fPHPSurum, site_tipi: fSiteTipi }
+      if (fSiteTipi === 'reverse_proxy') {
+        body.proxy_scheme = fProxyScheme
+        body.proxy_host = '127.0.0.1'
+        body.proxy_port = Number(fProxyPort)
+        body.proxy_websocket = fProxyWebSocket
+      }
       if (fPlanID !== '') body.plan_id = fPlanID
       if (fBayi !== '') body.bayi_user_id = fBayi
       setAdim(t('DomainsPage:create_modal.step_provision'))
@@ -269,12 +279,14 @@ export default function DomainsPage() {
       `  ${t('DomainsPage:result_modal.user')}: ${s.ftp_user}`,
       `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.ftp}`,
       '',
-      t('DomainsPage:result_modal.mysql'),
-      `  ${t('DomainsPage:result_modal.host')}: ${s.db_host || 'localhost'}`,
-      `  ${t('DomainsPage:result_modal.database')}: ${s.db_adi}`,
-      `  ${t('DomainsPage:result_modal.user')}: ${s.db_user}`,
-      `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.db}`,
-      '',
+      ...(s.db_adi ? [
+        t('DomainsPage:result_modal.mysql'),
+        `  ${t('DomainsPage:result_modal.host')}: ${s.db_host || 'localhost'}`,
+        `  ${t('DomainsPage:result_modal.database')}: ${s.db_adi}`,
+        `  ${t('DomainsPage:result_modal.user')}: ${s.db_user}`,
+        `  ${t('DomainsPage:result_modal.password')}: ${s.olusturulan_parolalar.db}`,
+        '',
+      ] : []),
       ...(s.nameserver ? [
         t('DomainsPage:result_modal.nameservers'),
         `  NS1: ${s.nameserver.ns1}`,
@@ -620,11 +632,12 @@ export default function DomainsPage() {
                   kullanıcı/parola orada sorulur, otomatik üretilmez). */}
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">{t('DomainsPage:create_modal.type_label')}</label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                   {([
                     ['php', '🐘', t('DomainsPage:create_modal.type_php'), t('DomainsPage:create_modal.type_php_desc')],
                     ['wordpress', '📝', t('DomainsPage:create_modal.type_wordpress'), t('DomainsPage:create_modal.type_wordpress_desc')],
                     ['statik', '📄', t('DomainsPage:create_modal.type_statik'), t('DomainsPage:create_modal.type_statik_desc')],
+                    ['reverse_proxy', '↪️', t('DomainsPage:create_modal.type_proxy'), t('DomainsPage:create_modal.type_proxy_desc')],
                   ] as const).map(([tip, ikon, ad, ac]) => (
                     <button key={tip} type="button" disabled={olusturuluyor}
                       onClick={() => setFSiteTipi(tip)}
@@ -641,6 +654,27 @@ export default function DomainsPage() {
                 </div>
               </div>
 
+              {fSiteTipi === 'reverse_proxy' && (
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-3">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{t('DomainsPage:create_modal.proxy_hint')}</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <select value={fProxyScheme} onChange={e => setFProxyScheme(e.target.value as 'http'|'https')}
+                      disabled={olusturuluyor} className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-800">
+                      <option value="http">http</option><option value="https">https</option>
+                    </select>
+                    <input value="127.0.0.1" disabled className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono bg-slate-50 dark:bg-slate-900" />
+                    <input type="number" min={1024} max={65535} required value={fProxyPort}
+                      onChange={e => setFProxyPort(e.target.value)} disabled={olusturuluyor}
+                      aria-label={t('DomainsPage:create_modal.proxy_port')}
+                      className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono" />
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" checked={fProxyWebSocket} onChange={e => setFProxyWebSocket(e.target.checked)} disabled={olusturuluyor} />
+                    {t('DomainsPage:create_modal.proxy_websocket')}
+                  </label>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">{t('DomainsPage:create_modal.domain_label')} <span className="text-red-500">*</span></label>
                 <input
@@ -656,7 +690,7 @@ export default function DomainsPage() {
                 <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{t('DomainsPage:create_modal.domain_hint')}</div>
               </div>
 
-              <div>
+              {fSiteTipi !== 'reverse_proxy' && <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
                   {t('DomainsPage:create_modal.php_label')}
                   {modalVeriYuk && phpSurumler.length === 0 && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">{t('common:loading')}</span>}
@@ -674,7 +708,7 @@ export default function DomainsPage() {
                       ))
                   }
                 </select>
-              </div>
+              </div>}
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
@@ -786,12 +820,12 @@ export default function DomainsPage() {
             </p>
 
             <div className="space-y-3">
-              <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
+              {olusturmaSonuc.db_adi && <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.ftp')}</div>
                 <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.ftp_host || '—'} kopyala={panoYaz} />
                 <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.ftp_user} kopyala={panoYaz} />
                 <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.ftp} kopyala={panoYaz} parola />
-              </div>
+              </div>}
 
               <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.mysql')}</div>

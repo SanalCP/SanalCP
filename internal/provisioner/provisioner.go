@@ -350,7 +350,21 @@ server {
 {{.SecHeaders}}
 {{.ModSec}}{{.DenyBlocks}}
 {{.IPKurallari}}{{.HotlinkLocation}}{{.WebmailBlok}}
-{{if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
+{{if eq .Backend "reverse-proxy"}}    # ---- Backend: Reverse Proxy ----
+    location / {
+        proxy_pass {{.ProxyScheme}}://{{.ProxyHost}}:{{.ProxyPort}};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+{{if .ProxyWebSocket}}        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+{{end}}        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+{{else if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
     location / {
         proxy_pass http://127.0.0.1:10080;
         proxy_set_header Host $host;
@@ -434,7 +448,21 @@ server {
 
 {{.DenyBlocks}}
 {{.IPKurallari}}{{.HotlinkLocation}}{{.WebmailBlok}}
-{{if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
+{{if eq .Backend "reverse-proxy"}}    # ---- Backend: Reverse Proxy ----
+    location / {
+        proxy_pass {{.ProxyScheme}}://{{.ProxyHost}}:{{.ProxyPort}};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Forwarded-Host $host;
+{{if .ProxyWebSocket}}        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+{{end}}        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+{{else if eq .Backend "apache"}}    # ---- Backend: Apache (127.0.0.1:10080 proxy) ----
     location / {
         proxy_pass http://127.0.0.1:10080;
         proxy_set_header Host $host;
@@ -728,7 +756,11 @@ type VhostOpts struct {
 	EkDirektifler string
 
 	// Web sunucu backend: "php-fpm" (default) | "apache" | "static"
-	Backend string
+	Backend        string
+	ProxyScheme    string
+	ProxyHost      string
+	ProxyPort      int
+	ProxyWebSocket bool
 
 	// Askida true ise normal vhost yerine 503 "askıya alındı" vhost'u render edilir.
 	Askida bool
@@ -932,6 +964,22 @@ func renderAndReload(opts VhostOpts, sk string) error {
 	// Default backend: php-fpm
 	if opts.Backend == "" {
 		opts.Backend = "php-fpm"
+	}
+	// SSL açma/kapama gibi bazı yollar VhostOpts'u doğrudan kurar. Proxy hedefini
+	// her render'da DB'den tazelemek bu yolların hedefi :0'a düşürmesini önler.
+	if opts.Backend == "reverse-proxy" && pkgDB != nil {
+		var ws int
+		if err := pkgDB.QueryRow(`SELECT COALESCE(proxy_scheme,'http'), COALESCE(proxy_host,''),
+			COALESCE(proxy_port,0), COALESCE(proxy_websocket,1) FROM domains
+			WHERE sistem_kullanici=? AND ana_domain_id IS NULL`, sk).
+			Scan(&opts.ProxyScheme, &opts.ProxyHost, &opts.ProxyPort, &ws); err != nil {
+			return fmt.Errorf("reverse proxy hedefi oku: %w", err)
+		}
+		opts.ProxyWebSocket = ws == 1
+		if opts.ProxyHost != "127.0.0.1" || (opts.ProxyScheme != "http" && opts.ProxyScheme != "https") ||
+			opts.ProxyPort < 1024 || opts.ProxyPort > 65535 {
+			return fmt.Errorf("geçersiz reverse proxy hedefi")
+		}
 	}
 
 	// 🔴 SON SAVUNMA HATTI: Apache backend'i yalnız RHEL ailesinde çalışır
@@ -1765,15 +1813,17 @@ func welcomeHTML(domain string) string {
 // ApplyVhostForDomain: domainID'ye gore nginx vhost'unu yeniden render eder.
 // PHP versiyonu/socket degisikliklerinden sonra cagrilir; SSL bilgilerini DB'den okur.
 func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error {
-	var alanAdi, sk, certPath, keyPath, sslKaynak, backend, webRoot string
-	var askida, cacheVersion int
+	var alanAdi, sk, certPath, keyPath, sslKaynak, backend, webRoot, proxyScheme, proxyHost string
+	var askida, cacheVersion, proxyPort, proxyWebSocket int
 	var anaDomainID sql.NullInt64
 	if err := db.QueryRow(
 		`SELECT alan_adi, sistem_kullanici, COALESCE(cert_path,''), COALESCE(key_path,''),
 		        COALESCE(ssl_kaynak,''), COALESCE(web_backend,'php-fpm'),
-		        COALESCE(askida,0), COALESCE(cache_version,0), COALESCE(web_root,''), ana_domain_id
+		        COALESCE(askida,0), COALESCE(cache_version,0), COALESCE(web_root,''), ana_domain_id,
+		        COALESCE(proxy_scheme,'http'), COALESCE(proxy_host,''), COALESCE(proxy_port,0), COALESCE(proxy_websocket,1)
 		 FROM domains WHERE id=?`, domainID).
-		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion, &webRoot, &anaDomainID); err != nil {
+		Scan(&alanAdi, &sk, &certPath, &keyPath, &sslKaynak, &backend, &askida, &cacheVersion, &webRoot, &anaDomainID,
+			&proxyScheme, &proxyHost, &proxyPort, &proxyWebSocket); err != nil {
 		return fmt.Errorf("domain bilgi cek: %w", err)
 	}
 	// 🔴 Per-tenant FPM (Seçenek A) aktifse socket'i DAİMA per-tenant socket'e zorla —
@@ -1793,14 +1843,15 @@ func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error
 
 	// nginx_settings (yoksa default true)
 	opts := VhostOpts{
-		AlanAdi:         alanAdi,
-		WebRoot:         filepath.Join(home, "public_html"),
-		PHPSocket:       socket,
-		PHPSurum:        surum,
-		CertPath:        certPath,
-		KeyPath:         keyPath,
-		SSLKaynak:       sslKaynak,
-		Backend:         backend,
+		AlanAdi:     alanAdi,
+		WebRoot:     filepath.Join(home, "public_html"),
+		PHPSocket:   socket,
+		PHPSurum:    surum,
+		CertPath:    certPath,
+		KeyPath:     keyPath,
+		SSLKaynak:   sslKaynak,
+		Backend:     backend,
+		ProxyScheme: proxyScheme, ProxyHost: proxyHost, ProxyPort: proxyPort, ProxyWebSocket: proxyWebSocket == 1,
 		Askida:          askida == 1, // askıdaysa her render'da 503 vhost'u tekrar uygulanır
 		CacheVersion:    cacheVersion,
 		HdrXContentType: true, HdrXXSS: true, HdrReferrer: true,

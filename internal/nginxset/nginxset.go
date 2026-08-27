@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
@@ -34,6 +35,89 @@ type Settings struct {
 	BrowserCacheGun    int  `json:"browser_cache_gun"`
 
 	EkDirektifler string `json:"ek_direktifler"`
+}
+
+type ProxyAyar struct {
+	Aktif     bool   `json:"aktif"`
+	Scheme    string `json:"scheme"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	WebSocket bool   `json:"websocket"`
+}
+
+func proxyAyarDogrula(p *ProxyAyar) error {
+	p.Scheme = strings.ToLower(strings.TrimSpace(p.Scheme))
+	p.Host = strings.ToLower(strings.TrimSpace(p.Host))
+	if p.Host == "localhost" {
+		p.Host = "127.0.0.1"
+	}
+	if p.Scheme != "http" && p.Scheme != "https" {
+		return errors.New("protokol http veya https olmalı")
+	}
+	if p.Host != "127.0.0.1" {
+		return errors.New("proxy hedefi yalnız 127.0.0.1 olabilir")
+	}
+	if p.Port < 1024 || p.Port > 65535 {
+		return errors.New("port 1024–65535 arasında olmalı")
+	}
+	if p.Port == 8080 || p.Port == 8443 || p.Port == 10080 {
+		return errors.New("bu port SanalCP tarafından ayrılmıştır")
+	}
+	return nil
+}
+
+// ProxyGoster/ProxyKaydet yalnız reverse-proxy olarak oluşturulmuş domainlerde
+// çalışır. Kaydetme render başarısızsa DB'yi eski hedefe geri döndürür.
+func (h *Handlers) ProxyGoster(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var p ProxyAyar
+	var backend string
+	var ws int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(web_backend,'php-fpm'),
+		COALESCE(proxy_scheme,'http'), COALESCE(proxy_host,''), COALESCE(proxy_port,0), COALESCE(proxy_websocket,1)
+		FROM domains WHERE id=?`, id).Scan(&backend, &p.Scheme, &p.Host, &p.Port, &ws); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	p.Aktif = backend == "reverse-proxy"
+	p.WebSocket = ws == 1
+	httpx.WriteJSON(w, http.StatusOK, p)
+}
+
+func (h *Handlers) ProxyKaydet(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var req ProxyAyar
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz istek gövdesi")
+		return
+	}
+	if err := proxyAyarDogrula(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	var backend, oldScheme, oldHost string
+	var oldPort, oldWS int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(web_backend,'php-fpm'), proxy_scheme, proxy_host, proxy_port, proxy_websocket
+		FROM domains WHERE id=?`, id).Scan(&backend, &oldScheme, &oldHost, &oldPort, &oldWS); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
+		return
+	}
+	if backend != "reverse-proxy" {
+		httpx.WriteError(w, http.StatusConflict, "domain reverse proxy türünde değil")
+		return
+	}
+	if _, err := h.DB.ExecContext(r.Context(), `UPDATE domains SET proxy_scheme=?, proxy_host=?, proxy_port=?, proxy_websocket=? WHERE id=?`,
+		req.Scheme, req.Host, req.Port, b2i(req.WebSocket), id); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kaydet: "+err.Error())
+		return
+	}
+	if err := provisioner.RerenderVhost(h.DB, id); err != nil {
+		_, _ = h.DB.ExecContext(r.Context(), `UPDATE domains SET proxy_scheme=?, proxy_host=?, proxy_port=?, proxy_websocket=? WHERE id=?`,
+			oldScheme, oldHost, oldPort, oldWS, id)
+		httpx.WriteError(w, http.StatusInternalServerError, "vhost uygulanamadı: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func Defaults() Settings {

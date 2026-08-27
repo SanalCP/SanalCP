@@ -686,6 +686,8 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/kaynak", kaynakH.Goster)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/nginx-settings", nginxsetH.Goster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/nginx-settings", nginxsetH.Kaydet)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/reverse-proxy", nginxsetH.ProxyGoster)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/reverse-proxy", nginxsetH.ProxyKaydet)
 				// Özel vhost modu: paylaşımlı nginx'te server_name/listen gibi tenant-izolasyonunu
 				// etkileyebilecek tam kontrol veriyor — MusteriScope DEĞİL, yalnızca admin.
 				r.With(middleware.AdminOnly).Get("/domains/{id}/vhost-ozel", nginxsetH.GetVhostOzel)

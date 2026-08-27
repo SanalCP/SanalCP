@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -263,9 +264,13 @@ type createReq struct {
 	PHPSurum   string `json:"php_surum"`
 	CustomerID *int64 `json:"customer_id,omitempty"`
 	PlanID     *int64 `json:"plan_id,omitempty"`
-	// SiteTipi: php | wordpress | statik (bkz. migrations/0064). Boş gelirse
+	// SiteTipi: php | wordpress | statik | reverse_proxy. Boş gelirse
 	// "php" varsayılır — eski istemciler ve API çağrıları bozulmaz.
-	SiteTipi string `json:"site_tipi,omitempty"`
+	SiteTipi       string `json:"site_tipi,omitempty"`
+	ProxyScheme    string `json:"proxy_scheme,omitempty"`
+	ProxyHost      string `json:"proxy_host,omitempty"`
+	ProxyPort      int    `json:"proxy_port,omitempty"`
+	ProxyWebSocket *bool  `json:"proxy_websocket,omitempty"`
 	// BayiUserID: domainin bağlanacağı bayi (users.id, rol=reseller).
 	// SADECE ADMİN geçebilir; nil = doğrudan admin'e ait.
 	//
@@ -284,9 +289,38 @@ func gecerliSiteTipi(v string) string {
 		return "statik"
 	case "wordpress":
 		return "wordpress"
+	case "reverse_proxy":
+		return "reverse_proxy"
 	default:
 		return "php"
 	}
+}
+
+func proxyHedefDogrula(req *createReq) error {
+	if req.SiteTipi != "reverse_proxy" {
+		return nil
+	}
+	req.ProxyScheme = strings.ToLower(strings.TrimSpace(req.ProxyScheme))
+	if req.ProxyScheme == "" {
+		req.ProxyScheme = "http"
+	}
+	if req.ProxyScheme != "http" && req.ProxyScheme != "https" {
+		return fmt.Errorf("proxy protokolü http veya https olmalı")
+	}
+	req.ProxyHost = strings.ToLower(strings.TrimSpace(req.ProxyHost))
+	if req.ProxyHost == "localhost" {
+		req.ProxyHost = "127.0.0.1"
+	}
+	if req.ProxyHost != "127.0.0.1" {
+		return fmt.Errorf("ilk sürümde proxy hedefi yalnız 127.0.0.1 olabilir")
+	}
+	if req.ProxyPort < 1024 || req.ProxyPort > 65535 {
+		return fmt.Errorf("proxy portu 1024–65535 arasında olmalı")
+	}
+	if req.ProxyPort == 8080 || req.ProxyPort == 8443 || req.ProxyPort == 10080 {
+		return fmt.Errorf("bu port SanalCP tarafından ayrılmıştır")
+	}
+	return nil
 }
 
 // sahipBayiCoz: yeni domainin bağlanacağı sahip bayiyi belirler.
@@ -453,6 +487,11 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	siteTipi := gecerliSiteTipi(req.SiteTipi)
+	req.SiteTipi = siteTipi
+	if err := proxyHedefDogrula(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	// Sahip bayiyi SAĞLAMADAN ÖNCE çöz ve doğrula: aşağıdaki Provision Linux
 	// kullanıcısı, nginx vhost'u ve FPM havuzu oluşturur. Doğrulamayı sonraya
@@ -474,7 +513,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	// boş kalır. Ad üretip veritabanını açmamak, panelde var olmayan bir
 	// veritabanını varmış gibi gösterirdi.
 	dbUser, dbName := "", ""
-	if siteTipi != "statik" {
+	if siteTipi != "statik" && siteTipi != "reverse_proxy" {
 		dbUser = pr.SistemKullanici + "_db"
 		dbName = pr.SistemKullanici + "_main"
 	}
@@ -492,6 +531,26 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := res.LastInsertId()
+	if siteTipi == "reverse_proxy" {
+		ws := 1
+		if req.ProxyWebSocket != nil && !*req.ProxyWebSocket {
+			ws = 0
+		}
+		if _, err := h.DB.ExecContext(r.Context(),
+			`UPDATE domains SET web_backend='reverse-proxy', proxy_scheme=?, proxy_host=?, proxy_port=?, proxy_websocket=? WHERE id=?`,
+			req.ProxyScheme, req.ProxyHost, req.ProxyPort, ws, id); err != nil {
+			_ = provisioner.Deprovision(req.AlanAdi, pr.SistemKullanici)
+			_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM domains WHERE id=?`, id)
+			httpx.WriteError(w, http.StatusInternalServerError, "proxy kaydı başarısız: "+err.Error())
+			return
+		}
+		if err := provisioner.RerenderVhost(h.DB, id); err != nil {
+			_ = provisioner.Deprovision(req.AlanAdi, pr.SistemKullanici)
+			_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM domains WHERE id=?`, id)
+			httpx.WriteError(w, http.StatusInternalServerError, "proxy vhost başarısız: "+err.Error())
+			return
+		}
+	}
 
 	if req.CustomerID != nil || req.PlanID != nil {
 		_, _ = h.DB.ExecContext(r.Context(),
@@ -542,7 +601,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	// yüzeyi bırakırdı. Kullanıcı sonradan ihtiyaç duyarsa Veritabanları
 	// sayfasından kendisi ekleyebilir.
 	var dbPass string
-	if siteTipi != "statik" {
+	if siteTipi != "statik" && siteTipi != "reverse_proxy" {
 		dbPass = hesaplar.RandomParola(24)
 		if err := hesaplar.MySQLCreateDB(h.DB, id, dbName, dbUser, dbPass); err != nil {
 			log.Printf("MySQL create %q hata: %v", dbName, err)
@@ -778,9 +837,9 @@ func kullanilabilirBackendler() []string {
 
 func (h *Handlers) GetWebBackend(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var backend string
+	var backend, siteTipi string
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT COALESCE(web_backend,'php-fpm') FROM domains WHERE id=?`, id).Scan(&backend)
+		`SELECT COALESCE(web_backend,'php-fpm'), COALESCE(site_tipi,'php') FROM domains WHERE id=?`, id).Scan(&backend, &siteTipi)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
@@ -789,9 +848,13 @@ func (h *Handlers) GetWebBackend(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
 		return
 	}
+	mevcutlar := kullanilabilirBackendler()
+	if siteTipi == "reverse_proxy" {
+		mevcutlar = []string{"reverse-proxy"}
+	}
 	yanit := map[string]any{
 		"backend":   backend,
-		"mevcutlar": kullanilabilirBackendler(),
+		"mevcutlar": mevcutlar,
 	}
 	// Neden eksik olduğunu SÖYLE: seçeneğin sessizce yok olması, kullanıcıya
 	// panelin bozuk olduğunu düşündürür.
@@ -818,11 +881,11 @@ func (h *Handlers) SetWebBackend(w http.ResponseWriter, r *http.Request) {
 			"Apache backend bu işletim sisteminde henüz desteklenmiyor (yalnızca AlmaLinux/RHEL ailesi)")
 		return
 	}
-	var alanAdi, sk, phpSurum string
+	var alanAdi, sk, phpSurum, siteTipi string
 	var isDemo int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT alan_adi, sistem_kullanici, php_surum, is_demo FROM domains WHERE id=?`, id).
-		Scan(&alanAdi, &sk, &phpSurum, &isDemo)
+		`SELECT alan_adi, sistem_kullanici, php_surum, is_demo, COALESCE(site_tipi,'php') FROM domains WHERE id=?`, id).
+		Scan(&alanAdi, &sk, &phpSurum, &isDemo, &siteTipi)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
@@ -833,6 +896,10 @@ func (h *Handlers) SetWebBackend(w http.ResponseWriter, r *http.Request) {
 	}
 	if isDemo == 1 {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin backend'i değiştirilemez")
+		return
+	}
+	if siteTipi == "reverse_proxy" {
+		httpx.WriteError(w, http.StatusConflict, "reverse proxy hesabının backend türü değiştirilemez")
 		return
 	}
 	_ = alanAdi

@@ -1,0 +1,6 @@
+-- 0070 — Domain bazlı güvenli reverse proxy hedefi.
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS proxy_scheme VARCHAR(8) NOT NULL DEFAULT 'http',
+  ADD COLUMN IF NOT EXISTS proxy_host VARCHAR(255) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS proxy_port INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS proxy_websocket TINYINT(1) NOT NULL DEFAULT 1;
