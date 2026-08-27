@@ -3,7 +3,7 @@
 // Kapsam sunucu tarafında zorlanır (bkz. internal/users): bayi yalnız kendi
 // altındaki hesapları görür ve yalnız müşteri hesabı açabilir. Buradaki rol
 // kısıtları o kuralların arayüz yansımasıdır, güvenlik sınırı değildir.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -103,7 +103,7 @@ export default function KullanicilarPage() {
   const [bayiPaketleri, setBayiPaketleri] = useState<BayiPaketOzet[]>([])
   const [hizmetPlanlari, setHizmetPlanlari] = useState<HizmetPlanOzet[]>([])
 
-  async function getir() {
+  const getir = useCallback(async () => {
     setYukleniyor(true)
     try {
       const r = await api.get<Kullanici[]>('/users')
@@ -114,8 +114,8 @@ export default function KullanicilarPage() {
     } finally {
       setYukleniyor(false)
     }
-  }
-  useEffect(() => { getir() }, [])
+  }, [t])
+  useEffect(() => { getir() }, [getir])
 
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()

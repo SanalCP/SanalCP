@@ -246,7 +246,7 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
         })
         .catch(() => setMevcutParola(t('DomainConnectionPage:no_permission')))
     }
-  }, [gosterMevcut, tip, domainId])
+  }, [gosterMevcut, tip, domainId, t])
 
   async function olustur() {
     setIsleniyor(true); setHata(null)

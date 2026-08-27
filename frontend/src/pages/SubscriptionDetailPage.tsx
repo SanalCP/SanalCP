@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
@@ -30,12 +30,12 @@ export default function SubscriptionDetailPage() {
   const [isleniyor, setIsleniyor] = useState(false)
   const [bildirim, setBildirim] = useState<string | null>(null)
 
-  function domainYukle() {
+  const domainYukle = useCallback(() => {
     if (!id) return
     api.get<Domain>(`/domains/${id}`)
       .then(r => setDomain(r.data))
       .catch(e => setHata(apiHata(e, t('SubscriptionDetailPage:subscription_load_failed'))))
-  }
+  }, [id, t])
 
   useEffect(() => {
     if (!id) return
@@ -43,7 +43,7 @@ export default function SubscriptionDetailPage() {
     api.get<{ disk_mb: { kullanim: number } }>(`/domains/${id}/kaynak`)
       .then(r => setDiskMB(r.data.disk_mb.kullanim))
       .catch(() => {})
-  }, [id])
+  }, [id, domainYukle])
 
   async function askiToggle() {
     if (!id || !domain) return

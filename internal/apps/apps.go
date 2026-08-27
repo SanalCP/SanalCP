@@ -59,8 +59,8 @@ type Kurulum struct {
 
 // Uygulama: her 1-tık uygulama türünün implement ettiği arayüz.
 type Uygulama interface {
-	Slug() string      // "wordpress", "prestashop" — route parametresi
-	Ad() string         // görünen ad ("WordPress", "PrestaShop")
+	Slug() string        // "wordpress", "prestashop" — route parametresi
+	Ad() string          // görünen ad ("WordPress", "PrestaShop")
 	DBOnEki() string     // db_accounts'ta kullanılacak DB adı/kullanıcı öneki (ör. "wp" → wp_xxxx / wpu_xxxx)
 	MarkerDosya() string // kurulu tespiti için hedef dizindeki göreli yol (ör. "wp-config.php")
 	FormAlanlari() []FormAlan

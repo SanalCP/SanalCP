@@ -59,7 +59,7 @@ export default function SunucuDurumuPage() {
       .catch((e) => { if (!iptal) setHata(apiHata(e, t('SunucuDurumuPage:load_failed'))) })
       .finally(() => { if (!iptal) setYukleniyor(false) })
     return () => { iptal = true }
-  }, [])
+  }, [t])
 
   const ramYuzde = usage?.ram_toplam_mb
     ? Math.round(((usage.ram_kullanilan_mb ?? 0) / usage.ram_toplam_mb) * 100)

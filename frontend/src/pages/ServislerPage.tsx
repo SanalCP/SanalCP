@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -50,7 +50,7 @@ export default function ServislerPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
 
-  async function getir() {
+  const getir = useCallback(async () => {
     try {
       const r = await api.get<Servis[]>('/system/servisler')
       setListe(r.data)
@@ -59,8 +59,8 @@ export default function ServislerPage() {
     } finally {
       setYukleniyor(false)
     }
-  }
-  useEffect(() => { getir() }, [])
+  }, [t])
+  useEffect(() => { getir() }, [getir])
 
   async function islem(s: Servis, aksiyon: 'restart' | 'reload') {
     setIslemBirim(s.birim); setHata(null); setBasari(null)

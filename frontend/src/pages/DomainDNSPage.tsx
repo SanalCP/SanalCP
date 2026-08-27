@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -50,14 +50,14 @@ export default function DomainDNSPage() {
   const [dnssecKapatOnay, setDnssecKapatOnay] = useState(false)
   const [dsKopyalandi, setDsKopyalandi] = useState(false)
 
-  function yukle() {
+  const yukle = useCallback(() => {
     if (!id) return
     setYuk(true); setHata(null)
     api.get<Kayit[]>(`/domains/${id}/dns`)
       .then(r => { setKayitlar(r.data); setSecili(new Set()) })
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }
+  }, [id])
 
   function secimDegistir(rid: number) {
     setSecili(prev => {
@@ -95,7 +95,7 @@ export default function DomainDNSPage() {
       api.get<DNSSEC>(`/domains/${id}/dns/dnssec`).then(r => setDnssec(r.data)).catch(() => {})
     }
     yukle()
-  }, [id])
+  }, [id, yukle])
 
   async function dnssecDegistir(aktif: boolean) {
     if (!id) return

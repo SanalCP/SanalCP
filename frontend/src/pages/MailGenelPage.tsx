@@ -1,7 +1,7 @@
 // Sunucu geneli e-posta bakışı: hangi domainde posta barındırma açık, kaç
 // kutu ve yönlendirme var. Kutu eklemek/silmek domain sayfasında.
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import GenelListe, { type Kolon } from '@/components/GenelListe'
 import { api, apiHata } from '@/lib/api'
@@ -87,14 +87,14 @@ export default function MailGenelPage() {
   const [queueYuk, setQueueYuk] = useState(true)
   const [queueIslem, setQueueIslem] = useState('')
 
-  function queueYukle() {
+  const queueYukle = useCallback(() => {
     setQueueYuk(true); setQueueHata(null)
     api.get<{ messages: QueueMessage[] }>('/admin/mail/queue')
       .then(r => setQueue(r.data.messages || []))
       .catch(e => setQueueHata(apiHata(e, t('MailGenelPage:queue_failed'))))
       .finally(() => setQueueYuk(false))
-  }
-  useEffect(queueYukle, [])
+  }, [t])
+  useEffect(queueYukle, [queueYukle])
 
   async function queueAction(action: 'flush'|'delete'|'hold'|'release'|'requeue', queue_id = '') {
     if (action === 'delete' && !confirm(t('MailGenelPage:confirm_delete_queue', { id: queue_id }))) return

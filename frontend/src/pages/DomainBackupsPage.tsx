@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -58,7 +58,7 @@ export default function DomainBackupsPage() {
   const [destKayit, setDestKayit] = useState(false)
   const [destTest, setDestTest] = useState<{ ok: boolean; hata?: string } | null>(null)
 
-  function yukle() {
+  const yukle = useCallback(() => {
     if (!id) return
     setYuk(true)
     Promise.all([
@@ -69,7 +69,7 @@ export default function DomainBackupsPage() {
     ]).then(([y, s, d, dbs]) => {
       setYedekler(y.data)
       setDatabases(dbs.data)
-      if (!restoreDatabase && dbs.data.length) setRestoreDatabase(dbs.data[0].db_name)
+      if (dbs.data.length) setRestoreDatabase(mevcut => mevcut || dbs.data[0].db_name)
       setSched(s.data)
       setDest(d.data)
       if (!d.data.yok) {
@@ -90,7 +90,7 @@ export default function DomainBackupsPage() {
     })
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }
+  }, [id])
 
   async function destKaydet() {
     setDestKayit(true); setHata(null); setBasari(null); setDestTest(null)
@@ -137,7 +137,7 @@ export default function DomainBackupsPage() {
   useEffect(() => {
     if (id) api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     yukle()
-  }, [id])
+  }, [id, yukle])
 
   async function scheduleKaydet(yeni: Schedule) {
     setSchedKayit(true); setHata(null); setBasari(null)

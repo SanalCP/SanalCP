@@ -53,7 +53,7 @@ export default function GenelListe<T>({
       .catch((e) => { if (!iptal) setHata(apiHata(e, t('common:load_failed'))) })
       .finally(() => { if (!iptal) setYukleniyor(false) })
     return () => { iptal = true }
-  }, [uc, yenilemeTetik])
+  }, [uc, yenilemeTetik, t])
 
   // Sıralama filtrelemeden ÖNCE değil sonra da olabilir; arama sonucu da aynı
   // sırada kalsın diye süzülmüş listeye uygulanır.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -19,16 +19,7 @@ export default function DomainAntivirusPage() {
   const [imzaYuk, setImzaYuk] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  function yukle() {
-    if (!id) return
-    api.get<Durum>(`/domains/${id}/antivirus`).then(r => {
-      setD(r.data)
-      if (r.data.son_tarama?.durum === 'calisiyor') startPoll(r.data.son_tarama.id)
-    }).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
-  }
-  useEffect(() => { yukle(); return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [id])
-
-  function startPoll(sid: number) {
+  const startPoll = useCallback((sid: number) => {
     setTarariyor(true)
     if (pollRef.current) clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
@@ -37,11 +28,20 @@ export default function DomainAntivirusPage() {
         if (data.durum !== 'calisiyor') {
           if (pollRef.current) clearInterval(pollRef.current)
           setTarariyor(false)
-          yukle()
+          api.get<Durum>(`/domains/${id}/antivirus`).then(r => setD(r.data)).catch(() => {})
         }
       } catch { if (pollRef.current) clearInterval(pollRef.current); setTarariyor(false) }
     }, 2500)
-  }
+  }, [id])
+
+  const yukle = useCallback(() => {
+    if (!id) return
+    api.get<Durum>(`/domains/${id}/antivirus`).then(r => {
+      setD(r.data)
+      if (r.data.son_tarama?.durum === 'calisiyor') startPoll(r.data.son_tarama.id)
+    }).catch(e => setHata(apiHata(e))).finally(() => setYuk(false))
+  }, [id, startPoll])
+  useEffect(() => { yukle(); return () => { if (pollRef.current) clearInterval(pollRef.current) } }, [yukle])
 
   async function tara() {
     setHata(null); setTarariyor(true)

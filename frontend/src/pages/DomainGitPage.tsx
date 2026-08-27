@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -47,7 +47,16 @@ export default function DomainGitPage() {
   const [ghAutoDeploy, setGhAutoDeploy] = useState(true)
   const [ghYukluyor, setGhYukluyor] = useState(false)
 
-  function yukle() {
+  const ghLoadRepos = useCallback(async () => {
+    try {
+      const r = await api.get<GHRepo[]>(`/domains/${id}/github/repos`)
+      setGhRepos(r.data || [])
+    } catch (e) {
+      setHata(apiHata(e, t('DomainGitPage:github.repos_load_failed')))
+    }
+  }, [id, t])
+
+  const yukle = useCallback(() => {
     if (!id) return
     setYuk(true)
     api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
@@ -63,8 +72,8 @@ export default function DomainGitPage() {
         ghLoadRepos()
       }
     }).catch(() => {})
-  }
-  useEffect(yukle, [id])
+  }, [id, ghLoadRepos])
+  useEffect(yukle, [yukle])
 
   async function ghConnect() {
     if (!ghToken.trim()) { setHata(t('DomainGitPage:github.token_required')); return }
@@ -77,15 +86,6 @@ export default function DomainGitPage() {
     } catch (e) {
       setHata(apiHata(e, t('DomainGitPage:github.connect_failed')))
     } finally { setGhYukluyor(false) }
-  }
-
-  async function ghLoadRepos() {
-    try {
-      const r = await api.get<GHRepo[]>(`/domains/${id}/github/repos`)
-      setGhRepos(r.data || [])
-    } catch (e) {
-      setHata(apiHata(e, t('DomainGitPage:github.repos_load_failed')))
-    }
   }
 
   async function ghLoadBranches(repoFull: string) {

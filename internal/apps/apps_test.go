@@ -9,12 +9,12 @@ type sahteUygulama struct {
 	slug string
 }
 
-func (s sahteUygulama) Slug() string                { return s.slug }
-func (s sahteUygulama) Ad() string                  { return "Sahte " + s.slug }
-func (s sahteUygulama) DBOnEki() string              { return s.slug }
-func (s sahteUygulama) MarkerDosya() string          { return "marker.txt" }
-func (s sahteUygulama) FormAlanlari() []FormAlan     { return nil }
-func (s sahteUygulama) GuncelleDesteklenir() bool    { return false }
+func (s sahteUygulama) Slug() string              { return s.slug }
+func (s sahteUygulama) Ad() string                { return "Sahte " + s.slug }
+func (s sahteUygulama) DBOnEki() string           { return s.slug }
+func (s sahteUygulama) MarkerDosya() string       { return "marker.txt" }
+func (s sahteUygulama) FormAlanlari() []FormAlan  { return nil }
+func (s sahteUygulama) GuncelleDesteklenir() bool { return false }
 func (s sahteUygulama) Kur(ctx context.Context, i KurulumIstek) (KurulumSonuc, error) {
 	return KurulumSonuc{}, nil
 }
@@ -22,7 +22,7 @@ func (s sahteUygulama) Bilgi(ctx context.Context, sk, dizin, url string) (Kurulu
 	return Kurulum{}, nil
 }
 func (s sahteUygulama) Guncelle(ctx context.Context, sk, dizin string) error { return nil }
-func (s sahteUygulama) DBAdiOku(dizin string) (string, bool)                { return "", false }
+func (s sahteUygulama) DBAdiOku(dizin string) (string, bool)                 { return "", false }
 
 func TestKaydetBulHepsi(t *testing.T) {
 	// Registry paket-seviyesi global olduğu için test isimlerini benzersiz

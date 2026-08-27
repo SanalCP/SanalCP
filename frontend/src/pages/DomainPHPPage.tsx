@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -49,15 +49,28 @@ export default function DomainPHPPage() {
     { v: 'static',   t: t('DomainPHPPage:pm_static') },
   ]
 
-  function yukle() {
+  const debugLogYukle = useCallback(async () => {
+    if (!id) return
+    setDlogYuk(true)
+    try {
+      const { data } = await api.get<{ satirlar: string[] }>(`/domains/${id}/php/debug-log`)
+      setDlog(data.satirlar || [])
+    } catch {
+      setDlog([])
+    } finally {
+      setDlogYuk(false)
+    }
+  }, [id])
+
+  const yukle = useCallback(() => {
     if (!id) return
     setYuk(true); setHata(null)
     api.get<Yanit>(`/domains/${id}/php-settings`)
       .then(r => { setYanit(r.data); setSurum(r.data.php_surum); setA(r.data.ayarlar); debugLogYukle() })
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }
-  useEffect(yukle, [id])
+  }, [id, debugLogYukle])
+  useEffect(yukle, [yukle])
 
   async function kaydet() {
     if (!a) return
@@ -75,19 +88,6 @@ export default function DomainPHPPage() {
 
   function P<K extends keyof Ayarlar>(k: K, v: Ayarlar[K]) {
     if (!a) return; setA({ ...a, [k]: v })
-  }
-
-  async function debugLogYukle() {
-    if (!id) return
-    setDlogYuk(true)
-    try {
-      const { data } = await api.get<{ satirlar: string[] }>(`/domains/${id}/php/debug-log`)
-      setDlog(data.satirlar || [])
-    } catch {
-      setDlog([])
-    } finally {
-      setDlogYuk(false)
-    }
   }
 
   async function debugLogTemizle() {

@@ -72,7 +72,7 @@ export default function BackupYonetimiPage() {
       }
     }, 2000)
     return () => clearInterval(iv)
-  }, [toplu?.calisiyor])
+  }, [toplu?.calisiyor, t])
 
   async function simdiYedekle() {
     setHata(null); setBasari(null); setYedekliyor(true)

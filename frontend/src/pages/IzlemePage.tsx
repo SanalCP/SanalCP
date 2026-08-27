@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -256,7 +256,7 @@ function DomainIzleme() {
     api.get<Domain[]>('/domains').then(r => {
       const aktif = r.data.filter(d => d.durum === 'aktif')
       setDomains(aktif)
-      if (aktif.length > 0 && secili === null) setSecili(aktif[0].id)
+      if (aktif.length > 0) setSecili(mevcut => mevcut ?? aktif[0].id)
     }).catch(() => {})
   }, [])
 
@@ -366,14 +366,14 @@ function SunucuLoglari() {
   const [arama, setArama] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  function yukle(k = kaynak, n = son) {
+  const yukle = useCallback(() => {
     setYuk(true); setHata(null)
-    api.get('/admin/system/loglar', { params: { kaynak: k, son: n } })
+    api.get('/admin/system/loglar', { params: { kaynak, son } })
       .then((r: any) => { setSatirlar(r.data.satirlar || []); if (r.data.kaynaklar) setKaynaklar(r.data.kaynaklar) })
       .catch((e: any) => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }
-  useEffect(() => { yukle(kaynak, son) }, [kaynak, son])
+  }, [kaynak, son])
+  useEffect(yukle, [yukle])
   const gorunen = useMemo(() => {
     const q = arama.trim().toLowerCase()
     return q ? satirlar.filter(s => s.toLowerCase().includes(q)) : satirlar

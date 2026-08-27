@@ -5,7 +5,7 @@
 // NOT: Bunlar panel giriş hesabı DEĞİLDİR — fatura/iletişim kaydıdır. Giriş
 // hesabı users tablosundadır (rol='user') ve customers.user_id ile buraya
 // bağlanır; müşteri o hesapla /cp adresinden girer.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -47,7 +47,7 @@ export default function MusterilerPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [silinecek, setSilinecek] = useState<Musteri | null>(null)
 
-  async function getir() {
+  const getir = useCallback(async () => {
     setYukleniyor(true)
     try {
       const r = await api.get<Musteri[]>('/customers')
@@ -58,14 +58,14 @@ export default function MusterilerPage() {
     } finally {
       setYukleniyor(false)
     }
-  }
+  }, [t])
 
   useEffect(() => {
     getir()
     api.get<Plan[]>('/plans')
       .then((r) => setPlanlar(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
-  }, [])
+  }, [getir])
 
   const suzulmus = useMemo(() => {
     const t = aranan.trim().toLowerCase()

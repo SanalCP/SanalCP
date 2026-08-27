@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -27,19 +27,19 @@ export default function DomainDatabasesPage() {
   const [silinecek, setSilinecek] = useState<DBGrup | null>(null)
   const [ekleAcik, setEkleAcik] = useState(false)
 
-  function yukle() {
+  const yukle = useCallback(() => {
     if (!id) return
     setYuk(true)
     api.get<DB[]>(`/domains/${id}/databases`)
       .then(r => setDbler(r.data))
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }
+  }, [id])
 
   useEffect(() => {
     if (id) api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     yukle()
-  }, [id])
+  }, [id, yukle])
 
   // db_adi'na gore grupla: ayni DB'ye birden fazla kullanici baglanabilir
   // (bkz. Yonet sayfasi "kullanici ekle"), listede tek satir kalir.

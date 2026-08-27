@@ -1,6 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -44,19 +44,19 @@ export default function DomainCronPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
 
-  function yukle() {
+  const yukle = useCallback(() => {
     if (!id) return
     setYukleniyor(true); setHata(null)
     api.get<ListResp>(`/domains/${id}/cron`)
       .then(r => setGorevler(r.data.gorevler))
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYukleniyor(false))
-  }
+  }, [id])
 
   useEffect(() => {
     if (id) api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
     yukle()
-  }, [id])
+  }, [id, yukle])
 
   async function sil(g: Gorev) {
     if (!confirm(t('DomainCronPage:confirmDelete', { command: g.komut.slice(0, 60) }))) return
