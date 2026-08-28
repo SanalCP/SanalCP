@@ -71,6 +71,10 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   MariaDB hesabıyla gerçek staging; WordPress/Laravel/PrestaShop yapılandırma
   uyarlaması, arama motoru engeli, seçmeli dosya/DB canlıya gönderimi ve her
   gönderim öncesi zorunlu tam kurtarma noktası eklendi.
+- **Faz 3 — tamamlandı (v0.9.31):** PrestaShop otomatik keşif ve sağlık özeti,
+  düşük yetkili mağaza DB hesabıyla bakım modu yönetimi, güvenli cache temizliği,
+  symlink-jail korumalı log görüntüleme ve bakım değişiklikleri öncesinde zorunlu
+  tam kurtarma noktası eklendi.
 - **Taşıma altyapısı ara teslimatı (v0.9.30):** Mevcut genel Web Sitesi İçe
   Aktarım aracı kalıcı arka plan işleri, canlı ilerleme/geçmiş, işlem öncesi
   zorunlu kurtarma noktası, hata halinde dosya/DB otomatik rollback ve aktarım

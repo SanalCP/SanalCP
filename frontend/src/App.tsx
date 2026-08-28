@@ -52,6 +52,7 @@ const AppsPage = lazy(() => import('@/pages/AppsPage'))
 const FirewallPage = lazy(() => import('@/pages/FirewallPage'))
 const BackupYonetimiPage = lazy(() => import('@/pages/BackupYonetimiPage'))
 const DomainWordPressPage = lazy(() => import('@/pages/DomainWordPressPage'))
+const DomainPrestaShopPage = lazy(() => import('@/pages/DomainPrestaShopPage'))
 const DomainAppsPage = lazy(() => import('@/pages/DomainAppsPage'))
 const DomainSubdomainlerPage = lazy(() => import('@/pages/DomainSubdomainlerPage'))
 const DomainEkAlanlarPage = lazy(() => import('@/pages/DomainEkAlanlarPage'))
@@ -114,6 +115,7 @@ export default function App() {
         <Route path="abonelikler/:id/kopyala"       element={<DomainKopyaPage />} />
         <Route path="abonelikler/:id/ice-aktarim"   element={<DomainIceAktarimPage />} />
         <Route path="abonelikler/:id/wordpress"     element={<DomainWordPressPage />} />
+        <Route path="abonelikler/:id/prestashop"    element={<DomainPrestaShopPage />} />
         <Route path="abonelikler/:id/uygulamalar"   element={<DomainAppsPage />} />
         <Route path="abonelikler/:id/subdomainler"  element={<DomainSubdomainlerPage />} />
         <Route path="abonelikler/:id/ek-alanlar"    element={<DomainEkAlanlarPage />} />

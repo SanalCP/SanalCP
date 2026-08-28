@@ -10,6 +10,8 @@
   "items": {
     "apps": "Uygulamalar",
     "apps_desc": "1-tıkla kurulum · yönetim",
+    "prestashop_tools": "PrestaShop Araçları",
+    "prestashop_tools_desc": "Sağlık, bakım, önbellek ve günlük yönetimi",
     "dns": "DNS Yönetimi",
     "dns_desc": "A, MX, TXT, CNAME kayıtları",
     "cloudflare": "Cloudflare",

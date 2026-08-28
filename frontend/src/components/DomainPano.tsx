@@ -57,6 +57,7 @@ export default function DomainPano({ domain }: { domain: Domain }) {
     <div>
       <Grup baslik={t('DomainPano:groups.apps')}>
         <ToolCard etiket={t('DomainPano:items.apps')} aciklama={t('DomainPano:items.apps_desc')} ikon={ICONS.wordpress} renk="sky" onClick={git('uygulamalar')} />
+        <ToolCard etiket={t('DomainPano:items.prestashop_tools')} aciklama={t('DomainPano:items.prestashop_tools_desc')} ikon={ICONS.prestashop} renk="violet" onClick={git('prestashop')} />
       </Grup>
 
       <Grup baslik={t('DomainPano:groups.domain_dns')}>

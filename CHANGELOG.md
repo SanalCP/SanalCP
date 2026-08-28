@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.31** (2026-08-28)
+
+PrestaShop operasyon araç seti eklendi. Panel kurulu mağazayı güvenli biçimde
+keşfeder; sürüm, PHP, modül, cache, SSL, veritabanı ve kurulum dizini sağlığını
+özetler. Bakım modu açılıp kapatılabilir, bilinen PrestaShop cache dizinleri
+temizlenebilir ve en güncel uygulama günlüğü görüntülenebilir. Bakım modu
+değişikliklerinden önce tam kurtarma noktası zorunludur; ayrıca elle kurtarma
+noktası oluşturulabilir. Yapılandırma ve log erişimleri tenant jail ve symlink
+kontrollerinden geçer, mağaza DB işlemleri kendi düşük yetkili hesabıyla yapılır.
+
 **0.9.30** (2026-08-28)
 
 Mevcut Web Sitesi İçe Aktarım aracı güvenli taşıma iş akışına yükseltildi.

@@ -67,7 +67,7 @@ import (
 	"sanalcp/internal/phpsurum"
 	"sanalcp/internal/plans"
 	"sanalcp/internal/pma"
-	_ "sanalcp/internal/prestashop"
+	"sanalcp/internal/prestashop"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/redis"
 	"sanalcp/internal/secretcrypt"
@@ -249,6 +249,7 @@ func main() {
 	filesH := &files.Handlers{DB: d}
 	iceAktarimH := &iceaktarim.Handlers{DB: d}
 	go iceAktarimH.RecoverInterruptedJobs()
+	prestashopH := &prestashop.Handlers{DB: d}
 	cronH := &cron.Handlers{DB: d}
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
@@ -583,6 +584,11 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/isler", iceAktarimH.Isler)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/isler/{jid}", iceAktarimH.Is)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/saglik", iceAktarimH.Saglik)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/prestashop/durum", prestashopH.Durum)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/prestashop/bakim", prestashopH.Bakim)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/prestashop/cache-temizle", prestashopH.CacheTemizle)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/prestashop/kurtarma-noktasi", prestashopH.KurtarmaNoktasi)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/prestashop/loglar", prestashopH.Loglar)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssl", domainsH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ssl/issue", domainsH.SSLIssue)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ssl", domainsH.SSLDisable)

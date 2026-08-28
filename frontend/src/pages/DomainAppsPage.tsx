@@ -106,6 +106,7 @@ export default function DomainAppsPage() {
 
   function yonetHedefi(k: Kurulu): string | null {
     if (k.tur === 'wordpress') return `/abonelikler/${id}/wordpress`
+    if (k.tur === 'prestashop') return `/abonelikler/${id}/prestashop?dizin=${encodeURIComponent(k.dizin)}`
     return null
   }
 

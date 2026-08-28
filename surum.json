@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.30",
-  "duyuru": "Web sitesi içe aktarma işlemleri arka plan işlerine taşındı; ilerleme geçmişi, zorunlu kurtarma noktası, otomatik rollback ve sağlık kontrolü eklendi.",
+  "son_surum": "0.9.31",
+  "duyuru": "PrestaShop operasyon araçları eklendi: sağlık özeti, bakım modu, güvenli cache temizliği, günlükler ve kurtarma noktaları.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }
