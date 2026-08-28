@@ -13,6 +13,11 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.21** (2026-08-28)
+
+Sunucu Saati kartındaki `Yerel` etiketi daha anlaşılır olması için
+`Sunucu saati` olarak değiştirildi ve UTC satırı arayüzden kaldırıldı.
+
 **0.9.20** (2026-08-28)
 
 `Araçlar ve Ayarlar → Sunucu bakımı` bölümüne **Sunucu Saati** kartı eklendi.

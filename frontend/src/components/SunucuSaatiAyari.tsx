@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
 type Durum = {
-  saat_dilimi: string; yerel_saat: string; utc_saat: string
+  saat_dilimi: string; yerel_saat: string
   ntp_aktif: boolean; ntp_senkron: boolean; donanim_saati_utc: boolean
   saat_dilimleri?: string[]
 }
@@ -53,7 +53,7 @@ export default function SunucuSaatiAyari() {
             {durum && <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${durum.ntp_senkron ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>{durum.ntp_senkron ? t('synced') : t('not_synced')}</span>}
           </div>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('desc')}</p>
-          {durum && <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-slate-600 dark:text-slate-300 sm:grid-cols-2"><span>{t('local')}: <code>{saatYaz(durum.yerel_saat)}</code></span><span>{t('utc')}: <code>{saatYaz(durum.utc_saat)}</code></span></div>}
+          {durum && <div className="mt-2 text-[11px] text-slate-600 dark:text-slate-300"><span>{t('server_time')}: <code>{saatYaz(durum.yerel_saat)}</code></span></div>}
           {hata && <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-300">{hata}</div>}
           {basari && <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{basari}</div>}
           <div className="mt-3 flex flex-col gap-2">

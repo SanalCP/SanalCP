@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.20",
-  "duyuru": "Araçlar ve Ayarlar ekranına sunucunun yerel/UTC saatini, saat dilimini ve NTP senkronizasyon durumunu gösteren Sunucu Saati kartı eklendi. Yönetici saat dilimini değiştirebilir ve otomatik NTP eşitlemesini açıp kapatabilir.",
+  "son_surum": "0.9.21",
+  "duyuru": "Sunucu Saati kartındaki zaman gösterimi sadeleştirildi. Yerel etiketi Sunucu saati olarak değiştirildi ve gereksiz UTC satırı kaldırıldı.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

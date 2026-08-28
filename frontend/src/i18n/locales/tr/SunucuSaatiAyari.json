@@ -1,8 +1,7 @@
 {
   "title": "Sunucu Saati",
   "desc": "Saat dilimini ve otomatik NTP senkronizasyonunu yönetin.",
-  "local": "Yerel",
-  "utc": "UTC",
+  "server_time": "Sunucu saati",
   "ntp": "Otomatik saat eşitleme (NTP)",
   "synced": "Senkron",
   "not_synced": "Senkron değil",
