@@ -23,6 +23,7 @@ import (
 	"sanalcp/internal/backups"
 	"sanalcp/internal/bayipaketleri"
 	"sanalcp/internal/cliapi"
+	"sanalcp/internal/cloudflare"
 	"sanalcp/internal/composer"
 	"sanalcp/internal/config"
 	"sanalcp/internal/cron"
@@ -171,6 +172,7 @@ func main() {
 
 	githubpkg.Init(secretBox) // github_connections.pat şifreleme kutusu
 	githubpkg.HealLegacyPlaintextPATs(context.Background(), d)
+	cloudflare.Init(secretBox) // Cloudflare API token şifreleme kutusu
 
 	ipv4 := detectIPv4()
 	log.Printf("server ipv4: %s", ipv4)
@@ -251,6 +253,7 @@ func main() {
 	plansH := &plans.Handlers{DB: d}
 	bayiPaketleriH := &bayipaketleri.Handlers{DB: d}
 	dnsH := &dns.Handlers{DB: d}
+	cloudflareH := &cloudflare.Handlers{DB: d}
 	genelH := &genelbakis.Handlers{DB: d}
 	accountsH := &accounts.Handlers{DB: d}
 	backupsH := &backups.Handlers{DB: d}
@@ -609,6 +612,17 @@ func main() {
 				r.With(middleware.MusteriScope).Put("/domains/{id}/dns/soa", dnsH.PutSOA)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns/dnssec", dnsH.GetDNSSEC)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns/dnssec", dnsH.PostDNSSEC)
+				r.With(middleware.AdminOnly).Get("/cloudflare", cloudflareH.Status)
+				r.With(middleware.AdminOnly).Put("/cloudflare/token", cloudflareH.SaveToken)
+				r.With(middleware.AdminOnly).Delete("/cloudflare/token", cloudflareH.DeleteToken)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/cloudflare", cloudflareH.DomainStatus)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/cloudflare/connect", cloudflareH.Connect)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/cloudflare/connect", cloudflareH.Disconnect)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/cloudflare/records", cloudflareH.Records)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/cloudflare/records", cloudflareH.CreateRecord)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/cloudflare/records/{rid}", cloudflareH.UpdateRecord)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/cloudflare/records/{rid}", cloudflareH.DeleteRecord)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/cloudflare/purge", cloudflareH.Purge)
 				// Merkezi DNS şablonu (admin) — domain eklerken + "Şablonu Uygula" bunu okur
 				r.With(middleware.BayiVeUstu).Get("/dns-template", dnsH.GetTemplate)
 				r.With(middleware.AdminOnly).Put("/dns-template", dnsH.PutTemplate)

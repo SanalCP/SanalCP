@@ -12,6 +12,8 @@
     "apps_desc": "1-tıkla kurulum · yönetim",
     "dns": "DNS Yönetimi",
     "dns_desc": "A, MX, TXT, CNAME kayıtları",
+    "cloudflare": "Cloudflare",
+    "cloudflare_desc": "DNS, proxy ve cache yönetimi",
     "subdomains": "Subdomainler",
     "subdomains_desc": "Alt alan adları",
     "addon_domains": "Ek Alan Adları",

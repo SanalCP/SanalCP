@@ -64,3 +64,6 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   yapısal DB dump doğrulaması, salt-okunur kurtarma kontrolü ve aylık geçici-DB
   restore tatbikatı eklendi. 2026-08-28 canlı kabulünde son yedek 47 tabloyla
   geçici DB'ye açıldı; tatbikat sonunda geçici şema kalmadığı doğrulandı.
+- **Faz 1 — tamamlandı (v0.9.28):** Şifreli ve doğrulanan Cloudflare API
+  token'ı, domain-zone eşleştirmesi, DNS kayıt CRUD'u, proxy aç/kapat ve tüm
+  zone cache'ini temizleme işlevleri eklendi.

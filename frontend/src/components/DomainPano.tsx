@@ -28,6 +28,7 @@ const ICONS = {
   subdomain: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064',
   ekdomain:  'M9 12h6m-6 4h3m-3-8h6M5 6h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z',
   dns:       'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
+  cloudflare:'M12 4a5 5 0 014.9 4H18a4 4 0 010 8H7a5 5 0 010-10c.4 0 .8 0 1.2.1A5 5 0 0112 4z',
   redis:     'M13 10V3L4 14h7v7l9-11h-7z',
   waf:       'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   erisim:    'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z',
@@ -60,6 +61,7 @@ export default function DomainPano({ domain }: { domain: Domain }) {
 
       <Grup baslik={t('DomainPano:groups.domain_dns')}>
         <ToolCard etiket={t('DomainPano:items.dns')}          aciklama={t('DomainPano:items.dns_desc')} ikon={ICONS.dns}       renk="sky"  onClick={git('dns')} />
+        <ToolCard etiket={t('DomainPano:items.cloudflare')} aciklama={t('DomainPano:items.cloudflare_desc')} ikon={ICONS.cloudflare} renk="amber" onClick={git('cloudflare')} />
         <ToolCard etiket={t('DomainPano:items.subdomains')}          aciklama={t('DomainPano:items.subdomains_desc')}   ikon={ICONS.subdomain} renk="teal" onClick={git('subdomainler')} />
         <ToolCard etiket={t('DomainPano:items.addon_domains')}        aciklama={t('DomainPano:items.addon_domains_desc')} ikon={ICONS.ekdomain} renk="indigo" onClick={git('ek-alanlar')} />
       </Grup>

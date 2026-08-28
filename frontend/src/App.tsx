@@ -29,6 +29,7 @@ const DomainIceAktarimPage = lazy(() => import('@/pages/DomainIceAktarimPage'))
 const DomainCronPage = lazy(() => import('@/pages/DomainCronPage'))
 const DomainLogsPage = lazy(() => import('@/pages/DomainLogsPage'))
 const DomainDNSPage = lazy(() => import('@/pages/DomainDNSPage'))
+const DomainCloudflarePage = lazy(() => import('@/pages/DomainCloudflarePage'))
 const RedisPage = lazy(() => import('@/pages/RedisPage'))
 const DomainConnectionPage = lazy(() => import('@/pages/DomainConnectionPage'))
 const DomainDatabasesPage = lazy(() => import('@/pages/DomainDatabasesPage'))
@@ -120,6 +121,7 @@ export default function App() {
         <Route path="abonelikler/:id/cron"          element={<DomainCronPage />} />
         <Route path="abonelikler/:id/gunlukler"     element={<DomainLogsPage />} />
         <Route path="abonelikler/:id/dns"           element={<DomainDNSPage />} />
+        <Route path="abonelikler/:id/cloudflare"    element={<DomainCloudflarePage />} />
         <Route path="abonelikler/:id/redis"         element={<RedisPage />} />
         <Route path="abonelikler/:id/mail"          element={<DomainMailPage />} />
         <Route path="abonelikler/:id/yedekler"      element={<DomainBackupsPage />} />

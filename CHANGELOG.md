@@ -13,6 +13,20 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.28** (2026-08-28)
+
+Cloudflare entegrasyonu eklendi. Yönetici Cloudflare API token'ını bağlantı
+doğrulamasından sonra AES-256-GCM ile şifreli saklayabilir. Domainler hesapta
+adı birebir eşleşen aktif zone'a bağlanabilir; Cloudflare DNS kayıtları
+listelenebilir, oluşturulabilir, güncellenebilir ve silinebilir. A/AAAA/CNAME
+kayıtlarında turuncu bulut proxy durumu yönetilebilir ve zone cache'i tek
+tıkla tamamen temizlenebilir.
+
+Token tarayıcıya geri gönderilmez. Domain işlemleri mevcut müşteri/bayi kapsam
+kontrolünden geçer ve kayıt uçları yalnız domain için sunucu tarafında saklanan
+zone kimliğini kullanır. Cloudflare API istemcisi için Bearer doğrulama, zone
+eşleme, hata mesajında token sızdırmama ve zone-sınırlı kayıt testleri eklendi.
+
 **0.9.27** (2026-08-28)
 
 Aylık kurtarma tatbikatı servisinin systemd sandbox'ı, `nginx -t` komutunun
