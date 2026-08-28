@@ -334,31 +334,60 @@ RCEOF
   ok "$(t "webmail SMTP ayarı onarıldı (giden e-posta kimlik doğrulaması)" "webmail SMTP settings repaired (outgoing mail authentication)")"
 fi
 
-# 10b) Disk quota (XFS user quota) GRUB config — 🔴 LIVE SERVER: DO NOT AUTO-REBOOT.
-# If root fs is XFS with `noquota`, idempotently write `rootflags=uquota` to
-# /etc/default/grub; the quota can only be enabled at MOUNT time (reboot). The operator
-# schedules the reboot → leave a sentinel file + a clear warning. HealKotaOnStartup (at
-# panel boot) applies limits itself once fs quota is active.
+# 10b) Disk quota GRUB config — 🔴 LIVE SERVER: DO NOT AUTO-REBOOT.
+# XFS needs rootflags=uquota, ext2/3/4 needs rootflags=usrquota. `grubby` is run
+# on EVERY repair while quota is inactive: /etc/default/grub may already carry
+# the flag while a newly installed BLS kernel entry does not (seen live on EL10).
 command -v quota >/dev/null 2>&1 || pkg_kur "$(paket_ad kota-ext)" "$(paket_ad kota-xfs)" || true
 QROOTFS=$(findmnt -no FSTYPE / 2>/dev/null || echo "")
 QROOTOPTS=$(findmnt -no OPTIONS / 2>/dev/null || echo "")
 QSENTINEL=/etc/sanalcp/reboot-required-quota
-if [ "$QROOTFS" = "xfs" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|quota'; then  # sigpipe-ok: echo builtin
-  if ! grep -q 'rootflags=uquota' /etc/default/grub 2>/dev/null; then
+case "$QROOTFS" in
+  xfs) QFLAG=rootflags=uquota ;;
+  ext2|ext3|ext4) QFLAG=rootflags=usrquota ;;
+  *) QFLAG= ;;
+esac
+if [ -n "$QFLAG" ] && ! echo "$QROOTOPTS" | grep -qwE 'usrquota|uquota|quota'; then  # sigpipe-ok: echo builtin
+  if ! grep -q "$QFLAG" /etc/default/grub 2>/dev/null; then
     if grep -q '^GRUB_CMDLINE_LINUX=' /etc/default/grub 2>/dev/null; then
-      sed -i 's/^\(GRUB_CMDLINE_LINUX="[^"]*\)"/\1 rootflags=uquota"/' /etc/default/grub
+      sed -i "s/^\(GRUB_CMDLINE_LINUX=\"[^\"]*\)\"/\1 $QFLAG\"/" /etc/default/grub
     else
-      echo 'GRUB_CMDLINE_LINUX="rootflags=uquota"' >> /etc/default/grub
+      echo "GRUB_CMDLINE_LINUX=\"$QFLAG\"" >> /etc/default/grub
     fi
-    command -v grubby >/dev/null 2>&1 && grubby --update-kernel=ALL --args="rootflags=uquota" >/dev/null 2>&1 || true
-    grub2-mkconfig -o /boot/grub2/grub.cfg >/dev/null 2>&1 || true
-    for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
   fi
+  command -v grubby >/dev/null 2>&1 && grubby --update-kernel=ALL --args="$QFLAG" >/dev/null 2>&1 || true
+  command -v grub2-mkconfig >/dev/null 2>&1 && grub2-mkconfig -o /boot/grub2/grub.cfg >/dev/null 2>&1 || true
+  for cfg in /boot/efi/EFI/*/grub.cfg; do [ -f "$cfg" ] && grub2-mkconfig -o "$cfg" >/dev/null 2>&1 || true; done
   mkdir -p /etc/sanalcp
-  echo "$(t "rootflags=uquota GRUB'a yazildi" "rootflags=uquota written to GRUB") $(date -Is 2>/dev/null) — $(t "reboot bekleniyor" "reboot pending")" > "$QSENTINEL" 2>/dev/null || true
+  echo "$QFLAG $(t "GRUB'a yazildi" "written to GRUB") $(date -Is 2>/dev/null) — $(t "reboot bekleniyor" "reboot pending")" > "$QSENTINEL" 2>/dev/null || true
   warn "$(t "🔴 Disk kotası GRUB'a yazıldı — AKTİF olması için tek seferlik REBOOT gerekli (canlı sunucuda operatör zamanlar). OTO-REBOOT YAPILMADI." "🔴 Disk quota was written to GRUB — needs a ONE-TIME REBOOT to become active (the operator schedules this on a live server). NO AUTO-REBOOT was performed.")"
-elif [ "$QROOTFS" = "xfs" ]; then
+elif [ -n "$QFLAG" ]; then
   [ -f "$QSENTINEL" ] && rm -f "$QSENTINEL" 2>/dev/null && ok "$(t "disk kotası aktif — reboot sentinel temizlendi" "disk quota active — reboot sentinel cleared")" || ok "$(t "disk kotası aktif (kök XFS user quota)" "disk quota active (root XFS user quota)")"
+fi
+
+# ext kotasında quotaon her açılışta çalışmalıdır. Bu birimi updater da yazar;
+# eski kurulumlar tam installer yeniden çalıştırmadan kendini onarabilsin.
+QEXT=0
+case "$QROOTFS" in ext2|ext3|ext4) QEXT=1 ;; esac
+if [ "$QEXT" = 1 ] && command -v quotacheck >/dev/null 2>&1; then
+  cat > /etc/systemd/system/sanalcp-quotacheck.service <<'QCEOF'
+[Unit]
+Description=SanalCP — ext quota accounting files (once) + enforcement (every boot)
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/sbin/modprobe quota_v2
+ExecStart=/bin/sh -c '[ -f /aquota.user ] || /usr/sbin/quotacheck -cum /'
+ExecStart=/bin/sh -c '/usr/sbin/quotaon -u / 2>/dev/null || true'
+
+[Install]
+WantedBy=local-fs.target
+QCEOF
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable sanalcp-quotacheck.service >/dev/null 2>&1 || true
 fi
 
 # 10c) Shell history hardening — the panel login IS the server's root password, so

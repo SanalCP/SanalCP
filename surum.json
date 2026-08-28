@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.24",
-  "duyuru": "Sunucu Bakımı bölümündeki 15 kart, üçlü satırlar halinde yeşil, mavi, amber, mor ve gül renkleriyle gruplandırıldı; koyu tema renkleri de eklendi.",
+  "son_surum": "0.9.25",
+  "duyuru": "Güncelleme betiğinin ext4 disk kotası onarımı tamamlandı. Yeni BLS kernel kayıtlarında kaybolan rootflags=usrquota parametresi artık tüm kernel kayıtlarına yeniden uygulanıyor ve quotaon servisi eski kurulumlarda otomatik kuruluyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

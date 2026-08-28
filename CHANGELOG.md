@@ -13,6 +13,14 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.25** (2026-08-28)
+
+Güncelleme betiğinin disk kotası onarımı ext2/3/4 sistemlerini de kapsayacak
+şekilde düzeltildi. `/etc/default/grub` doğru olsa bile yeni bir BLS kernel
+kaydında eksik kalabilen `rootflags=usrquota` artık tüm kernel kayıtlarına
+yeniden uygulanır. Eski ext kurulumlar için kalıcı `quotacheck + quotaon`
+systemd birimi de updater tarafından oluşturulup etkinleştirilir.
+
 **0.9.24** (2026-08-28)
 
 Sunucu Bakımı bölümündeki 15 kart, üçlü satırlar halinde beş ayrı renk
