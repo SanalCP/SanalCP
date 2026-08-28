@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.23",
-  "duyuru": "Swap bulunmayan sunucularda Sunucu Ayarları sayfasının beyaz ekranda kalmasına neden olan boş kaynak listesi hatası giderildi.",
+  "son_surum": "0.9.24",
+  "duyuru": "Sunucu Bakımı bölümündeki 15 kart, üçlü satırlar halinde yeşil, mavi, amber, mor ve gül renkleriyle gruplandırıldı; koyu tema renkleri de eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

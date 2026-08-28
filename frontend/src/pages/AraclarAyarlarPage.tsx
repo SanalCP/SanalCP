@@ -223,7 +223,7 @@ export default function AraclarAyarlarPage() {
             {t('AraclarAyarlarPage:section_maintenance')}
           </h2>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="sunucu-bakim-grid grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <PanelGuncelleme />
           <HostnameAyari />
           <SunucuSaatiAyari />

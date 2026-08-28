@@ -13,6 +13,12 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.24** (2026-08-28)
+
+Sunucu Bakımı bölümündeki 15 kart, üçlü satırlar halinde beş ayrı renk
+ailesiyle gruplandırıldı. Açık ve koyu tema için yeşil, mavi, amber, mor ve
+gül tonları eklendi.
+
 **0.9.23** (2026-08-28)
 
 Swap bulunmayan sunucularda boş kaynak listesinin `null` dönmesi nedeniyle

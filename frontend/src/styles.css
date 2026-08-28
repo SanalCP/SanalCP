@@ -169,6 +169,49 @@ html.dark ::-webkit-scrollbar-track { background: #1e293b; }
 html.dark ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
 html.dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
+/* Sunucu bakımı kartları masaüstünde üçlü satırlar oluşturur. Her üçlü aynı
+   renk ailesini kullanır; dar ekranlarda sıra değişmeden aynı grup korunur. */
+.sunucu-bakim-grid > :nth-child(-n+3) {
+  background-color: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.sunucu-bakim-grid > :nth-child(n+4):nth-child(-n+6) {
+  background-color: #f0f9ff;
+  border-color: #bae6fd;
+}
+.sunucu-bakim-grid > :nth-child(n+7):nth-child(-n+9) {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+}
+.sunucu-bakim-grid > :nth-child(n+10):nth-child(-n+12) {
+  background-color: #f5f3ff;
+  border-color: #ddd6fe;
+}
+.sunucu-bakim-grid > :nth-child(n+13):nth-child(-n+15) {
+  background-color: #fff1f2;
+  border-color: #fecdd3;
+}
+.dark .sunucu-bakim-grid > :nth-child(-n+3) {
+  background-color: rgb(6 78 59 / 0.22);
+  border-color: rgb(6 95 70 / 0.7);
+}
+.dark .sunucu-bakim-grid > :nth-child(n+4):nth-child(-n+6) {
+  background-color: rgb(12 74 110 / 0.22);
+  border-color: rgb(7 89 133 / 0.7);
+}
+.dark .sunucu-bakim-grid > :nth-child(n+7):nth-child(-n+9) {
+  background-color: rgb(120 53 15 / 0.22);
+  border-color: rgb(146 64 14 / 0.7);
+}
+.dark .sunucu-bakim-grid > :nth-child(n+10):nth-child(-n+12) {
+  background-color: rgb(76 29 149 / 0.22);
+  border-color: rgb(91 33 182 / 0.7);
+}
+.dark .sunucu-bakim-grid > :nth-child(n+13):nth-child(-n+15) {
+  background-color: rgb(136 19 55 / 0.22);
+  border-color: rgb(159 18 57 / 0.7);
+}
+
 /* Duyarli tablo etiketleri (bkz. src/lib/tablo.ts).
    Tailwind-in content-[attr(...)] yardimcisi calismaz: content-i
    var(--tw-content) uzerinden verir, attr() ise custom property icinde
