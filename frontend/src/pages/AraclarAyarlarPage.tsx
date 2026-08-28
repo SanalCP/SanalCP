@@ -16,6 +16,7 @@ import SSHPortUyarisi from '@/components/SSHPortUyarisi'
 import OturumBostaAyari from '@/components/OturumBostaAyari'
 import RootGirisiAyari from '@/components/RootGirisiAyari'
 import LisansBilgisi from '@/components/LisansBilgisi'
+import SunucuSaatiAyari from '@/components/SunucuSaatiAyari'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -224,6 +225,7 @@ export default function AraclarAyarlarPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <PanelGuncelleme />
           <HostnameAyari />
+          <SunucuSaatiAyari />
           <PanelDomain />
           <NameserverAyari />
           <SunucuOptimize />

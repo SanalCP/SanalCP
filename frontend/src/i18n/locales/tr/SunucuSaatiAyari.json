@@ -1,0 +1,15 @@
+{
+  "title": "Sunucu Saati",
+  "desc": "Saat dilimini ve otomatik NTP senkronizasyonunu yönetin.",
+  "local": "Yerel",
+  "utc": "UTC",
+  "ntp": "Otomatik saat eşitleme (NTP)",
+  "synced": "Senkron",
+  "not_synced": "Senkron değil",
+  "save": "Uygula",
+  "saving": "Uygulanıyor…",
+  "refresh": "Yenile",
+  "saved": "Saat ayarları kaydedildi",
+  "load_failed": "Saat bilgisi alınamadı",
+  "save_failed": "Saat ayarları uygulanamadı"
+}

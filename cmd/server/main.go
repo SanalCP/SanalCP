@@ -394,6 +394,8 @@ func main() {
 			r.With(middleware.AdminOnly).Post("/system/kapat", system.Kapat)
 			r.With(middleware.AdminOnly).Get("/system/hostname", system.HostnameDurum)
 			r.With(middleware.AdminOnly).Put("/system/hostname", system.HostnameKaydet)
+			r.With(middleware.AdminOnly).Get("/system/saat", system.SaatDurum)
+			r.With(middleware.AdminOnly).Put("/system/saat", system.SaatKaydet)
 			r.With(middleware.AdminOnly).Get("/system/panel-domain", panelAyarH.Durum)
 			r.With(middleware.AdminOnly).Post("/system/panel-domain", panelAyarH.Kaydet)
 			r.With(middleware.AdminOnly).Delete("/system/panel-domain", panelAyarH.Kaldir)

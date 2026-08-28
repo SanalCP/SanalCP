@@ -1,0 +1,15 @@
+{
+  "title": "Server Time",
+  "desc": "Manage the system timezone and automatic NTP synchronization.",
+  "local": "Local",
+  "utc": "UTC",
+  "ntp": "Automatic time synchronization (NTP)",
+  "synced": "Synchronized",
+  "not_synced": "Not synchronized",
+  "save": "Apply",
+  "saving": "Applying…",
+  "refresh": "Refresh",
+  "saved": "Time settings saved",
+  "load_failed": "Could not load time information",
+  "save_failed": "Could not apply time settings"
+}

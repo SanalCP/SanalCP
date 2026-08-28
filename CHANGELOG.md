@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.20** (2026-08-28)
+
+`Araçlar ve Ayarlar → Sunucu bakımı` bölümüne **Sunucu Saati** kartı eklendi.
+Kart yerel ve UTC saati, etkin saat dilimini ve NTP senkronizasyon durumunu
+gösterir. Yönetici, sistemin desteklediği saat dilimleri arasından seçim yapabilir
+ve otomatik NTP eşitlemesini açıp kapatabilir. Saat dilimi yalnız
+`timedatectl list-timezones` çıktısına göre doğrulanır; NTP uygulaması başarısız
+olursa önceki saat dilimi geri yüklenir. Manuel saat girişi güvenlik ve zaman
+tutarlılığı nedeniyle sunulmaz.
+
 **0.9.19** (2026-08-27)
 
 Yeni domain oluşturma akışına **Reverse Proxy** site tipi eklendi:
