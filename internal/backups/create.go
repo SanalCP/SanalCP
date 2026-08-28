@@ -108,10 +108,17 @@ func CreateRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, doma
 	if err != nil {
 		return "", 0, err
 	}
-	if _, err = db.ExecContext(ctx, `INSERT INTO backups(domain_id,tip,dosya,boyut_b,notlar) VALUES(?, 'tam', ?, ?, ?)`, domainID, name, size, note); err != nil {
+	proof, err := verifyArchive(ctx, abs, domain, sk)
+	if err != nil {
+		_ = os.Remove(abs)
+		return "", 0, fmt.Errorf("kurtarma noktası doğrulanamadı: %w", err)
+	}
+	res, err := db.ExecContext(ctx, `INSERT INTO backups(domain_id,tip,dosya,boyut_b,notlar,dogrulama_durum,dogrulama_hata,dogrulama_sha256,dogrulama_zamani) VALUES(?, 'tam', ?, ?, ?,'dogrulandi',?,?,NOW())`, domainID, name, size, note, proof.Detail, proof.SHA256)
+	if err != nil {
 		_ = os.Remove(abs)
 		return "", 0, err
 	}
+	_, _ = res.LastInsertId()
 	return name, size, nil
 }
 

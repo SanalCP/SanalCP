@@ -691,6 +691,7 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backups/{bid}/indir", backupsH.Download)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/backups/{bid}", backupsH.Delete)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/backups/{bid}/geriyukle", backupsH.Restore)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/backups/{bid}/dogrula", backupsH.Verify)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-schedule", backupsH.GetSchedule)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-schedule", backupsH.SetSchedule)
 				r.With(middleware.AdminOnly).Post("/admin/backups/tick", backupsH.TickNow)

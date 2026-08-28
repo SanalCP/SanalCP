@@ -100,6 +100,7 @@
     "file": "File",
     "type": "Type",
     "remote_copy": "Remote copy",
+    "verification": "Verification",
     "size": "Size",
     "created": "Created"
   },
@@ -109,6 +110,15 @@
     "ok": "✓ Remote",
     "uploading": "↑ Uploading",
     "error": "✗ Error"
+  },
+  "verification": {
+    "verified": "Verified",
+    "failed_short": "Failed",
+    "verifying": "Verifying",
+    "pending": "Pending",
+    "button": "Verify",
+    "completed": "Backup integrity and restore-readiness verified.",
+    "failed": "Backup verification failed; restore was blocked for safety."
   },
   "download": "Download",
   "restore_button": "↺ Restore",

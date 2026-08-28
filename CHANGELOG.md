@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.32** (2026-08-28)
+
+Domain yedekleri için doğrulanmış felaket kurtarma katmanı eklendi. Yeni
+yedekler güvenli arşiv çıkarma, manifest/domain eşleşmesi, dosya ağacı ve
+SHA-256 bütünlüğüyle doğrulanır; SQL dump'ları yalnız rastgele geçici şemaya
+yetkili tek kullanımlık MariaDB hesabıyla gerçekten geri yüklenir. En yeni
+yedekler periyodik olarak yeniden sınanır. Panel doğrulama durumunu, zamanı ve
+hata ayrıntısını gösterir. Her geri yükleme öncesinde aynı kanıt tekrar üretilir;
+özet değişmiş veya yedek bozuksa işlem fail-closed engellenir. Yıkıcı iç
+işlemlerin kurtarma noktaları doğrulanmadan işlem başlamaz.
+
 **0.9.31** (2026-08-28)
 
 PrestaShop operasyon araç seti eklendi. Panel kurulu mağazayı güvenli biçimde

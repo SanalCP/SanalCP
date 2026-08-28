@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
@@ -76,13 +77,13 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
 
-	var sk, dosya, alanAdi, uzakDurum string
+	var sk, dosya, alanAdi, uzakDurum, dogrulamaSHA string
 	var isDemo int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT d.sistem_kullanici, d.alan_adi, d.is_demo, b.dosya, b.uzak_durum
+		`SELECT d.sistem_kullanici, d.alan_adi, d.is_demo, b.dosya, b.uzak_durum, b.dogrulama_sha256
 		 FROM backups b JOIN domains d ON d.id=b.domain_id
 		 WHERE b.id=? AND b.domain_id=?`, bid, id).
-		Scan(&sk, &alanAdi, &isDemo, &dosya, &uzakDurum)
+		Scan(&sk, &alanAdi, &isDemo, &dosya, &uzakDurum, &dogrulamaSHA)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
 		return
@@ -120,6 +121,14 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 	abs, err := ensureLocalBackup(r.Context(), h.DB, id, sk, dosya, uzakDurum)
 	if err != nil {
 		httpx.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	// Fail closed: every restore re-verifies the exact bytes immediately before
+	// extraction, catching corruption that happened after an earlier proof.
+	verifyCtx, verifyCancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer verifyCancel()
+	if err := verifyAndRecordExpected(verifyCtx, h.DB, bid, id, alanAdi, sk, abs, dogrulamaSHA); err != nil {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "geri yükleme engellendi; yedek doğrulanamadı: "+err.Error())
 		return
 	}
 	tmpDir, err := os.MkdirTemp("", "sanal-restore-*")

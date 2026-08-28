@@ -2,6 +2,7 @@
 package backups
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -50,15 +51,19 @@ func RemoveDomainBackups(sk string) error {
 }
 
 type Yedek struct {
-	ID        int64  `json:"id"`
-	DomainID  int64  `json:"domain_id"`
-	Tip       string `json:"tip"`
-	Dosya     string `json:"dosya"`
-	BoyutB    int64  `json:"boyut_b"`
-	Notlar    string `json:"notlar"`
-	Olusturma string `json:"olusturma"`
-	UzakDurum string `json:"uzak_durum"`
-	UzakHata  string `json:"uzak_hata,omitempty"`
+	ID              int64  `json:"id"`
+	DomainID        int64  `json:"domain_id"`
+	Tip             string `json:"tip"`
+	Dosya           string `json:"dosya"`
+	BoyutB          int64  `json:"boyut_b"`
+	Notlar          string `json:"notlar"`
+	Olusturma       string `json:"olusturma"`
+	UzakDurum       string `json:"uzak_durum"`
+	UzakHata        string `json:"uzak_hata,omitempty"`
+	DogrulamaDurum  string `json:"dogrulama_durum"`
+	DogrulamaHata   string `json:"dogrulama_hata,omitempty"`
+	DogrulamaSHA256 string `json:"dogrulama_sha256,omitempty"`
+	DogrulamaZamani string `json:"dogrulama_zamani,omitempty"`
 }
 
 type Handlers struct {
@@ -79,7 +84,9 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	rows, err := h.DB.QueryContext(r.Context(),
 		`SELECT id, domain_id, tip, dosya, boyut_b, notlar,
-		        DATE_FORMAT(created_at,'%Y-%m-%d %H:%i'), uzak_durum, uzak_hata
+		        DATE_FORMAT(created_at,'%Y-%m-%d %H:%i'), uzak_durum, uzak_hata,
+		        dogrulama_durum, dogrulama_hata, dogrulama_sha256,
+		        COALESCE(DATE_FORMAT(dogrulama_zamani,'%Y-%m-%d %H:%i'),'')
 		 FROM backups WHERE domain_id=? ORDER BY id DESC`, id)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
@@ -90,7 +97,8 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var y Yedek
 		if err := rows.Scan(&y.ID, &y.DomainID, &y.Tip, &y.Dosya, &y.BoyutB,
-			&y.Notlar, &y.Olusturma, &y.UzakDurum, &y.UzakHata); err == nil {
+			&y.Notlar, &y.Olusturma, &y.UzakDurum, &y.UzakHata, &y.DogrulamaDurum,
+			&y.DogrulamaHata, &y.DogrulamaSHA256, &y.DogrulamaZamani); err == nil {
 			out = append(out, y)
 		}
 	}
@@ -272,6 +280,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	yid, _ := res.LastInsertId()
+	startVerification(h.DB, yid, id, alanAdi, sk, abs)
 	// Uzak hedef varsa arkaplanda yükle (API cevabını bloke etme)
 	pushToDestinationAsync(h.DB, id, yid, abs, dosya)
 
@@ -351,4 +360,28 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.FormatInt(st.Size(), 10))
 	}
 	_, _ = io.Copy(w, f)
+}
+
+// Verify refreshes the restore-readiness proof for a local or remote backup.
+func (h *Handlers) Verify(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
+	var domain, sk, dosya, uzak string
+	err := h.DB.QueryRowContext(r.Context(), `SELECT d.alan_adi,d.sistem_kullanici,b.dosya,b.uzak_durum FROM backups b JOIN domains d ON d.id=b.domain_id WHERE b.id=? AND b.domain_id=?`, bid, id).Scan(&domain, &sk, &dosya, &uzak)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "yedek bulunamadı")
+		return
+	}
+	abs, err := ensureLocalBackup(r.Context(), h.DB, id, sk, dosya, uzak)
+	if err != nil {
+		httpx.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	if err = verifyAndRecord(ctx, h.DB, bid, id, domain, sk, abs); err != nil {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "yedek doğrulanamadı: "+err.Error())
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "durum": "dogrulandi"})
 }

@@ -75,6 +75,11 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   düşük yetkili mağaza DB hesabıyla bakım modu yönetimi, güvenli cache temizliği,
   symlink-jail korumalı log görüntüleme ve bakım değişiklikleri öncesinde zorunlu
   tam kurtarma noktası eklendi.
+- **Faz 4 — tamamlandı (v0.9.32):** Domain yedekleri SHA-256, güvenli çıkarma,
+  manifest/dosya ağacı kontrolü ve izole geçici MariaDB şemasına gerçek restore
+  tatbikatıyla doğrulanır. Durum, zaman ve hata panelde görünür; en yeni yedekler
+  periyodik yeniden sınanır ve doğrulanamayan/değişmiş yedeğin geri yüklenmesi
+  fail-closed engellenir.
 - **Taşıma altyapısı ara teslimatı (v0.9.30):** Mevcut genel Web Sitesi İçe
   Aktarım aracı kalıcı arka plan işleri, canlı ilerleme/geçmiş, işlem öncesi
   zorunlu kurtarma noktası, hata halinde dosya/DB otomatik rollback ve aktarım

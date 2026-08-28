@@ -42,6 +42,15 @@ func gecerliFreq(f string) bool {
 // Her saatin başında (~ +60s offset) due olanları tarayıp yedekler.
 func StartScheduler(db *sql.DB) {
 	go func() {
+		time.Sleep(5 * time.Minute)
+		verifyLatestBackups(db)
+		t := time.NewTicker(24 * time.Hour)
+		defer t.Stop()
+		for range t.C {
+			verifyLatestBackups(db)
+		}
+	}()
+	go func() {
 		// İlk run: panel başladıktan 2 dakika sonra (warmup)
 		time.Sleep(2 * time.Minute)
 		tickOnce(db)
@@ -165,6 +174,7 @@ func runOneBackup(db *sql.DB, d dueDomain, notlar string) error {
 		return fmt.Errorf("DB kayıt: %w", err)
 	}
 	backupID, _ := res.LastInsertId()
+	startVerification(db, backupID, d.ID, d.AlanAdi, d.SK, abs)
 	if _, err := db.Exec(`UPDATE domains SET last_backup_at=NOW() WHERE id=?`, d.ID); err != nil {
 		log.Printf("last_backup_at güncellenemedi: %v", err)
 	}

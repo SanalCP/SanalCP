@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.31",
-  "duyuru": "PrestaShop operasyon araçları eklendi: sağlık özeti, bakım modu, güvenli cache temizliği, günlükler ve kurtarma noktaları.",
+  "son_surum": "0.9.32",
+  "duyuru": "Yedek doğrulama ve felaket kurtarma eklendi: SHA-256, güvenli açma, geçici veritabanına gerçek restore tatbikatı ve fail-closed geri yükleme.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

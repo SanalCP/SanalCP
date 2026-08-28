@@ -10,7 +10,7 @@ import Modal from '@/components/Modal'
 import { T } from '@/lib/tablo'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
-type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string }
+type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string; dogrulama_durum: string; dogrulama_hata?: string; dogrulama_sha256?: string; dogrulama_zamani?: string }
 type DB = { db_name: string }
 type RestoreScope = 'full' | 'files' | 'file' | 'database' | 'email'
 type Schedule = {
@@ -195,6 +195,16 @@ export default function DomainBackupsPage() {
     } finally {
       setIsleniyor(false)
     }
+  }
+
+  async function dogrula(y: Yedek) {
+    setIsleniyor(true); setHata(null); setBasari(null)
+    try {
+      await api.post(`/domains/${id}/backups/${y.id}/dogrula`)
+      setBasari(t('DomainBackupsPage:verification.completed'))
+      yukle()
+    } catch (e) { setHata(apiHata(e, t('DomainBackupsPage:verification.failed'))) }
+    finally { setIsleniyor(false) }
   }
 
   function indir(y: Yedek) {
@@ -471,6 +481,7 @@ export default function DomainBackupsPage() {
               <th className={T.baslik}>{t('DomainBackupsPage:table.file')}</th>
               <th className={T.baslik}>{t('DomainBackupsPage:table.type')}</th>
               <th className={T.baslik}>{t('DomainBackupsPage:table.remote_copy')}</th>
+              <th className={T.baslik}>{t('DomainBackupsPage:table.verification')}</th>
               <th className={T.baslik}>{t('DomainBackupsPage:table.size')}</th>
               <th className={T.baslik}>{t('DomainBackupsPage:table.created')}</th>
               <th className={`${T.baslik} text-right`}>{t('common:actions')}</th>
@@ -491,9 +502,19 @@ export default function DomainBackupsPage() {
                    y.uzak_durum === 'yukleniyor' ? <span className="text-xs text-sky-600 dark:text-sky-400">{t('DomainBackupsPage:remote_status.uploading')}</span> :
                    <span title={y.uzak_hata} className="text-xs text-red-600 dark:text-red-400">{t('DomainBackupsPage:remote_status.error')}</span>}
                 </td>
+                <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.verification')}>
+                  <div title={y.dogrulama_hata || y.dogrulama_sha256} className="text-xs">
+                    {y.dogrulama_durum === 'dogrulandi' ? <span className="text-emerald-600 dark:text-emerald-400">✓ {t('DomainBackupsPage:verification.verified')}</span> :
+                     y.dogrulama_durum === 'basarisiz' ? <span className="text-red-600 dark:text-red-400">✗ {t('DomainBackupsPage:verification.failed_short')}</span> :
+                     y.dogrulama_durum === 'dogrulaniyor' ? <span className="text-sky-600 dark:text-sky-400">◌ {t('DomainBackupsPage:verification.verifying')}</span> :
+                     <span className="text-amber-600 dark:text-amber-400">○ {t('DomainBackupsPage:verification.pending')}</span>}
+                    {y.dogrulama_zamani && <div className="text-[10px] text-slate-400 mt-0.5">{y.dogrulama_zamani}</div>}
+                  </div>
+                </td>
                 <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.size')}><span className="font-mono text-sm text-slate-600 dark:text-slate-400">{formatBoyut(y.boyut_b)}</span></td>
                 <td className={T.hucre} data-etiket={t('DomainBackupsPage:table.created')}><span className="text-sm text-slate-600 dark:text-slate-400">{y.olusturma}</span></td>
                 <td className={T.hucreAksiyon}>
+                  <button disabled={isleniyor} onClick={() => dogrula(y)} className="text-sm text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 px-2 py-1 rounded disabled:opacity-50">{t('DomainBackupsPage:verification.button')}</button>
                   <button onClick={() => indir(y)} className="text-sm text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/30 dark:bg-brand-900/20 px-2 py-1 rounded">{t('DomainBackupsPage:download')}</button>
                   <button onClick={() => setGeriYukle(y)} className="text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 dark:bg-amber-900/20 px-2 py-1 rounded">{t('DomainBackupsPage:restore_button')}</button>
                   <button onClick={() => setSilinecek(y)} className="text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 dark:bg-red-900/20 px-2 py-1 rounded">{t('common:delete')}</button>
