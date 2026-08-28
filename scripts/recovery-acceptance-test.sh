@@ -58,6 +58,14 @@ cat > "$MOCKBIN/mysql" <<EOF
 #!/usr/bin/env bash
 cat > '$STATE/mysql-input.sql'
 EOF
+# GitHub Actions runner'ı root değildir. Test gerçek /opt, systemd veya MariaDB'ye
+# dokunmadığı hâlde restore'un üretim root kapısı doğal olarak erken çıkardı.
+# Yalnız izole PATH içinde `id -u`yu root gibi göster; diğer id çağrılarını gerçek
+# binary'ye geçir.
+cat > "$MOCKBIN/id" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-u" ]; then echo 0; else exec /usr/bin/id "$@"; fi
+EOF
 chmod +x "$MOCKBIN"/*
 
 set +e
