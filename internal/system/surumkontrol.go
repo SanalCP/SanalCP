@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -296,6 +297,57 @@ func surumOnbellekGuvenilirMi(onbellekMevcut, suankiMevcut string) bool {
 	return onbellekMevcut == suankiMevcut
 }
 
+// surumDahaYeniMi yalnız noktayla ayrılmış sayısal sürümleri sıralar. Baştaki
+// "v" kabul edilir. Serbest biçimli/çözümlenemeyen etiketlerde yanlış bir
+// güncelleme bildirimi göstermek yerine güvenli biçimde false döner.
+func surumDahaYeniMi(uzak, mevcut string) bool {
+	parse := func(v string) ([]int, bool) {
+		v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+		// Build/prerelease eki sayısal çekirdeğin sıralamasını bozmamalı.
+		if i := strings.IndexAny(v, "-+"); i >= 0 {
+			v = v[:i]
+		}
+		parcalar := strings.Split(v, ".")
+		if len(parcalar) < 2 {
+			return nil, false
+		}
+		sayilar := make([]int, len(parcalar))
+		for i, p := range parcalar {
+			if p == "" {
+				return nil, false
+			}
+			n, err := strconv.Atoi(p)
+			if err != nil || n < 0 {
+				return nil, false
+			}
+			sayilar[i] = n
+		}
+		return sayilar, true
+	}
+	u, okU := parse(uzak)
+	m, okM := parse(mevcut)
+	if !okU || !okM {
+		return false
+	}
+	n := len(u)
+	if len(m) > n {
+		n = len(m)
+	}
+	for i := 0; i < n; i++ {
+		uv, mv := 0, 0
+		if i < len(u) {
+			uv = u[i]
+		}
+		if i < len(m) {
+			mv = m[i]
+		}
+		if uv != mv {
+			return uv > mv
+		}
+	}
+	return false
+}
+
 // SurumKontrolYenile — operatör "şimdi kontrol et" derse. Kapalıysa istek atmaz.
 func SurumKontrolYenile(w http.ResponseWriter, r *http.Request) {
 	if !surumKontrolAcikMi() {
@@ -316,11 +368,10 @@ func SurumKontrolDurum(w http.ResponseWriter, r *http.Request) {
 	buildTarihi := surumBuildTarihi
 	surumMu.RUnlock()
 
-	// Kasıtlı olarak SADECE eşitlik kıyası: sürüm etiketleri "0.3.0-f2" gibi
-	// serbest biçimli; semver sıralaması yanlış pozitif üretir. Farklıysa
-	// "yeni sürüm var" deriz — dev makinede ileri sürüm çalıştıran operatör
-	// için yanıltıcı olabilir, bilinçli kabul.
-	guncellemeVar := acik && y.SonSurum != "" && y.SonSurum != mevcut
+	// Yalnız uzaktaki sayısal sürüm gerçekten daha yüksekse bildirim göster.
+	// Böylece manifest yanlışlıkla geride kalırsa (kurulu 0.9.19, manifest
+	// 0.9.18) eski sürüm "yeni" diye sunulmaz.
+	guncellemeVar := acik && surumDahaYeniMi(y.SonSurum, mevcut)
 
 	cevap := map[string]any{
 		"acik":           acik,

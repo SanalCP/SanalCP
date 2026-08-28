@@ -44,6 +44,25 @@ func TestSurumOnbellekGuvenilirMi(t *testing.T) {
 	}
 }
 
+func TestSurumDahaYeniMi(t *testing.T) {
+	testler := []struct {
+		uzak, mevcut string
+		yeni         bool
+	}{
+		{"0.9.20", "0.9.19", true},
+		{"v0.10.0", "0.9.19", true},
+		{"0.9.19", "0.9.19", false},
+		{"0.9.18", "0.9.19", false}, // canlıda görülen ters bildirim
+		{"0.9.19", "0.9.19.1", false},
+		{"bozuk", "0.9.19", false},
+	}
+	for _, tc := range testler {
+		if got := surumDahaYeniMi(tc.uzak, tc.mevcut); got != tc.yeni {
+			t.Errorf("surumDahaYeniMi(%q,%q)=%v, want %v", tc.uzak, tc.mevcut, got, tc.yeni)
+		}
+	}
+}
+
 // TestSurumKontrolDurumKurulumKimligiIcerir — kurulum_kimlik'in rol kısıtlı
 // (BayiVeUstu, bkz. cmd/server/main.go) /system/surum-kontrol yanıtında
 // bulunduğunu doğrular. Önceden bu alan rol kısıtı OLMAYAN /system/surum'da
