@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.29",
-  "duyuru": "Ayrı Linux kullanıcısı ve veritabanıyla gerçek staging ortamı, seçmeli canlıya gönderim ve işlem öncesi otomatik kurtarma yedeği eklendi.",
+  "son_surum": "0.9.30",
+  "duyuru": "Web sitesi içe aktarma işlemleri arka plan işlerine taşındı; ilerleme geçmişi, zorunlu kurtarma noktası, otomatik rollback ve sağlık kontrolü eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

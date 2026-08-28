@@ -1,6 +1,7 @@
 package backups
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,47 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// RestoreRecoveryArchive restores a recovery point created by
+// CreateRecoveryArchive. It is used by internal transactional workflows after
+// a failed destructive operation; the archive is panel-generated and its
+// database names are still restricted to the requested domain.
+func RestoreRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, sk, archive, scope, database string) error {
+	if !adlar.SKGecerli(sk) {
+		return fmt.Errorf("güvensiz sistem kullanıcısı")
+	}
+	tmpDir, err := os.MkdirTemp("", "sanal-recovery-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpDir)
+	_, _ = exec.Command("chown", sk+":"+sk, tmpDir).CombinedOutput()
+	if out, e := archivex.GuvenliCikar(archive, tmpDir, sk); e != nil {
+		return fmt.Errorf("kurtarma arşivi açılamadı: %s: %w", strings.TrimSpace(out), e)
+	}
+	extracted := filepath.Join(tmpDir, sk)
+	switch scope {
+	case "files":
+		return restoreTree(filepath.Join(extracted, "public_html"), "public_html", sk, true)
+	case "home":
+		return restoreTree(extracted, "", sk, true)
+	case "database":
+		if !mysqlNameRE.MatchString(database) {
+			return fmt.Errorf("geçersiz veritabanı")
+		}
+		var n int
+		if e := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM db_accounts WHERE domain_id=? AND db_name=?`, domainID, database).Scan(&n); e != nil || n == 0 {
+			return fmt.Errorf("veritabanı bu domaine ait değil")
+		}
+		dump, e := findDatabaseDump(tmpDir, database)
+		if e != nil {
+			return e
+		}
+		return importDatabase(dump, database)
+	default:
+		return fmt.Errorf("geçersiz kurtarma kapsamı")
+	}
+}
 
 type restoreRequest struct {
 	Scope    string `json:"scope"`    // full | files | file | database | email

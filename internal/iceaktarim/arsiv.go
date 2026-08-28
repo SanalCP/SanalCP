@@ -1,16 +1,19 @@
 package iceaktarim
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"sanalcp/internal/archivex"
+	"sanalcp/internal/backups"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
 )
@@ -171,6 +174,7 @@ type arsivUygulaReq struct {
 
 type arsivUygulaCevap struct {
 	OK      bool   `json:"ok"`
+	JobID   int64  `json:"job_id"`
 	Hedef   string `json:"hedef"`
 	Atlanan string `json:"atlanan_kok,omitempty"`
 	Silindi bool   `json:"hedef_temizlendi"`
@@ -178,7 +182,7 @@ type arsivUygulaCevap struct {
 
 // ArsivUygula — POST /domains/{id}/ice-aktarim/arsiv-uygula
 func (h *Handlers) ArsivUygula(w http.ResponseWriter, r *http.Request) {
-	_, home, sk, err := h.domain(r)
+	domainID, home, sk, err := h.domain(r)
 	if err != nil {
 		httpx.WriteError(w, durumKodu(err), err.Error())
 		return
@@ -206,14 +210,6 @@ func (h *Handlers) ArsivUygula(w http.ResponseWriter, r *http.Request) {
 			"hedef dizin güvenli değil (symlink?): "+err.Error())
 		return
 	}
-	if req.Temizle {
-		// fd-göreli özyinelemeli silme — os.RemoveAll ile YAPILMAZ.
-		if err := jailpath.IceriginiSil(home, hedefRel); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "hedef temizlenemedi: "+err.Error())
-			return
-		}
-	}
-
 	strip := 0
 	atlanan := ""
 	if req.KokAtla {
@@ -232,27 +228,65 @@ func (h *Handlers) ArsivUygula(w http.ResponseWriter, r *http.Request) {
 		atlanan = ozet.KokKlasor
 	}
 
-	hedefMutlak := path.Join(home, hedefRel)
-	out, err := archivex.GuvenliCikarStrip(mutlakArsiv, hedefMutlak, sk, strip)
-	if err != nil {
-		mesaj := err.Error()
-		if s := strings.TrimSpace(out); s != "" {
-			mesaj += ": " + s
-		}
-		durum := http.StatusBadRequest
-		if errors.Is(err, archivex.ErrStripDesteklenmiyor) {
-			durum = http.StatusNotImplemented
-		}
-		httpx.WriteError(w, durum, "çıkarma başarısız: "+mesaj)
+	var alanAdi string
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT alan_adi FROM domains WHERE id=?`, domainID).Scan(&alanAdi); err != nil {
+		httpx.WriteError(w, 500, "domain okunamadı")
 		return
 	}
-	sahiplendir(hedefMutlak, sk)
-	// Staging dosyası artık gereksiz — tenant kotasında tutmayalım.
-	_ = jailpath.Sil(home, path.Join(stagingRel, req.StageID))
+	jobID, err := h.newJob(r.Context(), domainID, "files", hedefRel, "Kurtarma noktası bekleniyor")
+	if err != nil {
+		httpx.WriteError(w, 500, "aktarım işi oluşturulamadı")
+		return
+	}
+	go h.runArchiveJob(jobID, domainID, alanAdi, home, sk, req.StageID, mutlakArsiv, hedefRel, strip, req.Temizle)
+	httpx.WriteJSON(w, http.StatusAccepted, arsivUygulaCevap{OK: true, JobID: jobID, Hedef: hedefRel, Atlanan: atlanan, Silindi: req.Temizle})
+}
 
-	httpx.WriteJSON(w, http.StatusOK, arsivUygulaCevap{
-		OK: true, Hedef: hedefRel, Atlanan: atlanan, Silindi: req.Temizle,
-	})
+func (h *Handlers) runArchiveJob(jobID, domainID int64, alanAdi, home, sk, stageID, archive, target string, strip int, temizle bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
+	defer cancel()
+	h.jobUpdate(jobID, "running", 5, "Kurtarma noktası oluşturuluyor", "", "")
+	name, _, err := backups.CreateRecoveryArchive(ctx, h.DB, domainID, alanAdi, sk, "Web sitesi içe aktarımı öncesi otomatik kurtarma noktası")
+	if err != nil {
+		h.jobUpdate(jobID, "failed", 5, "İşlem durduruldu", "Kurtarma noktası oluşturulamadı: "+err.Error(), "")
+		return
+	}
+	h.jobUpdate(jobID, "running", 25, "Arşiv güvenli biçimde çıkarılıyor", "", name)
+	if temizle {
+		if err = jailpath.IceriginiSil(home, target); err != nil {
+			h.jobUpdate(jobID, "failed", 25, "Hedef temizlenemedi", err.Error(), name)
+			return
+		}
+	}
+	hedefMutlak := path.Join(home, target)
+	out, err := archivex.GuvenliCikarStrip(archive, hedefMutlak, sk, strip)
+	if err == nil {
+		sahiplendir(hedefMutlak, sk)
+		_ = jailpath.Sil(home, path.Join(stagingRel, stageID))
+		h.jobUpdate(jobID, "success", 100, "Dosya aktarımı tamamlandı", "", name)
+		return
+	}
+	mesaj := err.Error()
+	if s := strings.TrimSpace(out); s != "" {
+		mesaj += ": " + s
+	}
+	h.jobUpdate(jobID, "running", 75, "Aktarım başarısız; otomatik geri alınıyor", mesaj, name)
+	backupPath := filepath.Join(backups.BackupRoot, sk, name)
+	scope := rollbackScope(target)
+	rbCtx, rbCancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer rbCancel()
+	if rb := backups.RestoreRecoveryArchive(rbCtx, h.DB, domainID, sk, backupPath, scope, ""); rb != nil {
+		h.jobUpdate(jobID, "failed", 100, "Geri alma başarısız", mesaj+"; rollback: "+rb.Error(), name)
+		return
+	}
+	h.jobUpdate(jobID, "rolled_back", 100, "Hata sonrası dosyalar geri alındı", mesaj, name)
+}
+
+func rollbackScope(target string) string {
+	if target == "public_html" || strings.HasPrefix(target, "public_html/") {
+		return "files"
+	}
+	return "home"
 }
 
 // hedefDogrula: hedefi ev dizinine göreli, temiz bir yola indirger.

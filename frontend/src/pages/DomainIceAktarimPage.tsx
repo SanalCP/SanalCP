@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AxiosProgressEvent } from 'axios'
 import { useTranslation } from 'react-i18next'
@@ -29,6 +29,8 @@ type ConfigSonuc = {
   db_adi: string
   guncellemeler: { yol: string; tur: string; alanlar: string[]; uygulandi: boolean; not?: string }[]
 }
+type ImportJob = { id:number; tur:'files'|'database'; durum:'queued'|'running'|'success'|'failed'|'rolled_back'; ilerleme:number; adim:string; mesaj:string; recovery_file:string; created_at:string; finished_at:string }
+type Health = { ok:boolean; checks:{name:string;ok:boolean;detail:string}[] }
 
 function mb(bayt: number) {
   if (bayt < 1024) return `${bayt} B`
@@ -71,6 +73,11 @@ export default function DomainIceAktarimPage() {
   // --- 3. Config ---
   const [configSonuc, setConfigSonuc] = useState<ConfigSonuc | null>(null)
   const [configCalisiyor, setConfigCalisiyor] = useState(false)
+  const [isler, setIsler] = useState<ImportJob[]>([])
+  const [saglik, setSaglik] = useState<Health|null>(null)
+
+  const isleriYukle = useCallback(() => { if (id) api.get<ImportJob[]>(`/domains/${id}/ice-aktarim/isler`).then(r => setIsler(r.data || [])).catch(() => {}) }, [id])
+  function saglikKontrol(){if(id)api.get<Health>(`/domains/${id}/ice-aktarim/saglik`).then(r=>setSaglik(r.data)).catch(e=>setHata(apiHata(e)))}
 
   useEffect(() => {
     if (!id) return
@@ -81,7 +88,14 @@ export default function DomainIceAktarimPage() {
         if (r.data?.length) setDBAdi(r.data[0].db_adi)
       })
       .catch(() => { /* liste boş kalır; hata ilgili adımda gösterilir */ })
-  }, [id])
+    isleriYukle()
+  }, [id, isleriYukle])
+
+  useEffect(() => {
+    if (!isler.some(j => j.durum === 'queued' || j.durum === 'running')) return
+    const timer = window.setInterval(isleriYukle, 2000)
+    return () => window.clearInterval(timer)
+  }, [isler, isleriYukle])
 
   function sifirlaMesaj() { setHata(null); setOk(null) }
 
@@ -111,10 +125,10 @@ export default function DomainIceAktarimPage() {
     if (temizle && !confirm(t('DomainIceAktarimPage:files.confirm_wipe', { hedef }))) return
     sifirlaMesaj(); setCikariliyor(true)
     try {
-      await api.post(`/domains/${id}/ice-aktarim/arsiv-uygula`, {
+      const { data } = await api.post(`/domains/${id}/ice-aktarim/arsiv-uygula`, {
         stage_id: ozet.stage_id, hedef, kok_atla: kokAtla, temizle,
       }, { timeout: 0 })
-      setOk(t('DomainIceAktarimPage:files.done', { hedef }))
+      setOk(t('DomainIceAktarimPage:jobs.queued', { id: data.job_id })); isleriYukle()
       setOzet(null); setArsiv(null)
     } catch (e) {
       setHata(apiHata(e, t('DomainIceAktarimPage:errors.extract')))
@@ -132,13 +146,13 @@ export default function DomainIceAktarimPage() {
     form.append('db_name', dbAdi)
     form.append('bosalt', bosalt ? '1' : '0')
     try {
-      await api.post(`/domains/${id}/ice-aktarim/sql`, form, {
+      const { data } = await api.post(`/domains/${id}/ice-aktarim/sql`, form, {
         timeout: 0,
         onUploadProgress: (e: AxiosProgressEvent) => {
           if (e.total) setDumpIlerleme(Math.round((e.loaded / e.total) * 100))
         },
       })
-      setOk(t('DomainIceAktarimPage:db.done', { db: dbAdi }))
+      setOk(t('DomainIceAktarimPage:jobs.queued', { id: data.job_id })); isleriYukle()
       setDump(null)
     } catch (e) {
       setHata(apiHata(e, t('DomainIceAktarimPage:errors.dump')))
@@ -176,6 +190,18 @@ export default function DomainIceAktarimPage() {
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {ok && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{ok}</div>}
+
+      {isler.length > 0 && <section className={kutu}>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainIceAktarimPage:jobs.title')}</h2>
+        <div className="space-y-3">{isler.map(j => <div key={j.id} className="border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+          <div className="flex items-center justify-between text-sm mb-2"><span className="font-medium">#{j.id} · {t(`DomainIceAktarimPage:jobs.types.${j.tur}`)}</span><span className={j.durum==='success'?'text-emerald-600':j.durum==='failed'?'text-red-600':j.durum==='rolled_back'?'text-amber-600':'text-blue-600'}>{t(`DomainIceAktarimPage:jobs.states.${j.durum}`)}</span></div>
+          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-brand-600 transition-all" style={{width:`${j.ilerleme}%`}} /></div>
+          <div className="mt-1 text-xs text-slate-500">{j.ilerleme}% · {j.adim}</div>{j.mesaj&&<div className="mt-2 text-xs text-red-600 dark:text-red-400">{j.mesaj}</div>}{j.recovery_file&&<div className="mt-1 text-xs text-slate-500">{t('DomainIceAktarimPage:jobs.recovery')}: <span className="font-mono">{j.recovery_file}</span></div>}
+        </div>)}</div>
+      </section>}
+
+      <section className={kutu}><div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('DomainIceAktarimPage:health.title')}</h2><p className="text-xs text-slate-500 mt-1">{t('DomainIceAktarimPage:health.desc')}</p></div><button onClick={saglikKontrol} className={dugme}>{t('DomainIceAktarimPage:health.button')}</button></div>
+      {saglik&&<div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">{saglik.checks.map(c=><div key={c.name} className={`p-3 rounded-lg border text-xs ${c.ok?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-red-200 bg-red-50 text-red-700'}`}><div className="font-semibold">{c.ok?'✓':'✕'} {t(`DomainIceAktarimPage:health.${c.name}`)}</div><div className="mt-1 opacity-80">{c.detail}</div></div>)}</div>}</section>
 
       {/* 1 — Site dosyaları */}
       <section className={kutu}>

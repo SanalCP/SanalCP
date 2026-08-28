@@ -3,6 +3,7 @@ package iceaktarim
 import (
 	"bufio"
 	"compress/gzip"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,9 +11,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"sanalcp/internal/backups"
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -40,7 +44,7 @@ type sqlCevap struct {
 // içine konacak `USE mysql; GRANT ...` ifadeleriyle DB sunucusunun tamamını
 // devretmek olurdu.
 func (h *Handlers) SQLYukle(w http.ResponseWriter, r *http.Request) {
-	domainID, _, _, err := h.domain(r)
+	domainID, _, sk, err := h.domain(r)
 	if err != nil {
 		httpx.WriteError(w, durumKodu(err), err.Error())
 		return
@@ -76,7 +80,13 @@ func (h *Handlers) SQLYukle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hamAd = ham.Name()
-	defer os.Remove(hamAd)
+	handoff := false
+	defer func() {
+		_ = ham.Close()
+		if !handoff {
+			_ = os.Remove(hamAd)
+		}
+	}()
 	defer ham.Close()
 	if err := ham.Chmod(0o600); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "geçici dosya izni ayarlanamadı")
@@ -128,34 +138,78 @@ func (h *Handlers) SQLYukle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := ham.Sync(); err != nil {
+		httpx.WriteError(w, 500, "dump diske yazılamadı")
+		return
+	}
+	if err := ham.Close(); err != nil {
+		httpx.WriteError(w, 500, "dump kapatılamadı")
+		return
+	}
+	var alanAdi string
+	if err = h.DB.QueryRowContext(r.Context(), `SELECT alan_adi FROM domains WHERE id=?`, domainID).Scan(&alanAdi); err != nil {
+		httpx.WriteError(w, 500, "domain okunamadı")
+		return
+	}
+	jobID, err := h.newJob(r.Context(), domainID, "database", hedef.DBAdi, "Kurtarma noktası bekleniyor")
+	if err != nil {
+		httpx.WriteError(w, 500, "aktarım işi oluşturulamadı")
+		return
+	}
+	handoff = true
+	go h.runSQLJob(jobID, domainID, alanAdi, sk, hamAd, hedef, bosalt)
+	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"ok": true, "job_id": jobID, "db_adi": hedef.DBAdi, "bayt": bayt, "bosaltildi": bosalt})
+}
+
+func (h *Handlers) runSQLJob(jobID, domainID int64, alanAdi, sk, dumpPath string, hedef sqlimport.Hedef, bosalt bool) {
+	defer os.Remove(dumpPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
+	defer cancel()
 	select {
 	case dumpKapisi <- struct{}{}:
 		defer func() { <-dumpKapisi }()
-	case <-r.Context().Done():
-		httpx.WriteError(w, http.StatusRequestTimeout, "içe aktarma sırası beklenirken istek sona erdi")
+	case <-ctx.Done():
+		h.jobUpdate(jobID, "failed", 0, "Sıra zaman aşımı", ctx.Err().Error(), "")
 		return
 	}
-
-	src, acHata := dumpAkisi(ham)
-	if acHata != nil {
-		httpx.WriteError(w, http.StatusBadRequest, acHata.Error())
+	h.jobUpdate(jobID, "running", 5, "Kurtarma noktası oluşturuluyor", "", "")
+	name, _, err := backups.CreateRecoveryArchive(ctx, h.DB, domainID, alanAdi, sk, "SQL içe aktarımı öncesi otomatik kurtarma noktası")
+	if err != nil {
+		h.jobUpdate(jobID, "failed", 5, "İşlem durduruldu", "Kurtarma noktası oluşturulamadı: "+err.Error(), "")
 		return
 	}
-	if kapat, ok := src.(io.Closer); ok {
-		defer kapat.Close()
+	h.jobUpdate(jobID, "running", 30, "SQL dump içe aktarılıyor", "", name)
+	f, err := os.Open(dumpPath)
+	if err == nil {
+		defer f.Close()
 	}
-
-	if bosalt {
-		if err := sqlimport.TablolariSil(r.Context(), hedef); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
-			return
+	if err == nil {
+		var src io.Reader
+		src, err = dumpAkisi(f)
+		if c, ok := src.(io.Closer); ok {
+			defer c.Close()
+		}
+		if err == nil && bosalt {
+			err = sqlimport.TablolariSil(ctx, hedef)
+		}
+		if err == nil {
+			err = sqlimport.Uygula(ctx, hedef, src)
 		}
 	}
-	if err := sqlimport.Uygula(r.Context(), hedef, src); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+	if err == nil {
+		h.jobUpdate(jobID, "success", 100, "Veritabanı aktarımı tamamlandı", "", name)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, sqlCevap{OK: true, DBAdi: hedef.DBAdi, Bayt: bayt, Bosalti: bosalt})
+	mesaj := err.Error()
+	h.jobUpdate(jobID, "running", 75, "Aktarım başarısız; veritabanı geri alınıyor", mesaj, name)
+	backupPath := filepath.Join(backups.BackupRoot, sk, name)
+	rbCtx, rbCancel := context.WithTimeout(context.Background(), 20*time.Minute)
+	defer rbCancel()
+	if rb := backups.RestoreRecoveryArchive(rbCtx, h.DB, domainID, sk, backupPath, "database", hedef.DBAdi); rb != nil {
+		h.jobUpdate(jobID, "failed", 100, "Geri alma başarısız", mesaj+"; rollback: "+rb.Error(), name)
+		return
+	}
+	h.jobUpdate(jobID, "rolled_back", 100, "Hata sonrası veritabanı geri alındı", mesaj, name)
 }
 
 // dbHedefi: hedef veritabanının BU domaine ait olduğunu doğrular ve o

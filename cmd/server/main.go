@@ -248,6 +248,7 @@ func main() {
 	domainsH := &domains.Handlers{DB: d, IPv4: ipv4}
 	filesH := &files.Handlers{DB: d}
 	iceAktarimH := &iceaktarim.Handlers{DB: d}
+	go iceAktarimH.RecoverInterruptedJobs()
 	cronH := &cron.Handlers{DB: d}
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
@@ -579,6 +580,9 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/arsiv-uygula", iceAktarimH.ArsivUygula)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/sql", iceAktarimH.SQLYukle)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ice-aktarim/config", iceAktarimH.ConfigGuncelle)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/isler", iceAktarimH.Isler)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/isler/{jid}", iceAktarimH.Is)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/ice-aktarim/saglik", iceAktarimH.Saglik)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssl", domainsH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ssl/issue", domainsH.SSLIssue)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ssl", domainsH.SSLDisable)

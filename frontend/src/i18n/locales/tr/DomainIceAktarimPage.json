@@ -34,10 +34,18 @@
   },
   "config": {
     "title": "3 · Bağlantı ayarları",
-    "desc": "Aktarılan uygulamanın veritabanı bilgilerini bu sunucudaki yeni değerlerle günceller (WordPress wp-config.php, Laravel .env). Aktarım sonrası \"veritabanı bağlantı hatası\" almamak için bu adımı çalıştırın.",
+    "desc": "Aktarılan uygulamanın veritabanı bilgilerini bu sunucudaki yeni değerlerle günceller (WordPress, Laravel ve PrestaShop).",
     "apply": "{{dizin}} altındaki config dosyalarını {{db}} bilgileriyle güncelle",
     "none_found": "Hedef klasörde güncellenebilecek bir yapılandırma dosyası bulunamadı."
   },
+  "jobs": {
+    "title": "Aktarım işleri",
+    "queued": "Aktarım işi #{{id}} kuyruğa alındı; bu sayfadan güvenle ayrılabilirsiniz.",
+    "recovery": "Kurtarma noktası",
+    "types": { "files": "Site dosyaları", "database": "Veritabanı" },
+    "states": { "queued": "Kuyrukta", "running": "Çalışıyor", "success": "Tamamlandı", "failed": "Başarısız", "rolled_back": "Geri alındı" }
+  },
+  "health": { "title": "Aktarım sonrası sağlık kontrolü", "desc": "Dosyaları, veritabanı kaydını ve yerel HTTP yanıtını doğrular.", "button": "Kontrol et", "files": "Site dosyaları", "database": "Veritabanı", "http": "HTTP yanıtı" },
   "errors": {
     "upload": "Arşiv yüklenemedi.",
     "extract": "Arşiv çıkarılamadı.",

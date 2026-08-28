@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.30** (2026-08-28)
+
+Mevcut Web Sitesi İçe Aktarım aracı güvenli taşıma iş akışına yükseltildi.
+Dosya çıkarma ve SQL içe aktarma işlemleri kalıcı arka plan işi olarak çalışır;
+yüzde, işlem adımı, hata ve kurtarma dosyası panelde izlenebilir. Her uygulama
+öncesinde tam kurtarma noktası zorunludur. Kısmi dosya veya SQL hatasında ilgili
+bölüm otomatik geri yüklenir; aynı domain için çakışan aktarım engellenir.
+Aktarım sonrası dosya, veritabanı kaydı ve yerel HTTP sağlık kontrolü eklendi.
+
 **0.9.29** (2026-08-28)
 
 Gerçek staging ortamı eklendi. Her staging sitesi ayrı Linux kullanıcısı,

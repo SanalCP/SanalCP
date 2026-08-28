@@ -34,10 +34,18 @@
   },
   "config": {
     "title": "3 · Connection settings",
-    "desc": "Updates the imported application's database credentials with this server's new values (WordPress wp-config.php, Laravel .env). Run this step to avoid a \"database connection error\" after import.",
+    "desc": "Updates imported application database credentials for WordPress, Laravel and PrestaShop.",
     "apply": "Update config files under {{dizin}} with {{db}} credentials",
     "none_found": "No updatable configuration file found in the target folder."
   },
+  "jobs": {
+    "title": "Import jobs",
+    "queued": "Import job #{{id}} was queued; you may safely leave this page.",
+    "recovery": "Recovery point",
+    "types": { "files": "Site files", "database": "Database" },
+    "states": { "queued": "Queued", "running": "Running", "success": "Completed", "failed": "Failed", "rolled_back": "Rolled back" }
+  },
+  "health": { "title": "Post-import health check", "desc": "Validates site files, database metadata and the local HTTP response.", "button": "Run checks", "files": "Site files", "database": "Database", "http": "HTTP response" },
   "errors": {
     "upload": "Archive upload failed.",
     "extract": "Archive extraction failed.",
