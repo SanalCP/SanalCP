@@ -1,0 +1,10 @@
+{
+  "common": {"load_failed":"Could not load information","save_failed":"Could not save setting","saved":"Setting saved","save":"Save","refresh":"Refresh"},
+  "security": {"title":"Automatic security updates","desc":"Installs security patches automatically each day.","pending":"{{count}} pending","enable":"Enable automatic security updates","auto_reboot":"Automatically reboot after updates when required","last":"Last run"},
+  "identity": {"title":"Server identity and DNS","desc":"Checks hostname, A/AAAA and PTR record consistency.","ok":"DNS matches","warning":"Check required","hostname":"Hostname","ips":"Server IPs","forward":"A/AAAA records"},
+  "storage": {"title":"Disk and inode alerts","desc":"Monitors capacity thresholds and the largest system directories.","warning":"Threshold exceeded","ok":"Normal","disk":"Disk","inode":"Inode","disk_limit":"Disk alert threshold (%)","inode_limit":"Inode alert threshold (%)"},
+  "reboot": {"title":"Reboot requirement","desc":"Shows the running kernel and last server boot.","required":"Reboot required","not_required":"Not required","boot":"Last boot","uptime":"Uptime","days":"days","running":"Running kernel","latest":"Latest installed kernel"},
+  "journal": {"title":"System journal","desc":"Limits journald disk usage and cleans old entries.","usage":"Usage","persistent":"persistent","volatile":"volatile","limit":"Maximum size (MB)","clean":"Clean old entries","confirm":"Permanently remove old journal entries down to the selected limit?","cleaned":"Old journal entries cleaned","clean_failed":"Could not clean journal"},
+  "dns": {"title":"DNS resolver","desc":"Manages NetworkManager DNS servers and tests resolution.","servers":"DNS servers (comma-separated)","test":"Test","test_ok":"Resolution succeeded: {{ips}}","test_failed":"DNS test failed","confirm":"Changing DNS can affect network resolution. Apply it?"},
+  "swap": {"title":"Swap and swappiness","desc":"Shows swap usage and can create a safe swap file.","active":"Swap active","none":"No swap","usage":"Usage","create":"Create swap (MB)","confirm":"Create a persistent {{size}} MB swap file on disk?"}
+}

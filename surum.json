@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.21",
-  "duyuru": "Sunucu Saati kartındaki zaman gösterimi sadeleştirildi. Yerel etiketi Sunucu saati olarak değiştirildi ve gereksiz UTC satırı kaldırıldı.",
+  "son_surum": "0.9.22",
+  "duyuru": "Sunucu Ayarları ekranına otomatik güvenlik güncellemeleri, hostname/PTR denetimi, disk ve inode eşikleri, yeniden başlatma gereksinimi, journald yönetimi, DNS çözümleyici testi/ayarı ve swap yönetimi eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
 }

@@ -13,6 +13,23 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.22** (2026-08-28)
+
+Sunucu bakımı bölümüne yedi yeni yönetim ve sağlık kartı eklendi:
+
+- Günlük systemd zamanlayıcısıyla otomatik güvenlik güncellemeleri ve isteğe bağlı
+  yeniden başlatma,
+- hostname, sunucu IP'leri, A/AAAA ve PTR uyumluluk denetimi,
+- disk ve inode uyarı eşikleri ile büyük sistem dizinlerinin görünümü,
+- çalışan/kurulu kernel karşılaştırması, son açılış ve reboot gereksinimi,
+- journald disk kullanımı, kalıcı boyut sınırı ve güvenli vacuum işlemi,
+- NetworkManager üzerinden kesintisiz DNS çözümleyici ayarı ve çözümleme testi,
+- swap durumu, kalıcı swap dosyası oluşturma ve swappiness yönetimi.
+
+Tüm değiştiren uçlar yalnız yöneticilere açıktır. DNS ayarı IP doğrulaması ve
+çözümleme sonrası geri alma koruması kullanır; swap oluşturma boş disk alanını
+önceden denetler ve kullanıcı onayı gerektirir.
+
 **0.9.21** (2026-08-28)
 
 Sunucu Saati kartındaki `Yerel` etiketi daha anlaşılır olması için

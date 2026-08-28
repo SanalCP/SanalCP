@@ -17,6 +17,7 @@ import OturumBostaAyari from '@/components/OturumBostaAyari'
 import RootGirisiAyari from '@/components/RootGirisiAyari'
 import LisansBilgisi from '@/components/LisansBilgisi'
 import SunucuSaatiAyari from '@/components/SunucuSaatiAyari'
+import { DepolamaAyari, DNSCozumleyiciAyari, GuvenlikGuncellemeAyari, JournalAyari, RebootBilgisi, SunucuKimlikDNS, SwapAyari } from '@/components/GelismisSunucuAyarlari'
 
 /*
  * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
@@ -226,6 +227,13 @@ export default function AraclarAyarlarPage() {
           <PanelGuncelleme />
           <HostnameAyari />
           <SunucuSaatiAyari />
+          <GuvenlikGuncellemeAyari />
+          <SunucuKimlikDNS />
+          <DepolamaAyari />
+          <RebootBilgisi />
+          <JournalAyari />
+          <DNSCozumleyiciAyari />
+          <SwapAyari />
           <PanelDomain />
           <NameserverAyari />
           <SunucuOptimize />
