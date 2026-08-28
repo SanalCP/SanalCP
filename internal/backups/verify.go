@@ -43,7 +43,10 @@ func verifyArchive(ctx context.Context, archive, domain, sk string) (verificatio
 	f.Close()
 	sha := hex.EncodeToString(h.Sum(nil))
 
-	tmp, err := os.MkdirTemp("", "sanal-backup-verify-*")
+	// Servis TMPDIR'i /var/lib/sanalcp/tmp olabilir ve üst dizin yalnız root'a
+	// açıktır. Çıkarma tenant kimliğinde çalıştığı için açıkça systemd PrivateTmp
+	// içindeki 01777 /tmp'yi kullan; rastgele alt dizin sonra 0700+tenant olur.
+	tmp, err := os.MkdirTemp("/tmp", "sanal-backup-verify-*")
 	if err != nil {
 		return verificationResult{}, err
 	}
