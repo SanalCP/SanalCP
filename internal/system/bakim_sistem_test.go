@@ -43,3 +43,10 @@ func TestGuvenlikBetigiRebootVarsayilani(t *testing.T) {
 		t.Fatal("pasif ayarda otomatik reboot etkin olamaz")
 	}
 }
+
+func TestSwapKaynaklariBosDizi(t *testing.T) {
+	d := swapOku()
+	if d.Kaynaklar == nil {
+		t.Fatal("swap kaynakları null dönmemeli; frontend dizi bekliyor")
+	}
+}

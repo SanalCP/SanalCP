@@ -34,7 +34,7 @@ func SunucuKimlikDNS(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	host, _ := os.Hostname()
-	d := kimlikDNSDurum{Hostname: host, PTR: map[string][]string{}}
+	d := kimlikDNSDurum{Hostname: host, Adresler: []string{}, HostnameAdresleri: []string{}, PTR: map[string][]string{}}
 	ifaces, _ := net.Interfaces()
 	for _, in := range ifaces {
 		addrs, _ := in.Addrs()
@@ -253,7 +253,7 @@ func resolvConfOku() (dnsDurum, error) {
 	if e != nil {
 		return dnsDurum{}, e
 	}
-	d := dnsDurum{Yonetici: "resolv.conf"}
+	d := dnsDurum{Sunucular: []string{}, AramaAlanlari: []string{}, Yonetici: "resolv.conf"}
 	for _, ln := range strings.Split(string(b), "\n") {
 		f := strings.Fields(ln)
 		if len(f) > 1 && f[0] == "nameserver" {
@@ -385,7 +385,7 @@ type swapDurum struct {
 }
 
 func swapOku() swapDurum {
-	d := swapDurum{}
+	d := swapDurum{Kaynaklar: []string{}}
 	if b, e := os.ReadFile("/proc/swaps"); e == nil {
 		for i, ln := range strings.Split(string(b), "\n") {
 			if i == 0 {

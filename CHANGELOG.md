@@ -13,6 +13,12 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.23** (2026-08-28)
+
+Swap bulunmayan sunucularda boş kaynak listesinin `null` dönmesi nedeniyle
+Sunucu Ayarları sayfasını düşüren frontend hatası giderildi. Sistem bilgi
+yanıtlarındaki liste alanları artık boşken de tutarlı biçimde `[]` döner.
+
 **0.9.22** (2026-08-28)
 
 Sunucu bakımı bölümüne yedi yeni yönetim ve sağlık kartı eklendi:
