@@ -44,6 +44,65 @@ type configCevap struct {
 	Guncellemeler []configGuncelleme `json:"guncellemeler"`
 }
 
+// StagingConfigGuncelle rewrites supported application configs after an
+// internal clone. It intentionally shares the same symlink-safe writers as
+// the interactive import flow.
+func StagingConfigGuncelle(home, sk string, kimlik sqlimport.Hedef) []configGuncelleme {
+	out := []configGuncelleme{}
+	for _, dizin := range aramaDizinleri(home, "public_html") {
+		if g, ok := wpGuncelle(home, sk, dizin, kimlik); ok {
+			out = append(out, g)
+		}
+		if g, ok := envGuncelle(home, sk, dizin, kimlik); ok {
+			out = append(out, g)
+		}
+		if g, ok := prestaShopGuncelle(home, sk, dizin, kimlik); ok {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// PrestaShop 1.7+ stores credentials in app/config/parameters.php; older
+// releases use config/settings.inc.php. Both are plain PHP scalar values.
+func prestaShopGuncelle(home, sk, dizin string, kimlik sqlimport.Hedef) (configGuncelleme, bool) {
+	files := []string{path.Join(dizin, "app/config/parameters.php"), path.Join(dizin, "config/settings.inc.php")}
+	for _, rel := range files {
+		icerik, ok := dosyaOku(home, rel)
+		if !ok {
+			continue
+		}
+		metin := string(icerik)
+		alanlar := []string{}
+		values := map[string]string{"database_name": kimlik.DBAdi, "database_user": kimlik.Kullanici, "database_password": kimlik.Parola, "database_host": "localhost", "_DB_NAME_": kimlik.DBAdi, "_DB_USER_": kimlik.Kullanici, "_DB_PASSWD_": kimlik.Parola, "_DB_SERVER_": "localhost"}
+		for key, value := range values {
+			arrayRe := regexp.MustCompile(`(?m)(['"]` + regexp.QuoteMeta(key) + `['"]\s*=>\s*)['"][^'"\r\n]*['"]`)
+			defineRe := regexp.MustCompile(`(?m)(define\s*\(\s*['"]` + regexp.QuoteMeta(key) + `['"]\s*,\s*)['"][^'"\r\n]*['"]`)
+			yeni := "${1}'" + phpKacTemplate(value) + "'"
+			if arrayRe.MatchString(metin) {
+				metin = arrayRe.ReplaceAllString(metin, yeni)
+				alanlar = append(alanlar, key)
+			}
+			if defineRe.MatchString(metin) {
+				metin = defineRe.ReplaceAllString(metin, yeni)
+				alanlar = append(alanlar, key)
+			}
+		}
+		g := configGuncelleme{Yol: rel, Tur: "prestashop", Alanlar: alanlar}
+		if len(alanlar) == 0 {
+			g.Not = "DB alanları bulunamadı — elle güncelleyin"
+			return g, true
+		}
+		if err := jailpath.DosyaYaz(home, rel, sk, []byte(metin), 0o640); err != nil {
+			g.Not = "yazılamadı: " + err.Error()
+			return g, true
+		}
+		g.Uygulandi = true
+		return g, true
+	}
+	return configGuncelleme{}, false
+}
+
 // ConfigGuncelle — POST /domains/{id}/ice-aktarim/config
 //
 // Aktarılan uygulamanın veritabanı bağlantı ayarlarını hedefteki YENİ değerlerle

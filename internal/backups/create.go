@@ -94,6 +94,27 @@ func createArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, 
 	return info.Size(), nil
 }
 
+// CreateRecoveryArchive creates a full local recovery point for destructive
+// internal workflows such as staging -> production deployment.
+func CreateRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, note string) (string, int64, error) {
+	stamp := time.Now().UTC().Format("20060102-150405")
+	dir := filepath.Join(BackupRoot, sk)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", 0, err
+	}
+	name := fmt.Sprintf("%s-staging-recovery-%s.tar.gz", sk, stamp)
+	abs := filepath.Join(dir, name)
+	size, err := createArchive(ctx, db, domainID, domain, sk, abs)
+	if err != nil {
+		return "", 0, err
+	}
+	if _, err = db.ExecContext(ctx, `INSERT INTO backups(domain_id,tip,dosya,boyut_b,notlar) VALUES(?, 'tam', ?, ?, ?)`, domainID, name, size, note); err != nil {
+		_ = os.Remove(abs)
+		return "", 0, err
+	}
+	return name, size, nil
+}
+
 func domainDatabases(ctx context.Context, db *sql.DB, domainID int64, sk string) ([]string, error) {
 	rows, err := db.QueryContext(ctx,
 		`SELECT DISTINCT db_name FROM db_accounts WHERE domain_id=? ORDER BY db_name`, domainID)

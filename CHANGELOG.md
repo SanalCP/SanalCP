@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.29** (2026-08-28)
+
+Gerçek staging ortamı eklendi. Her staging sitesi ayrı Linux kullanıcısı,
+PHP-FPM/vhost ve MariaDB kullanıcı/veritabanıyla sağlanır; WordPress, Laravel ve
+PrestaShop bağlantı ayarları staging kimliklerine çevrilir ve arama motorları
+`X-Robots-Tag` ile engellenir. Dosyalar ve veritabanı ayrı ayrı canlıya
+gönderilebilir. Her gönderimden önce canlı sitenin tam kurtarma yedeğinin
+başarıyla oluşturulması zorunludur; yedek alınamazsa işlem başlamaz.
+
 **0.9.28** (2026-08-28)
 
 Cloudflare entegrasyonu eklendi. Yönetici Cloudflare API token'ını bağlantı

@@ -67,3 +67,7 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
 - **Faz 1 — tamamlandı (v0.9.28):** Şifreli ve doğrulanan Cloudflare API
   token'ı, domain-zone eşleştirmesi, DNS kayıt CRUD'u, proxy aç/kapat ve tüm
   zone cache'ini temizleme işlevleri eklendi.
+- **Faz 2 — tamamlandı (v0.9.29):** Ayrı Linux kullanıcısı, PHP-FPM/vhost ve
+  MariaDB hesabıyla gerçek staging; WordPress/Laravel/PrestaShop yapılandırma
+  uyarlaması, arama motoru engeli, seçmeli dosya/DB canlıya gönderimi ve her
+  gönderim öncesi zorunlu tam kurtarma noktası eklendi.

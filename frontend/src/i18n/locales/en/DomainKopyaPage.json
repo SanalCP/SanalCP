@@ -1,15 +1,1 @@
-{
-  "title": "Clone Site",
-  "desc": "Creates a timestamped snapshot of your site's files under ~/kopyalar/ — a safe restore point before making changes.",
-  "created": "Copy created: {{ad}} ({{mb}} MB)",
-  "create_failed": "Could not create copy",
-  "confirm_delete": "Delete this copy?\n{{ad}} ({{mb}} MB)",
-  "delete_failed": "Could not delete",
-  "info_box": "ℹ️ This tool only copies files (the database is not included). For a full backup, use the Backup & Restore tool.",
-  "create_new_desc": "Create a new copy from the public_html contents.",
-  "creating": "Copying…",
-  "create_button": "Create Copy",
-  "existing_copies": "Existing copies",
-  "no_copies": "No copies yet.",
-  "back_to_subscription": "← Back to subscription"
-}
+{"title":"Staging Environment","desc":"Manage an isolated working copy of the live site with its own user and database.","info_box":"Staging is blocked from search engines. A full recovery backup is created automatically before every production deployment.","hostname":"Staging hostname","creating":"Preparing environment…","create_button":"Create Staging","created":"Staging environment is ready.","create_failed":"Could not create staging","created_at":"Created: {{date}}","last_push":"Last deployment: {{date}}","open":"Open staging","push_title":"Deploy to production","files":"Files","database":"Database","push_button":"Deploy selected items","working":"Working…","confirm_push":"The selected staging content will overwrite production. Continue?","pushed":"Deployment completed. Recovery backup: {{backup}}","push_failed":"Deployment failed","delete_button":"Delete staging","confirm_delete":"Permanently delete the staging environment and its database?","deleted":"Staging environment deleted.","delete_failed":"Could not delete staging","back_to_subscription":"← Back to subscription"}

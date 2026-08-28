@@ -275,7 +275,7 @@ func main() {
 	korumaH := &sifrekoruma.Handlers{DB: d}
 	avH := &antivirus.Handlers{DB: d}
 	antivirus.Init(cfg.AVMaxConcurrent) // eşzamanlı tarama sınırı (ClamAV RAM/OOM koruması)
-	kopyaH := &sitekopya.Handlers{DB: d}
+	kopyaH := &sitekopya.Handlers{DB: d, IPv4: ipv4}
 	wpH := &wordpress.Handlers{DB: d}
 	appsH := &apps.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
@@ -487,7 +487,8 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/imza-guncelle", avH.ImzaGuncelle)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/kopya", kopyaH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/kopya", kopyaH.Olustur)
-				r.With(middleware.MusteriScope).Delete("/domains/{id}/kopya/{ad}", kopyaH.Sil)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/kopya/canliya-gonder", kopyaH.CanliyaGonder)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/kopya", kopyaH.Sil)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/wordpress", wpH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/wordpress", wpH.Kur)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/wordpress/guncelle", wpH.Guncelle)

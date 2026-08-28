@@ -166,6 +166,34 @@ func TestEnvGuncelleLaravelOlmayaniAtlar(t *testing.T) {
 	}
 }
 
+func TestPrestaShopConfigGuncelle(t *testing.T) {
+	kimlik := sqlimport.Hedef{DBAdi: "c_stage_main", Kullanici: "c_stage_db", Parola: "SafePass12345"}
+	home := sahteHome(t)
+	dir := filepath.Join(home, "public_html", "app", "config")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	yol := filepath.Join(dir, "parameters.php")
+	eski := `<?php return ['parameters'=>['database_host'=>'old','database_name'=>'old_db','database_user'=>'old_user','database_password'=>'old_pass']];`
+	if err := os.WriteFile(yol, []byte(eski), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	g, ok := prestaShopGuncelle(home, "c_test", "public_html", kimlik)
+	if !ok || !g.Uygulandi {
+		t.Fatalf("PrestaShop config güncellenmedi: %+v", g)
+	}
+	b, err := os.ReadFile(yol)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{kimlik.DBAdi, kimlik.Kullanici, kimlik.Parola, "localhost"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("config %q içermiyor: %s", want, got)
+		}
+	}
+}
+
 func TestHedefDogrula(t *testing.T) {
 	gecerli := map[string]string{
 		"":                    "public_html",

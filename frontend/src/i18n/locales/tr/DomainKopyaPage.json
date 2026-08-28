@@ -1,15 +1,1 @@
-{
-  "title": "Web Sitesini Kopyala",
-  "desc": "Sitenizin dosyalarının zaman-damgalı bir anlık-görüntüsünü ~/kopyalar/ altında oluşturur — değişiklik yapmadan önce güvenli bir yedek noktası.",
-  "created": "Kopya oluşturuldu: {{ad}} ({{mb}} MB)",
-  "create_failed": "Kopya oluşturulamadı",
-  "confirm_delete": "Kopya silinsin mi?\n{{ad}} ({{mb}} MB)",
-  "delete_failed": "Silinemedi",
-  "info_box": "ℹ️ Bu araç yalnızca dosyaları kopyalar (veritabanı dahil değildir). Tam yedek için Yedekle ve Geri Yükle aracını kullanın.",
-  "create_new_desc": "public_html içeriğinden yeni bir kopya oluştur.",
-  "creating": "Kopyalanıyor…",
-  "create_button": "Kopya Oluştur",
-  "existing_copies": "Mevcut kopyalar",
-  "no_copies": "Henüz kopya yok.",
-  "back_to_subscription": "← Aboneliğe dön"
-}
+{"title":"Staging Ortamı","desc":"Canlı sitenin ayrı kullanıcı ve veritabanına sahip güvenli bir çalışma kopyasını yönetin.","info_box":"Staging arama motorlarına kapalıdır. Canlıya gönderimden önce panel otomatik olarak tam kurtarma yedeği alır.","hostname":"Staging alan adı","creating":"Ortam hazırlanıyor…","create_button":"Staging Oluştur","created":"Staging ortamı hazır.","create_failed":"Staging oluşturulamadı","created_at":"Oluşturma: {{date}}","last_push":"Son gönderim: {{date}}","open":"Staging'i aç","push_title":"Canlıya gönder","files":"Dosyalar","database":"Veritabanı","push_button":"Seçilenleri canlıya gönder","working":"İşlem sürüyor…","confirm_push":"Seçilen staging içeriği canlı sitenin üzerine yazılacak. Devam edilsin mi?","pushed":"Canlıya gönderildi. Kurtarma yedeği: {{backup}}","push_failed":"Canlıya gönderilemedi","delete_button":"Staging'i sil","confirm_delete":"Staging ortamı ve ayrı veritabanı kalıcı olarak silinsin mi?","deleted":"Staging ortamı silindi.","delete_failed":"Staging silinemedi","back_to_subscription":"← Aboneliğe dön"}
