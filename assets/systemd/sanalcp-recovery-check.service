@@ -10,7 +10,9 @@ Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
 PrivateTmp=true
-ProtectSystem=strict
+# nginx -t mevcut vhost log hedeflerini açarak doğrular; strict /var'ı da salt
+# okunur yaptığı için sağlam nginx yapılandırmasını yanlış-negatif gösterir.
+# full, /usr ve /etc'yi korurken nginx'in /var/log doğrulamasına izin verir.
+ProtectSystem=full
 ProtectHome=true
 NoNewPrivileges=true
-

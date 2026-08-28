@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.27** (2026-08-28)
+
+Aylık kurtarma tatbikatı servisinin systemd sandbox'ı, `nginx -t` komutunun
+`/var/log/nginx` hedeflerini açabilmesine izin verecek şekilde düzeltildi. İlk
+0.9.26 kurulumunda restore tatbikatı 47 tabloyu başarıyla açsa da bu sandbox
+kısıtı nginx kontrolünü yanlış-negatif gösteriyordu.
+
 **0.9.26** (2026-08-28)
 
 Kurtarma ve regresyon güvenlik ağı eklendi. Son panel veritabanı yedeğini

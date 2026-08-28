@@ -1,5 +1,5 @@
 {
-  "son_surum": "0.9.26",
+  "son_surum": "0.9.27",
   "duyuru": "Güncelleme betiğinin ext4 disk kotası onarımı tamamlandı. Yeni BLS kernel kayıtlarında kaybolan rootflags=usrquota parametresi artık tüm kernel kayıtlarına yeniden uygulanıyor ve quotaon servisi eski kurulumlarda otomatik kuruluyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-28"
