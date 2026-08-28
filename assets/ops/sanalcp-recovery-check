@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# SanalCP kurtarma sağlık kontrolü.
+# Varsayılan salt-okunur. --restore-drill yalnız rastgele GEÇİCİ bir DB oluşturur,
+# son panel dump'ını oraya açar, doğrular ve çıkışta geçici DB'yi siler.
+set -uo pipefail
+
+RESTORE_DRILL=0
+JSON=0
+DBDIR="${SANAL_DBDIR:-/var/backups/sanalcp/db}"
+HEALTH="${SANAL_HEALTH:-http://127.0.0.1:8080/healthz}"
+SVC="${SANAL_SVC:-sanalcp}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --restore-drill) RESTORE_DRILL=1 ;;
+    --json) JSON=1 ;;
+    -h|--help)
+      sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//'
+      echo "Kullanım: sanalcp-recovery-check [--restore-drill] [--json]"
+      exit 0 ;;
+    *) echo "bilinmeyen argüman: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+PASS=0; FAIL=0; WARN=0
+RESULTS=()
+add() {
+  local durum="$1" kod="$2" mesaj="$3"
+  RESULTS+=("$durum|$kod|$mesaj")
+  case "$durum" in pass) PASS=$((PASS+1));; fail) FAIL=$((FAIL+1));; warn) WARN=$((WARN+1));; esac
+}
+
+if systemctl is-active --quiet "$SVC" 2>/dev/null; then add pass service "SanalCP servisi aktif"
+else add fail service "SanalCP servisi aktif değil"; fi
+
+if curl -fsS --max-time 5 "$HEALTH" >/dev/null 2>&1; then add pass health "Panel sağlık ucu yanıt veriyor"
+else add fail health "Panel sağlık ucu yanıt vermiyor"; fi
+
+if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then add pass nginx "nginx yapılandırması geçerli"
+else add fail nginx "nginx yapılandırma testi başarısız"; fi
+
+if mysql -N -B -e 'SELECT 1' >/dev/null 2>&1; then add pass database "MariaDB bağlantısı başarılı"
+else add fail database "MariaDB bağlantısı başarısız"; fi
+
+if systemctl is-enabled --quiet sanalcp-db-backup.timer 2>/dev/null && \
+   systemctl is-active --quiet sanalcp-db-backup.timer 2>/dev/null; then
+  add pass backup_timer "Günlük panel DB yedek timer'ı etkin"
+else
+  add fail backup_timer "Günlük panel DB yedek timer'ı etkin/aktif değil"
+fi
+
+LATEST="$(find "$DBDIR" -maxdepth 1 -type f -name 'panel-*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)"
+if [ -z "$LATEST" ] || [ ! -f "$LATEST" ]; then
+  add fail latest_backup "Geçerli isimde panel DB yedeği bulunamadı"
+else
+  AGE=$(( $(date +%s) - $(stat -c %Y "$LATEST") ))
+  if gzip -t "$LATEST" >/dev/null 2>&1 && zgrep -q '^USE `panel`;' "$LATEST" && zgrep -q '^CREATE TABLE ' "$LATEST"; then
+    if [ "$AGE" -le 129600 ]; then
+      add pass latest_backup "Son DB yedeği yapısal olarak geçerli ve 36 saatten yeni: $LATEST"
+    else
+      add fail latest_backup "Son DB yedeği geçerli fakat 36 saatten eski: $LATEST"
+    fi
+  else
+    add fail latest_backup "Son DB yedeği bozuk veya panel şeması içermiyor: $LATEST"
+  fi
+fi
+
+if [ "$RESTORE_DRILL" = 1 ]; then
+  if [ -z "$LATEST" ] || [ ! -f "$LATEST" ]; then
+    add fail restore_drill "Tatbikat için yedek bulunamadı"
+  elif ! command -v mysql >/dev/null 2>&1; then
+    add fail restore_drill "mysql istemcisi bulunamadı"
+  else
+    DRILL_DB="sanalcp_drill_$(date +%s)_$RANDOM"
+    cleanup_drill() { mysql -N -B -e "DROP DATABASE IF EXISTS \`$DRILL_DB\`;" >/dev/null 2>&1 || true; }
+    trap cleanup_drill EXIT INT TERM
+    # Dump'taki yalnız backtick ile çevrili panel şema adını rastgele geçici ada
+    # çeviririz. Hedef ad sabit alfasayısal desenden üretildiği için SQL enjeksiyonu yoktur.
+    if zcat "$LATEST" | sed "s/\`panel\`/\`$DRILL_DB\`/g" | mysql >/dev/null 2>&1; then
+      TABLES="$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DRILL_DB';" 2>/dev/null || echo 0)"
+      if [[ "$TABLES" =~ ^[0-9]+$ ]] && [ "$TABLES" -gt 0 ]; then
+        add pass restore_drill "Yedek geçici DB'ye başarıyla açıldı ($TABLES tablo)"
+      else
+        add fail restore_drill "Restore tamamlandı fakat geçici DB'de tablo bulunamadı"
+      fi
+    else
+      add fail restore_drill "Yedek geçici DB'ye geri yüklenemedi"
+    fi
+    cleanup_drill
+    trap - EXIT INT TERM
+  fi
+else
+  add warn restore_drill "Gerçek restore tatbikatı çalıştırılmadı (--restore-drill ile etkinleştirilir)"
+fi
+
+if [ "$JSON" = 1 ]; then
+  printf '{"ok":%s,"passed":%d,"failed":%d,"warnings":%d,"checks":[' "$([ "$FAIL" -eq 0 ] && echo true || echo false)" "$PASS" "$FAIL" "$WARN"
+  first=1
+  for row in "${RESULTS[@]}"; do
+    IFS='|' read -r durum kod mesaj <<< "$row"
+    [ "$first" = 1 ] || printf ','; first=0
+    # Mesajlar kontrollü yerel çıktıdır; JSON için ters slash/tırnak/newline kaçır.
+    mesaj=${mesaj//\\/\\\\}; mesaj=${mesaj//\"/\\\"}; mesaj=${mesaj//$'\n'/\\n}
+    printf '{"status":"%s","code":"%s","message":"%s"}' "$durum" "$kod" "$mesaj"
+  done
+  printf ']}\n'
+else
+  for row in "${RESULTS[@]}"; do
+    IFS='|' read -r durum kod mesaj <<< "$row"
+    case "$durum" in pass) simge='✓';; fail) simge='✗';; warn) simge='!';; esac
+    printf '%s %-16s %s\n' "$simge" "$kod" "$mesaj"
+  done
+  printf '\nSonuç: %d başarılı, %d başarısız, %d uyarı\n' "$PASS" "$FAIL" "$WARN"
+fi
+
+[ "$FAIL" -eq 0 ]

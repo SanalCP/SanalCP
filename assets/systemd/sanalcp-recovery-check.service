@@ -1,0 +1,16 @@
+[Unit]
+Description=SanalCP monthly backup restore drill
+After=mariadb.service sanalcp.service
+Wants=mariadb.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sanalcp-recovery-check --restore-drill --json
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+

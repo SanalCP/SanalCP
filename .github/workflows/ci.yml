@@ -18,6 +18,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  recovery:
+    name: Kurtarma — izole rollback kabul testi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sağlıksız sürümde tam rollback
+        run: |
+          bash scripts/recovery-acceptance-test.sh
+          bash scripts/recovery-check-test.sh
+
   go:
     name: Go — vet, test, gofmt
     runs-on: ubuntu-latest

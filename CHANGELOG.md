@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.26** (2026-08-28)
+
+Kurtarma ve regresyon güvenlik ağı eklendi. Son panel veritabanı yedeğini
+salt-okunur sağlık kontrolleriyle doğrulayan ve isteğe bağlı olarak rastgele
+geçici bir veritabanına gerçekten geri açan `sanalcp-recovery-check` aracı
+eklendi. Aylık systemd timer'ı restore tatbikatını otomatik çalıştırıp sonucu
+journald'a kaydeder.
+
+Core onarımının sağlık kontrolü başarısız olduğunda rollback artık yalnız
+binary ve veritabanını değil frontend ile migration dizinini de onarım öncesi
+duruma döndürüyor. Canonical restore assetleri SHA-256 manifestiyle doğrulanıyor;
+DB yedekleri de geçerli gzip olmanın yanında `panel` şeması ve tablo tanımı
+içermek zorunda. Sağlıksız release senaryosunu gerçek servislerden izole şekilde
+sınayan kabul testleri CI'a eklendi.
+
 **0.9.25** (2026-08-28)
 
 Güncelleme betiğinin disk kotası onarımı ext2/3/4 sistemlerini de kapsayacak

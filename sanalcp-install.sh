@@ -684,7 +684,7 @@ cp "$A/systemd/sanalcp.service" /etc/systemd/system/sanalcp.service
 # Daily panel DB backup (03:30) — copying the file is NOT enough, it's enabled
 # --now below; otherwise the timer never fires and the install would silently end
 # up with no backups.
-for u in sanalcp-db-backup.service sanalcp-db-backup.timer; do
+for u in sanalcp-db-backup.service sanalcp-db-backup.timer sanalcp-recovery-check.service sanalcp-recovery-check.timer; do
   [ -f "$A/systemd/$u" ] && cp "$A/systemd/$u" "/etc/systemd/system/$u"
 done
 systemctl daemon-reload
@@ -693,6 +693,12 @@ if [ -f /etc/systemd/system/sanalcp-db-backup.timer ]; then
   systemctl is-active --quiet sanalcp-db-backup.timer \
     && ok "daily panel DB backup ACTIVE (03:30 → /var/backups/sanalcp/db, 14 days)" \
     || warn "DB backup timer failed to start — daily panel DB backup may not run"
+fi
+if [ -f /etc/systemd/system/sanalcp-recovery-check.timer ] && [ -x /usr/local/bin/sanalcp-recovery-check ]; then
+  systemctl enable --now sanalcp-recovery-check.timer >/dev/null 2>&1
+  systemctl is-active --quiet sanalcp-recovery-check.timer \
+    && ok "monthly backup restore drill timer active" \
+    || warn "monthly backup restore drill timer could not be started"
 fi
 # 🔴 enable + RESTART (svc_hazirla): the pools were written in step 6/9, and on
 # Debian php-fpm has been running since apt installed it — "enable --now" would

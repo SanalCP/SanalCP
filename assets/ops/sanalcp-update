@@ -246,6 +246,22 @@ if [ -d "$A/ops" ]; then
   ok "$(t "ops-tool'lar güncellendi" "ops tools updated")"
 fi
 
+# Aylık gerçek restore tatbikatı: son panel dump'ını rastgele geçici DB'ye açar,
+# tablo varlığını doğrular ve geçici DB'yi siler. Sonuç journald'da kalır.
+RCUNITS=0
+for u in sanalcp-recovery-check.service sanalcp-recovery-check.timer; do
+  if [ -f "$A/systemd/$u" ]; then install -m 0644 "$A/systemd/$u" "/etc/systemd/system/$u"; RCUNITS=1; fi
+done
+if [ "$RCUNITS" = 1 ] && [ -x /usr/local/bin/sanalcp-recovery-check ]; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable --now sanalcp-recovery-check.timer >/dev/null 2>&1 || true
+  if systemctl is-active --quiet sanalcp-recovery-check.timer; then
+    ok "$(t "aylık yedekten dönüş tatbikatı etkin" "monthly backup restore drill enabled")"
+  else
+    warn "$(t "aylık yedekten dönüş timer'ı başlatılamadı" "monthly backup restore timer could not be started")"
+  fi
+fi
+
 # 9a) nginx conf'lari — _default80/_default443/php-fpm. Bunlar eskiden SADECE kurulumda
 # yaziliyordu, dolayisiyla conf'a giren hicbir duzeltme mevcut kurulumlara inmiyordu.
 # _panel.conf BURADA YOK: onu panel kendisi binary'ye gomulu kanonik surumden gunceller

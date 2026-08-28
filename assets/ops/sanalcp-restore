@@ -39,6 +39,9 @@ SCRIPTS="${SANAL_SCRIPTS:-$PREFIX/src/scripts}"
 OPSBIN="${SANAL_OPSBIN:-/usr/local/bin}"
 SVC="${SANAL_SVC:-sanalcp}"
 HEALTH="${SANAL_HEALTH:-http://127.0.0.1:8080/healthz}"
+HEALTH_RETRIES="${SANAL_HEALTH_RETRIES:-6}"
+HEALTH_SLEEP="${SANAL_HEALTH_SLEEP:-2}"
+ROLLBACK_SLEEP="${SANAL_ROLLBACK_SLEEP:-3}"
 DBBK="${SANAL_DBBK:-/usr/local/bin/sanalcp-db-backup}"  # panel DB dump aracı
 DBDIR="${SANAL_DBDIR:-/var/backups/sanalcp/db}"         # dump'ların yeri
 PREDUMP=""                                                    # onarım-öncesi dump (rollback'te geri yüklenir)
@@ -91,6 +94,10 @@ fi
 [ -d "$A" ] || die "assets/ bulunamadı ($A) — repo yapısı beklenenden farklı"
 NEWBIN="$A/sanalcp-server"
 [ -f "$NEWBIN" ] || die "$NEWBIN yok — canonical release bozuk/eksik, onarım iptal"
+[ -f "$A/SHA256SUMS" ] || die "canonical release bütünlük manifesti yok — onarım iptal"
+(cd "$(dirname "$A")" && sha256sum -c assets/SHA256SUMS >/dev/null) || \
+  die "canonical release SHA-256 doğrulaması başarısız — onarım iptal"
+ok "canonical release asset bütünlüğü doğrulandı"
 
 # ───────────────────────────────────────────────────────────────────────────
 # b) BÜTÜNLÜK TEŞHİSİ (önce göster — neyin bozuk olduğunu operatör görsün).
@@ -189,6 +196,12 @@ fi
 # e) ops-tool'lar + src/scripts + migration'lar. Migration'lar EKLENİR (mevcut korunur).
 # ───────────────────────────────────────────────────────────────────────────
 if [ -f "$A/migrations.tar.gz" ]; then
+  # DB rollback tek başına yeterli değildir: schema_migrations defteri eski ana
+  # dönerken diskte yeni SQL dosyaları kalırsa eski binary açılışta bunları yeniden
+  # uygulayabilir veya checksum uyuşmazlığıyla kapanabilir. Güncelleyicidekiyle aynı
+  # tam-dizin snapshot'ını al; rollback merge değil REPLACE yapacak.
+  rm -rf "${MIGR}.bak"
+  if [ -d "$MIGR" ]; then cp -a "$MIGR" "${MIGR}.bak"; else mkdir -p "${MIGR}.bak"; fi
   mkdir -p "$MIGR"; tar xzf "$A/migrations.tar.gz" -C "$MIGR"
   ok "migration'lar senkron ($(ls "$MIGR"/*.sql 2>/dev/null | wc -l) sql, mevcutlar korundu)"
 elif [ -d "$A/migrations" ]; then
@@ -229,8 +242,8 @@ fi
 step "Yeniden başlatılıyor"
 systemctl restart "$SVC"
 HEALTHY=0
-for i in 1 2 3 4 5 6; do
-  sleep 2
+for ((i=1; i<=HEALTH_RETRIES; i++)); do
+  sleep "$HEALTH_SLEEP"
   if systemctl is-active --quiet "$SVC" && curl -fsS "$HEALTH" >/dev/null 2>&1; then HEALTHY=1; break; fi
 done
 
@@ -239,16 +252,39 @@ if [ "$HEALTHY" = 1 ]; then
   ok "panel ACTIVE + /healthz OK"
   echo -e "${c_g}══ Onarım tamam — core canonical'e getirildi (env/DB/siteler/yedekler korundu) ══${c_0}"
 else
-  warn "onarım sonrası sağlıklı başlamadı — ESKİ binary'ye + onarım-öncesi DB'ye dönülüyor"
+  warn "onarım sonrası sağlıklı başlamadı — ESKİ core + onarım-öncesi DB'ye dönülüyor"
   [ -f "$BIN.bak" ] && install -m 0755 "$BIN.bak" "$BIN"
   [ -f "$SEED.bak" ] && install -m 0755 "$SEED.bak" "$SEED" 2>/dev/null || true
+
+  # Frontend atomik swap sırasında eski sürüm FDIST.old altında tutulur. Sağlık
+  # kapısı geçmediyse yeni arayüzü bırakmak API/UI sürüm uyumsuzluğu ve beyaz sayfa
+  # üretebilir; eski dizini bütünüyle geri koy.
+  if [ -d "${FDIST}.old" ]; then
+    rm -rf "${FDIST}.failed"
+    [ -d "$FDIST" ] && mv "$FDIST" "${FDIST}.failed"
+    mv "${FDIST}.old" "$FDIST"
+    rm -rf "${FDIST}.failed"
+    ok "frontend-dist onarım öncesine döndürüldü"
+  else
+    warn "frontend yedeği yok — diskteki frontend canonical sürümden kalmış olabilir"
+  fi
+
+  # DB'yi eski ana döndürmeden önce migration dosyalarını da aynı ana getir.
+  if [ -d "${MIGR}.bak" ]; then
+    rm -rf "${MIGR:?}"
+    cp -a "${MIGR}.bak" "$MIGR"
+    ok "migration dosyaları onarım öncesine döndürüldü"
+  else
+    warn "migration yedeği yok — diskteki migration'lar canonical sürümden kalmış olabilir"
+  fi
+  sync
   command -v restorecon >/dev/null && restorecon "$BIN" >/dev/null 2>&1 || true
   systemctl stop "$SVC" >/dev/null 2>&1 || true
   if [ -n "$PREDUMP" ] && [ -f "$PREDUMP" ]; then
     if zcat "$PREDUMP" | mysql; then ok "DB onarım-öncesi yedeğe geri yüklendi ($PREDUMP)"
     else warn "DB geri yükleme BAŞARISIZ — elle: zcat '$PREDUMP' | mysql"; fi
   fi
-  systemctl restart "$SVC"; sleep 3
+  systemctl restart "$SVC"; sleep "$ROLLBACK_SLEEP"
   if systemctl is-active --quiet "$SVC"; then
     die "rollback yapıldı — panel ESKİ sürüm + ESKİ DB ile ayakta. Hata: journalctl -u $SVC -n 40"
   else

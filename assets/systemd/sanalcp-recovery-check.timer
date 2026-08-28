@@ -1,0 +1,12 @@
+[Unit]
+Description=Run SanalCP backup restore drill monthly
+
+[Timer]
+OnCalendar=*-*-01 04:15:00
+RandomizedDelaySec=30m
+Persistent=true
+Unit=sanalcp-recovery-check.service
+
+[Install]
+WantedBy=timers.target
+
