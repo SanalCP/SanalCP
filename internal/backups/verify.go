@@ -54,26 +54,36 @@ func verifyArchive(ctx context.Context, archive, domain, sk string) (verificatio
 	if out, e := archivex.GuvenliCikar(archive, tmp, sk); e != nil {
 		return verificationResult{}, fmt.Errorf("arşiv güvenli açılamadı: %s: %w", strings.TrimSpace(out), e)
 	}
-	raw, err := os.ReadFile(filepath.Join(tmp, "manifest.json"))
-	if err != nil {
-		return verificationResult{}, fmt.Errorf("manifest.json eksik: %w", err)
-	}
-	var m backupManifest
-	if err = json.Unmarshal(raw, &m); err != nil {
-		return verificationResult{}, fmt.Errorf("manifest bozuk: %w", err)
-	}
-	if m.Version < 2 || m.User != sk || !strings.EqualFold(m.Domain, domain) {
-		return verificationResult{}, fmt.Errorf("manifest domain/kullanıcı eşleşmiyor")
-	}
 	home := filepath.Join(tmp, sk)
 	if st, e := os.Stat(home); e != nil || !st.IsDir() {
 		return verificationResult{}, fmt.Errorf("hesap dosya ağacı eksik")
 	}
-	for _, name := range m.Databases {
+	type dbDump struct{ name, path string }
+	var dumps []dbDump
+	raw, manifestErr := os.ReadFile(filepath.Join(tmp, "manifest.json"))
+	if manifestErr == nil {
+		var m backupManifest
+		if err = json.Unmarshal(raw, &m); err != nil {
+			return verificationResult{}, fmt.Errorf("manifest bozuk: %w", err)
+		}
+		if m.Version < 2 || m.User != sk || !strings.EqualFold(m.Domain, domain) {
+			return verificationResult{}, fmt.Errorf("manifest domain/kullanıcı eşleşmiyor")
+		}
+		for _, name := range m.Databases {
+			dumps = append(dumps, dbDump{name, filepath.Join(tmp, "databases", name+".sql")})
+		}
+	} else {
+		// Eski v1/cron arşivleri manifest taşımaz; kesin tenant kök dizini ve
+		// kökteki dump.sql üzerinden geriye dönük, yine fail-closed doğrulanır.
+		if _, e := os.Stat(filepath.Join(tmp, "dump.sql")); e == nil {
+			dumps = append(dumps, dbDump{sk + "_main", filepath.Join(tmp, "dump.sql")})
+		}
+	}
+	for _, dump := range dumps {
+		name, p := dump.name, dump.path
 		if !mysqlNameRE.MatchString(name) {
 			return verificationResult{}, fmt.Errorf("geçersiz DB adı: %q", name)
 		}
-		p := filepath.Join(tmp, "databases", name+".sql")
 		st, e := os.Stat(p)
 		if e != nil || st.Size() == 0 {
 			return verificationResult{}, fmt.Errorf("%s SQL dump eksik/boş", name)
@@ -93,7 +103,7 @@ func verifyArchive(ctx context.Context, archive, domain, sk string) (verificatio
 			return verificationResult{}, fmt.Errorf("%s geçici geri yükleme tatbikatı: %w", name, err)
 		}
 	}
-	return verificationResult{SHA256: sha, Detail: fmt.Sprintf("arşiv güvenli açıldı; %d veritabanı geçici şemaya geri yüklendi", len(m.Databases))}, nil
+	return verificationResult{SHA256: sha, Detail: fmt.Sprintf("arşiv güvenli açıldı; %d veritabanı geçici şemaya geri yüklendi", len(dumps))}, nil
 }
 
 func restoreDrillSQL(ctx context.Context, dump string) error {
