@@ -1,0 +1,13 @@
+{
+  "label": "Restrict panel access by IP/CIDR",
+  "desc": "Only the listed IPv4/IPv6 addresses and networks can access the panel API. Enter one address or CIDR per line.",
+  "current_ip": "Your current client IP: {{ip}}",
+  "placeholder": "203.0.113.10\n192.0.2.0/24\n2001:db8::/48",
+  "empty_hint": "An empty list disables the restriction.",
+  "recovery_hint": "If locked out, run as root on the server:",
+  "save": "Save", "saving": "Saving…", "saved": "Panel access restriction saved.",
+  "temporary_title": "Temporary access", "temporary_desc": "Allow one IP or network for a limited time without changing the permanent list.",
+  "temporary_active": "Allowed for {{cidr}} until {{bitis}}", "minutes": "Minutes", "temporary_open": "Allow temporarily",
+  "temporary_cancel": "Cancel", "temporary_saved": "Temporary access enabled.", "temporary_cancelled": "Temporary access cancelled.",
+  "load_failed": "Could not load the access setting.", "save_failed": "Could not save the access setting."
+}

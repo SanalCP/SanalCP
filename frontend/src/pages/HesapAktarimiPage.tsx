@@ -36,6 +36,9 @@ type ImportResult = {
   ssl_expires?: string
   credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
+type RemoteSite = { domain: string; hesap: string }
+type RemoteInventory = { provider: string; surum: string; domainler: string[]; siteler: RemoteSite[] }
+type RemoteJob = { id: number; domain: string; durum: string; ilerleme: number; mesaj: string; target_domain_id?: number; source_http_status?: number; target_http_status?: number }
 
 export default function HesapAktarimiPage() {
   const { t } = useTranslation(['HesapAktarimiPage', 'common'])
@@ -52,6 +55,13 @@ export default function HesapAktarimiPage() {
   const [phpVersion, setPHPVersion] = useState('8.3')
   const [aktariliyor, setAktariliyor] = useState(false)
   const [sonuc, setSonuc] = useState<ImportResult | null>(null)
+  const [sshHost, setSSHHost] = useState('')
+  const [sshPort, setSSHPort] = useState(22)
+  const [sshKesif, setSSHKesif] = useState<RemoteInventory | null>(null)
+  const [sshBusy, setSSHBusy] = useState(false)
+  const [sshSite, setSSHSite] = useState<RemoteSite | null>(null)
+  const [sshJob, setSSHJob] = useState<RemoteJob | null>(null)
+  const [sshGecmis, setSSHGecmis] = useState<RemoteJob[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -62,6 +72,8 @@ export default function HesapAktarimiPage() {
       setPlans(p.data)
     }).catch(() => { /* seçim listesi boş kalır; API hatası importta gösterilir */ })
   }, [])
+
+  useEffect(() => { api.get<RemoteJob[]>('/admin/transfers/remote/jobs').then(r => setSSHGecmis(r.data)).catch(() => {}) }, [])
 
   async function analizEt() {
     if (!dosya) return
@@ -83,6 +95,37 @@ export default function HesapAktarimiPage() {
       setYukleniyor(false)
     }
   }
+
+  async function uzakKesfet() {
+    setSSHBusy(true); setHata(null); setSSHKesif(null)
+    try {
+      const r = await api.post<RemoteInventory>('/admin/transfers/remote/discover', { host: sshHost, port: sshPort, kullanici: 'root' })
+      setSSHKesif(r.data); setSSHSite(r.data.siteler?.[0] || null)
+    } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.failed'))) }
+    finally { setSSHBusy(false) }
+  }
+
+  async function uzakAktar() {
+    if (!sshKesif || !sshSite || !customerID) return
+    setSSHBusy(true); setHata(null)
+    try {
+      const r = await api.post<{ job_id: number }>('/admin/transfers/remote/start', {
+        host: sshHost, port: sshPort, provider: sshKesif.provider,
+        hesap: sshSite.hesap, domain: sshSite.domain, customer_id: Number(customerID),
+        plan_id: planID ? Number(planID) : null, php_version: phpVersion,
+      })
+      setSSHJob({ id: r.data.job_id, domain: sshSite.domain, durum: 'queued', ilerleme: 0, mesaj: t('HesapAktarimiPage:remote.queued') })
+    } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.start_failed'))) }
+    finally { setSSHBusy(false) }
+  }
+
+  useEffect(() => {
+    if (!sshJob || ['success', 'failed'].includes(sshJob.durum)) return
+    const timer = window.setInterval(() => {
+      api.get<RemoteJob>(`/admin/transfers/remote/jobs/${sshJob.id}`).then(r => setSSHJob(r.data)).catch(() => {})
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [sshJob])
 
   async function iceAktar() {
     if (!dosya || !envanter || !customerID || !domain) return
@@ -124,6 +167,32 @@ export default function HesapAktarimiPage() {
       </p>
 
       {hata && <div className="mb-4 px-4 py-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-sm text-red-700 dark:text-red-300">{hata}</div>}
+
+      <div className="rounded-2xl border border-brand-200 dark:border-brand-800 bg-brand-50/40 dark:bg-brand-950/10 p-5 mb-5">
+        <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t('HesapAktarimiPage:remote.title')}</h2>
+        <p className="mt-1 text-xs text-slate-500">{t('HesapAktarimiPage:remote.desc')}</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input value={sshHost} onChange={e => setSSHHost(e.target.value)} placeholder="old-server.example.com" className={`${inputClass} flex-1`} />
+          <input type="number" min={1} max={65535} value={sshPort} onChange={e => setSSHPort(Number(e.target.value))} className={`${inputClass} sm:w-28`} />
+          <button onClick={() => void uzakKesfet()} disabled={!sshHost || sshBusy} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{sshBusy ? t('HesapAktarimiPage:remote.discovering') : t('HesapAktarimiPage:remote.discover')}</button>
+        </div>
+        {sshKesif && <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+          <strong>{sshKesif.provider}</strong>{sshKesif.surum && ` · ${sshKesif.surum}`}
+          <div className="mt-1 text-xs">{t('HesapAktarimiPage:remote.domains', { count: sshKesif.domainler.length })}: {sshKesif.domainler.join(', ') || '—'}</div>
+          {['cpanel', 'plesk', 'directadmin'].includes(sshKesif.provider) && <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <select value={sshSite?.domain || ''} onChange={e => setSSHSite(sshKesif.siteler.find(s => s.domain === e.target.value) || null)} className={inputClass}>{sshKesif.siteler.map(s => <option key={s.domain} value={s.domain}>{s.domain} · {s.hesap}</option>)}</select>
+            <select value={customerID} onChange={e => setCustomerID(e.target.value)} className={inputClass}><option value="">{t('HesapAktarimiPage:target_section.select_customer')}</option>{customers.map(c => <option key={c.id} value={c.id}>{c.ad}</option>)}</select>
+            <button onClick={() => void uzakAktar()} disabled={!sshSite || !customerID || sshBusy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{t('HesapAktarimiPage:remote.start')}</button>
+          </div>}
+        </div>}
+        {sshJob && <div className={`mt-3 rounded-xl border p-3 text-sm ${sshJob.durum === 'failed' ? 'border-red-200 bg-red-50 text-red-700' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
+          <div className="flex justify-between"><strong>{t('HesapAktarimiPage:remote.job')} #{sshJob.id}</strong><span>{sshJob.ilerleme}% · {sshJob.durum}</span></div>
+          <div className="mt-1 text-xs">{sshJob.mesaj}</div><div className="mt-2 h-1.5 rounded bg-white"><div className="h-full rounded bg-brand-600" style={{ width: `${sshJob.ilerleme}%` }} /></div>
+          {(sshJob.source_http_status || sshJob.target_http_status) && <div className="mt-2 text-xs">HTTP: {sshJob.source_http_status || '—'} → {sshJob.target_http_status || '—'}</div>}
+          {sshJob.target_domain_id && <Link className="mt-2 inline-block font-medium text-brand-700" to={`/abonelikler/${sshJob.target_domain_id}`}>{t('HesapAktarimiPage:result.manage_domain')}</Link>}
+        </div>}
+        {sshGecmis.length > 0 && <details className="mt-3 text-xs text-slate-600 dark:text-slate-300"><summary>{t('HesapAktarimiPage:remote.history')}</summary><div className="mt-2 space-y-1">{sshGecmis.map(j => <div key={j.id} className="flex justify-between rounded bg-white/70 p-2 dark:bg-slate-900/50"><span>#{j.id} · {j.domain}</span><span>{j.ilerleme}% · {j.durum}</span></div>)}</div></details>}
+      </div>
 
       <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-5 mb-5">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">

@@ -700,13 +700,21 @@ func copyRecorded(w http.ResponseWriter, rr *httptest.ResponseRecorder) {
 	_, _ = w.Write(rr.Body.Bytes())
 }
 
-func (h *Handlers) rollbackDomain(r *http.Request, id int64) {
+func (h *Handlers) rollbackDomain(r *http.Request, id int64) error {
+	if h.Domains == nil {
+		return errors.New("domain silme handler'ı yok")
+	}
 	rc := chi.NewRouteContext()
 	rc.URLParams.Add("id", strconv.FormatInt(id, 10))
 	ctx := contextWithRoute(r, rc)
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/domains/"+strconv.FormatInt(id, 10), nil).
 		WithContext(ctx)
-	h.Domains.Delete(httptest.NewRecorder(), req)
+	rr := httptest.NewRecorder()
+	h.Domains.Delete(rr, req)
+	if rr.Code < http.StatusOK || rr.Code >= http.StatusMultipleChoices {
+		return fmt.Errorf("domain silme HTTP %d: %s", rr.Code, strings.TrimSpace(rr.Body.String()))
+	}
+	return nil
 }
 
 func contextWithRoute(r *http.Request, rc *chi.Context) context.Context {

@@ -12,6 +12,8 @@
     "apps_desc": "1-click install · management",
     "prestashop_tools": "PrestaShop Tools",
     "prestashop_tools_desc": "Health, maintenance, cache and log management",
+    "laravel_tools": "Laravel Tools",
+    "laravel_tools_desc": "Health, .env, Artisan and deployment management",
     "dns": "DNS Management",
     "dns_desc": "A, MX, TXT, CNAME records",
     "cloudflare": "Cloudflare",

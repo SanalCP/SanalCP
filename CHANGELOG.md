@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.33** (2026-08-29)
+
+Panel güvenliği ve operasyon araçları genişletildi. Panel API'si IPv4/IPv6
+CIDR allowlist'i, geçici erişim ve root kurtarma komutuyla sınırlandırılabilir.
+Panel ve domain trafiğine bot/rate-limit profilleri, istisnalar, gözlem kayıtları
+ve nginx doğrulamalı geri alma eklendi. cPanel, Plesk ve DirectAdmin'den SSH
+üzerinden site taşıma arka plan işleriyle desteklendi. Laravel keşif, maskeli
+`.env`, izin listeli Artisan, deploy sağlık kapısı ve otomatik geri alma
+özellikleri eklendi.
+
 **0.9.32** (2026-08-28)
 
 Domain yedekleri için doğrulanmış felaket kurtarma katmanı eklendi. Yeni

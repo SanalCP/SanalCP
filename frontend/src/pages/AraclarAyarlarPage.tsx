@@ -15,6 +15,8 @@ import NameserverAyari from '@/components/NameserverAyari'
 import SSHPortUyarisi from '@/components/SSHPortUyarisi'
 import OturumBostaAyari from '@/components/OturumBostaAyari'
 import RootGirisiAyari from '@/components/RootGirisiAyari'
+import PanelErisimAyari from '@/components/PanelErisimAyari'
+import PanelHizLimitiAyari from '@/components/PanelHizLimitiAyari'
 import LisansBilgisi from '@/components/LisansBilgisi'
 import SunucuSaatiAyari from '@/components/SunucuSaatiAyari'
 import { DepolamaAyari, DNSCozumleyiciAyari, GuvenlikGuncellemeAyari, JournalAyari, RebootBilgisi, SunucuKimlikDNS, SwapAyari } from '@/components/GelismisSunucuAyarlari'
@@ -242,6 +244,8 @@ export default function AraclarAyarlarPage() {
         </div>
         <div className="mt-3">
           <RootGirisiAyari />
+          <PanelErisimAyari />
+          <PanelHizLimitiAyari />
         </div>
       </section>
 

@@ -63,6 +63,7 @@
     "ssh_access": "SSH Erişimi",
     "logs": "Günlükler",
     "waf": "WAF",
+    "rate_limit": "Bot ve Hız Sınırı",
     "access_control": "Erişim Kontrolü",
     "password_protected_dirs": "Şifre Korumalı Dizinler",
     "imunify": "Imunify",

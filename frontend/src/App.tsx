@@ -41,6 +41,7 @@ const DomainBackupsPage = lazy(() => import('@/pages/DomainBackupsPage'))
 const DomainGitPage = lazy(() => import('@/pages/DomainGitPage'))
 const DomainWebSunucuPage = lazy(() => import('@/pages/DomainWebSunucuPage'))
 const DomainWafPage = lazy(() => import('@/pages/DomainWafPage'))
+const DomainRateLimitPage = lazy(() => import('@/pages/DomainRateLimitPage'))
 const PHPModuleriPage = lazy(() => import('@/pages/PHPModuleriPage'))
 const PaketlerPage = lazy(() => import('@/pages/PaketlerPage'))
 const PaketDetayPage = lazy(() => import('@/pages/PaketDetayPage'))
@@ -53,6 +54,7 @@ const FirewallPage = lazy(() => import('@/pages/FirewallPage'))
 const BackupYonetimiPage = lazy(() => import('@/pages/BackupYonetimiPage'))
 const DomainWordPressPage = lazy(() => import('@/pages/DomainWordPressPage'))
 const DomainPrestaShopPage = lazy(() => import('@/pages/DomainPrestaShopPage'))
+const DomainLaravelPage = lazy(() => import('@/pages/DomainLaravelPage'))
 const DomainAppsPage = lazy(() => import('@/pages/DomainAppsPage'))
 const DomainSubdomainlerPage = lazy(() => import('@/pages/DomainSubdomainlerPage'))
 const DomainEkAlanlarPage = lazy(() => import('@/pages/DomainEkAlanlarPage'))
@@ -116,6 +118,7 @@ export default function App() {
         <Route path="abonelikler/:id/ice-aktarim"   element={<DomainIceAktarimPage />} />
         <Route path="abonelikler/:id/wordpress"     element={<DomainWordPressPage />} />
         <Route path="abonelikler/:id/prestashop"    element={<DomainPrestaShopPage />} />
+        <Route path="abonelikler/:id/laravel"       element={<DomainLaravelPage />} />
         <Route path="abonelikler/:id/uygulamalar"   element={<DomainAppsPage />} />
         <Route path="abonelikler/:id/subdomainler"  element={<DomainSubdomainlerPage />} />
         <Route path="abonelikler/:id/ek-alanlar"    element={<DomainEkAlanlarPage />} />
@@ -130,6 +133,7 @@ export default function App() {
         <Route path="abonelikler/:id/git"           element={<DomainGitPage />} />
         <Route path="abonelikler/:id/web-sunucu"    element={<DomainWebSunucuPage />} />
         <Route path="abonelikler/:id/waf"           element={<DomainWafPage />} />
+        <Route path="abonelikler/:id/rate-limit"    element={<DomainRateLimitPage />} />
         <Route path="sistem/php-modulleri"           element={<PHPModuleriPage />} />
         <Route path="araclar/paketler"               element={<PaketlerPage />} />
         <Route path="araclar/paketler/:id"           element={<PaketDetayPage />} />

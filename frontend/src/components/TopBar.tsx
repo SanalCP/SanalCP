@@ -76,6 +76,7 @@ function domainSayfalari(t: TFunc): readonly [string, string, string][] {
     ['/ssh-erisim', t('TopBar:domain_pages.ssh.baslik'), t('TopBar:domain_pages.ssh.aciklama')],
     ['/gunlukler', t('TopBar:domain_pages.logs.baslik'), t('TopBar:domain_pages.logs.aciklama')],
     ['/waf', t('TopBar:domain_pages.waf.baslik'), t('TopBar:domain_pages.waf.aciklama')],
+    ['/rate-limit', t('TopBar:domain_pages.rate_limit.baslik'), t('TopBar:domain_pages.rate_limit.aciklama')],
     ['/erisim-kontrol', t('TopBar:domain_pages.access_control.baslik'), t('TopBar:domain_pages.access_control.aciklama')],
     ['/sifre-koruma', t('TopBar:domain_pages.password_protect.baslik'), t('TopBar:domain_pages.password_protect.aciklama')],
     ['/imunify', t('TopBar:domain_pages.imunify.baslik'), t('TopBar:domain_pages.imunify.aciklama')],

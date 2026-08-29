@@ -1,0 +1,13 @@
+{
+  "label": "Panel erişimini IP/CIDR ile sınırlandır",
+  "desc": "Yalnız listedeki IPv4/IPv6 adresleri ve ağlar panel API'sine erişebilir. Her satıra bir adres veya CIDR yazın.",
+  "current_ip": "Mevcut istemci IP'niz: {{ip}}",
+  "placeholder": "203.0.113.10\n192.0.2.0/24\n2001:db8::/48",
+  "empty_hint": "Boş liste kısıtlamayı kapatır.",
+  "recovery_hint": "Kilitlenirseniz sunucuda root olarak çalıştırın:",
+  "save": "Kaydet", "saving": "Kaydediliyor…", "saved": "Panel erişim kısıtı kaydedildi.",
+  "temporary_title": "Geçici erişim", "temporary_desc": "Bir IP veya ağı belirli süreyle kalıcı listeye dokunmadan açın.",
+  "temporary_active": "{{cidr}} için {{bitis}} tarihine kadar açık", "minutes": "Dakika", "temporary_open": "Geçici aç",
+  "temporary_cancel": "İptal et", "temporary_saved": "Geçici erişim açıldı.", "temporary_cancelled": "Geçici erişim iptal edildi.",
+  "load_failed": "Erişim ayarı okunamadı.", "save_failed": "Erişim ayarı kaydedilemedi."
+}

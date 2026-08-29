@@ -1,4 +1,5 @@
 {
+  "remote": { "title": "Discover from a live server (Phase 7)", "desc": "Connects using a root SSH key to a server already present in known_hosts; no password is stored. Detects cPanel, Plesk, and DirectAdmin.", "discover": "Discover over SSH", "discovering": "Discovering…", "failed": "Could not discover the remote server.", "domains": "Discovered domains ({{count}})", "start": "Transfer selected site", "start_failed": "Could not start remote transfer.", "queued": "Transfer queued", "job": "Transfer job", "history": "Recent remote transfer jobs" },
   "title": "Account Import",
   "subtitle": "Safely analyze a full cPanel account backup. The archive is not extracted or permanently stored on the server at this stage.",
   "breadcrumb": {

@@ -177,6 +177,7 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
     ]},
     { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
       { to: y('/waf'),           etiket: t('DashboardLayout:items.waf'),          ikon: ICONS.waf },
+      { to: y('/rate-limit'),    etiket: t('DashboardLayout:items.rate_limit'),   ikon: ICONS.waf },
       { to: y('/erisim-kontrol'), etiket: t('DashboardLayout:items.access_control'), ikon: ICONS.erisim },
       { to: y('/sifre-koruma'),  etiket: t('DashboardLayout:items.password_protected_dirs'), ikon: ICONS.kilit },
       { to: y('/imunify'),       etiket: t('DashboardLayout:items.imunify'),      ikon: ICONS.imunify },

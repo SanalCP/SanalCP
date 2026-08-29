@@ -63,6 +63,7 @@
     "ssh_access": "SSH Access",
     "logs": "Logs",
     "waf": "WAF",
+    "rate_limit": "Bot & Rate Limiting",
     "access_control": "Access Control",
     "password_protected_dirs": "Password-Protected Directories",
     "imunify": "Imunify",

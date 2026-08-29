@@ -67,6 +67,7 @@
     "ssh": { "baslik": "SSH Erişimi", "aciklama": "Terminal erişimi" },
     "logs": { "baslik": "Günlükler", "aciklama": "Erişim ve hata logları" },
     "waf": { "baslik": "WAF", "aciklama": "Web uygulama güvenlik duvarı" },
+    "rate_limit": { "baslik": "Bot ve Hız Sınırı", "aciklama": "Trafik profilleri ve istisnalar" },
     "access_control": { "baslik": "Erişim Kontrolü", "aciklama": "IP erişim kuralları" },
     "password_protect": { "baslik": "Şifre Korumalı Dizinler", "aciklama": "Dizin parolası" },
     "imunify": { "baslik": "Imunify", "aciklama": "Zararlı yazılım taraması" },

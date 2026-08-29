@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Panel IP/CIDR allowlist'i nedeniyle kilitlenildiğinde root kurtarma aracı.
+# Kullanım: sudo sanalcp-panel-erisim-kurtar --disable
+set -euo pipefail
+
+if [ "${1:-}" != "--disable" ] || [ $# -ne 1 ]; then
+  echo "Kullanım: sudo sanalcp-panel-erisim-kurtar --disable" >&2
+  exit 2
+fi
+ETKIN_UID="${SANALCP_EFFECTIVE_UID:-${EUID:-$(id -u)}}"
+if [ "$ETKIN_UID" -ne 0 ]; then
+  echo "Bu komut root olarak çalıştırılmalı." >&2
+  exit 1
+fi
+
+MYSQL_BIN="${SANALCP_MYSQL_BIN:-mysql}"
+"$MYSQL_BIN" panel -e "UPDATE panel_ayarlari SET erisim_cidrleri=NULL, gecici_erisim_cidr=NULL, gecici_erisim_bitis=NULL WHERE id=1;"
+echo "Panel IP/CIDR erişim kısıtı kapatıldı. Panel servisini yeniden başlatmanız gerekmez."

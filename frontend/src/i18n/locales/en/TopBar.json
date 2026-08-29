@@ -67,6 +67,7 @@
     "ssh": { "baslik": "SSH Access", "aciklama": "Terminal access" },
     "logs": { "baslik": "Logs", "aciklama": "Access and error logs" },
     "waf": { "baslik": "WAF", "aciklama": "Web application firewall" },
+    "rate_limit": { "baslik": "Bot & Rate Limiting", "aciklama": "Traffic profiles and exceptions" },
     "access_control": { "baslik": "Access Control", "aciklama": "IP access rules" },
     "password_protect": { "baslik": "Password Protected Directories", "aciklama": "Directory password" },
     "imunify": { "baslik": "Imunify", "aciklama": "Malware scanning" },

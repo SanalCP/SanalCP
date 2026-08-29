@@ -1,0 +1,1 @@
+{"title":"Panel rate limit","desc":"Limits all panel API calls per IP. Failed-login lockout remains active separately.","profiles":{"kapali":"Disabled","dengeli":"Balanced · 600/min","siki":"Strict · 120/min","ozel":"Custom"},"exceptions":"IP/CIDR exceptions","save":"Apply","saving":"Saving…","saved":"Panel rate profile applied.","events":"Recent 429 events ({{count}})"}

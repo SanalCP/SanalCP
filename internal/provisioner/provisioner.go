@@ -345,6 +345,7 @@ server {
 
     access_log /var/log/nginx/{{.AlanAdi}}.access.log;
     error_log  /var/log/nginx/{{.AlanAdi}}.error.log warn;
+{{.RateLimit}}
 
     # ---- Güvenlik header'ları (panel'den yönetilir; server seviyesi) ----
 {{.SecHeaders}}
@@ -437,6 +438,7 @@ server {
 
     access_log /var/log/nginx/{{.AlanAdi}}.access.log;
     error_log  /var/log/nginx/{{.AlanAdi}}.error.log warn;
+{{.RateLimit}}
 
     # ---- Güvenlik header'ları (panel'den yönetilir; server seviyesi) ----
 {{.SecHeaders}}
@@ -786,6 +788,7 @@ type VhostOpts struct {
 	ModSec          string // WAF (ModSecurity) server-context direktif blogu; WAF pasif/modul yoksa ""
 	IPKurallari     string // server-context allow/deny blogu; kapaliysa ""
 	HotlinkLocation string // resim uzantilari icin valid_referers location'u; kapaliysa ""
+	RateLimit       string // domain bot/rate-limit direktifleri; kapalıysa ""
 }
 
 func (o VhostOpts) SSL() bool {
@@ -1083,6 +1086,12 @@ func renderAndReload(opts VhostOpts, sk string) error {
 		// buildModSec, WAF pasif/modul yoksa "" doner (vhost'u bozmaz) ve aktifse per-domain
 		// modsec conf dosyasini da tazeler → tek kaynak: her render self-healing.
 		if !opts.Askida {
+			if pkgDB != nil {
+				var domainID int64
+				if err := pkgDB.QueryRow(`SELECT id FROM domains WHERE sistem_kullanici=? AND ana_domain_id IS NULL`, sk).Scan(&domainID); err == nil {
+					opts.RateLimit = buildRateLimit(pkgDB, domainID)
+				}
+			}
 			opts.ModSec = buildModSec(sk)
 			opts.IPKurallari = buildIPRules(sk)
 			opts.HotlinkLocation = buildHotlink(sk, opts.AlanAdi)

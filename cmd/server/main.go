@@ -47,6 +47,7 @@ import (
 	_ "sanalcp/internal/joomla"
 	"sanalcp/internal/kaynak"
 	"sanalcp/internal/kaynaklimit"
+	"sanalcp/internal/laravel"
 	"sanalcp/internal/logs"
 	"sanalcp/internal/mail"
 	_ "sanalcp/internal/matomo"
@@ -73,6 +74,7 @@ import (
 	"sanalcp/internal/secretcrypt"
 	"sanalcp/internal/sifrekoruma"
 	"sanalcp/internal/sitekopya"
+	"sanalcp/internal/siteratelimit"
 	"sanalcp/internal/sshaccess"
 	"sanalcp/internal/subdomain"
 	"sanalcp/internal/system"
@@ -155,6 +157,11 @@ func main() {
 
 	provisioner.Init(d) // askıya-alma tutarlılığı için provisioner'a DB handle'ı ver
 	middleware.Init(d)  // musteri-scope askiya-alma kontrolu icin DB handle
+	// Domain bot/rate-limit zone ve istisna haritalarını DB'den yeniden üret.
+	// Restore/reboot sonrasında diskteki türetilmiş nginx dosyasına güvenilmez.
+	if err := provisioner.RateLimitGlobalYaz(d); err != nil {
+		log.Printf("bot/rate-limit nginx yapılandırması üretilemedi (mevcut nginx korundu): %v", err)
+	}
 
 	secretBox, err := secretcrypt.New(cfg.SecretKey)
 	if err != nil {
@@ -250,6 +257,8 @@ func main() {
 	iceAktarimH := &iceaktarim.Handlers{DB: d}
 	go iceAktarimH.RecoverInterruptedJobs()
 	prestashopH := &prestashop.Handlers{DB: d}
+	laravelH := &laravel.Handlers{DB: d}
+	go laravelH.RecoverJobs()
 	cronH := &cron.Handlers{DB: d}
 	logsH := &logs.Handlers{DB: d}
 	plansH := &plans.Handlers{DB: d}
@@ -282,11 +291,13 @@ func main() {
 	appsH := &apps.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
 	wafH := &waf.Handlers{DB: d}
+	rateLimitH := &siteratelimit.Handlers{DB: d}
 	redisH := &redis.Handlers{DB: d}
 	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
 	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH}
+	transfers.RecoverRemoteJobs(d)
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
 	phpExtH := &phpext.Handlers{DB: d}
@@ -338,6 +349,9 @@ func main() {
 		"/api/v1/eklenti-bundle/{ad}/app.js", eklentiH.Bundle)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		// Giriş dahil tüm panel API'si IP/CIDR izin listesine tabidir.
+		r.Use(middleware.PanelErisimKisiti)
+		r.Use(middleware.PanelHizLimiti)
 		// Kaba-kuvvet koruması: giriş uçları IP başına hız-sınırlı (bkz. middleware.GirisLimiti)
 		r.With(middleware.GirisLimiti).Post("/auth/login", authH.Login)
 		r.With(middleware.GirisLimiti).Post("/musteri/login", musteriH.Login)
@@ -425,6 +439,11 @@ func main() {
 			// SSH root erişimini ETKİLEMEZ — yalnız :8443 panel girişi.
 			r.With(middleware.AdminOnly).Get("/system/root-girisi", panelAyarH.RootGirisi)
 			r.With(middleware.AdminOnly).Put("/system/root-girisi", panelAyarH.RootGirisiKaydet)
+			r.With(middleware.AdminOnly).Get("/system/panel-erisim", panelAyarH.ErisimKisiti)
+			r.With(middleware.AdminOnly).Put("/system/panel-erisim", panelAyarH.ErisimKisitiKaydet)
+			r.With(middleware.AdminOnly).Put("/system/panel-erisim/gecici", panelAyarH.GeciciErisimKaydet)
+			r.With(middleware.AdminOnly).Get("/system/panel-hiz-limiti", panelAyarH.HizLimiti)
+			r.With(middleware.AdminOnly).Put("/system/panel-hiz-limiti", panelAyarH.HizLimitiKaydet)
 			eklentiH.Routes(r)
 			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
 			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.
@@ -589,6 +608,18 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/prestashop/cache-temizle", prestashopH.CacheTemizle)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/prestashop/kurtarma-noktasi", prestashopH.KurtarmaNoktasi)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/prestashop/loglar", prestashopH.Loglar)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/laravel/durum", laravelH.Durum)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/laravel/discover", laravelH.Discover)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/laravel/artisan", laravelH.Artisan)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/laravel/bakim", laravelH.Bakim)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/laravel/env", laravelH.EnvGet)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/laravel/env", laravelH.EnvPut)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/laravel/deploy", laravelH.Deploy)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/laravel/composer", laravelH.Composer)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/laravel/scheduler", laravelH.Scheduler)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/laravel/queue", laravelH.Queue)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/laravel/jobs", laravelH.Jobs)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/laravel/jobs/{jid}", laravelH.Job)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssl", domainsH.SSLDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ssl/issue", domainsH.SSLIssue)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ssl", domainsH.SSLDisable)
@@ -705,6 +736,10 @@ func main() {
 				r.With(middleware.BayiVeUstu).Get("/admin/backups/toplu-durum", backupsH.TopluYedekDurum)
 				r.With(middleware.AdminOnly).Post("/admin/transfers/analyze", transfersH.Analyze)
 				r.With(middleware.AdminOnly).Post("/admin/transfers/import", transfersH.Import)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/remote/discover", transfersH.RemoteDiscover)
+				r.With(middleware.AdminOnly).Post("/admin/transfers/remote/start", transfersH.RemoteStart)
+				r.With(middleware.AdminOnly).Get("/admin/transfers/remote/jobs/{jid}", transfersH.RemoteJob)
+				r.With(middleware.AdminOnly).Get("/admin/transfers/remote/jobs", transfersH.RemoteJobs)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-destination", backupsH.GetDestination)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-destination", backupsH.PutDestination)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/backup-destination", backupsH.DeleteDestination)
@@ -736,6 +771,8 @@ func main() {
 				r.With(middleware.AdminOnly).Put("/domains/{id}/vhost-ozel", nginxsetH.SetVhostOzel)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/waf", wafH.Goster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/waf", wafH.Kaydet)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/rate-limit", rateLimitH.Goster)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/rate-limit", rateLimitH.Kaydet)
 				// PHP sürüm/modül LİSTESİ bayiye açık (müşteri domaininin PHP
 				// ayarını yaparken gerekli); kurulum/kaldırma sunucu değiştirir.
 				r.With(middleware.BayiVeUstu).Get("/php-extensions", phpExtH.List)

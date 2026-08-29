@@ -80,6 +80,32 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   tatbikatıyla doğrulanır. Durum, zaman ve hata panelde görünür; en yeni yedekler
   periyodik yeniden sınanır ve doğrulanamayan/değişmiş yedeğin geri yüklenmesi
   fail-closed engellenir.
+- **Faz 5 — tamamlandı (yayın bekliyor):** Panel API'sinin tamamı güvenilir vekil
+  zincirinden alınan gerçek istemci IP'sine göre IPv4/IPv6 ve CIDR allowlist'inden
+  geçirilir. Mevcut IP kontrolü yöneticinin kendini dışarıda bırakmasını engeller;
+  süreli tek-adres/ağ erişimi ve kilitlenme halinde root tarafından çalıştırılan
+  `sanalcp-panel-erisim-kurtar --disable` kurtarma yolu bulunur.
+- **Faz 6 — tamamlandı (yayın bekliyor):** Panel ve domain trafiği için
+  kapalı/dengeli/sıkı/özel profiller, IP/CIDR ve yol istisnaları, bilinen tarama
+  botlarını engelleme ve 403/429 gözlem kayıtları eklendi. Domain nginx ayarları
+  merkezi zone/map üretimi, `nginx -t` kapısı ve DB+dosya rollback ile uygulanır;
+  panelin başarısız-giriş kilidi genel panel hız sınırının altında ayrıca korunur.
+- **Faz 7 — tamamlandı (yayın bekliyor):** Parola saklamayan, BatchMode + StrictHostKeyChecking kullanan
+  SSH keşif ucu cPanel, Plesk ve DirectAdmin sunucularından sürüm ve domain
+  envanteri çıkarır. cPanel `pkgacct`; Plesk ve DirectAdmin ise seçili sitenin
+  web kökü, veritabanları, DNS zone'u ve varsa SSL çiftini ortak güvenli arşiv
+  sözleşmesine paketler. Arşiv 20 GiB sınırıyla SSH üzerinden alınır ve mevcut
+  doğrulama + domain rollback hattında kalıcı arka plan işi olarak içe aktarılır.
+  Kaynak sağlıklı olduğu halde hedef 5xx/erişilemez durumdaysa oluşturulan site
+  otomatik geri alınır; kaynak/hedef HTTP kodları iş geçmişinde saklanır.
+- **Faz 8 — tamamlandı (yayın bekliyor):** Symlink takip etmeyen otomatik Laravel
+  keşfi ve sağlık özeti; fail-closed maskelenen `.env` görüntüleme ve atomik
+  değişken güncelleme; bakım modu ve izin listeli Artisan işlemleri eklendi.
+  Git + Composer + cache + isteğe bağlı migration deploy'u doğrulanmış kurtarma
+  noktası, bakım penceresi, HTTP sağlık kapısı ve dosya+DB otomatik rollback ile
+  kalıcı arka plan işi olarak çalışır. Scheduler mevcut crontab'ı koruyarak,
+  queue worker ise tenant kimliğinde sandbox'lı systemd servisiyle yönetilir;
+  yarım deploy panel başlangıcında otomatik geri alınır ve geçmiş panelde görünür.
 - **Taşıma altyapısı ara teslimatı (v0.9.30):** Mevcut genel Web Sitesi İçe
   Aktarım aracı kalıcı arka plan işleri, canlı ilerleme/geçmiş, işlem öncesi
   zorunlu kurtarma noktası, hata halinde dosya/DB otomatik rollback ve aktarım

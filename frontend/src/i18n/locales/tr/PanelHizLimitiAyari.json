@@ -1,0 +1,1 @@
+{"title":"Panel hız sınırı","desc":"Tüm panel API çağrılarını IP başına sınırlar. Başarısız giriş kilidi ayrıca çalışır.","profiles":{"kapali":"Kapalı","dengeli":"Dengeli · 600/dk","siki":"Sıkı · 120/dk","ozel":"Özel"},"exceptions":"IP/CIDR istisnaları","save":"Uygula","saving":"Kaydediliyor…","saved":"Panel hız profili uygulandı.","events":"Son 429 olayları ({{count}})"}
