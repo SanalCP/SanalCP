@@ -12,7 +12,7 @@ type Yanit={alan_adi:string;ayar:Ayar;olaylar:Olay[]}
 export default function DomainRateLimitPage(){
  const {id}=useParams();const {t}=useTranslation(['DomainRateLimitPage','common'])
  const [y,setY]=useState<Yanit|null>(null),[a,setA]=useState<Ayar|null>(null);const [hata,setHata]=useState(''),[ok,setOk]=useState(''),[busy,setBusy]=useState(false)
- function yukle(){api.get<Yanit>(`/domains/${id}/rate-limit`).then(r=>{setY(r.data);setA(r.data.ayar)}).catch(e=>setHata(apiHata(e)))}
+ function yukle(){api.get<Yanit>(`/domains/${id}/rate-limit`).then(r=>{setY(r.data);setA({...r.data.ayar,ip_istisnalari:r.data.ayar.ip_istisnalari??[],yol_istisnalari:r.data.ayar.yol_istisnalari??[]})}).catch(e=>setHata(apiHata(e)))}
  useEffect(yukle,[id])
  async function kaydet(){if(!a)return;setBusy(true);setHata('');setOk('');try{await api.put(`/domains/${id}/rate-limit`,{ayar:a});setOk(t('DomainRateLimitPage:saved'));yukle()}catch(e){setHata(apiHata(e,t('DomainRateLimitPage:save_failed')))}finally{setBusy(false)}}
  const metin=(xs:string[])=>xs.join('\n'), dizi=(s:string)=>s.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean)

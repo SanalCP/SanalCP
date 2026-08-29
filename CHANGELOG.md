@@ -13,6 +13,20 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.36** (2026-08-29)
+
+Araçlar ve Ayarlar ile domain Rate Limit sayfalarında görülen "Bu sayfa
+yüklenemedi" hatası giderildi. Boş liste durumunda API yanıtları `[]` yerine
+`null` üretiyordu; panel bu alanlarda doğrudan `.join()` çağırdığı için sayfa
+render sırasında çöküyordu. Hata, hiç panel erişim kısıtı veya IP istisnası
+tanımlanmamış kurulumlarda — yani varsayılan durumda — her zaman oluşuyordu.
+
+Panel erişim CIDR'leri, panel hız limiti IP istisnaları, domain rate limit IP ve
+yol istisnaları ile rate limit olay listesi artık boşken de dizi olarak
+kodlanıyor. Kaydetme yanıtı da isteğin ham hâlini değil gerçekten saklanan
+normalize listeyi döndürüyor. Panel tarafında bu alanlar ayrıca null'a karşı
+korumaya alındı.
+
 **0.9.35** (2026-08-29)
 
 Panel sürüm güncellemesi sırasında beyaz sayfa sorunu giderildi. Yeni sürüm

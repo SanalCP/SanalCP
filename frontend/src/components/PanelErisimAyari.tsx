@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
-type Durum = { cidrler: string[]; istemci_ip: string; gecici_cidr: string; gecici_bitis: string }
+// cidrler sunucudan boş listede null gelebiliyordu; tip bunu yansıtır, okuma
+// noktaları dizi()'den geçer.
+type Durum = { cidrler: string[] | null; istemci_ip: string; gecici_cidr: string; gecici_bitis: string }
+
+const dizi = (x: string[] | null | undefined) => x ?? []
 
 export default function PanelErisimAyari() {
   const { t } = useTranslation(['PanelErisimAyari'])
@@ -18,7 +22,7 @@ export default function PanelErisimAyari() {
   const yukle = useCallback(async () => {
     try {
       const { data } = await api.get<Durum>('/system/panel-erisim')
-      setDeger(data.cidrler.join('\n'))
+      setDeger(dizi(data.cidrler).join('\n'))
       setIstemciIP(data.istemci_ip)
       setGeciciCIDR(data.gecici_cidr || '')
       setGeciciBitis(data.gecici_bitis || '')
@@ -31,7 +35,7 @@ export default function PanelErisimAyari() {
     try {
       const cidrler = deger.split(/[\n,]+/).map(x => x.trim()).filter(Boolean)
       const { data } = await api.put<Durum>('/system/panel-erisim', { cidrler })
-      setDeger(data.cidrler.join('\n')); setIstemciIP(data.istemci_ip)
+      setDeger(dizi(data.cidrler).join('\n')); setIstemciIP(data.istemci_ip)
       setBasari(t('PanelErisimAyari:saved'))
     } catch (e) { setHata(apiHata(e, t('PanelErisimAyari:save_failed'))) }
     finally { setKaydediliyor(false) }

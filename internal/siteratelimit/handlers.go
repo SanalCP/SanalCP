@@ -110,11 +110,17 @@ func (h *Handlers) Kaydet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 500, "nginx doğrulama başarısız; önceki ayar geri yüklendi: "+err.Error())
 		return
 	}
+	// Yanıt gerçekten kaydedilen (normalize edilmiş) listeleri göstersin; istek
+	// alanı hiç göndermediyse `a`daki dilim nil kalır ve JSON'da null olurdu.
+	a.IPIstisnalari = ips
+	a.YolIstisnalari = yollar
 	httpx.WriteJSON(w, 200, map[string]any{"ok": true, "ayar": a})
 }
 
+// Boş girdide nil DEĞİL boş dilim döner: nil dilim JSON'da "null" olarak
+// kodlanıyor ve paneldeki `.join()` çağrıları null üzerinde patlıyor.
 func satirlar(s string) []string {
-	var o []string
+	o := []string{}
 	for _, x := range strings.FieldsFunc(s, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' }) {
 		if x = strings.TrimSpace(x); x != "" {
 			o = append(o, x)
@@ -123,7 +129,7 @@ func satirlar(s string) []string {
 	return o
 }
 func ipler(in []string) ([]string, error) {
-	var o []string
+	o := []string{}
 	for _, x := range in {
 		for _, s := range satirlar(x) {
 			if ip := net.ParseIP(s); ip != nil {
@@ -140,7 +146,7 @@ func ipler(in []string) ([]string, error) {
 	return o, nil
 }
 func yollarDogrula(in []string) ([]string, error) {
-	var o []string
+	o := []string{}
 	for _, x := range in {
 		for _, s := range satirlar(x) {
 			if !strings.HasPrefix(s, "/") || strings.ContainsAny(s, " \t\"'{};") {
@@ -176,7 +182,7 @@ func olaylar(domain string, n int) []olay {
 			}
 		}
 	}
-	var out []olay
+	out := []olay{}
 	for _, x := range lines {
 		p := strings.Fields(x)
 		if len(p) > 8 {

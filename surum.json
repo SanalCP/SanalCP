@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.35",
-  "duyuru": "Sürüm güncellemesi sonrası panelde görülen beyaz sayfa sorunu giderildi; sayfa hatalarında panel artık kendini toparlıyor.",
+  "son_surum": "0.9.36",
+  "duyuru": "Araçlar ve Ayarlar ile Rate Limit sayfalarında çıkan \"Bu sayfa yüklenemedi\" hatası giderildi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-29"
 }

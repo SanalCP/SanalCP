@@ -133,8 +133,10 @@ func (h *Handlers) ErisimKisitiKaydet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// satirlar boş girdide de nil DEĞİL boş dilim döner: JSON'da nil dilim "null"
+// olarak kodlanıyor ve paneldeki `.join()` çağrıları null üzerinde patlıyor.
 func satirlar(ham string) []string {
-	var sonuc []string
+	sonuc := []string{}
 	for _, s := range strings.FieldsFunc(ham, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' }) {
 		if s = strings.TrimSpace(s); s != "" {
 			sonuc = append(sonuc, s)
@@ -144,7 +146,8 @@ func satirlar(ham string) []string {
 }
 
 func normalizeCIDRler(girdiler []string) ([]string, []*net.IPNet, error) {
-	var norm []string
+	// norm yanıtta JSON'a yazılıyor; boş sonuçta "null" değil "[]" olmalı.
+	norm := []string{}
 	var aglar []*net.IPNet
 	goruldu := map[string]bool{}
 	for _, girdi := range girdiler {
