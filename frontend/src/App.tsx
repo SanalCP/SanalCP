@@ -68,6 +68,7 @@ const MailGenelPage = lazy(() => import('@/pages/MailGenelPage'))
 const VeritabanlariGenelPage = lazy(() => import('@/pages/VeritabanlariGenelPage'))
 const MusterilerPage = lazy(() => import('@/pages/MusterilerPage'))
 const GuvenlikGunluguPage = lazy(() => import('@/pages/GuvenlikGunluguPage'))
+const GuvenlikBildirimleriPage = lazy(() => import('@/pages/GuvenlikBildirimleriPage'))
 const KullanicilarPage = lazy(() => import('@/pages/KullanicilarPage'))
 const BayiPaketleriPage = lazy(() => import('@/pages/BayiPaketleriPage'))
 const BayiOzetPage = lazy(() => import('@/pages/BayiOzetPage'))
@@ -157,6 +158,7 @@ export default function App() {
         <Route path="sunucu-durumu"     element={<SunucuDurumuPage />} />
         <Route path="musteriler"        element={<MusterilerPage />} />
         <Route path="guvenlik-gunlugu"  element={<GuvenlikGunluguPage />} />
+        <Route path="guvenlik-bildirimleri" element={<GuvenlikBildirimleriPage />} />
 
         <Route path="araclar-ayarlar" element={<AraclarAyarlarPage />} />
         <Route path="istatistikler" element={<IstatistiklerPage />} />

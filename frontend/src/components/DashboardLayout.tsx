@@ -103,6 +103,7 @@ function nav(t: TFunction): NavGroup[] {
     { to: '/musteriler',           etiket: t('DashboardLayout:items.customers'),     ikon: ICONS.musteri },
     { to: '/hesap-aktarimi',       etiket: t('DashboardLayout:items.account_transfer'), ikon: ICONS.kopya },
     { to: '/guvenlik-gunlugu',     etiket: t('DashboardLayout:items.security_log'),  ikon: ICONS.log },
+    { to: '/guvenlik-bildirimleri', etiket: t('DashboardLayout:items.security_notifications'), ikon: ICONS.kilit },
     { to: '/araclar-ayarlar',      etiket: t('DashboardLayout:items.tools_settings'), ikon: ICONS.araclar },
   ]},
   ]

@@ -1,0 +1,1 @@
+{"title":"Security Notifications","subtitle":"Time-window correlation of login, WAF, file, and process events","acik":"Open","cozuldu":"Resolved","empty":"No notifications","empty_desc":"No correlated security events exist in this state.","resolve":"Mark resolved","reopen":"Reopen","levels":{"kritik":"Critical","yuksek":"High","orta":"Medium","dusuk":"Low"}}

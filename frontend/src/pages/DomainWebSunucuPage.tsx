@@ -23,10 +23,12 @@ type Ayarlar = {
   fastcgi_cache_dakika: number
   browser_cache: boolean
   browser_cache_gun: number
+  http3: boolean
+  cache_profili: 'kapali'|'genel'|'wordpress'|'prestashop'|'ozel'
   ek_direktifler: string
 }
 
-type Yanit = { alan_adi: string; ayarlar: Ayarlar }
+type Yanit = { alan_adi: string; ayarlar: Ayarlar; http3_destekli: boolean }
 type VhostOzelYanit = { ozel: boolean; icerik: string; alan_adi: string }
 type ProxyAyar = { aktif: boolean; scheme: 'http'|'https'; host: string; port: number; websocket: boolean }
 
@@ -85,6 +87,7 @@ export default function DomainWebSunucuPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
   const [isleniyor, setIsleniyor] = useState(false)
+  const [olcum,setOlcum]=useState<{ilk_ttfb_ms:number;ikinci_ttfb_ms:number;ilk_cache:string;ikinci_cache:string}|null>(null)
 
   const [backend, setBackend] = useState<string>('php-fpm')
   // Apache backend Debian ailesinde v1'de kapalı; hangi seçeneklerin gerçekten
@@ -366,6 +369,10 @@ export default function DomainWebSunucuPage() {
 
           {/* Performans Önbelleği */}
           <Kart baslik={t('DomainWebSunucuPage:cache_title')}>
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainWebSunucuPage:cache_profile')}<select value={a.cache_profili} onChange={e=>P('cache_profili',e.target.value as Ayarlar['cache_profili'])} className="mt-1 block w-full rounded border p-2 dark:bg-slate-900"><option value="kapali">{t('DomainWebSunucuPage:profiles.off')}</option><option value="genel">{t('DomainWebSunucuPage:profiles.general')}</option><option value="wordpress">WordPress</option><option value="prestashop">PrestaShop</option><option value="ozel">{t('DomainWebSunucuPage:profiles.custom')}</option></select></label>
+              <div><SatirToggle etiket="HTTP/3 (QUIC)" deger={yanit?.http3_destekli?t('DomainWebSunucuPage:http3_supported'):t('DomainWebSunucuPage:http3_unsupported')} aciklama={t('DomainWebSunucuPage:http3_desc')} acik={a.http3} onToggle={()=>yanit?.http3_destekli&&P('http3',!a.http3)}/></div>
+            </div>
             <SatirToggle
               etiket={t('DomainWebSunucuPage:fastcgi_cache_label')}
               deger={t('DomainWebSunucuPage:fastcgi_cache_value', { min: a.fastcgi_cache_dakika })}
@@ -409,6 +416,7 @@ export default function DomainWebSunucuPage() {
                 </div>
               )}
             </div>
+            <div className="mt-4 border-t pt-4 dark:border-slate-800"><button onClick={async()=>{try{const r=await api.post(`/domains/${id}/nginx-settings/olc`);setOlcum(r.data)}catch(e){setHata(apiHata(e))}}} className="rounded-lg border px-3 py-2 text-xs dark:border-slate-700">{t('DomainWebSunucuPage:measure')}</button>{olcum&&<span className="ml-3 text-xs text-slate-500">TTFB {olcum.ilk_ttfb_ms} ms → {olcum.ikinci_ttfb_ms} ms · {olcum.ilk_cache||'—'} → {olcum.ikinci_cache||'—'}</span>}</div>
           </Kart>
 
           {vhostOzel && (

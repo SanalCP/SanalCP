@@ -328,7 +328,10 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name {{.SunucuAdlari}};
+{{if .HTTP3}}    listen 443 quic;
+    listen [::]:443 quic;
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+{{end}}    server_name {{.SunucuAdlari}};
 
     ssl_certificate     {{.CertPath}};
     ssl_certificate_key {{.KeyPath}};
@@ -384,8 +387,12 @@ server {
 {{if .FastCgiCache}}    set $skip_cache 0;
     if ($request_method = POST) { set $skip_cache 1; }
     if ($query_string != "") { set $skip_cache 1; }
-    if ($request_uri ~* "/wp-admin/|/wp-login.php|/cart/|/checkout/|/my-account/|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
+{{if eq .CacheProfili "wordpress"}}    if ($request_uri ~* "/wp-admin/|/wp-login.php|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
     if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") { set $skip_cache 1; }
+{{else if eq .CacheProfili "prestashop"}}    if ($request_uri ~* "/cart/|/checkout/|/my-account/|/order/|/admin[^/]*/") { set $skip_cache 1; }
+    if ($http_cookie ~* "PrestaShop-|PHPSESSID") { set $skip_cache 1; }
+{{else}}    if ($http_cookie ~* "PHPSESSID") { set $skip_cache 1; }
+{{end}}
 {{end}}    location ~ \.php(?:$|/) {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
         try_files $fastcgi_script_name =404;
@@ -483,8 +490,12 @@ server {
 {{if .FastCgiCache}}    set $skip_cache 0;
     if ($request_method = POST) { set $skip_cache 1; }
     if ($query_string != "") { set $skip_cache 1; }
-    if ($request_uri ~* "/wp-admin/|/wp-login.php|/cart/|/checkout/|/my-account/|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
+{{if eq .CacheProfili "wordpress"}}    if ($request_uri ~* "/wp-admin/|/wp-login.php|preview=true|sitemap.*\.xml") { set $skip_cache 1; }
     if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") { set $skip_cache 1; }
+{{else if eq .CacheProfili "prestashop"}}    if ($request_uri ~* "/cart/|/checkout/|/my-account/|/order/|/admin[^/]*/") { set $skip_cache 1; }
+    if ($http_cookie ~* "PrestaShop-|PHPSESSID") { set $skip_cache 1; }
+{{else}}    if ($http_cookie ~* "PHPSESSID") { set $skip_cache 1; }
+{{end}}
 {{end}}    location ~ \.php(?:$|/) {
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
         try_files $fastcgi_script_name =404;
@@ -752,6 +763,8 @@ type VhostOpts struct {
 	FastCgiCacheDakika int
 	BrowserCache       bool
 	BrowserCacheGun    int
+	HTTP3              bool
+	CacheProfili       string
 	CacheVersion       int // cache:purge CLI komutuyla artan sayaç; fastcgi_cache_key'e gömülür
 
 	// Kullanici ek direktifleri
@@ -793,6 +806,15 @@ type VhostOpts struct {
 
 func (o VhostOpts) SSL() bool {
 	return o.CertPath != "" && o.KeyPath != ""
+}
+
+func HTTP3Destekli() bool {
+	out, err := exec.Command("nginx", "-V").CombinedOutput()
+	if err != nil {
+		return false
+	}
+	s := strings.ToLower(string(out))
+	return strings.Contains(s, "http_v3_module") || strings.Contains(s, "quic")
 }
 
 // SunucuAdlari: server_name direktifinde kullanilacak host listesi. Domain zaten
@@ -1872,17 +1894,18 @@ func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error
 	opts.FastCgiCacheDakika = 60
 	opts.BrowserCache = true
 	opts.BrowserCacheGun = 30
+	opts.CacheProfili = "kapali"
 
-	var b1, b2, b3, b4, b5, b6, b7, b8, bFC, bBC int
+	var b1, b2, b3, b4, b5, b6, b7, b8, bFC, bBC, bH3 int
 	var maxAge, fcDk, bcGun int
 	var ek string
 	err := db.QueryRow(
 		`SELECT hdr_x_content_type, hdr_x_xss, hdr_referrer, hdr_permissions,
 		        hdr_csp_upgrade, hdr_hsts, hsts_max_age, hsts_subdomains, hsts_preload, ek_direktifler,
-		        fastcgi_cache, fastcgi_cache_dakika, browser_cache, browser_cache_gun
+		        fastcgi_cache, fastcgi_cache_dakika, browser_cache, browser_cache_gun,COALESCE(http3,0),COALESCE(cache_profili,'kapali')
 		 FROM nginx_settings WHERE domain_id=?`, domainID).
 		Scan(&b1, &b2, &b3, &b4, &b5, &b6, &maxAge, &b7, &b8, &ek,
-			&bFC, &fcDk, &bBC, &bcGun)
+			&bFC, &fcDk, &bBC, &bcGun, &bH3, &opts.CacheProfili)
 	if err == nil {
 		opts.HdrXContentType = b1 == 1
 		opts.HdrXXSS = b2 == 1
@@ -1898,6 +1921,7 @@ func ApplyVhostForDomain(db *sql.DB, domainID int64, socket, surum string) error
 		opts.FastCgiCacheDakika = fcDk
 		opts.BrowserCache = bBC == 1
 		opts.BrowserCacheGun = bcGun
+		opts.HTTP3 = bH3 == 1 && HTTP3Destekli()
 	}
 	// Korumali dizin (.htpasswd) bloklari — nginx_settings satiri olsun olmasin eklenir
 	if pb := buildProtectedBlocks(db, domainID, socket); pb != "" {

@@ -80,17 +80,17 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   tatbikatıyla doğrulanır. Durum, zaman ve hata panelde görünür; en yeni yedekler
   periyodik yeniden sınanır ve doğrulanamayan/değişmiş yedeğin geri yüklenmesi
   fail-closed engellenir.
-- **Faz 5 — tamamlandı (yayın bekliyor):** Panel API'sinin tamamı güvenilir vekil
+- **Faz 5 — tamamlandı (v0.9.33):** Panel API'sinin tamamı güvenilir vekil
   zincirinden alınan gerçek istemci IP'sine göre IPv4/IPv6 ve CIDR allowlist'inden
   geçirilir. Mevcut IP kontrolü yöneticinin kendini dışarıda bırakmasını engeller;
   süreli tek-adres/ağ erişimi ve kilitlenme halinde root tarafından çalıştırılan
   `sanalcp-panel-erisim-kurtar --disable` kurtarma yolu bulunur.
-- **Faz 6 — tamamlandı (yayın bekliyor):** Panel ve domain trafiği için
+- **Faz 6 — tamamlandı (v0.9.33):** Panel ve domain trafiği için
   kapalı/dengeli/sıkı/özel profiller, IP/CIDR ve yol istisnaları, bilinen tarama
   botlarını engelleme ve 403/429 gözlem kayıtları eklendi. Domain nginx ayarları
   merkezi zone/map üretimi, `nginx -t` kapısı ve DB+dosya rollback ile uygulanır;
   panelin başarısız-giriş kilidi genel panel hız sınırının altında ayrıca korunur.
-- **Faz 7 — tamamlandı (yayın bekliyor):** Parola saklamayan, BatchMode + StrictHostKeyChecking kullanan
+- **Faz 7 — tamamlandı (v0.9.33):** Parola saklamayan, BatchMode + StrictHostKeyChecking kullanan
   SSH keşif ucu cPanel, Plesk ve DirectAdmin sunucularından sürüm ve domain
   envanteri çıkarır. cPanel `pkgacct`; Plesk ve DirectAdmin ise seçili sitenin
   web kökü, veritabanları, DNS zone'u ve varsa SSL çiftini ortak güvenli arşiv
@@ -98,7 +98,7 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   doğrulama + domain rollback hattında kalıcı arka plan işi olarak içe aktarılır.
   Kaynak sağlıklı olduğu halde hedef 5xx/erişilemez durumdaysa oluşturulan site
   otomatik geri alınır; kaynak/hedef HTTP kodları iş geçmişinde saklanır.
-- **Faz 8 — tamamlandı (yayın bekliyor):** Symlink takip etmeyen otomatik Laravel
+- **Faz 8 — tamamlandı (v0.9.33):** Symlink takip etmeyen otomatik Laravel
   keşfi ve sağlık özeti; fail-closed maskelenen `.env` görüntüleme ve atomik
   değişken güncelleme; bakım modu ve izin listeli Artisan işlemleri eklendi.
   Git + Composer + cache + isteğe bağlı migration deploy'u doğrulanmış kurtarma
@@ -106,6 +106,32 @@ Toplam geliştirme tahmini: **49–80 iş günü**. İlk üretim eşiği olan 0�
   kalıcı arka plan işi olarak çalışır. Scheduler mevcut crontab'ı koruyarak,
   queue worker ise tenant kimliğinde sandbox'lı systemd servisiyle yönetilir;
   yarım deploy panel başlangıcında otomatik geri alınır ve geçmiş panelde görünür.
+- **Faz 9 — tamamlandı (v0.9.34):** PHP webshell motoru sabit tek-imza yaklaşımından
+  açıklanabilir puanlamaya geçirildi. Güçlü içerik imzaları birleştirilir;
+  uploads/cache/tmp gibi yazılabilir konumlar tek başına bulgu üretmeden puanı
+  güçlendirir. Yalnız 70/100 ve üstü bulgular raporlanır; ClamAV eşleşmeleri
+  100/100 kabul edilir. Panel risk seviyesi, puan ve gerekçeleri gösterir.
+  WordPress kurulumlarında resmî çekirdek checksum doğrulaması tenant kimliğiyle
+  çalışır; değişmiş çekirdek dosyaları kritik, çekirdek dizinine sonradan eklenen
+  dosyalar yüksek riskli sayılır. Site kökündeki özel dosyalar yanlış-pozitif
+  üretmez, WP-CLI/ağ hatası da zararlı bulgusuna dönüştürülmez. Yanlış-pozitif
+  istisnaları tam yol+imza+SHA-256 üçlüsüne bağlıdır ve dosya değişince geçersiz
+  olur. Karantina ve geri alma openat2/renameat2 ile symlink takip etmez; tarama
+  sonrası değişen kaynağı ve dolu geri dönüş hedefini fail-closed reddeder.
+- **Faz 10 — tamamlandı (v0.9.34):** Başarısız giriş kümeleri, başarısız denemelerin ardından
+  gelen başarılı giriş, aktif zararlı dosya bulguları, yoğun panel/WAF hız sınırı
+  olayları ve başarısız deploy/taşıma süreçleri ortak bildirim modelinde
+  ilişkilendirilir. Saat pencereli SHA-256 dedup anahtarı tekrar bildirimlerini
+  önler; kritik/yüksek/orta/düşük seviyeleri ile açık/çözüldü iş akışı panelde
+  sunulur. ModSecurity serial audit günlüğü IP, Host ve CRS kuralı düzeyinde
+  normalize edilir; üst çubuk açık ve kritik bildirim sayısını canlı gösterir.
+- **Faz 11 — tamamlandı (v0.9.34):** Nginx QUIC/HTTP/3 desteği gerçek derleme
+  seçeneklerinden algılanır; desteklenmeyen sunucuda açma reddedilir. HTTP/3
+  yalnız TLS vhost'una QUIC ve Alt-Svc ekler; nginx doğrulaması başarısızsa DB ve
+  dosya eski duruma döner. Genel PHP, WordPress ve PrestaShop cache profilleri
+  oturum, yönetim, sepet ve ödeme yollarını fail-safe atlar. İki ardışık yerel
+  HTTPS isteğiyle TTFB ve X-Cache-Status önce/sonra ölçümü panelde gösterilir ve
+  geçmişe kaydedilir.
 - **Taşıma altyapısı ara teslimatı (v0.9.30):** Mevcut genel Web Sitesi İçe
   Aktarım aracı kalıcı arka plan işleri, canlı ilerleme/geçmiş, işlem öncesi
   zorunlu kurtarma noktası, hata halinde dosya/DB otomatik rollback ve aktarım

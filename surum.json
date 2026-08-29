@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.33",
-  "duyuru": "Panel erişim allowlist'i, bot/rate-limit yönetimi, uzak panelden site taşıma ve Laravel araçları eklendi.",
+  "son_surum": "0.9.34",
+  "duyuru": "Gelişmiş zararlı yazılım motoru, güvenlik bildirim merkezi, HTTP/3 yönetimi ve uygulama cache profilleri eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-29"
 }

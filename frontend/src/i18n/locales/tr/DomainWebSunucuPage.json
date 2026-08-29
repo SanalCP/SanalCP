@@ -23,6 +23,7 @@
   "security_headers_title": "Güvenlik Başlıkları (HTTP + HTTPS)",
   "hsts_title": "HTTP Strict Transport Security (yalnızca HTTPS)",
   "cache_title": "Performans Önbelleği",
+  "cache_profile":"Uygulama cache profili","profiles":{"off":"Kapalı","general":"Genel PHP","custom":"Özel"},"http3_supported":"Sunucu destekliyor","http3_unsupported":"Bu nginx derlemesi desteklemiyor","http3_desc":"TLS sitelerinde QUIC dinleyicisi ve Alt-Svc başlığı ekler; nginx doğrulaması başarısızsa geri alınır.","measure":"Önce/sonra TTFB ölç",
   "save_failed": "Kaydetme başarısız",
   "vhost_save_failed": "Vhost kaydedilemedi",
   "vhost_revert": "Eski İçeriğe Dön",

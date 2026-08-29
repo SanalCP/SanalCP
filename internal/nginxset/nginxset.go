@@ -6,10 +6,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
@@ -29,10 +32,12 @@ type Settings struct {
 	HSTSPreload     bool `json:"hsts_preload"`
 
 	// Performans onbellegi
-	FastCgiCache       bool `json:"fastcgi_cache"`
-	FastCgiCacheDakika int  `json:"fastcgi_cache_dakika"`
-	BrowserCache       bool `json:"browser_cache"`
-	BrowserCacheGun    int  `json:"browser_cache_gun"`
+	FastCgiCache       bool   `json:"fastcgi_cache"`
+	FastCgiCacheDakika int    `json:"fastcgi_cache_dakika"`
+	BrowserCache       bool   `json:"browser_cache"`
+	BrowserCacheGun    int    `json:"browser_cache_gun"`
+	HTTP3              bool   `json:"http3"`
+	CacheProfili       string `json:"cache_profili"`
 
 	EkDirektifler string `json:"ek_direktifler"`
 }
@@ -127,6 +132,7 @@ func Defaults() Settings {
 		HSTSMaxAge: 31536000, HSTSSubdomains: true, HSTSPreload: false,
 		FastCgiCache: false, FastCgiCacheDakika: 60,
 		BrowserCache: true, BrowserCacheGun: 30,
+		HTTP3: false, CacheProfili: "kapali",
 		EkDirektifler: "",
 	}
 }
@@ -140,15 +146,15 @@ func b2i(b bool) int {
 
 func Get(ctx context.Context, db *sql.DB, domainID int64) (Settings, error) {
 	s := Defaults()
-	var b1, b2, b3, b4, b5, b6, b7, b8, bFC, bBC int
+	var b1, b2, b3, b4, b5, b6, b7, b8, bFC, bBC, bH3 int
 	err := db.QueryRowContext(ctx,
 		`SELECT hdr_x_content_type, hdr_x_xss, hdr_referrer, hdr_permissions,
 		        hdr_csp_upgrade, hdr_hsts, hsts_max_age, hsts_subdomains, hsts_preload,
 		        ek_direktifler, fastcgi_cache, fastcgi_cache_dakika,
-		        browser_cache, browser_cache_gun
+		        browser_cache, browser_cache_gun, COALESCE(http3,0), COALESCE(cache_profili,'kapali')
 		 FROM nginx_settings WHERE domain_id=?`, domainID).
 		Scan(&b1, &b2, &b3, &b4, &b5, &b6, &s.HSTSMaxAge, &b7, &b8,
-			&s.EkDirektifler, &bFC, &s.FastCgiCacheDakika, &bBC, &s.BrowserCacheGun)
+			&s.EkDirektifler, &bFC, &s.FastCgiCacheDakika, &bBC, &s.BrowserCacheGun, &bH3, &s.CacheProfili)
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, nil
 	}
@@ -165,6 +171,7 @@ func Get(ctx context.Context, db *sql.DB, domainID int64) (Settings, error) {
 	s.HSTSPreload = b8 == 1
 	s.FastCgiCache = bFC == 1
 	s.BrowserCache = bBC == 1
+	s.HTTP3 = bH3 == 1
 	return s, nil
 }
 
@@ -172,8 +179,8 @@ func Save(ctx context.Context, db *sql.DB, domainID int64, s Settings) error {
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO nginx_settings(domain_id, hdr_x_content_type, hdr_x_xss, hdr_referrer,
 		    hdr_permissions, hdr_csp_upgrade, hdr_hsts, hsts_max_age, hsts_subdomains, hsts_preload,
-		    ek_direktifler, fastcgi_cache, fastcgi_cache_dakika, browser_cache, browser_cache_gun)
-		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		    ek_direktifler, fastcgi_cache, fastcgi_cache_dakika, browser_cache, browser_cache_gun,http3,cache_profili)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		 ON DUPLICATE KEY UPDATE
 		    hdr_x_content_type=VALUES(hdr_x_content_type),
 		    hdr_x_xss=VALUES(hdr_x_xss),
@@ -188,17 +195,40 @@ func Save(ctx context.Context, db *sql.DB, domainID int64, s Settings) error {
 		    fastcgi_cache=VALUES(fastcgi_cache),
 		    fastcgi_cache_dakika=VALUES(fastcgi_cache_dakika),
 		    browser_cache=VALUES(browser_cache),
-		    browser_cache_gun=VALUES(browser_cache_gun)`,
+		    browser_cache_gun=VALUES(browser_cache_gun),http3=VALUES(http3),cache_profili=VALUES(cache_profili)`,
 		domainID, b2i(s.HdrXContentType), b2i(s.HdrXXSS), b2i(s.HdrReferrer),
 		b2i(s.HdrPermissions), b2i(s.HdrCSPUpgrade), b2i(s.HdrHSTS),
 		s.HSTSMaxAge, b2i(s.HSTSSubdomains), b2i(s.HSTSPreload),
 		s.EkDirektifler, b2i(s.FastCgiCache), s.FastCgiCacheDakika,
-		b2i(s.BrowserCache), s.BrowserCacheGun)
+		b2i(s.BrowserCache), s.BrowserCacheGun, b2i(s.HTTP3), s.CacheProfili)
 	return err
 }
 
 type Handlers struct {
 	DB *sql.DB
+}
+
+func profilUygula(s *Settings) error {
+	switch s.CacheProfili {
+	case "kapali":
+		s.FastCgiCache = false
+	case "genel":
+		s.FastCgiCache = true
+		s.FastCgiCacheDakika = 15
+	case "wordpress":
+		s.FastCgiCache = true
+		s.FastCgiCacheDakika = 60
+	case "prestashop":
+		s.FastCgiCache = true
+		s.FastCgiCacheDakika = 30
+	case "ozel":
+	default:
+		return errors.New("geçersiz cache profili")
+	}
+	if s.FastCgiCacheDakika < 1 || s.FastCgiCacheDakika > 10080 {
+		return errors.New("cache süresi 1–10080 dakika olmalı")
+	}
+	return nil
 }
 
 func (h *Handlers) Goster(w http.ResponseWriter, r *http.Request) {
@@ -215,8 +245,9 @@ func (h *Handlers) Goster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"alan_adi": alanAdi,
-		"ayarlar":  s,
+		"alan_adi":       alanAdi,
+		"ayarlar":        s,
+		"http3_destekli": provisioner.HTTP3Destekli(),
 	})
 }
 
@@ -227,6 +258,19 @@ func (h *Handlers) Kaydet(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
+	eski, err := Get(r.Context(), h.DB, id)
+	if err != nil {
+		httpx.WriteError(w, 500, "eski ayarlar okunamadı")
+		return
+	}
+	if err := profilUygula(&req.Ayarlar); err != nil {
+		httpx.WriteError(w, 400, err.Error())
+		return
+	}
+	if req.Ayarlar.HTTP3 && !provisioner.HTTP3Destekli() {
+		httpx.WriteError(w, 409, "nginx HTTP/3/QUIC desteğiyle derlenmemiş")
 		return
 	}
 	var php, sk string
@@ -245,20 +289,63 @@ func (h *Handlers) Kaydet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz nginx direktifi: "+err.Error())
 		return
 	}
-	if err := Save(r.Context(), h.DB, id, req.Ayarlar); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "kaydet: "+err.Error())
-		return
-	}
 	socket, err := provisioner.PHPSocketFor(sk, php)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "socket: "+err.Error())
 		return
 	}
+	if err := Save(r.Context(), h.DB, id, req.Ayarlar); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kaydet: "+err.Error())
+		return
+	}
 	if err := provisioner.ApplyVhostForDomain(h.DB, id, socket, php); err != nil {
+		_ = Save(context.Background(), h.DB, id, eski)
+		_ = provisioner.ApplyVhostForDomain(h.DB, id, socket, php)
 		httpx.WriteError(w, http.StatusInternalServerError, "vhost: "+err.Error())
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *Handlers) Olc(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	var alan, profil string
+	if h.DB.QueryRowContext(r.Context(), `SELECT d.alan_adi,COALESCE(n.cache_profili,'kapali') FROM domains d LEFT JOIN nginx_settings n ON n.domain_id=d.id WHERE d.id=?`, id).Scan(&alan, &profil) != nil {
+		httpx.WriteError(w, 404, "domain bulunamadı")
+		return
+	}
+	olc := func() (int, string, error) {
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "curl", "-ksS", "--resolve", alan+":443:127.0.0.1", "-D", "-", "-o", "/dev/null", "-w", "\nTTFB:%{time_starttransfer}", "https://"+alan+"/").CombinedOutput()
+		if err != nil {
+			return 0, "", err
+		}
+		s := string(out)
+		var sec float64
+		if _, err = fmt.Sscanf(s[strings.LastIndex(s, "TTFB:"):], "TTFB:%f", &sec); err != nil {
+			return 0, "", err
+		}
+		cache := ""
+		for _, l := range strings.Split(s, "\n") {
+			if strings.HasPrefix(strings.ToLower(l), "x-cache-status:") {
+				cache = strings.TrimSpace(strings.SplitN(l, ":", 2)[1])
+			}
+		}
+		return int(sec * 1000), cache, nil
+	}
+	bir, c1, e := olc()
+	if e != nil {
+		httpx.WriteError(w, 502, "ilk ölçüm: "+e.Error())
+		return
+	}
+	iki, c2, e := olc()
+	if e != nil {
+		httpx.WriteError(w, 502, "ikinci ölçüm: "+e.Error())
+		return
+	}
+	_, _ = h.DB.Exec(`INSERT INTO performans_olcumleri(domain_id,cache_profili,ilk_ttfb_ms,ikinci_ttfb_ms,ilk_cache,ikinci_cache) VALUES(?,?,?,?,?,?)`, id, profil, bir, iki, c1, c2)
+	httpx.WriteJSON(w, 200, map[string]any{"ilk_ttfb_ms": bir, "ikinci_ttfb_ms": iki, "ilk_cache": c1, "ikinci_cache": c2, "profil": profil})
 }
 
 // ---- Özel (ham) vhost modu — yalnızca admin. Bkz. internal/provisioner/provisioner.go

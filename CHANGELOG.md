@@ -13,6 +13,24 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.34** (2026-08-29)
+
+Gelişmiş zararlı yazılım ve bütünlük motoru eklendi. PHP webshell içerik
+sinyalleri ve yazılabilir konum sezgileri açıklanabilir 0–100 risk puanında
+birleştirilir; zayıf tek sinyaller bulgu üretmez. WordPress çekirdek dosyaları
+resmî checksum'larla tenant kimliğinde doğrulanır. Yanlış-pozitif istisnaları
+yalnız tam dosya yolu, imza ve SHA-256 özeti değişmediği sürece geçerlidir.
+Karantina ve geri alma işlemleri symlink takip etmez, değişmiş kaynağı veya dolu
+hedefi reddeder ve veritabanı hatasında dosya hareketini geri alır.
+
+Güvenlik bildirim merkezi; giriş, ModSecurity/WAF, zararlı dosya ve başarısız
+deploy/taşıma olaylarını zaman pencerelerinde ilişkilendirir. Tekrarlanan olaylar
+birleştirilir, önem seviyesi atanır ve açık/çözüldü durumu panelden yönetilir.
+
+HTTP/3 desteği nginx yetenek algılamasıyla güvenli biçimde açılabilir. Genel PHP,
+WordPress ve PrestaShop cache profilleri ile oturum/sepet/ödeme bypass kuralları
+eklendi; yerel HTTPS üzerinden ardışık TTFB ve cache HIT/MISS ölçümü yapılabilir.
+
 **0.9.33** (2026-08-29)
 
 Panel güvenliği ve operasyon araçları genişletildi. Panel API'si IPv4/IPv6

@@ -40,6 +40,7 @@ import (
 	"sanalcp/internal/gocis"
 	_ "sanalcp/internal/grav"
 	"sanalcp/internal/guvenlikduvari"
+	"sanalcp/internal/guvenlikolay"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/iceaktarim"
@@ -290,6 +291,7 @@ func main() {
 	wpH := &wordpress.Handlers{DB: d}
 	appsH := &apps.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
+	guvenlikOlayH := &guvenlikolay.Handlers{DB: d}
 	wafH := &waf.Handlers{DB: d}
 	rateLimitH := &siteratelimit.Handlers{DB: d}
 	redisH := &redis.Handlers{DB: d}
@@ -505,6 +507,9 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/tara", avH.Tara)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/antivirus/tara/{sid}", avH.TaraDurum)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/karantina", avH.Karantina)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/karantina-geri-al", avH.KarantinaGeriAl)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/istisna", avH.IstisnaEkle)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/antivirus/istisna/{bid}", avH.IstisnaSil)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/antivirus/imza-guncelle", avH.ImzaGuncelle)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/kopya", kopyaH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/kopya", kopyaH.Olustur)
@@ -692,6 +697,9 @@ func main() {
 				// ama okunacak uç yoktu.
 				r.With(middleware.AdminOnly).Get("/audit", authH.AuditListe)
 				r.With(middleware.AdminOnly).Get("/audit/eylemler", authH.AuditEylemler)
+				r.With(middleware.AdminOnly).Get("/guvenlik-bildirimleri", guvenlikOlayH.Liste)
+				r.With(middleware.AdminOnly).Get("/guvenlik-bildirimleri/ozet", guvenlikOlayH.Ozet)
+				r.With(middleware.AdminOnly).Put("/guvenlik-bildirimleri/{id}", guvenlikOlayH.Durum)
 				// Panel hesapları (admin + bayi). Kapsam daraltması handler
 				// içindedir: bayi yalnız kendi altındaki hesapları görür/yönetir
 				// ve yalnız 'user' rolünde hesap açabilir.
@@ -763,6 +771,7 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/kaynak", kaynakH.Goster)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/nginx-settings", nginxsetH.Goster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/nginx-settings", nginxsetH.Kaydet)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/nginx-settings/olc", nginxsetH.Olc)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/reverse-proxy", nginxsetH.ProxyGoster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/reverse-proxy", nginxsetH.ProxyKaydet)
 				// Özel vhost modu: paylaşımlı nginx'te server_name/listen gibi tenant-izolasyonunu

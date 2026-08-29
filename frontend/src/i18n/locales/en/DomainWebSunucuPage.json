@@ -23,6 +23,7 @@
   "security_headers_title": "Security Headers (HTTP + HTTPS)",
   "hsts_title": "HTTP Strict Transport Security (HTTPS only)",
   "cache_title": "Performance Cache",
+  "cache_profile":"Application cache profile","profiles":{"off":"Off","general":"General PHP","custom":"Custom"},"http3_supported":"Supported by server","http3_unsupported":"Not supported by this nginx build","http3_desc":"Adds a QUIC listener and Alt-Svc header on TLS sites; rolls back if nginx validation fails.","measure":"Measure before/after TTFB",
   "save_failed": "Could not save",
   "vhost_save_failed": "Could not save vhost",
   "vhost_revert": "Revert to Original",

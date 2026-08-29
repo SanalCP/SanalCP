@@ -185,6 +185,28 @@ func DosyaYaz(home, rel, sk string, veri []byte, mode uint32) error {
 	return nil
 }
 
+// Tasi: home içindeki iki yol arasında, parent dizinleri openat2 ile pinleyerek
+// atomik ve symlink takip etmeyen taşıma yapar. Hedef varsa üzerine yazmaz.
+func Tasi(home, eskiRel, yeniRel string) error {
+	eskiRel, yeniRel = temizRel(eskiRel), temizRel(yeniRel)
+	eskiAd, yeniAd := filepath.Base(eskiRel), filepath.Base(yeniRel)
+	if eskiAd == "." || yeniAd == "." || eskiAd == ".." || yeniAd == ".." {
+		return fmt.Errorf("jailpath: geçersiz taşıma yolu")
+	}
+	eskiDizin, yeniDizin := filepath.Dir(eskiRel), filepath.Dir(yeniRel)
+	ef, err := AcDizin(home, eskiDizin)
+	if err != nil {
+		return err
+	}
+	defer ef.Close()
+	yf, err := AcDizin(home, yeniDizin)
+	if err != nil {
+		return err
+	}
+	defer yf.Close()
+	return unix.Renameat2(int(ef.Fd()), eskiAd, int(yf.Fd()), yeniAd, unix.RENAME_NOREPLACE)
+}
+
 // IceriginiSil: home/rel dizininin İÇERİĞİNİ symlink-güvenli siler (dizinin
 // kendisi kalır). Tüm işlemler pinlenmiş fd'lere görelidir; hiçbir adımda
 // symlink takip edilmez — jail dışında silme imkânsızdır.

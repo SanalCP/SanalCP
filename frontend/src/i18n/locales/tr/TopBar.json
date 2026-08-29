@@ -39,6 +39,7 @@
     "dns_template": { "baslik": "DNS Şablonu", "aciklama": "Varsayılan DNS kayıtları" },
     "firewall": { "baslik": "Güvenlik Duvarı", "aciklama": "Firewall kuralları" },
     "security_log": { "baslik": "Güvenlik Günlüğü", "aciklama": "Güvenlik olayları" },
+    "security_notifications": { "baslik": "Güvenlik Bildirimleri", "aciklama": "İlişkilendirilmiş olaylar" },
     "backup": { "baslik": "Yedekleme", "aciklama": "Sunucu yedek yönetimi" },
     "transfer": { "baslik": "Hesap Aktarımı", "aciklama": "Hesap ve site taşıma" },
     "tools_settings": { "baslik": "Araçlar ve Ayarlar", "aciklama": "Panel araçları" },

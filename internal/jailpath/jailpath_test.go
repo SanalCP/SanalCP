@@ -80,6 +80,54 @@ func TestHomeDisinaCikilamaz(t *testing.T) {
 	}
 }
 
+func TestTasiAtomikVeHedefiEzmez(t *testing.T) {
+	home, _ := kur(t)
+	if err := os.MkdirAll(filepath.Join(home, "public_html"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".karantina"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "public_html", "x.php"), []byte("zararli"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Tasi(home, "public_html/x.php", ".karantina/x.php"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "public_html", "x.php")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("kaynak hâlâ var: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "public_html", "x.php"), []byte("yeni"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Tasi(home, ".karantina/x.php", "public_html/x.php"); !errors.Is(err, unix.EEXIST) {
+		t.Fatalf("dolu hedef ezilmedi fakat err=%v", err)
+	}
+	b, _ := os.ReadFile(filepath.Join(home, "public_html", "x.php"))
+	if string(b) != "yeni" {
+		t.Fatalf("hedef içerik ezildi: %q", b)
+	}
+}
+
+func TestTasiSymlinkParentiReddeder(t *testing.T) {
+	home, disari := kur(t)
+	if err := os.MkdirAll(filepath.Join(home, "public_html"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, "public_html", "x.php"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(disari, filepath.Join(home, ".karantina")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Tasi(home, "public_html/x.php", ".karantina/x.php"); err == nil {
+		t.Fatal("symlink parent üzerinden taşıma kabul edildi")
+	}
+	if _, err := os.Stat(filepath.Join(disari, "x.php")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("jail dışına dosya taşındı: %v", err)
+	}
+}
+
 func TestIceriginiSilYalnizIcerigiSiler(t *testing.T) {
 	home, disari := kur(t)
 	hedef := filepath.Join(home, "public_html")

@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS guvenlik_bildirimleri (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  dedup_key CHAR(64) NOT NULL,
+  tur VARCHAR(48) NOT NULL,
+  seviye ENUM('dusuk','orta','yuksek','kritik') NOT NULL,
+  baslik VARCHAR(255) NOT NULL,
+  aciklama TEXT NOT NULL,
+  kaynak VARCHAR(32) NOT NULL,
+  kaynak_sayisi INT UNSIGNED NOT NULL DEFAULT 1,
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  domain_id BIGINT UNSIGNED NULL,
+  durum ENUM('acik','cozuldu') NOT NULL DEFAULT 'acik',
+  ilk_at DATETIME NOT NULL,
+  son_at DATETIME NOT NULL,
+  cozuldu_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_guvenlik_bildirim_dedup (dedup_key),
+  KEY ix_guvenlik_bildirim_durum (durum,seviye,son_at),
+  KEY ix_guvenlik_bildirim_domain (domain_id,son_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

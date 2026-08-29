@@ -6,9 +6,12 @@ package antivirus
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -21,11 +24,14 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/sys/unix"
 )
 
 const clamBin = "/usr/bin/clamscan"
+const wpBin = "/usr/local/bin/wp"
 
 type Handlers struct{ DB *sql.DB }
 
@@ -76,23 +82,34 @@ var errCap = errors.New("dosya-siniri")
 
 // Düşük yanlış-pozitif, yüksek sinyalli PHP webshell/obfuscation imzaları
 var heuristics = []struct {
-	ad string
-	re *regexp.Regexp
+	ad   string
+	puan int
+	re   *regexp.Regexp
 }{
-	{"PHP.Webshell.EvalBase64", regexp.MustCompile(`(?i)eval\s*\(\s*(base64_decode|gzinflate|gzuncompress|str_rot13|convert_uudecode)\s*\(`)},
-	{"PHP.Webshell.PregReplaceE", regexp.MustCompile(`(?i)preg_replace\s*\(\s*['"][^'"]{0,200}/e['"]`)},
-	{"PHP.Webshell.AssertInput", regexp.MustCompile(`(?i)assert\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)`)},
-	{"PHP.Webshell.SystemInput", regexp.MustCompile(`(?i)(shell_exec|passthru|system|popen|proc_open)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE|SERVER)`)},
-	{"PHP.Webshell.KnownMarker", regexp.MustCompile(`(?i)(c99shell|r57shell|b374k|wso[_ ]?shell|filesman|indoxploit|angelshell|priv8|mini\s*shell)`)},
-	{"PHP.Obf.CreateFunc", regexp.MustCompile(`(?i)create_function\s*\([^)]*base64_decode`)},
-	{"PHP.Obf.CharObfEval", regexp.MustCompile(`(?i)\$\{?['"]?\w+['"]?\}?\s*\(\s*\$\{?['"]?\w+['"]?\}?\s*\)\s*;.*base64`)},
+	{"PHP.Webshell.EvalBase64", 75, regexp.MustCompile(`(?i)eval\s*\(\s*(base64_decode|gzinflate|gzuncompress|str_rot13|convert_uudecode)\s*\(`)},
+	{"PHP.Webshell.PregReplaceE", 55, regexp.MustCompile(`(?i)preg_replace\s*\(\s*['"][^'"]{0,200}/e['"]`)},
+	{"PHP.Webshell.AssertInput", 75, regexp.MustCompile(`(?i)assert\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)`)},
+	{"PHP.Webshell.SystemInput", 80, regexp.MustCompile(`(?i)(shell_exec|passthru|system|popen|proc_open)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE|SERVER)`)},
+	{"PHP.Webshell.KnownMarker", 90, regexp.MustCompile(`(?i)(c99shell|r57shell|b374k|wso[_ ]?shell|filesman|indoxploit|angelshell|priv8|mini\s*shell)`)},
+	{"PHP.Obf.CreateFunc", 65, regexp.MustCompile(`(?i)create_function\s*\([^)]*base64_decode`)},
+	{"PHP.Obf.CharObfEval", 70, regexp.MustCompile(`(?is)\$\{?['"]?\w+['"]?\}?\s*\(\s*\$\{?['"]?\w+['"]?\}?\s*\)\s*;.{0,500}base64`)},
+	{"PHP.Obf.LongBase64", 25, regexp.MustCompile(`(?i)['"][A-Za-z0-9+/]{500,}={0,2}['"]`)},
 }
 
+const bulguEsigi = 70
+
 type Bulgu struct {
-	Dosya     string `json:"dosya"`
-	Imza      string `json:"imza"`
-	Motor     string `json:"motor"`
-	Karantina int    `json:"karantina"`
+	ID            int64    `json:"id"`
+	Dosya         string   `json:"dosya"`
+	Imza          string   `json:"imza"`
+	Motor         string   `json:"motor"`
+	Karantina     int      `json:"karantina"`
+	Puan          int      `json:"puan"`
+	Risk          string   `json:"risk"`
+	Gerekceler    []string `json:"gerekceler"`
+	SHA256        string   `json:"sha256"`
+	Istisna       int      `json:"istisna"`
+	KarantinaYolu string   `json:"karantina_yolu"`
 }
 
 func (h *Handlers) domain(r *http.Request) (id int64, sk string, demo, ok bool) {
@@ -161,14 +178,16 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) bulgular(ctx context.Context, sid int64) []Bulgu {
 	out := []Bulgu{}
-	rows, err := h.DB.QueryContext(ctx, `SELECT dosya, imza, motor, karantina FROM av_bulgular WHERE tarama_id=? ORDER BY id`, sid)
+	rows, err := h.DB.QueryContext(ctx, `SELECT id,dosya,imza,motor,karantina,COALESCE(puan,0),COALESCE(risk,''),COALESCE(gerekceler,'[]'),COALESCE(sha256,''),COALESCE(istisna,0),COALESCE(karantina_yolu,'') FROM av_bulgular WHERE tarama_id=? ORDER BY puan DESC,id`, sid)
 	if err != nil {
 		return out
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var b Bulgu
-		if err := rows.Scan(&b.Dosya, &b.Imza, &b.Motor, &b.Karantina); err == nil {
+		var gerekceler string
+		if err := rows.Scan(&b.ID, &b.Dosya, &b.Imza, &b.Motor, &b.Karantina, &b.Puan, &b.Risk, &gerekceler, &b.SHA256, &b.Istisna, &b.KarantinaYolu); err == nil {
+			_ = json.Unmarshal([]byte(gerekceler), &b.Gerekceler)
 			out = append(out, b)
 		}
 	}
@@ -211,13 +230,20 @@ func (h *Handlers) Tara(w http.ResponseWriter, r *http.Request) {
 		defer release()
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 		defer cancel()
-		taranan, findings := runScan(ctx, root)
+		taranan, findings := runScan(ctx, root, sk)
+		aktifBulgu := 0
 		for _, f := range findings {
-			_, _ = h.DB.Exec(`INSERT INTO av_bulgular (tarama_id, domain_id, dosya, imza, motor) VALUES (?,?,?,?,?)`,
-				sid, id, f.Dosya, f.Imza, f.Motor)
+			var istisna int
+			_ = h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM av_istisnalar WHERE domain_id=? AND dosya=? AND imza=? AND sha256=?)`, id, f.Dosya, f.Imza, f.SHA256).Scan(&istisna)
+			gerekceler, _ := json.Marshal(f.Gerekceler)
+			_, _ = h.DB.Exec(`INSERT INTO av_bulgular (tarama_id,domain_id,dosya,imza,motor,puan,risk,gerekceler,sha256,istisna) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+				sid, id, f.Dosya, f.Imza, f.Motor, f.Puan, f.Risk, gerekceler, f.SHA256, istisna)
+			if istisna == 0 {
+				aktifBulgu++
+			}
 		}
 		_, _ = h.DB.Exec(`UPDATE av_taramalar SET durum='bitti', taranan=?, enfekte=?, bitis=NOW() WHERE id=?`,
-			taranan, len(findings), sid)
+			taranan, aktifBulgu, sid)
 	}()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"scan_id": sid})
 }
@@ -262,38 +288,176 @@ func (h *Handlers) Karantina(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Dosya string `json:"dosya"`
+		BulguID int64 `json:"bulgu_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	home := "/home/" + sk
-	root := home + "/public_html"
-	clean := filepath.Clean(req.Dosya)
-	// Yol domain'in public_html'i içinde OLMALI (path-traversal + cross-user koruması)
-	if clean != root && !strings.HasPrefix(clean, root+"/") {
-		httpx.WriteError(w, http.StatusBadRequest, "yol domain dizini dışında")
+	var dosya, beklenenSHA string
+	var karantina int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT dosya,COALESCE(sha256,''),karantina FROM av_bulgular WHERE id=? AND domain_id=?`, req.BulguID, id).Scan(&dosya, &beklenenSHA, &karantina); err != nil {
+		httpx.WriteError(w, http.StatusNotFound, "bulgu bulunamadı")
 		return
 	}
-	fi, err := os.Lstat(clean)
-	if err != nil || fi.IsDir() {
-		httpx.WriteError(w, http.StatusBadRequest, "dosya bulunamadı")
+	if karantina != 0 || beklenenSHA == "" {
+		httpx.WriteError(w, http.StatusConflict, "bulgu karantinaya uygun değil")
 		return
 	}
-	qdir := home + "/.karantina"
-	if err := os.MkdirAll(qdir, 0o700); err != nil {
+	home, root := "/home/"+sk, "/home/"+sk+"/public_html"
+	mevcutSHA, err := guvenliDosyaOzeti(root, dosya)
+	if err != nil || mevcutSHA != beklenenSHA {
+		httpx.WriteError(w, http.StatusConflict, "dosya taramadan sonra değişmiş; yeniden tarayın")
+		return
+	}
+	if err := jailpath.DizinOlustur(home, ".karantina", sk); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "karantina dizini oluşturulamadı")
 		return
 	}
-	hedef := filepath.Join(qdir, time.Now().Format("20060102_150405")+"_"+filepath.Base(clean))
-	if err := os.Rename(clean, hedef); err != nil { // aynı dosya-sistemi → atomik; fuser/rm YOK
+	if qd, err := jailpath.AcDizin(home, ".karantina"); err == nil {
+		_ = unix.Fchmod(int(qd.Fd()), 0o700)
+		_ = qd.Close()
+	}
+	kaynakRel, err := filepath.Rel(home, dosya)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz bulgu yolu")
+		return
+	}
+	hedefRel := filepath.Join(".karantina", fmt.Sprintf("%d_%s", req.BulguID, filepath.Base(dosya)))
+	if err := jailpath.Tasi(home, kaynakRel, hedefRel); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "taşınamadı: "+err.Error())
 		return
 	}
-	_ = os.Chmod(hedef, 0o000) // çalıştırılamaz/okunamaz
-	_, _ = h.DB.Exec(`UPDATE av_bulgular SET karantina=1 WHERE domain_id=? AND dosya=?`, id, clean)
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "hedef": hedef})
+	if qf, err := jailpath.Ac(home, filepath.ToSlash(hedefRel), unix.O_RDONLY|unix.O_NONBLOCK, 0); err == nil {
+		_ = unix.Fchmod(int(qf.Fd()), 0)
+		_ = qf.Close()
+	}
+	hedef := filepath.Join(home, hedefRel)
+	if _, err := h.DB.Exec(`UPDATE av_bulgular SET karantina=1,karantina_yolu=?,karantina_zamani=NOW() WHERE id=? AND domain_id=?`, hedef, req.BulguID, id); err != nil {
+		_ = jailpath.Tasi(home, hedefRel, kaynakRel)
+		httpx.WriteError(w, 500, "karantina kaydı güncellenemedi")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// POST /domains/{id}/antivirus/karantina-geri-al {bulgu_id}
+func (h *Handlers) KarantinaGeriAl(w http.ResponseWriter, r *http.Request) {
+	id, sk, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, 404, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, 403, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	var req struct {
+		BulguID int64 `json:"bulgu_id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&req) != nil {
+		httpx.WriteError(w, 400, "geçersiz gövde")
+		return
+	}
+	var dosya, qyol, beklenenSHA string
+	var karantina int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT dosya,COALESCE(karantina_yolu,''),COALESCE(sha256,''),karantina FROM av_bulgular WHERE id=? AND domain_id=?`, req.BulguID, id).Scan(&dosya, &qyol, &beklenenSHA, &karantina); err != nil {
+		httpx.WriteError(w, 404, "bulgu bulunamadı")
+		return
+	}
+	if karantina == 0 || qyol == "" || beklenenSHA == "" {
+		httpx.WriteError(w, 409, "bulgu karantinada değil")
+		return
+	}
+	home, root := "/home/"+sk, "/home/"+sk+"/public_html"
+	qSHA, err := guvenliDosyaOzeti(root, qyol)
+	if err != nil || qSHA != beklenenSHA {
+		httpx.WriteError(w, 409, "karantina dosyası değişmiş veya okunamıyor")
+		return
+	}
+	kaynakRel, e1 := filepath.Rel(home, qyol)
+	hedefRel, e2 := filepath.Rel(home, dosya)
+	if e1 != nil || e2 != nil {
+		httpx.WriteError(w, 400, "geçersiz karantina yolu")
+		return
+	}
+	if err := jailpath.Tasi(home, kaynakRel, hedefRel); err != nil {
+		httpx.WriteError(w, 409, "özgün hedef dolu veya güvenli değil: "+err.Error())
+		return
+	}
+	if f, err := jailpath.Ac(home, filepath.ToSlash(hedefRel), unix.O_RDONLY|unix.O_NONBLOCK, 0); err == nil {
+		_ = unix.Fchmod(int(f.Fd()), 0o640)
+		_ = f.Close()
+	}
+	if _, err := h.DB.Exec(`UPDATE av_bulgular SET karantina=0,karantina_yolu='',karantina_zamani=NULL WHERE id=? AND domain_id=?`, req.BulguID, id); err != nil {
+		_ = jailpath.Tasi(home, hedefRel, kaynakRel)
+		httpx.WriteError(w, 500, "geri alma kaydı güncellenemedi")
+		return
+	}
+	httpx.WriteJSON(w, 200, map[string]any{"ok": true})
+}
+
+// POST /domains/{id}/antivirus/istisna {bulgu_id}. İstisna yalnız tam yol,
+// imza ve SHA-256 üçlüsüne bağlıdır; dosya değişirse sonraki taramada yeniden çıkar.
+func (h *Handlers) IstisnaEkle(w http.ResponseWriter, r *http.Request) {
+	id, sk, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, 404, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, 403, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	var req struct {
+		BulguID int64 `json:"bulgu_id"`
+	}
+	if json.NewDecoder(r.Body).Decode(&req) != nil {
+		httpx.WriteError(w, 400, "geçersiz gövde")
+		return
+	}
+	var dosya, imza, beklenenSHA string
+	var karantina int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT dosya,imza,COALESCE(sha256,''),karantina FROM av_bulgular WHERE id=? AND domain_id=?`, req.BulguID, id).Scan(&dosya, &imza, &beklenenSHA, &karantina); err != nil {
+		httpx.WriteError(w, 404, "bulgu bulunamadı")
+		return
+	}
+	if karantina != 0 || beklenenSHA == "" {
+		httpx.WriteError(w, 409, "bulgu istisnaya uygun değil")
+		return
+	}
+	mevcut, err := guvenliDosyaOzeti("/home/"+sk+"/public_html", dosya)
+	if err != nil || mevcut != beklenenSHA {
+		httpx.WriteError(w, 409, "dosya taramadan sonra değişmiş; yeniden tarayın")
+		return
+	}
+	if _, err := h.DB.Exec(`INSERT IGNORE INTO av_istisnalar(domain_id,dosya,imza,sha256) VALUES(?,?,?,?)`, id, dosya, imza, beklenenSHA); err != nil {
+		httpx.WriteError(w, 500, "istisna kaydedilemedi")
+		return
+	}
+	_, _ = h.DB.Exec(`UPDATE av_bulgular SET istisna=1 WHERE domain_id=? AND dosya=? AND imza=? AND sha256=?`, id, dosya, imza, beklenenSHA)
+	httpx.WriteJSON(w, 200, map[string]any{"ok": true})
+}
+
+func (h *Handlers) IstisnaSil(w http.ResponseWriter, r *http.Request) {
+	id, _, demo, ok := h.domain(r)
+	if !ok {
+		httpx.WriteError(w, 404, "domain bulunamadı")
+		return
+	}
+	if demo {
+		httpx.WriteError(w, 403, "demo aboneliğinde kullanılamaz")
+		return
+	}
+	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
+	var dosya, imza, sha string
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT dosya,imza,COALESCE(sha256,'') FROM av_bulgular WHERE id=? AND domain_id=?`, bid, id).Scan(&dosya, &imza, &sha); err != nil {
+		httpx.WriteError(w, 404, "bulgu bulunamadı")
+		return
+	}
+	_, _ = h.DB.Exec(`DELETE FROM av_istisnalar WHERE domain_id=? AND dosya=? AND imza=? AND sha256=?`, id, dosya, imza, sha)
+	_, _ = h.DB.Exec(`UPDATE av_bulgular SET istisna=0 WHERE domain_id=? AND dosya=? AND imza=? AND sha256=?`, id, dosya, imza, sha)
+	httpx.WriteJSON(w, 200, map[string]any{"ok": true})
 }
 
 // POST /domains/{id}/antivirus/imza-guncelle  → freshclam
@@ -320,7 +484,7 @@ func (h *Handlers) ImzaGuncelle(w http.ResponseWriter, r *http.Request) {
 }
 
 // runScan: ClamAV (varsa) + heuristik. taranan dosya sayısı + bulgular döner.
-func runScan(ctx context.Context, root string) (int, []Bulgu) {
+func runScan(ctx context.Context, root string, kullanici ...string) (int, []Bulgu) {
 	var findings []Bulgu
 	seen := map[string]bool{}
 
@@ -337,7 +501,7 @@ func runScan(ctx context.Context, root string) (int, []Bulgu) {
 					imza := strings.TrimSuffix(line[i+2:], " FOUND")
 					if !seen["c|"+dosya] {
 						seen["c|"+dosya] = true
-						findings = append(findings, Bulgu{Dosya: dosya, Imza: imza, Motor: "clamav"})
+						findings = append(findings, Bulgu{Dosya: dosya, Imza: imza, Motor: "clamav", Puan: 100, Risk: "kritik", Gerekceler: []string{"ClamAV imza eşleşmesi"}})
 					}
 				}
 			}
@@ -360,6 +524,9 @@ func runScan(ctx context.Context, root string) (int, []Bulgu) {
 			}
 			return nil
 		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
 		if !phpish(strings.ToLower(filepath.Ext(p))) {
 			return nil
 		}
@@ -375,18 +542,148 @@ func runScan(ctx context.Context, root string) (int, []Bulgu) {
 		if e != nil {
 			return nil
 		}
+		puan := 0
+		gerekceler := []string{}
+		imzalar := []string{}
 		for _, hs := range heuristics {
 			if hs.re.Match(b) {
-				k := "h|" + p + "|" + hs.ad
-				if !seen[k] {
-					seen[k] = true
-					findings = append(findings, Bulgu{Dosya: p, Imza: hs.ad, Motor: "heuristik"})
-				}
+				puan += hs.puan
+				imzalar = append(imzalar, hs.ad)
+				gerekceler = append(gerekceler, hs.ad+" ("+strconv.Itoa(hs.puan)+")")
 			}
+		}
+		if ek, neden := konumPuani(root, p); ek > 0 && puan > 0 {
+			puan += ek
+			gerekceler = append(gerekceler, neden+" ("+strconv.Itoa(ek)+")")
+		}
+		if puan > 100 {
+			puan = 100
+		}
+		if puan >= bulguEsigi && !seen["h|"+p] {
+			seen["h|"+p] = true
+			findings = append(findings, Bulgu{Dosya: p, Imza: strings.Join(imzalar, ", "), Motor: "puanli-heuristik", Puan: puan, Risk: riskSeviyesi(puan), Gerekceler: gerekceler})
 		}
 		return nil
 	})
+	if len(kullanici) > 0 && kullanici[0] != "" {
+		for _, f := range wordpressButunluk(ctx, root, kullanici[0]) {
+			if !seen["w|"+f.Dosya] {
+				seen["w|"+f.Dosya] = true
+				findings = append(findings, f)
+			}
+		}
+	}
+	for i := range findings {
+		findings[i].SHA256, _ = guvenliDosyaOzeti(root, findings[i].Dosya)
+	}
 	return taranan, findings
+}
+
+func guvenliDosyaOzeti(root, dosya string) (string, error) {
+	home := filepath.Dir(root)
+	rel, err := filepath.Rel(home, dosya)
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errors.New("dosya tenant kökü dışında")
+	}
+	f, err := jailpath.Ac(home, filepath.ToSlash(rel), unix.O_RDONLY|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() || st.Size() > 25*1024*1024 {
+		return "", errors.New("özetlenemeyen dosya")
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+var wpChecksumSatiri = regexp.MustCompile(`(?m)^Warning:\s+(File (?:should not exist|doesn't verify against checksum):)\s+(.+?)\s*$`)
+
+// wordpressButunluk yalnız kurulu WordPress köklerini denetler. WP-CLI/ağ
+// hatası bulgu değildir; doğrulanamayan durum ile doğrulanmış ihlal ayrılır.
+func wordpressButunluk(ctx context.Context, root, sk string) []Bulgu {
+	if _, err := os.Stat(wpBin); err != nil {
+		return nil
+	}
+	adaylar := []string{root}
+	if entries, err := os.ReadDir(root); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				adaylar = append(adaylar, filepath.Join(root, e.Name()))
+			}
+		}
+	}
+	var out []Bulgu
+	for _, dir := range adaylar {
+		if _, err := os.Stat(filepath.Join(dir, "wp-config.php")); err != nil {
+			continue
+		}
+		full := []string{"-u", sk, "--", "env", "HOME=/home/" + sk, "TMPDIR=/home/" + sk,
+			"/usr/bin/php", "-d", "memory_limit=256M", wpBin, "core", "verify-checksums",
+			"--path=" + dir, "--skip-plugins", "--skip-themes", "--no-color"}
+		b, _ := exec.CommandContext(ctx, "runuser", full...).CombinedOutput()
+		out = append(out, wordpressChecksumBulgular(dir, string(b))...)
+	}
+	return out
+}
+
+func wordpressChecksumBulgular(root, cikti string) []Bulgu {
+	out := []Bulgu{}
+	for _, m := range wpChecksumSatiri.FindAllStringSubmatch(cikti, -1) {
+		rel := filepath.Clean(strings.TrimSpace(m[2]))
+		if rel == "." || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		beklenmeyen := strings.Contains(m[1], "should not exist")
+		coreDizini := strings.HasPrefix(filepath.ToSlash(rel), "wp-admin/") || strings.HasPrefix(filepath.ToSlash(rel), "wp-includes/")
+		if beklenmeyen && !coreDizini {
+			continue
+		}
+		puan, risk := 100, "kritik"
+		imza, gerekce := "WordPress.Core.ChecksumMismatch", "Resmî WordPress çekirdek checksum'u eşleşmedi"
+		if beklenmeyen {
+			puan, risk = 85, "yuksek"
+			imza, gerekce = "WordPress.Core.UnexpectedFile", "WordPress çekirdek dizininde dağıtıma ait olmayan dosya"
+		}
+		out = append(out, Bulgu{Dosya: filepath.Join(root, rel), Imza: imza, Motor: "wordpress-checksum", Puan: puan, Risk: risk, Gerekceler: []string{gerekce}})
+	}
+	return out
+}
+
+func riskSeviyesi(puan int) string {
+	if puan >= 90 {
+		return "kritik"
+	}
+	if puan >= 70 {
+		return "yuksek"
+	}
+	if puan >= 40 {
+		return "orta"
+	}
+	return "dusuk"
+}
+
+// Konum tek başına bulgu üretmez; yalnız içerik sinyalini güçlendirir. Böylece
+// uploads/cache altındaki meşru PHP dosyaları otomatik karantina adayına dönüşmez.
+func konumPuani(root, p string) (int, string) {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return 0, ""
+	}
+	d := "/" + strings.ToLower(filepath.ToSlash(filepath.Dir(rel))) + "/"
+	for _, parca := range []string{"/uploads/", "/upload/", "/cache/", "/tmp/", "/images/", "/assets/"} {
+		if strings.Contains(d, parca) {
+			return 20, "PHP için olağandışı yazılabilir konum"
+		}
+	}
+	if strings.Count(filepath.Base(p), ".") >= 2 {
+		return 10, "Çok uzantılı dosya adı"
+	}
+	return 0, ""
 }
 
 func phpish(ext string) bool {

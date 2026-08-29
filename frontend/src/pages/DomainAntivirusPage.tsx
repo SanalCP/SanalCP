@@ -6,7 +6,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
 
 type Domain = { id: number; alan_adi: string }
-type Bulgu = { dosya: string; imza: string; motor: string; karantina: number }
+type Bulgu = { id: number; dosya: string; imza: string; motor: string; karantina: number; puan: number; risk: string; gerekceler: string[]; sha256: string; istisna: number; karantina_yolu: string }
 type Tarama = { id: number; durum: string; motor: string; taranan: number; enfekte: number; baslangic: string; bitis: string }
 type Durum = { clamav: boolean; imza_tarihi: string; kullanici: string; son_tarama: Tarama | null; bulgular: Bulgu[] }
 
@@ -61,8 +61,27 @@ export default function DomainAntivirusPage() {
   async function karantina(b: Bulgu) {
     if (!confirm(t('DomainAntivirusPage:quarantine_confirm', { file: b.dosya }))) return
     setHata(null)
-    try { await api.post(`/domains/${id}/antivirus/karantina`, { dosya: b.dosya }); yukle() }
+    try { await api.post(`/domains/${id}/antivirus/karantina`, { bulgu_id: b.id }); yukle() }
     catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:quarantine_failed'))) }
+  }
+
+  async function geriAl(b: Bulgu) {
+    if (!confirm(t('DomainAntivirusPage:restore_confirm', { file: b.dosya }))) return
+    setHata(null)
+    try { await api.post(`/domains/${id}/antivirus/karantina-geri-al`, { bulgu_id: b.id }); yukle() }
+    catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:restore_failed'))) }
+  }
+
+  async function istisnaDegistir(b: Bulgu) {
+    setHata(null)
+    try {
+      if (b.istisna) await api.delete(`/domains/${id}/antivirus/istisna/${b.id}`)
+      else {
+        if (!confirm(t('DomainAntivirusPage:exception_confirm', { file: b.dosya }))) return
+        await api.post(`/domains/${id}/antivirus/istisna`, { bulgu_id: b.id })
+      }
+      yukle()
+    } catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:exception_failed'))) }
   }
 
   async function imzaGuncelle() {
@@ -75,7 +94,7 @@ export default function DomainAntivirusPage() {
   if (yuk) return <div className="px-6 py-5 text-slate-400">{t('common:loading')}</div>
   if (!d) return <div className="px-6 py-5"><div className="text-sm text-red-600">{hata || t('DomainAntivirusPage:not_found')}</div></div>
 
-  const aktif = d.bulgular.filter(b => !b.karantina)
+  const aktif = d.bulgular.filter(b => !b.karantina && !b.istisna)
 
   return (
     <div className="px-6 py-5">
@@ -145,21 +164,26 @@ export default function DomainAntivirusPage() {
               <table className={T.tablo}>
                 <thead className={T.baslikGrubu}>
                   <tr className="text-left border-b border-slate-100 dark:border-slate-700">
-                    <th className={T.baslik}>{t('DomainAntivirusPage:table.file')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.signature')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.engine')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.status')}</th><th className={T.baslik}></th>
+                    <th className={T.baslik}>{t('DomainAntivirusPage:table.file')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.signature')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.score')}</th><th className={T.baslik}>{t('DomainAntivirusPage:table.status')}</th><th className={T.baslik}></th>
                   </tr>
                 </thead>
                 <tbody className={T.govde}>
                   {d.bulgular.map((b, i) => (
                     <tr key={i} className={`${T.satir} lg:border-b lg:border-slate-50 dark:lg:border-slate-800`}>
                       <td className={T.hucreBaslik}><span className="font-mono text-xs lg:text-xs text-sm break-all">{b.dosya}</span></td>
-                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.signature')}><span className="text-slate-700 dark:text-slate-200">{b.imza}</span></td>
-                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.engine')}><span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-500">{b.motor}</span></td>
+                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.signature')}><span className="text-slate-700 dark:text-slate-200">{b.imza}</span>{b.gerekceler?.length > 0 && <details className="mt-1 text-xs text-slate-500"><summary>{t('DomainAntivirusPage:reasons')}</summary>{b.gerekceler.map((g, j) => <div key={j}>• {g}</div>)}</details>}</td>
+                      <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.score')}><span className={`text-xs px-2 py-1 rounded font-semibold ${b.puan >= 90 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>{b.puan || 100}/100 · {t(`DomainAntivirusPage:risk.${b.risk || 'kritik'}`)}</span><div className="mt-1 text-xs text-slate-400">{b.motor}</div></td>
                       <td className={T.hucre} data-etiket={t('DomainAntivirusPage:table.status')}>
                         {b.karantina ? <span className="text-xs text-amber-600 dark:text-amber-400">🔒 {t('DomainAntivirusPage:quarantined')}</span>
+                          : b.istisna ? <span className="text-xs text-slate-500">✓ {t('DomainAntivirusPage:excepted')}</span>
                           : <span className="text-xs text-red-600 dark:text-red-400">⚠ {t('DomainAntivirusPage:active_finding')}</span>}
                       </td>
                       <td className={T.hucreAksiyon}>
-                        {!b.karantina && <button onClick={() => karantina(b)} className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap">{t('DomainAntivirusPage:quarantine_action')}</button>}
+                        <div className="flex flex-col items-end gap-1">
+                          {b.karantina ? <button onClick={() => geriAl(b)} className="text-xs text-amber-700 dark:text-amber-300 hover:underline whitespace-nowrap">{t('DomainAntivirusPage:restore_action')}</button>
+                            : !b.istisna && <button onClick={() => karantina(b)} className="text-xs text-red-600 dark:text-red-400 hover:underline whitespace-nowrap">{t('DomainAntivirusPage:quarantine_action')}</button>}
+                          {!b.karantina && <button onClick={() => istisnaDegistir(b)} className="text-xs text-slate-500 hover:underline whitespace-nowrap">{b.istisna ? t('DomainAntivirusPage:exception_remove') : t('DomainAntivirusPage:exception_action')}</button>}
+                        </div>
                       </td>
                     </tr>
                   ))}

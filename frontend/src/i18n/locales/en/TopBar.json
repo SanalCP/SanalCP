@@ -39,6 +39,7 @@
     "dns_template": { "baslik": "DNS Template", "aciklama": "Default DNS records" },
     "firewall": { "baslik": "Firewall", "aciklama": "Firewall rules" },
     "security_log": { "baslik": "Security Log", "aciklama": "Security events" },
+    "security_notifications": { "baslik": "Security Notifications", "aciklama": "Correlated events" },
     "backup": { "baslik": "Backup", "aciklama": "Server backup management" },
     "transfer": { "baslik": "Account Transfer", "aciklama": "Account and site migration" },
     "tools_settings": { "baslik": "Tools & Settings", "aciklama": "Panel tools" },
