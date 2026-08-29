@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.34",
-  "duyuru": "Gelişmiş zararlı yazılım motoru, güvenlik bildirim merkezi, HTTP/3 yönetimi ve uygulama cache profilleri eklendi.",
+  "son_surum": "0.9.35",
+  "duyuru": "Sürüm güncellemesi sonrası panelde görülen beyaz sayfa sorunu giderildi; sayfa hatalarında panel artık kendini toparlıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-08-29"
 }

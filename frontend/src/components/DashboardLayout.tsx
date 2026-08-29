@@ -10,6 +10,7 @@ import { useAuth } from '@/store/auth'
 import TopBar from './TopBar'
 import AltNavBar from './AltNavBar'
 import DomainSecici from './DomainSecici'
+import HataSiniri from './HataSiniri'
 
 const SURUM_UYARI_KAPALI_KEY = 'sp-surum-duyuru-kapatildi'
 const MENU_KAPALI_GRUP_KEY = 'sp-menu-kapali-gruplar'
@@ -520,13 +521,17 @@ export default function DashboardLayout() {
 
         <main id="sp-main-content" tabIndex={-1} className="flex-1 min-w-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 flex flex-col">
           <div className="flex-1 min-w-0">
-            <Suspense fallback={
-              <div className="px-6 py-10 text-sm text-slate-400 dark:text-slate-500" role="status">
-                {t('DashboardLayout:page_loading')}
-              </div>
-            }>
-              <Outlet />
-            </Suspense>
+            {/* Sınır yol bazında sıfırlanır: patlayan bir sayfadan başka bir
+                sayfaya geçince kabuk korunur, yeni sayfa normal açılır. */}
+            <HataSiniri key={konum.pathname}>
+              <Suspense fallback={
+                <div className="px-6 py-10 text-sm text-slate-400 dark:text-slate-500" role="status">
+                  {t('DashboardLayout:page_loading')}
+                </div>
+              }>
+                <Outlet />
+              </Suspense>
+            </HataSiniri>
           </div>
           <footer className="py-4 text-center text-xs text-slate-400 dark:text-slate-600">
             SanalCP {surumBilgi?.mevcut ? `v${surumBilgi.mevcut}` : ''}

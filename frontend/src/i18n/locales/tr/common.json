@@ -53,5 +53,13 @@
   "processing": "İşleniyor…",
   "show_password": "Göster",
   "hide_password": "Gizle",
-  "generate_password": "Oluştur"
+  "generate_password": "Oluştur",
+  "error_boundary": {
+    "title": "Bu sayfa yüklenemedi",
+    "desc": "Sayfa beklenmedik bir hatayla karşılaştı. Panel yeni bir sürüme güncellenmiş olabilir; sayfayı yenilemek çoğu durumda sorunu çözer.",
+    "refreshing": "Yeni sürüm yayınlandı, panel yenileniyor…",
+    "reload": "Sayfayı yenile",
+    "home": "Anasayfaya dön",
+    "details": "Teknik ayrıntı"
+  }
 }

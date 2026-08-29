@@ -53,5 +53,13 @@
   "processing": "Processing…",
   "show_password": "Show",
   "hide_password": "Hide",
-  "generate_password": "Generate"
+  "generate_password": "Generate",
+  "error_boundary": {
+    "title": "This page could not be loaded",
+    "desc": "The page hit an unexpected error. The panel may have been updated to a new version; refreshing usually resolves this.",
+    "refreshing": "A new version was published, reloading the panel…",
+    "reload": "Reload page",
+    "home": "Back to home",
+    "details": "Technical detail"
+  }
 }

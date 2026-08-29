@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.35** (2026-08-29)
+
+Panel sürüm güncellemesi sırasında beyaz sayfa sorunu giderildi. Yeni sürüm
+yayınlandığında `frontend-dist` yeni içerik hash'leriyle değiştiği için, o
+sırada açık kalan sekmeler artık var olmayan JavaScript parçalarını istiyor ve
+404 alıyordu; panelde hata sınırı bulunmadığından React ağacı tümüyle çöküp
+kullanıcıya boş beyaz sayfa gösteriliyordu.
+
+Sayfa parçaları, çeviri dosyaları ve Vite ön-yükleme hataları artık tanınıyor ve
+sayfa bir kez otomatik yenileniyor; `index.html` no-store ile sunulduğu için
+yenileme taze dosyalarla açılır. Yenileme sorunu çözmezse sonsuz döngü yerine
+yenileme ve anasayfa seçenekleri sunan bir hata kartı gösterilir. Panele ayrıca
+genel bir hata sınırı eklendi: bir sayfa render sırasında hata verdiğinde menü ve
+üst çubuk ayakta kalır, başka bir sayfaya geçiş normal çalışır.
+
 **0.9.34** (2026-08-29)
 
 Gelişmiş zararlı yazılım ve bütünlük motoru eklendi. PHP webshell içerik

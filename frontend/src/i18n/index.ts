@@ -4,6 +4,7 @@
 
 import i18n, { type BackendModule } from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { chunkYenilemeDene, chunkYuklemeHatasiMi } from '@/lib/chunk'
 
 export type Lang = 'tr' | 'en'
 
@@ -26,7 +27,12 @@ const localeBackend: BackendModule = {
     }
     load()
       .then(module => callback(null, module.default))
-      .catch(error => callback(error instanceof Error ? error : new Error(String(error)), false))
+      .catch(error => {
+        // Çeviri dosyaları da ayrı birer dinamik parça. Yeni sürüm yayınlandıktan
+        // sonra açık kalan sekmede bunlar da 404 alır; sayfayı yenilemek çözer.
+        if (chunkYuklemeHatasiMi(error) && chunkYenilemeDene()) return
+        callback(error instanceof Error ? error : new Error(String(error)), false)
+      })
   },
 }
 
