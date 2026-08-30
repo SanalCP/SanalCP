@@ -13,6 +13,14 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.39** (2026-08-30)
+
+İngilizce panelde Güvenlik Açıkları (CVE) kartında sabit kalan dört metin
+çeviriye bağlandı: "Toplam N benzersiz CVE", "· son tarama {tarih}", "Güvenlik
+güncellemelerini kur" düğmesi ve temiz-sistem durumundaki "Sistem güncel" /
+"Bilinen bir güvenlik açığı yok". Çeviri anahtarları zaten mevcuttu; yalnız
+kullanılmıyordu. Türkçe çıktı değişmez, migration gerektirmez.
+
 **0.9.38** (2026-08-30)
 
 Boşta oturum zaman aşımı etkin olduğunda başarılı yeni girişin önceki oturumun

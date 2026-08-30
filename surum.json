@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.38",
-  "duyuru": "Boşta oturum süresi dolmuş kullanıcıların yeniden girişte anında çıkışa yönlendirilmesi giderildi.",
+  "son_surum": "0.9.39",
+  "duyuru": "İngilizce panelde Güvenlik Açıkları kartında Türkçe kalan metinler çeviriye bağlandı.",
   "kritik": false,
   "yayin_tarihi": "2026-08-30"
 }
