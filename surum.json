@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.36",
-  "duyuru": "Araçlar ve Ayarlar ile Rate Limit sayfalarında çıkan \"Bu sayfa yüklenemedi\" hatası giderildi.",
+  "son_surum": "0.9.37",
+  "duyuru": "Merkezi İşlemler ve Bildirimler görünümü, güvenli güncelleme ön kontrolleri ve panel dayanıklılık testleri eklendi.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-29"
+  "yayin_tarihi": "2026-08-30"
 }

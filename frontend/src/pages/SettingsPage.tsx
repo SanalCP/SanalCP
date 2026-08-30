@@ -74,7 +74,7 @@ export default function SettingsPage() {
   const [f2Kapat, setF2Kapat] = useState(false); const [kapatKod, setKapatKod] = useState('')
 
   const [tema, setTema] = useState('system'); const [dil, setDil] = useState('tr')
-  const [tOk, setTOk] = useState(''); const [tYuk, setTYuk] = useState(false)
+  const [tOk, setTOk] = useState(''); const [tErr, setTErr] = useState(''); const [tYuk, setTYuk] = useState(false)
 
   // API token'ları. Ham token yalnız oluşturma yanıtında döner ve bir daha
   // elde edilemez — bu yüzden yeniUretilen ayrı state'te tutulup kullanıcı
@@ -161,13 +161,13 @@ export default function SettingsPage() {
   }
 
   async function tercihKaydet() {
-    setTOk(''); setTYuk(true)
+    setTOk(''); setTErr(''); setTYuk(true)
     try {
       await api.put('/me', { ad_soyad: ad, eposta, tercih_tema: tema, tercih_dil: dil })
       try { localStorage.setItem('sanal.tema', tema) } catch { /* yoksay */ }
       setLang(dil as Lang)
       setTOk(t('common:saved')); setTimeout(() => setTOk(''), 3000)
-    } catch { setTOk('') } finally { setTYuk(false) }
+    } catch (e) { setTErr(apiHata(e, t('common:save_failed'))) } finally { setTYuk(false) }
   }
 
   const bayiMi = ben?.rol === 'reseller'
@@ -456,6 +456,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <button onClick={tercihKaydet} disabled={tYuk} className={btn}>{tYuk ? t('common:saving') : t('SettingsPage:prefs.save')}</button>
                 <Uyari tip="ok" mesaj={tOk} />
+                <Uyari tip="err" mesaj={tErr} />
               </div>
             </div>
           } />

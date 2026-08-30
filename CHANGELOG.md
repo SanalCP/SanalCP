@@ -13,6 +13,26 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.37** (2026-08-30)
+
+Üst çubuğa merkezi İşlemler ve Bildirimler görünümü eklendi. İçe aktarım,
+uzak hesap taşıma, Laravel deploy ve zararlı yazılım taramaları ortak durum ve
+ilerleme modeliyle tek yerden izlenebilir; aktif işler otomatik yenilenir ve
+her kayıt ilgili ayrıntı ekranına bağlanır. Güvenlik korelasyonu bu özet
+üzerinden de düzenli çalışmaya devam eder.
+
+Panel güncellemesi artık başlamadan önce veritabanı, boş disk alanı, yedek
+aracı, mevcut frontend ve nginx yapılandırmasını denetler. Engelleyici bir
+kontrol başarısızsa hem arayüzden hem doğrudan API çağrısından güncelleme
+reddedilir. Mevcut binary, frontend, migration ve DB otomatik geri dönüş
+mekanizması korunmuştur.
+
+Frontend'e gerçek React render test altyapısı eklendi. Panel erişimi, panel hız
+limiti ve domain rate-limit ekranları boş veya `null` API listeleriyle sınanır.
+Ayar kartları yüklenme, hata ve tekrar-dene durumlarını görünür gösterir;
+profil tercihi kaydetme hataları artık sessizce yutulmaz. Domain rate-limit
+olay listesindeki ek `null` çökme olasılığı da giderildi.
+
 **0.9.36** (2026-08-29)
 
 Araçlar ve Ayarlar ile domain Rate Limit sayfalarında görülen "Bu sayfa

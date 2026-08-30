@@ -44,6 +44,7 @@ import (
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/iceaktarim"
+	"sanalcp/internal/islemmerkezi"
 	"sanalcp/internal/istatistik"
 	_ "sanalcp/internal/joomla"
 	"sanalcp/internal/kaynak"
@@ -292,6 +293,7 @@ func main() {
 	appsH := &apps.Handlers{DB: d}
 	fwH := &guvenlikduvari.Handlers{DB: d}
 	guvenlikOlayH := &guvenlikolay.Handlers{DB: d}
+	islemMerkeziH := &islemmerkezi.Handlers{DB: d, Senkronize: guvenlikOlayH.Senkronize}
 	wafH := &waf.Handlers{DB: d}
 	rateLimitH := &siteratelimit.Handlers{DB: d}
 	redisH := &redis.Handlers{DB: d}
@@ -398,7 +400,8 @@ func main() {
 			r.With(middleware.BayiVeUstu).Get("/system/servisler", system.ServisDurumlar)
 			r.With(middleware.AdminOnly).Post("/system/servis-islem", system.ServisIslem)
 			r.With(middleware.BayiVeUstu).Get("/system/guncelleme", system.GuncellemeDurum)
-			r.With(middleware.AdminOnly).Post("/system/guncelleme/baslat", system.GuncellemeBaslat)
+			r.With(middleware.AdminOnly).Get("/system/guncelleme/on-kontrol", system.GuncellemeOnKontrol(d))
+			r.With(middleware.AdminOnly).Post("/system/guncelleme/baslat", system.GuncellemeBaslat(d))
 			r.With(middleware.AdminOnly).Get("/system/guncelleme/log", system.GuncellemeLog)
 			r.With(middleware.BayiVeUstu).Get("/system/optimize", system.OptimizeDurum)
 			r.With(middleware.AdminOnly).Post("/system/optimize/baslat", system.OptimizeBaslat)
@@ -700,6 +703,8 @@ func main() {
 				r.With(middleware.AdminOnly).Get("/guvenlik-bildirimleri", guvenlikOlayH.Liste)
 				r.With(middleware.AdminOnly).Get("/guvenlik-bildirimleri/ozet", guvenlikOlayH.Ozet)
 				r.With(middleware.AdminOnly).Put("/guvenlik-bildirimleri/{id}", guvenlikOlayH.Durum)
+				r.With(middleware.AdminOnly).Get("/islemler", islemMerkeziH.Liste)
+				r.With(middleware.AdminOnly).Get("/islemler/ozet", islemMerkeziH.Ozet)
 				// Panel hesapları (admin + bayi). Kapsam daraltması handler
 				// içindedir: bayi yalnız kendi altındaki hesapları görür/yönetir
 				// ve yalnız 'user' rolünde hesap açabilir.

@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 
 type Durum = { arac_var: boolean; calisiyor: boolean; durum: string }
 type LogYanit = { log: string; calisiyor: boolean; durum: string }
+type OnKontrol = { uygun: boolean; otomatik_rollback: boolean; kontroller: { anahtar: string; basarili: boolean; engelleyici: boolean; aciklama: string }[] }
 
 export default function PanelGuncelleme() {
   const { t } = useTranslation(['PanelGuncelleme', 'common'])
@@ -18,6 +19,8 @@ export default function PanelGuncelleme() {
   const [baslatiliyor, setBaslatiliyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const [onay, setOnay] = useState(false)
+  const [onKontrol, setOnKontrol] = useState<OnKontrol | null>(null)
+  const [kontrolEdiliyor, setKontrolEdiliyor] = useState(false)
   const logRef = useRef<HTMLPreElement>(null)
 
   const durumYukle = useCallback(async () => {
@@ -60,6 +63,17 @@ export default function PanelGuncelleme() {
     } finally { setBaslatiliyor(false) }
   }
 
+  async function onKontrolYap() {
+    setHata(null); setKontrolEdiliyor(true); setOnKontrol(null)
+    try {
+      const { data } = await api.get<OnKontrol>('/system/guncelleme/on-kontrol')
+      const temiz: OnKontrol = { uygun: data?.uygun === true, otomatik_rollback: data?.otomatik_rollback === true, kontroller: Array.isArray(data?.kontroller) ? data.kontroller : [] }
+      setOnKontrol(temiz)
+      setOnay(temiz.uygun)
+    } catch (e: any) { setHata(e?.response?.data?.hata || e?.message || t('PanelGuncelleme:precheck_failed')) }
+    finally { setKontrolEdiliyor(false) }
+  }
+
   return (
     <div className="h-full p-4 border rounded-2xl bg-emerald-50 dark:bg-emerald-900/15 border-emerald-200 dark:border-emerald-800/50">
       <div className="flex items-start gap-3">
@@ -76,6 +90,11 @@ export default function PanelGuncelleme() {
 
           {hata && <div className="mt-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs">{hata}</div>}
 
+          {onKontrol && <div className="mt-2 space-y-1 rounded-lg border border-slate-200 bg-white/70 p-2.5 text-xs dark:border-slate-700 dark:bg-slate-900/40">
+            {onKontrol.kontroller.map(k => <div key={k.anahtar} className={k.basarili ? 'text-emerald-700 dark:text-emerald-300' : k.engelleyici ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}>{k.basarili ? '✓' : k.engelleyici ? '✕' : '⚠'} {k.aciklama}</div>)}
+            {onKontrol.otomatik_rollback && <div className="pt-1 text-slate-500">✓ {t('PanelGuncelleme:auto_rollback_ready')}</div>}
+          </div>}
+
           {calisiyor && (
             <div className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
               <span className="w-3 h-3 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -89,9 +108,9 @@ export default function PanelGuncelleme() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {!onay ? (
-              <button onClick={() => setOnay(true)} disabled={calisiyor || baslatiliyor}
+              <button onClick={() => void onKontrolYap()} disabled={calisiyor || baslatiliyor || kontrolEdiliyor}
                 className="text-xs px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed">
-                {t('PanelGuncelleme:check_and_install')}
+                {kontrolEdiliyor ? t('PanelGuncelleme:checking') : t('PanelGuncelleme:check_and_install')}
               </button>
             ) : (
               <>

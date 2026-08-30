@@ -182,6 +182,11 @@ func (h *Handlers) senkronize() {
 	}
 }
 
+// Senkronize güvenlik adaylarını kalıcı bildirimlere işler. Merkezi işlem
+// özeti de bu çağrıyı kullanır; böylece eski bildirim rozeti kaldırıldığında
+// korelasyon yalnız güvenlik sayfası açılınca çalışan bir sürece dönüşmez.
+func (h *Handlers) Senkronize() { h.senkronize() }
+
 func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	h.senkronize()
 	durum := r.URL.Query().Get("durum")

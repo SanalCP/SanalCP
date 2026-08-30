@@ -17,8 +17,8 @@ echo "== Go test/vet =="
 go test ./...
 go vet ./...
 
-echo "== Frontend temiz kurulum + lint + build =="
-(cd frontend && npm ci && npm run lint && npm run build)
+echo "== Frontend temiz kurulum + test + lint + build =="
+(cd frontend && npm ci && npm test && npm run lint && npm run build)
 
 echo "== Panel nginx vhost'u (kanonik kaynak -> asset) =="
 # _panel.conf'un TEK kaynagi internal/nginxconf/_panel.conf'tur: binary'ye

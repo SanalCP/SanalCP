@@ -8,6 +8,7 @@ import { useAuth } from '@/store/auth'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import { api } from '@/lib/api'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import IslemMerkezi from '@/components/IslemMerkezi'
 
 type AramaKaydi = {
   tur: 'sayfa' | 'domain' | 'musteri' | 'kullanici'
@@ -130,7 +131,6 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
   const [seciliSonuc, setSeciliSonuc] = useState(0)
   const [kayitlar, setKayitlar] = useState<AramaKaydi[]>([])
   const [kayitlarYuklendi, setKayitlarYuklendi] = useState(false)
-  const [bildirim, setBildirim] = useState({ acik: 0, kritik: 0 })
 
   const rol = kullanici?.rol || 'user'
   const domainID = location.pathname.match(/^\/abonelikler\/(\d+)/)?.[1]
@@ -138,11 +138,6 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
   const SAYFALAR = useMemo(() => sayfalar(t), [t])
   const DOMAIN_SAYFALARI = useMemo(() => domainSayfalari(t), [t])
 
-  useEffect(() => {
-    if (rol !== 'admin') return
-    const yukle = () => api.get<{ acik: number; kritik: number }>('/guvenlik-bildirimleri/ozet').then(r => setBildirim(r.data)).catch(() => {})
-    void yukle(); const timer = window.setInterval(yukle, 60000); return () => window.clearInterval(timer)
-  }, [rol])
 
   const sonuclar = useMemo(() => {
     const q = normalize(arama.trim())
@@ -370,12 +365,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
             </svg>
           )}
         </button>
-        <button onClick={() => navigate('/guvenlik-bildirimleri')} type="button" aria-label={t('TopBar:notifications')} className="relative hidden sm:inline-flex p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200 rounded-md transition" title={t('TopBar:notifications')}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          {bildirim.acik > 0 && <span className={`absolute -right-1 -top-1 min-w-4 rounded-full px-1 text-center text-[10px] font-bold text-white ${bildirim.kritik ? 'bg-red-600' : 'bg-amber-500'}`}>{bildirim.acik > 99 ? '99+' : bildirim.acik}</span>}
-        </button>
+        <IslemMerkezi admin={rol === 'admin'} />
 
         <div className="relative">
           <button

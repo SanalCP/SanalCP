@@ -7,6 +7,9 @@
   "log_started": "Güncelleme başlatıldı…\n",
   "running": "Güncelleme çalışıyor — panel kısa süre yeniden başlayabilir, sayfayı kapatmayın.",
   "check_and_install": "Güncellemeleri denetle ve kur",
+  "checking": "Ön kontroller yapılıyor…",
+  "precheck_failed": "Güncelleme ön kontrolü çalıştırılamadı.",
+  "auto_rollback_ready": "Sağlık kontrolü başarısız olursa otomatik tam geri dönüş hazır",
   "confirm_prompt": "Panel güncellenecek ve servis yeniden başlayacak. Onaylıyor musunuz?",
   "starting": "Başlatılıyor…",
   "confirm_yes": "Evet, güncelle"

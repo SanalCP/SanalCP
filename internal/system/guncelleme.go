@@ -14,16 +14,65 @@ package system
 // unit olarak başlatılır; panel restart olurken süreç yaşamaya devam eder.
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"sanalcp/internal/httpx"
 )
+
+type GuncellemeKontrolu struct {
+	Anahtar     string `json:"anahtar"`
+	Basarili    bool   `json:"basarili"`
+	Engelleyici bool   `json:"engelleyici"`
+	Aciklama    string `json:"aciklama"`
+}
+
+// GuncellemeOnKontrol değişiklik yapmadan güncellemenin güvenli önkoşullarını
+// sınar. Ayrıntılı komut çıktıları bilgi sızdırmamak için yanıta eklenmez.
+func GuncellemeOnKontrol(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		kontroller, uygun := guncellemeKontrolleri(r.Context(), db)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"uygun": uygun, "kontroller": kontroller, "otomatik_rollback": true})
+	}
+}
+
+func guncellemeKontrolleri(parent context.Context, db *sql.DB) ([]GuncellemeKontrolu, bool) {
+	kontroller := []GuncellemeKontrolu{}
+	ekle := func(k string, ok, engelleyici bool, tr, en string) {
+		kontroller = append(kontroller, GuncellemeKontrolu{Anahtar: k, Basarili: ok, Engelleyici: engelleyici, Aciklama: t(tr, en)})
+	}
+	ctxDB, cancelDB := context.WithTimeout(parent, 3*time.Second)
+	ekle("veritabani", db.PingContext(ctxDB) == nil, true, "Veritabanı bağlantısı hazır", "Database connection is ready")
+	cancelDB()
+	var fs syscall.Statfs_t
+	err := syscall.Statfs("/opt/sanalcp", &fs)
+	bos := uint64(fs.Bavail) * uint64(fs.Bsize)
+	ekle("disk", err == nil && bos >= 1<<30, true, "En az 1 GiB boş disk alanı var", "At least 1 GiB of disk space is available")
+	_, backupErr := os.Stat("/usr/local/bin/sanalcp-db-backup")
+	ekle("yedek", backupErr == nil, false, "DB yedek aracı hazır (yoksa güncelleyici kuracak)", "Database backup tool is ready (the updater will install it if missing)")
+	_, frontErr := os.Stat("/opt/sanalcp/frontend-dist/index.html")
+	ekle("frontend", frontErr == nil, true, "Mevcut panel arayüzü yedeklenebilir", "Current panel frontend can be backed up")
+	ctxNginx, cancelNginx := context.WithTimeout(parent, 5*time.Second)
+	nginxErr := exec.CommandContext(ctxNginx, "nginx", "-t").Run()
+	cancelNginx()
+	ekle("nginx", nginxErr == nil, true, "nginx yapılandırması geçerli", "nginx configuration is valid")
+	uygun := true
+	for _, k := range kontroller {
+		if !k.Basarili && k.Engelleyici {
+			uygun = false
+			break
+		}
+	}
+	return kontroller, uygun
+}
 
 const (
 	guncelleScript = "/usr/local/bin/sanalcp-update"
@@ -76,46 +125,52 @@ func guncelleAracIndir() error {
 }
 
 // GuncellemeBaslat — aracı (gerekirse indirip) ayrı systemd unit'inde başlatır.
-func GuncellemeBaslat(w http.ResponseWriter, r *http.Request) {
-	if calisiyor, _ := guncelleCalisiyor(); calisiyor {
-		httpx.WriteError(w, http.StatusConflict, t("güncelleme zaten çalışıyor", "update already running"))
-		return
-	}
-	aracIndirildi := false
-	if _, err := os.Stat(guncelleScript); err != nil {
-		if err := guncelleAracIndir(); err != nil {
-			httpx.WriteError(w, http.StatusBadGateway, t("güncelleme aracı alınamadı: ", "could not fetch update tool: ")+err.Error())
+func GuncellemeBaslat(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, uygun := guncellemeKontrolleri(r.Context(), db); !uygun {
+			httpx.WriteError(w, http.StatusPreconditionFailed, t("güncelleme ön kontrolleri başarısız", "update pre-checks failed"))
 			return
 		}
-		aracIndirildi = true
-	}
+		if calisiyor, _ := guncelleCalisiyor(); calisiyor {
+			httpx.WriteError(w, http.StatusConflict, t("güncelleme zaten çalışıyor", "update already running"))
+			return
+		}
+		aracIndirildi := false
+		if _, err := os.Stat(guncelleScript); err != nil {
+			if err := guncelleAracIndir(); err != nil {
+				httpx.WriteError(w, http.StatusBadGateway, t("güncelleme aracı alınamadı: ", "could not fetch update tool: ")+err.Error())
+				return
+			}
+			aracIndirildi = true
+		}
 
-	_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
-	bas := fmt.Sprintf("%s\n", t(
-		fmt.Sprintf("=== Güncelleme başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("=== Update started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
-	if aracIndirildi {
-		bas += t("(güncelleme aracı eksikti — repo'dan indirildi)\n", "(update tool was missing — fetched from the repo)\n")
-	}
-	if err := os.WriteFile(guncelleLogYol, []byte(bas), 0o640); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
-		return
-	}
+		_ = os.MkdirAll("/opt/sanalcp/logs", 0o750)
+		bas := fmt.Sprintf("%s\n", t(
+			fmt.Sprintf("=== Güncelleme başlatıldı: %s ===", time.Now().Format("2006-01-02 15:04:05")),
+			fmt.Sprintf("=== Update started: %s ===", time.Now().Format("2006-01-02 15:04:05"))))
+		if aracIndirildi {
+			bas += t("(güncelleme aracı eksikti — repo'dan indirildi)\n", "(update tool was missing — fetched from the repo)\n")
+		}
+		if err := os.WriteFile(guncelleLogYol, []byte(bas), 0o640); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, t("log açılamadı: ", "could not open log: ")+err.Error())
+			return
+		}
 
-	// systemd-run: PID 1 altında ayrı transient unit → panel restart'ında ÖLMEZ.
-	cmd := exec.Command("systemd-run",
-		"--collect", // bitince unit'i temizle (failed olsa da)
-		"--unit", guncelleUnit,
-		"--description", "SanalCP güncelleme",
-		"/bin/bash", "-lc", fmt.Sprintf("%s >>%s 2>&1", guncelleScript, guncelleLogYol))
-	if out, err := cmd.CombinedOutput(); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
-		return
+		// systemd-run: PID 1 altında ayrı transient unit → panel restart'ında ÖLMEZ.
+		cmd := exec.Command("systemd-run",
+			"--collect", // bitince unit'i temizle (failed olsa da)
+			"--unit", guncelleUnit,
+			"--description", "SanalCP güncelleme",
+			"/bin/bash", "-lc", fmt.Sprintf("%s >>%s 2>&1", guncelleScript, guncelleLogYol))
+		if out, err := cmd.CombinedOutput(); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, t("başlatılamadı: ", "could not start: ")+strings.TrimSpace(string(out)))
+			return
+		}
+		httpx.WriteJSON(w, http.StatusAccepted, map[string]any{
+			"baslatildi":     true,
+			"arac_indirildi": aracIndirildi,
+		})
 	}
-	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{
-		"baslatildi":     true,
-		"arac_indirildi": aracIndirildi,
-	})
 }
 
 // GuncellemeLog — log kuyruğu + durum. Panel restart olsa da log dosyası diskte kalır.

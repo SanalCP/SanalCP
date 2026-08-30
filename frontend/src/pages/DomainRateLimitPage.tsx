@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -7,13 +7,14 @@ import { api, apiHata } from '@/lib/api'
 type Profil='kapali'|'dengeli'|'siki'|'ozel'
 type Ayar={profil:Profil;istek_dakika:number;burst:number;bot_engelle:boolean;ip_istisnalari:string[];yol_istisnalari:string[]}
 type Olay={zaman:string;ip:string;yol:string;durum:number}
+type ApiYanit={alan_adi?:string;ayar?:Partial<Ayar>|null;olaylar?:Olay[]|null}
 type Yanit={alan_adi:string;ayar:Ayar;olaylar:Olay[]}
 
 export default function DomainRateLimitPage(){
  const {id}=useParams();const {t}=useTranslation(['DomainRateLimitPage','common'])
  const [y,setY]=useState<Yanit|null>(null),[a,setA]=useState<Ayar|null>(null);const [hata,setHata]=useState(''),[ok,setOk]=useState(''),[busy,setBusy]=useState(false)
- function yukle(){api.get<Yanit>(`/domains/${id}/rate-limit`).then(r=>{setY(r.data);setA({...r.data.ayar,ip_istisnalari:r.data.ayar.ip_istisnalari??[],yol_istisnalari:r.data.ayar.yol_istisnalari??[]})}).catch(e=>setHata(apiHata(e)))}
- useEffect(yukle,[id])
+ const yukle=useCallback(()=>{api.get<ApiYanit>(`/domains/${id}/rate-limit`).then(r=>{const ham=r.data.ayar;if(!ham||!(['kapali','dengeli','siki','ozel'] as string[]).includes(ham.profil||''))throw new Error('geçersiz API yanıtı');const ayar:Ayar={profil:ham.profil as Profil,istek_dakika:Number(ham.istek_dakika)||0,burst:Number(ham.burst)||0,bot_engelle:Boolean(ham.bot_engelle),ip_istisnalari:Array.isArray(ham.ip_istisnalari)?ham.ip_istisnalari:[],yol_istisnalari:Array.isArray(ham.yol_istisnalari)?ham.yol_istisnalari:[]};setY({alan_adi:r.data.alan_adi||'',ayar,olaylar:Array.isArray(r.data.olaylar)?r.data.olaylar:[]});setA(ayar)}).catch(e=>setHata(apiHata(e,t('common:load_failed'))))},[id,t])
+ useEffect(()=>{yukle()},[yukle])
  async function kaydet(){if(!a)return;setBusy(true);setHata('');setOk('');try{await api.put(`/domains/${id}/rate-limit`,{ayar:a});setOk(t('DomainRateLimitPage:saved'));yukle()}catch(e){setHata(apiHata(e,t('DomainRateLimitPage:save_failed')))}finally{setBusy(false)}}
  const metin=(xs:string[])=>xs.join('\n'), dizi=(s:string)=>s.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean)
  return <div className="w-full px-6 py-5">

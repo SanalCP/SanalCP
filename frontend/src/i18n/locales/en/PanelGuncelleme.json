@@ -7,6 +7,9 @@
   "log_started": "Update started…\n",
   "running": "Update running — the panel may restart briefly, don't close this page.",
   "check_and_install": "Check and install updates",
+  "checking": "Running pre-update checks…",
+  "precheck_failed": "Pre-update checks could not be run.",
+  "auto_rollback_ready": "Automatic full rollback is ready if the health check fails",
   "confirm_prompt": "The panel will be updated and the service will restart. Do you confirm?",
   "starting": "Starting…",
   "confirm_yes": "Yes, update"

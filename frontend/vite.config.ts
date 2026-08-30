@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +18,11 @@ export default defineConfig({
       '/api':     process.env.VITE_API_PROXY || 'http://localhost:8080',
       '/healthz': process.env.VITE_API_PROXY || 'http://localhost:8080',
     },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    clearMocks: true,
   },
   build: {
     outDir: 'dist',
