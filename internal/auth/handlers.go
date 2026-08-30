@@ -268,7 +268,10 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteAudit(h.DB, uid, kadi, ip, "auth.login", kadi, true)
-	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
+	// Yeni oturum, önceki oturumun boşta kalma sayacını miras almamalı.
+	// Aksi hâlde last_activity_at limitten eskiyse parola doğru kabul edilip
+	// çerez yazıldıktan sonraki ilk API isteği oturumu anında sonlandırır.
+	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=?, last_activity_at=NOW() WHERE id=?`, ip, uid)
 	// Bu handler'a yalnız admin/bayi ulaşabilir (müşteri rolü satır 205'te
 	// reddedilir) — arka plandaki ~24 saatlik periyodu beklemeden giriş anında
 	// güncel bir sürüm kontrolü tetikle (cooldown'lu, bkz. system.SurumKontrolTetikle).

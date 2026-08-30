@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.38** (2026-08-30)
+
+Boşta oturum zaman aşımı etkin olduğunda başarılı yeni girişin önceki oturumun
+`last_activity_at` değerini miras alması giderildi. Parola doğrulaması ve çerez
+yazımı başarılı olsa bile ilk API isteğinin anında 401 dönmesine yol açan sayaç
+artık her başarılı girişte sıfırlanır; davranış regresyon testiyle korunur.
+
 **0.9.37** (2026-08-30)
 
 Üst çubuğa merkezi İşlemler ve Bildirimler görünümü eklendi. İçe aktarım,

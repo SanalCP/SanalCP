@@ -172,7 +172,10 @@ func TestLogin_RootGirisiAcikkenDogruParolaTokenUretir(t *testing.T) {
 			AddRow(0, "", 0, 7))
 	mock.ExpectExec(`INSERT INTO audit_log`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(`UPDATE users SET last_login_at=NOW\(\)`).
+	// Başarılı giriş, eski oturumun boşta kalma zamanını yeni oturuma
+	// taşımamalı; aksi hâlde ilk yetkili istek anında 401 döner.
+	mock.ExpectExec(`UPDATE users SET last_login_at=NOW\(\), last_login_ip=\?, last_activity_at=NOW\(\) WHERE id=\?`).
+		WithArgs("192.0.2.1", int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	secret := []byte("test")

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.37",
-  "duyuru": "Merkezi İşlemler ve Bildirimler görünümü, güvenli güncelleme ön kontrolleri ve panel dayanıklılık testleri eklendi.",
+  "son_surum": "0.9.38",
+  "duyuru": "Boşta oturum süresi dolmuş kullanıcıların yeniden girişte anında çıkışa yönlendirilmesi giderildi.",
   "kritik": false,
   "yayin_tarihi": "2026-08-30"
 }
