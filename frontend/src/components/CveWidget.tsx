@@ -257,8 +257,8 @@ export default function CveWidget() {
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/25">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-emerald-500"><path d="M20 6 9 17l-5-5" /></svg>
           </span>
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Sistem güncel</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">Bilinen bir güvenlik açığı yok</p>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('CveWidget:system_up_to_date')}</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">{t('CveWidget:no_known_vulnerabilities')}</p>
         </div>
       ) : (
         <>
@@ -274,8 +274,8 @@ export default function CveWidget() {
             ))}
           </div>
           <p className="mb-3 text-[11px] text-slate-400 dark:text-slate-500">
-            Toplam <strong className="text-slate-600 dark:text-slate-300">{veri.toplam_cve}</strong> benzersiz CVE
-            {veri.son_tarama ? <> · son tarama {veri.son_tarama}</> : null}
+            {t('CveWidget:total_unique_cve')} <strong className="text-slate-600 dark:text-slate-300">{veri.toplam_cve}</strong> {t('CveWidget:unique_cve_suffix')}
+            {veri.son_tarama ? <> {t('CveWidget:last_scan', { date: veri.son_tarama })}</> : null}
           </p>
 
           {/* öne çıkan CVE'ler */}
@@ -300,7 +300,7 @@ export default function CveWidget() {
               onClick={guncelle}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d={SHIELD} /><path d={CHECK} /></svg>
-              Güvenlik güncellemelerini kur
+              {t('CveWidget:install_security_updates')}
             </button>
           )}
           {/* KernelCare — rebootsuz canlı çekirdek yaması aksiyonu */}
