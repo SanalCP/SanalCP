@@ -239,6 +239,51 @@ Yeni domain oluşturma akışına **Reverse Proxy** site tipi eklendi:
 - Reverse Proxy hesaplarında gereksiz MySQL veritabanı oluşturulmaz. Migration
   `0070_reverse_proxy.sql` mevcut domainleri değiştirmeden yeni proxy alanlarını ekler.
 
+**0.9.18** (2026-08-27)
+
+Uygulama kartlarında jenerik yer tutucu yerine her uygulamanın kendi ikonu
+gösteriliyor. Domain alt sayfalarında breadcrumb'ın domain bağlantısını
+kaybetmesi giderildi.
+
+**0.9.17** (2026-08-27)
+
+Farklı uygulamaların tanıma (marker) dosyalarının çakışması giderildi: aynı
+dizinde birden fazla uygulama tanınabildiğinde liste yanlış uygulamayı
+gösterebiliyordu. Çakışma regresyon testiyle korunuyor.
+
+**0.9.16** (2026-08-27)
+
+Uygulama kataloğuna **MediaWiki, Nextcloud ve phpBB** eklendi. Her sürücü kendi
+minimum/maksimum PHP sürümünü, veritabanı ön ekini ve tanıma dosyasını
+tanımlar; çerçevenin ortak kur/güncelle/sil akışı değişmedi.
+
+**0.9.15** (2026-08-27)
+
+Uygulama kataloğu **Joomla, Drupal, OpenCart, Matomo ve Grav** ile genişletildi.
+0.9.14'te CDN kaynağı HTTP 522 döndüğü için gizlenen **PrestaShop** sürücüsü de
+bu sürümde yeniden açıldı. Grav veritabanı gerektirmediği için kurulumunda
+MySQL veritabanı oluşturulmaz.
+
+**0.9.14** (2026-08-26)
+
+Uygulama kurulum çerçevesi eklendi. Tek bir **Uygulamalar** menüsü altından
+1-tık kur / güncelle / sil akışı çalışır; her uygulama `apps.Uygulama` arayüzünü
+uygulayıp registry'ye kendini kaydeder, ortak HTTP uçları bu registry üzerinden
+çalışır. İlk sürücüler WordPress (mevcut wp-cli akışına dokunmadan adapter ile)
+ve PrestaShop'tur.
+
+Tüm veritabanı işlemleri root yetki yoluna (`hesaplar.MySQLDropDB` /
+`MySQLDropDBKeepUser`) taşındı; kurulum ve silme geri alma yollarındaki orphan
+veritabanı riski giderildi. Arşiv açma zip-slip'e karşı korumalıdır.
+
+PrestaShop, ilk canlı smoke testte `download.prestashop.com` HTTP 522 döndüğü
+için bu sürümde panelde gizlendi (0.9.15'te geri açıldı).
+
+**0.9.13** (2026-08-26)
+
+WordPress güncellemesinin `TMPDIR` izin hatasıyla başarısız olması giderildi;
+wp-cli artık tenant'ın erişebildiği bir geçici dizinle çalıştırılıyor.
+
 **0.9.12** (2026-08-25)
 
 0.9.11'deki Veritabanı Yönet sayfasında kod incelemesinden kalan küçük
@@ -283,7 +328,50 @@ Araçlar ve Ayarlar sayfasına, kurulumu tanımlayan bir lisans numarası kartı
 - Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez. Mevcut
   kurulumlarda tek `sanalcp-update` yeterli.
 
-## 0.9.x — Panel girişi root'tan ayrıldı
+## 0.9.x — Panel girişi root'tan ayrıldı, güvenlik sertleştirme
+
+**0.9.7** (2026-08-23)
+
+Hesap parolası, veritabanı parola sıfırlama, e-posta kutusu ve dizin şifre
+koruma ekranlarına ortak güvenli parola üreteci ve göster/gizle düğmesi eklendi.
+Kullanıcı akışlarında davranış değişikliği yok, migration gerektirmez.
+
+**0.9.6** (2026-08-23)
+
+Frontend'e ESLint (flat config) kuruldu ve CI'a lint job'ı eklendi. Süreçte 33
+gerçek `jsx-a11y` hatası düzeltildi (klavye desteği, label-input eşleştirmesi).
+Kullanıcı akışlarında davranış değişikliği yok.
+
+**0.9.5** (2026-08-23)
+
+`ACME_STAGING=1` ortam değişkeniyle Let's Encrypt `--issue` çağrılarına staging
+sunucusu eklenebiliyor; manuel ve CI testlerinde üretim rate-limit'ine
+takılmadan doğrulama yapılabilir. Varsayılan davranış (prod API) değişmedi.
+
+**0.9.4** (2026-08-23)
+
+`/admin/backups/temizle` artık domain başına ayrı `SELECT`/`DELETE` yerine tek
+`SELECT ... IN (...)` ve tek `DELETE ... IN (...)` kullanıyor; çok domainli
+kurulumlarda yedek temizliğindeki N+1 sorgu giderildi.
+
+**0.9.3** (2026-08-21)
+
+`/api/v1/eklenti-bundle/{ad}/app.js` ucu `RequireAuth` + `BayiVeUstu` zincirine
+alındı. Uç HttpOnly çerez taşıdığı için kimlik doğrulamasız erişime açık
+kalmamalıydı; güvenlik denetimindeki 4.4 maddesi kapandı.
+
+**0.9.2** (2026-08-21)
+
+Güvenlik güncellemesi:
+
+- Panel oturumu **HttpOnly çerezine** taşındı — tarayıcıda çalışan bir XSS ile
+  oturum çalınamaz.
+- Antivirüs taramasına eşzamanlılık sınırı eklendi
+  (`PANEL_AV_MAX_CONCURRENT`, varsayılan 1).
+- Ortak `WriteExecError` yardımcısı ve onu kullanan 9 uç ile uzun komut
+  çıktılarının hata yanıtıyla sızması ve DoS yüzeyi kapatıldı.
+
+Mevcut kurulumlarda tek `sanalcp-update` yeterli, migration yok.
 
 **0.9.1** (2026-08-20)
 
