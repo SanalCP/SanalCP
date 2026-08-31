@@ -16,6 +16,14 @@ type Plan = {
   ad: string
 }
 
+type PlanIslem = {
+  id: string
+  durum: 'calisiyor' | 'basarili' | 'basarisiz'
+  ilerleme: number
+  adim: 'plan_kaydedildi' | 'kaynak_limitleri' | 'waf' | 'tamamlandi'
+  hata?: string
+}
+
 const ICONS = {
   baglanti:  'M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m.172-5.172a4 4 0 00-5.656 5.656l-3 3a4 4 0 005.656 5.656',
   dosyalar:  'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
@@ -33,6 +41,7 @@ export default function SubscriptionDetailPage() {
   const [domain, setDomain] = useState<Domain | null>(null)
   const [planlar, setPlanlar] = useState<Plan[]>([])
   const [seciliPlanID, setSeciliPlanID] = useState<number | ''>('')
+  const [planIslem, setPlanIslem] = useState<PlanIslem | null>(null)
   const [hata, setHata] = useState<string | null>(null)
   const [diskMB, setDiskMB] = useState<number | null>(null)
   const [menuAcik, setMenuAcik] = useState(false)
@@ -65,6 +74,36 @@ export default function SubscriptionDetailPage() {
     setSeciliPlanID(domain?.plan_id ?? '')
   }, [domain?.plan_id])
 
+  useEffect(() => {
+    if (!id || !planIslem?.id || planIslem.durum !== 'calisiyor') return
+    let iptal = false
+    const sorgula = async () => {
+      try {
+        const { data } = await api.get<Omit<PlanIslem, 'id'>>(`/domains/${id}/plan-islemleri/${planIslem.id}`)
+        if (iptal) return
+        const sonraki = { id: planIslem.id, ...data }
+        setPlanIslem(sonraki)
+        if (data.durum === 'basarili') {
+          setIsleniyor(false)
+          setBildirim(t('SubscriptionDetailPage:change_plan_success'))
+          setTimeout(() => { setBildirim(null); setPlanIslem(null) }, 6000)
+          domainYukle()
+        } else if (data.durum === 'basarisiz') {
+          setIsleniyor(false)
+          setHata(data.hata || t('SubscriptionDetailPage:change_plan_failed'))
+        }
+      } catch (e) {
+        if (!iptal) {
+          setIsleniyor(false)
+          setHata(apiHata(e, t('SubscriptionDetailPage:plan_progress_failed')))
+        }
+      }
+    }
+    void sorgula()
+    const zamanlayici = window.setInterval(sorgula, 750)
+    return () => { iptal = true; window.clearInterval(zamanlayici) }
+  }, [id, planIslem?.id, planIslem?.durum, domainYukle, t])
+
   async function askiToggle() {
     if (!id || !domain) return
     const askiyaAl = !domain.askida
@@ -90,13 +129,10 @@ export default function SubscriptionDetailPage() {
 
     setIsleniyor(true); setHata(null); setBildirim(null)
     try {
-      await api.put(`/domains/${id}/plan`, { plan_id: yeniPlan.id })
-      setBildirim(t('SubscriptionDetailPage:change_plan_success', { plan: yeniPlan.ad }))
-      setTimeout(() => setBildirim(null), 6000)
-      domainYukle()
+      const { data } = await api.put<{ islem_id: string }>(`/domains/${id}/plan`, { plan_id: yeniPlan.id })
+      setPlanIslem({ id: data.islem_id, durum: 'calisiyor', ilerleme: 15, adim: 'plan_kaydedildi' })
     } catch (e) {
       setHata(apiHata(e, t('SubscriptionDetailPage:change_plan_failed')))
-    } finally {
       setIsleniyor(false)
     }
   }
@@ -244,7 +280,22 @@ export default function SubscriptionDetailPage() {
                     {isleniyor ? t('SubscriptionDetailPage:changing_plan') : t('SubscriptionDetailPage:change_plan')}
                   </button>
                 </div>
-                <p className="ta-hint mt-1.5">{t('SubscriptionDetailPage:change_plan_hint')}</p>
+                {planIslem ? (
+                  <div className="mt-3" role="status" aria-live="polite">
+                    <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-300">
+                      <span>{t(`SubscriptionDetailPage:plan_progress.${planIslem.adim}`)}</span>
+                      <span className="font-mono font-semibold tabular-nums">%{planIslem.ilerleme}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${planIslem.durum === 'basarisiz' ? 'bg-red-500' : planIslem.durum === 'basarili' ? 'bg-emerald-500' : 'bg-brand-600'}`}
+                        style={{ width: `${planIslem.ilerleme}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="ta-hint mt-1.5">{t('SubscriptionDetailPage:change_plan_hint')}</p>
+                )}
               </div>
             )}
           </div>

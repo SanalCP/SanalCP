@@ -41,7 +41,14 @@
   "changing_plan": "Changing…",
   "change_plan_hint": "The new plan's resource limits and WAF settings are applied in the background.",
   "change_plan_confirm": "The plan for {{domain}} will change from {{current}} to {{next}}. Continue?",
-  "change_plan_success": "✓ Plan changed to {{plan}}; resource limits are being applied in the background.",
+  "change_plan_success": "✓ Plan changed and all settings were applied.",
   "change_plan_failed": "Plan could not be changed",
-  "plans_load_failed": "Service plans could not be loaded"
+  "plans_load_failed": "Service plans could not be loaded",
+  "plan_progress_failed": "Plan change progress could not be retrieved",
+  "plan_progress": {
+    "plan_kaydedildi": "Plan saved…",
+    "kaynak_limitleri": "Applying resource limits…",
+    "waf": "Applying WAF settings…",
+    "tamamlandi": "Operation completed"
+  }
 }

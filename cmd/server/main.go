@@ -649,6 +649,7 @@ func main() {
 				r.With(middleware.AdminOnly).Delete("/plans/{id}", plansH.Delete)
 				r.With(middleware.AdminOnly).Get("/plans/{id}/domains", plansH.DomainlerAra)
 				r.With(middleware.AdminOnly).Put("/domains/{id}/plan", domainsH.SetPlan)
+				r.With(middleware.AdminOnly).Get("/domains/{id}/plan-islemleri/{jid}", domainsH.PlanIslemDurumu)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/dns", dnsH.List)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/dns", dnsH.Create)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/dns/{rid}", dnsH.Update)

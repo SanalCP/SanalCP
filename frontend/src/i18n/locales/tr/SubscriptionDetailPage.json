@@ -41,7 +41,14 @@
   "changing_plan": "Değiştiriliyor…",
   "change_plan_hint": "Yeni paketin kaynak limitleri ve WAF ayarları arka planda uygulanır.",
   "change_plan_confirm": "{{domain}} paketi {{current}} → {{next}} olarak değiştirilecek. Devam edilsin mi?",
-  "change_plan_success": "✓ Paket {{plan}} olarak değiştirildi; kaynak limitleri arka planda uygulanıyor.",
+  "change_plan_success": "✓ Paket değiştirildi ve tüm ayarlar uygulandı.",
   "change_plan_failed": "Paket değiştirilemedi",
-  "plans_load_failed": "Hizmet paketleri yüklenemedi"
+  "plans_load_failed": "Hizmet paketleri yüklenemedi",
+  "plan_progress_failed": "Paket değişikliği ilerlemesi alınamadı",
+  "plan_progress": {
+    "plan_kaydedildi": "Paket kaydedildi…",
+    "kaynak_limitleri": "Kaynak limitleri uygulanıyor…",
+    "waf": "WAF ayarları uygulanıyor…",
+    "tamamlandi": "İşlem tamamlandı"
+  }
 }
