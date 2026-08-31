@@ -13,6 +13,18 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.40** (2026-08-31)
+
+Domain/abonelik detayına yöneticiye özel hizmet paketi değiştirme kontrolü
+eklendi. Değişiklik eski ve yeni paket adlarını gösteren onaydan sonra uygulanır;
+aynı paket seçiliyken işlem kapalıdır.
+
+Paket değişikliği sonrasında kaynak limitleri ve WAF uygulaması artık gerçek
+backend aşamalarından izlenir. Panel plan kaydı, kaynak limitleri, WAF ve
+tamamlanma adımlarını canlı yüzde çubuğuyla gösterir; arka plan hataları başarılı
+gibi gösterilmek yerine kullanıcıya iletilir. Türkçe ve İngilizce arayüzler
+desteklenir, migration gerekmez.
+
 **0.9.39** (2026-08-30)
 
 İngilizce panelde Güvenlik Açıkları (CVE) kartında sabit kalan dört metin

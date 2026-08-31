@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.39",
-  "duyuru": "İngilizce panelde Güvenlik Açıkları kartında Türkçe kalan metinler çeviriye bağlandı.",
+  "son_surum": "0.9.40",
+  "duyuru": "Domain paketleri artık panelden değiştirilebilir; kaynak limiti ve WAF uygulaması canlı ilerleme çubuğuyla izlenebilir.",
   "kritik": false,
-  "yayin_tarihi": "2026-08-30"
+  "yayin_tarihi": "2026-08-31"
 }
