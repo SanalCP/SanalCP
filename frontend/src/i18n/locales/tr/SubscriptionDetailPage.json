@@ -34,5 +34,14 @@
   "ssl_preview": "SSL etkinleştirilince otomatik görünür",
   "refresh_preview": "Önizlemeyi yenile",
   "ssl_required": "Önizleme için SSL gerekli",
-  "open": "Aç"
+  "open": "Aç",
+  "service_plan": "Hizmet paketi",
+  "no_plan": "Paket atanmamış",
+  "change_plan": "Paketi Değiştir",
+  "changing_plan": "Değiştiriliyor…",
+  "change_plan_hint": "Yeni paketin kaynak limitleri ve WAF ayarları arka planda uygulanır.",
+  "change_plan_confirm": "{{domain}} paketi {{current}} → {{next}} olarak değiştirilecek. Devam edilsin mi?",
+  "change_plan_success": "✓ Paket {{plan}} olarak değiştirildi; kaynak limitleri arka planda uygulanıyor.",
+  "change_plan_failed": "Paket değiştirilemedi",
+  "plans_load_failed": "Hizmet paketleri yüklenemedi"
 }

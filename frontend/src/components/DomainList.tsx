@@ -23,6 +23,8 @@ export type Domain = {
   notlar?: string
   ssh_erisim?: boolean
   askida?: boolean
+  plan_id?: number | null
+  plan_ad?: string
 }
 
 export default function DomainList({

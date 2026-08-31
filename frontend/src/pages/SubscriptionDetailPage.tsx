@@ -9,6 +9,12 @@ import ResourceCard from '@/components/ResourceCard'
 import DomainKaynakKart from '@/components/DomainKaynakKart'
 import DomainPano from "@/components/DomainPano"
 import type { Domain } from '@/components/DomainList'
+import { useAuth } from '@/store/auth'
+
+type Plan = {
+  id: number
+  ad: string
+}
 
 const ICONS = {
   baglanti:  'M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m.172-5.172a4 4 0 00-5.656 5.656l-3 3a4 4 0 005.656 5.656',
@@ -23,7 +29,10 @@ export default function SubscriptionDetailPage() {
   const { t } = useTranslation(['SubscriptionDetailPage', 'common'])
   const { id } = useParams()
   const navigate = useNavigate()
+  const adminMi = useAuth((s) => s.kullanici?.rol) === 'admin'
   const [domain, setDomain] = useState<Domain | null>(null)
+  const [planlar, setPlanlar] = useState<Plan[]>([])
+  const [seciliPlanID, setSeciliPlanID] = useState<number | ''>('')
   const [hata, setHata] = useState<string | null>(null)
   const [diskMB, setDiskMB] = useState<number | null>(null)
   const [menuAcik, setMenuAcik] = useState(false)
@@ -45,6 +54,17 @@ export default function SubscriptionDetailPage() {
       .catch(() => {})
   }, [id, domainYukle])
 
+  useEffect(() => {
+    if (!adminMi) return
+    api.get<Plan[]>('/plans')
+      .then(r => setPlanlar(r.data || []))
+      .catch(e => setHata(apiHata(e, t('SubscriptionDetailPage:plans_load_failed'))))
+  }, [adminMi, t])
+
+  useEffect(() => {
+    setSeciliPlanID(domain?.plan_id ?? '')
+  }, [domain?.plan_id])
+
   async function askiToggle() {
     if (!id || !domain) return
     const askiyaAl = !domain.askida
@@ -57,6 +77,28 @@ export default function SubscriptionDetailPage() {
       domainYukle()
     } catch (e) { setHata(apiHata(e, t('SubscriptionDetailPage:operation_failed'))) }
     finally { setIsleniyor(false) }
+  }
+
+  async function paketDegistir() {
+    if (!id || !domain || seciliPlanID === '' || seciliPlanID === domain.plan_id) return
+    const yeniPlan = planlar.find(p => p.id === seciliPlanID)
+    if (!yeniPlan || !window.confirm(t('SubscriptionDetailPage:change_plan_confirm', {
+      domain: domain.alan_adi,
+      current: domain.plan_ad || t('SubscriptionDetailPage:no_plan'),
+      next: yeniPlan.ad,
+    }))) return
+
+    setIsleniyor(true); setHata(null); setBildirim(null)
+    try {
+      await api.put(`/domains/${id}/plan`, { plan_id: yeniPlan.id })
+      setBildirim(t('SubscriptionDetailPage:change_plan_success', { plan: yeniPlan.ad }))
+      setTimeout(() => setBildirim(null), 6000)
+      domainYukle()
+    } catch (e) {
+      setHata(apiHata(e, t('SubscriptionDetailPage:change_plan_failed')))
+    } finally {
+      setIsleniyor(false)
+    }
   }
 
   if (hata && !domain) return (
@@ -178,6 +220,33 @@ export default function SubscriptionDetailPage() {
               <Stat e={t('SubscriptionDetailPage:created')}   d={domain.olusturulma} />
               <Stat e={t('SubscriptionDetailPage:php_version')}    d={domain.php_surum} />
             </div>
+
+            {adminMi && (
+              <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <label htmlFor="domain-plan" className="ta-label-sm">{t('SubscriptionDetailPage:service_plan')}</label>
+                <div className="mt-1.5 flex gap-2">
+                  <select
+                    id="domain-plan"
+                    value={seciliPlanID}
+                    onChange={e => setSeciliPlanID(e.target.value === '' ? '' : Number(e.target.value))}
+                    disabled={isleniyor}
+                    className="ta-input ta-input-sm min-w-0 flex-1"
+                  >
+                    <option value="" disabled>{t('SubscriptionDetailPage:no_plan')}</option>
+                    {planlar.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={paketDegistir}
+                    disabled={isleniyor || seciliPlanID === '' || seciliPlanID === domain.plan_id}
+                    className="ta-primary-button whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isleniyor ? t('SubscriptionDetailPage:changing_plan') : t('SubscriptionDetailPage:change_plan')}
+                  </button>
+                </div>
+                <p className="ta-hint mt-1.5">{t('SubscriptionDetailPage:change_plan_hint')}</p>
+              </div>
+            )}
           </div>
         </aside>
 

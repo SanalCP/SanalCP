@@ -34,5 +34,14 @@
   "ssl_preview": "Appears automatically when SSL is enabled",
   "refresh_preview": "Refresh preview",
   "ssl_required": "SSL required for preview",
-  "open": "Open"
+  "open": "Open",
+  "service_plan": "Service plan",
+  "no_plan": "No plan assigned",
+  "change_plan": "Change Plan",
+  "changing_plan": "Changing…",
+  "change_plan_hint": "The new plan's resource limits and WAF settings are applied in the background.",
+  "change_plan_confirm": "The plan for {{domain}} will change from {{current}} to {{next}}. Continue?",
+  "change_plan_success": "✓ Plan changed to {{plan}}; resource limits are being applied in the background.",
+  "change_plan_failed": "Plan could not be changed",
+  "plans_load_failed": "Service plans could not be loaded"
 }
