@@ -16,7 +16,7 @@ inventory(){
   version=$(curl -fsS --max-time 2 http://127.0.0.1:8080/healthz 2>/dev/null \
     | sed -n 's/.*"surum":"\([^"]*\)".*/\1/p' || true)
   echo "VERSION=${version:-unknown}"
-  sql "SELECT CONCAT('SITE=',LOWER(alan_adi),'|',sistem_kullanici,'|',php_surum) FROM domains WHERE durum IN ('aktif','pasif') ORDER BY alan_adi"
+  sql "SELECT CONCAT('SITE=',LOWER(alan_adi),'|',sistem_kullanici,'|',php_surum) FROM domains WHERE ana_domain_id IS NULL AND durum IN ('aktif','pasif') ORDER BY alan_adi"
 }
 
 export_domain(){

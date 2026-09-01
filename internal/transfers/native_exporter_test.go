@@ -18,7 +18,10 @@ func TestNativeExporterInventoryProtokolu(t *testing.T) {
 	}
 	yaz("id", `echo 0`)
 	yaz("curl", `echo '{"surum":"0.9.99"}'`)
-	yaz("mysql", `echo 'SITE=example.com|c_example|8.3'`)
+	yaz("mysql", `case "$*" in
+  *"ana_domain_id IS NULL"*) echo 'SITE=example.com|c_example|8.3' ;;
+  *) echo 'inventory ana domain filtresi eksik' >&2; exit 42 ;;
+esac`)
 
 	script, err := filepath.Abs("../../assets/ops/sanalcp-transfer-export")
 	if err != nil {
