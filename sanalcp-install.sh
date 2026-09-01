@@ -10,7 +10,7 @@
 #
 # Designed to be idempotent (safe to re-run). Run as root.
 #
-#   ./sanalcp-install.sh [--admin-kullanici <k>] [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en]
+#   ./sanalcp-install.sh [--admin-kullanici <k>] [--admin-parola <p>] [--admin-eposta <e>] [--lang tr|en] [--no-reboot]
 #
 # assets/ must sit next to this script:
 #   sanalcp-server  sanalcp-seed-admin  frontend-dist.tar.gz
@@ -22,11 +22,15 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 A="$HERE/assets"
 ADMIN_PAROLA=""; ADMIN_EPOSTA="admin@local"; PANEL_LANG=""; ADMIN_KULLANICI="admin"
+# Kurulum sonu yeniden başlatma: varsayılan AÇIK (bkz. adım 16). Otomasyon/CI
+# için --no-reboot veya SANALCP_REBOOT=0.
+REBOOT_ET="${SANALCP_REBOOT:-1}"
 while [ $# -gt 0 ]; do case "$1" in
   --admin-kullanici) shift; ADMIN_KULLANICI="$1" ;;
   --admin-parola) shift; ADMIN_PAROLA="$1" ;;
   --admin-eposta) shift; ADMIN_EPOSTA="$1" ;;
   --lang) shift; PANEL_LANG="$1" ;;
+  --no-reboot) REBOOT_ET="0" ;;
   *) echo "unknown argument: $1"; exit 2 ;;
 esac; shift; done
 
@@ -1051,9 +1055,60 @@ echo
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"
 echo -e "${c_g} ✓ SanalCP installation complete${c_0}"
 echo -e "   Panel:    ${c_b}https://${IP:-SERVER_IP}:8443${c_0}"
-echo -e "   Username: ${c_b}root${c_0}   Password: ${c_b}this server's root password${c_0}"
-echo -e "   (panel admin login verifies against the server's root account via PAM)"
+echo -e "   Username: ${c_b}${ADMIN_KULLANICI}${c_0}   Password: ${c_b}${ADMIN_PAROLA}${c_0}"
+echo -e "   ${c_y}Write this password down — it was not saved to any file.${c_0}"
+echo -e "   (panel login for 'root' is DISABLED on new installs; SSH root access is unaffected)"
 if [ -n "${KOTA_FLAG:-}" ] && ! cikti_esler '(^|,)(usrquota|uquota|quota)(,|$)' findmnt -no OPTIONS /; then
   echo -e "   ${c_y}Disk quota: $KOTA_FLAG was written to GRUB — takes effect after a ONE-TIME reboot.${c_0}"
 fi
 echo -e "${c_g}═══════════════════════════════════════════════${c_0}"
+
+# ============ 16) ONE-TIME REBOOT ============
+# 🔴 Yeni kurulumda ilk yeniden başlatma OPSİYONEL DEĞİL. Disk kotası GRUB'a
+# yazılan $KOTA_FLAG (rootflags=usrquota / uquota) ile geliyor ve o bayrak
+# çekirdeğe ancak reboot'ta ulaşıyor: o ana kadar panel plan limitlerini
+# GÖSTERİR ama sistem HİÇBİRİNİ UYGULAMAZ — sessiz ve tehlikeli bir ara durum
+# (aynı sınıf hata Debian 12/13 ve Ubuntu 24.04'te canlıda yaşandı, bkz. 0.8.0
+# duyurusu). Ayrıca kurulum sırasında gelen çekirdek/systemd güncellemeleri ve
+# yeni yazılan tüm unit'lerin temiz açılışta gerçekten ayağa kalktığı ancak bu
+# reboot'tan sonra doğrulanmış olur. Bu yüzden kurulum artık reboot'u kendi
+# üstleniyor; operatörün "sonra yaparım" deyip unutmasına bırakılmıyor.
+#
+# Sıralama önemli: bu blok panel admin parolasının basıldığı kutudan SONRA
+# çalışır ve TTY varsa tuşa basılmadan reboot etmez — parola ekranda kaybolmaz.
+if [ "$REBOOT_ET" = "0" ]; then
+  echo
+  warn "--no-reboot / SANALCP_REBOOT=0 — reboot the server yourself with 'reboot'; until then disk quota limits are NOT enforced"
+else
+  echo
+  if [ "$PANEL_LANG" = "en" ]; then
+    R1="The server must reboot ONCE to finish setup (disk quota takes effect at boot)."
+    R2="Press any key to reboot now  ·  Ctrl+C to cancel (then run 'reboot' yourself)"
+    R3="No TTY — rebooting in 10 seconds (use --no-reboot to skip)"
+  else
+    R1="Kurulumun tamamlanması için sunucunun BİR KEZ yeniden başlatılması gerekiyor (disk kotası açılışta devreye girer)."
+    R2="Yeniden başlatmak için bir tuşa basın  ·  İptal için Ctrl+C (sonra kendiniz 'reboot' çalıştırın)"
+    R3="TTY yok — 10 saniye içinde yeniden başlatılıyor (atlamak için --no-reboot)"
+  fi
+  echo -e "  ${c_y}${R1}${c_0}"
+  # curl | bash akışında stdin BETİĞİN KENDİSİ — `read` /dev/tty'ye yönlendirilmezse
+  # betik gövdesinden okur ve hiç beklemeden geçer (adım 0'daki dil seçimiyle aynı tuzak).
+  #
+  # 🔴 `[ -r /dev/tty ]` BURADA YETMEZ: denetleyen terminali olmayan bir süreçte
+  # (ssh host 'curl ... | bash', cron, systemd, nohup) düğüm görünür ve okunabilir
+  # görünür, ama AÇMAK ENXIO ile başarısız olur. O durumda `read < /dev/tty` anında
+  # hata verir ve akış uyarısız/beklemesiz doğrudan reboot'a düşerdi. Bu yüzden
+  # gerçekten AÇARAK sınıyoruz; başarısızsa TTY'siz kola geçiyoruz.
+  if { exec 3</dev/tty; } 2>/dev/null; then
+    printf "  %s " "$R2"
+    read -rsn1 <&3 || true
+    exec 3<&-
+    echo
+  else
+    warn "$R3"
+    sleep 10
+  fi
+  ok "rebooting…"
+  # systemctl yoksa/çalışmıyorsa (konteyner benzeri ortam) düz reboot'a düş.
+  systemctl reboot 2>/dev/null || reboot
+fi

@@ -13,6 +13,29 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.41** (2026-09-01)
+
+Kurulum artık sunucuyu kendisi yeniden başlatıyor. Yeni kurulumda ilk yeniden
+başlatma zaten zorunluydu — disk kotası GRUB'a yazılan `rootflags=usrquota`
+(XFS'te `uquota`) ile geliyor ve o bayrak çekirdeğe ancak açılışta ulaşıyor, yani
+reboot edilmeden panel plan limitlerini gösterir ama sistem hiçbirini uygulamaz —
+fakat bu yeniden başlatma yalnızca bir uyarı satırıyla operatöre bırakılıyordu.
+Kurulumun sonunda artık "yeniden başlatmak için bir tuşa basın" istemi çıkıyor ve
+tuşa basılınca sunucu yeniden başlatılıyor. İstem, panel yönetici parolasının
+basıldığı kutudan sonra geldiği için parola ekranda kaybolmuyor. Terminali
+olmayan (otomasyon/CI) kurulumlarda istem beklemeye takılmaz: 10 saniyelik
+uyarıdan sonra yeniden başlatılır. `--no-reboot` bayrağı veya `SANALCP_REBOOT=0`
+ortam değişkeni ile tamamen kapatılabilir.
+
+Kurulum sonundaki özet ekranı düzeltildi. Panel girişi 2026-08-20'de root'tan
+ayrıldığından beri özet eski metni basmaya devam ediyordu: kullanıcı adı olarak
+`root`, parola olarak "sunucunun root parolası" gösteriyordu. Oysa aynı kurulum
+panel root girişini kapatıyor (`root_girisi_acik=0`) ve rastgele parolalı gerçek
+bir admin hesabı üretiyor; doğru bilgi ekranın epey yukarısındaki kutuda kalıyor
+ve özet onunla çelişiyordu. Özet artık üretilen admin kullanıcı adını ve
+parolasını gösteriyor, panel root girişinin kapalı olduğunu (SSH root erişiminin
+etkilenmediğini) belirtiyor.
+
 **0.9.40** (2026-08-31)
 
 Domain/abonelik detayına yöneticiye özel hizmet paketi değiştirme kontrolü
