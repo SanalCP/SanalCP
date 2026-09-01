@@ -256,6 +256,12 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "web dosyaları aktarılamadı: "+err.Error())
 		return
 	}
+	if _, native := ekler.uyeler[ekler.nativeDomain]; native {
+		if err := restoreNativeHome(tmpPath, inv.ArchiveRoot, created.SistemKullanici); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "kullanıcı ana dizini dosyaları aktarılamadı: "+err.Error())
+			return
+		}
+	}
 	dbMaps := databaseMappings(inv.Databases, created.SistemKullanici, created.DBAdi, created.DBUser)
 	for i, m := range dbMaps {
 		if i > 0 {
@@ -831,6 +837,78 @@ func restoreWeb(archivePath, root, sk string) error {
 	}
 	_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
 	return nil
+}
+
+// restoreNativeHome, yalnız SanalCP dışa aktarıcısının web kökü dışında
+// paketlediği güvenli üst-seviye dosyaları geri yükler. Alt dizin, symlink ve
+// kabuk/SSH kimliği kabul edilmez.
+func restoreNativeHome(archivePath, root, sk string) error {
+	if !adlar.SKGecerli(sk) || root == "" {
+		return errors.New("güvensiz hedef")
+	}
+	if err := archivex.Tara(archivePath, archivex.TurTarGz); err != nil {
+		return err
+	}
+	prefix := path.Clean(root+"/homedir/native_home") + "/"
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	members := make([]string, 0, 8)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		name := path.Clean(h.Name)
+		if !strings.HasPrefix(name, prefix) || h.Typeflag != tar.TypeReg {
+			continue
+		}
+		base := strings.TrimPrefix(name, prefix)
+		if base == "" || strings.Contains(base, "/") || nativeHomeFileDenied(base) {
+			return fmt.Errorf("güvensiz kullanıcı ana dizini üyesi: %s", name)
+		}
+		members = append(members, name)
+		if len(members) > 256 {
+			return errors.New("çok fazla kullanıcı ana dizini dosyası")
+		}
+	}
+	if len(members) == 0 {
+		return nil
+	}
+	f, err = os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	args := []string{"-u", sk, "--", "tar", "-xz", "-f", "-", "-C", "/home/" + sk,
+		"--strip-components=3", "--no-same-owner", "--no-same-permissions"}
+	args = append(args, members...)
+	cmd := exec.Command("runuser", args...)
+	cmd.Stdin = f
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("tar: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func nativeHomeFileDenied(base string) bool {
+	switch base {
+	case ".bash_logout", ".bash_profile", ".bashrc", ".bash_history", ".profile",
+		".lesshst", ".viminfo", ".mysql_history", ".wget-hsts", "authorized_keys":
+		return true
+	}
+	return false
 }
 
 // restoreDatabases — bütün SQL dump'larını TEK arşiv geçişinde içe aktarır.

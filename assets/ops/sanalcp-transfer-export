@@ -70,6 +70,18 @@ export_domain(){
   if [ -d "/home/$sk/public_html" ]; then
     cp -a "/home/$sk/public_html/." "$root/homedir/public_html/"
   fi
+  # Bazı uygulamalar sırları web kökü dışında, doğrudan kullanıcı ana
+  # dizininde tutar (örn. /home/kullanici/config.local.php). Yalnız düzenli
+  # üst-seviye dosyaları taşı; kabuk/SSH/panel kimlikleri hedefe kopyalanmaz.
+  mkdir -p "$root/homedir/native_home"
+  find "/home/$sk" -mindepth 1 -maxdepth 1 -type f -print0 \
+    | while IFS= read -r -d '' home_file; do
+        base=${home_file##*/}
+        case "$base" in
+          .bash_logout|.bash_profile|.bashrc|.bash_history|.profile|.lesshst|.viminfo|.mysql_history|.wget-hsts|authorized_keys) continue ;;
+        esac
+        cp -a -- "$home_file" "$root/homedir/native_home/$base"
+      done
   sql "SELECT tam_ad FROM subdomanlar WHERE domain_id=$domain_id ORDER BY alt_ad" \
     | while IFS= read -r child; do
         [[ "$child" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "güvensiz alt alan adı"
