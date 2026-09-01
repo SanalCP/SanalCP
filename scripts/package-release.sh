@@ -10,6 +10,26 @@ command -v go >/dev/null || { echo "go bulunamadı" >&2; exit 1; }
 command -v npm >/dev/null || { echo "npm bulunamadı" >&2; exit 1; }
 command -v tar >/dev/null || { echo "tar bulunamadı" >&2; exit 1; }
 
+# Release binary'sindeki stdlib, go.mod'daki dil sürümünden değil bu betiği
+# çalıştıran TOOLCHAIN'den gelir. v0.9.42 yereldeki go1.25.0 ile paketlenip
+# kaynak taraması temiz olduğu hâlde binary taramasında 47 stdlib açığı taşıdı.
+# CI'nin kullandığı güncel ve yamalı alt sınırı paketleme anında da zorla.
+GO_TOOLCHAIN="$(go env GOVERSION)"
+GO_NUM="${GO_TOOLCHAIN#go}"
+GO_MAJOR="${GO_NUM%%.*}"
+GO_REST="${GO_NUM#*.}"
+GO_MINOR="${GO_REST%%.*}"
+GO_PATCH="${GO_REST#*.}"; GO_PATCH="${GO_PATCH%%[^0-9]*}"
+case "$GO_MAJOR.$GO_MINOR.$GO_PATCH" in
+  *[!0-9.]*) echo "geçersiz Go toolchain sürümü: $GO_TOOLCHAIN" >&2; exit 1 ;;
+esac
+if [ "$GO_MAJOR" -lt 1 ] || { [ "$GO_MAJOR" -eq 1 ] && { [ "$GO_MINOR" -lt 26 ] || { [ "$GO_MINOR" -eq 26 ] && [ "$GO_PATCH" -lt 7 ]; }; }; }; then
+  echo "release için Go >= 1.26.7 gerekli; bulunan: $GO_TOOLCHAIN" >&2
+  echo "örnek: GOTOOLCHAIN=go1.26.7 ./scripts/package-release.sh" >&2
+  exit 1
+fi
+echo "== Release toolchain: $GO_TOOLCHAIN =="
+
 EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}"
 BUILD_DATE="$(date -u -d "@$EPOCH" +%Y-%m-%d)"
 
@@ -39,6 +59,11 @@ if [ -f scripts/seed_admin.go ]; then
     go build -trimpath -buildvcs=false -ldflags "-s -w" \
     -o assets/sanalcp-seed-admin scripts/seed_admin.go
 fi
+BUILT_WITH="$(go version -m assets/sanalcp-server | awk 'NR==1 {print $2}')"
+[ "$BUILT_WITH" = "$GO_TOOLCHAIN" ] || {
+  echo "binary toolchain uyuşmazlığı: beklenen $GO_TOOLCHAIN, bulunan $BUILT_WITH" >&2
+  exit 1
+}
 
 echo "== Deterministik frontend/migration arşivleri =="
 tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner \

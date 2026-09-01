@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.43** (2026-09-01)
+
+`v0.9.42` release assetleri yerel makinedeki eski Go 1.25.0 toolchain'iyle
+derlenmişti. Kaynak kod `govulncheck` taraması temizdi; ancak dağıtılan binary
+Go 1.25.0 standard library'sini içine gömdüğü için CI binary taraması 47 eski
+stdlib kaydı buldu. Binary'ler yamalı Go 1.26.7 ile yeniden üretildi. Release
+paketleme betiği artık Go 1.26.7 altındaki toolchain'leri reddediyor ve üretilen
+binary'nin gerçekten beklenen toolchain'i taşıdığını doğruluyor.
+
 **0.9.42** (2026-09-01)
 
 Debian ve Ubuntu sunucularda dashboard güvenlik denetimi etkinleştirildi. Panel,
