@@ -2,16 +2,20 @@ package transfers
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
+	"sanalcp/internal/dns"
 	"sanalcp/internal/provisioner"
 )
 
@@ -25,6 +29,30 @@ type nativeAddonDomain struct {
 	Domain     string `json:"domain"`
 	Parked     int    `json:"parked"`
 	PHPVersion string `json:"php_version"`
+}
+
+type nativeAddonDNSRecord struct {
+	Domain string `json:"domain"`
+	nativeDNSRecord
+}
+
+func (r *nativeAddonDNSRecord) UnmarshalJSON(b []byte) error {
+	type wire struct {
+		Domain   string `json:"domain"`
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Value    string `json:"value"`
+		TTL      int    `json:"ttl"`
+		Priority int    `json:"priority"`
+		Active   int    `json:"active"`
+	}
+	var w wire
+	if err := json.Unmarshal(b, &w); err != nil {
+		return err
+	}
+	r.Domain = w.Domain
+	r.nativeDNSRecord = nativeDNSRecord{Name: w.Name, Type: w.Type, Value: w.Value, TTL: w.TTL, Priority: w.Priority, Active: w.Active}
+	return nil
 }
 
 func (h *Handlers) importNativeChildDomains(r *http.Request, archivePath string, e arsivEkler, inv Inventory, parentID int64, sk string) (int, int, error) {
@@ -86,7 +114,117 @@ func (h *Handlers) importNativeChildDomains(r *http.Request, archivePath string,
 	if err := restoreNativeChildTrees(archivePath, inv.ArchiveRoot, sk, "domains", addonNames(addons)); err != nil {
 		return len(subs), len(addons), fmt.Errorf("ek alan dosyaları: %w", err)
 	}
+	if err := h.importNativeAddonMetadata(r.Context(), e, inv, parentID, addons); err != nil {
+		return len(subs), len(addons), err
+	}
 	return len(subs), len(addons), nil
+}
+
+func (h *Handlers) importNativeAddonMetadata(ctx context.Context, e arsivEkler, inv Inventory, parentID int64, addons []nativeAddonDomain) error {
+	if len(addons) == 0 {
+		return nil
+	}
+	ids := map[string]int64{}
+	rows, err := h.DB.QueryContext(ctx, `SELECT alan_adi,id FROM domains WHERE ana_domain_id=?`, parentID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var domain string
+		var id int64
+		if err = rows.Scan(&domain, &id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids[domain] = id
+	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err = rows.Close(); err != nil {
+		return err
+	}
+	for _, a := range addons {
+		if ids[a.Domain] <= 0 {
+			return fmt.Errorf("hedef ek alan bulunamadı: %s", a.Domain)
+		}
+	}
+
+	dnsRows, err := decodeJSONLines[nativeAddonDNSRecord](e.uyeler[e.nativeAddonDNS])
+	if err != nil {
+		return fmt.Errorf("ek alan DNS metadata: %w", err)
+	}
+	grouped := map[string][]nativeDNSRecord{}
+	var sourceIP, targetIP string
+	var meta nativeDomainMeta
+	_ = json.Unmarshal(e.uyeler[e.nativeDomain], &meta)
+	sourceIP = meta.SourceIPv4
+	_ = h.DB.QueryRowContext(ctx, `SELECT ipv4 FROM domains WHERE id=?`, parentID).Scan(&targetIP)
+	for _, row := range dnsRows {
+		row.Domain = strings.ToLower(strings.TrimSpace(row.Domain))
+		row.Type = strings.ToUpper(strings.TrimSpace(row.Type))
+		if ids[row.Domain] <= 0 || !nativeDNSSafe(row.nativeDNSRecord) {
+			return fmt.Errorf("geçersiz ek alan DNS kaydı: %s", row.Domain)
+		}
+		if row.Type == "A" && sourceIP != "" && strings.TrimSpace(row.Value) == sourceIP && targetIP != "" {
+			row.Value = targetIP
+		}
+		grouped[row.Domain] = append(grouped[row.Domain], row.nativeDNSRecord)
+	}
+	_, hasDNS := e.uyeler[e.nativeAddonDNS]
+	if hasDNS {
+		for _, a := range addons {
+			tx, er := h.DB.BeginTx(ctx, nil)
+			if er != nil {
+				return er
+			}
+			if _, er = tx.ExecContext(ctx, `DELETE FROM dns_records WHERE domain_id=?`, ids[a.Domain]); er != nil {
+				tx.Rollback()
+				return er
+			}
+			for _, rec := range grouped[a.Domain] {
+				if _, er = tx.ExecContext(ctx, `INSERT INTO dns_records(domain_id,ad,tip,deger,ttl,oncelik,aktif) VALUES(?,?,?,?,?,?,?)`, ids[a.Domain], rec.Name, rec.Type, rec.Value, rec.TTL, rec.Priority, rec.Active); er != nil {
+					tx.Rollback()
+					return er
+				}
+			}
+			if er = tx.Commit(); er != nil {
+				return er
+			}
+			if er = dns.WriteZone(ctx, h.DB, ids[a.Domain]); er != nil {
+				return er
+			}
+		}
+	}
+	for _, a := range addons {
+		base := e.nativeAddonBase(a.Domain)
+		child := arsivEkler{nativeSecurity: base + "/security.json", nativeRedirect: base + "/redirect.json", nativeIPRules: base + "/ip_rules.jsonl", nativeNginx: base + "/nginx.json", nativeRate: base + "/rate_limit.json", uyeler: e.uyeler}
+		if err = h.importNativePortableSettings(ctx, child, ids[a.Domain]); err != nil {
+			return fmt.Errorf("%s ayarları: %w", a.Domain, err)
+		}
+		cert, key := e.uyeler[base+"/cert.pem"], e.uyeler[base+"/key.pem"]
+		if len(cert) > 0 || len(key) > 0 {
+			if len(cert) == 0 || len(key) == 0 {
+				return fmt.Errorf("%s SSL çifti eksik", a.Domain)
+			}
+			certPath, keyPath, expires, er := provisioner.InstallImportedSSL(a.Domain, cert, key)
+			if er != nil {
+				return fmt.Errorf("%s SSL: %w", a.Domain, er)
+			}
+			if _, er = h.DB.ExecContext(ctx, `UPDATE domains SET ssl_aktif=1,ssl_kaynak='imported',cert_path=?,key_path=?,ssl_bitis=? WHERE id=?`, certPath, keyPath, expires, ids[a.Domain]); er != nil {
+				return er
+			}
+			if er = provisioner.RerenderVhost(h.DB, ids[a.Domain]); er != nil {
+				return er
+			}
+		}
+	}
+	return nil
+}
+
+func (e arsivEkler) nativeAddonBase(domain string) string {
+	return path.Dir(e.nativeAddons) + "/addons/" + domain
 }
 
 func validPHPVersion(s string) bool {

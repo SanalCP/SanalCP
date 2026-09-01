@@ -79,3 +79,13 @@ func TestNativeChildMetadataHelpers(t *testing.T) {
 		t.Fatalf("parked domain için gereksiz docroot seçildi: %v", got)
 	}
 }
+
+func TestNativeAddonDNSJSON(t *testing.T) {
+	rows, err := decodeJSONLines[nativeAddonDNSRecord]([]byte(`{"domain":"blog.test","name":"@","type":"A","value":"192.0.2.4","ttl":300,"priority":0,"active":1}` + "\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Domain != "blog.test" || rows[0].Type != "A" || rows[0].Value != "192.0.2.4" {
+		t.Fatalf("addon DNS metadata çözülemedi: %+v", rows)
+	}
+}

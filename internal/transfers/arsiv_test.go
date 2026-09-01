@@ -100,3 +100,24 @@ func TestSSLCiftiEksikAnahtardaBulunamadiDoner(t *testing.T) {
 		t.Fatal("eşleşen özel anahtar yokken SSL çifti dönmemeli")
 	}
 }
+
+func TestReadSmallTarMembersPrefixUyeleriniToplar(t *testing.T) {
+	yol := archiveFile(t,
+		testEntry{name: "cpmove-demo/sanalcp/domain.json", body: `{"version":1}`},
+		testEntry{name: "cpmove-demo/sanalcp/addons/blog.test/security.json", body: `{"hotlink_enabled":0}`},
+		testEntry{name: "cpmove-demo/sanalcp/addons/blog.test/cert.pem", body: "CERT"},
+		testEntry{name: "cpmove-demo/homedir/public_html/index.php", body: "IGNORE"},
+	)
+	got, err := readSmallTarMembersMatching(yol,
+		[]string{"cpmove-demo/sanalcp/domain.json"},
+		[]string{"cpmove-demo/sanalcp/addons/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || string(got["cpmove-demo/sanalcp/addons/blog.test/cert.pem"]) != "CERT" {
+		t.Fatalf("prefix üyeleri eksik veya fazla: %v", got)
+	}
+	if _, ok := got["cpmove-demo/homedir/public_html/index.php"]; ok {
+		t.Fatal("prefix dışındaki web dosyası küçük metadata belleğine alındı")
+	}
+}

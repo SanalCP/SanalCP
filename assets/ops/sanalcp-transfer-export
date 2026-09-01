@@ -64,6 +64,8 @@ export_domain(){
     > "$root/sanalcp/subdomains.jsonl"
   sql "SELECT JSON_OBJECT('domain',alan_adi,'parked',parked,'php_version',php_surum) FROM domains WHERE ana_domain_id=$domain_id ORDER BY alan_adi" \
     > "$root/sanalcp/addon_domains.jsonl"
+  sql "SELECT JSON_OBJECT('domain',d.alan_adi,'name',r.ad,'type',r.tip,'value',r.deger,'ttl',r.ttl,'priority',r.oncelik,'active',r.aktif) FROM domains d JOIN dns_records r ON r.domain_id=d.id WHERE d.ana_domain_id=$domain_id ORDER BY d.alan_adi,r.id" \
+    > "$root/sanalcp/addon_dns.jsonl"
 
   if [ -d "/home/$sk/public_html" ]; then
     cp -a "/home/$sk/public_html/." "$root/homedir/public_html/"
@@ -81,6 +83,21 @@ export_domain(){
         [ -d "/home/$sk/domains/$child" ] || continue
         mkdir -p "$root/homedir/domains/$child"
         cp -a "/home/$sk/domains/$child/." "$root/homedir/domains/$child/"
+      done
+  sql "SELECT id,alan_adi,COALESCE(cert_path,''),COALESCE(key_path,'') FROM domains WHERE ana_domain_id=$domain_id ORDER BY alan_adi" \
+    | while IFS=$'\t' read -r child_id child cert_path key_path; do
+        [[ "$child" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "güvensiz ek alan adı"
+        child_root="$root/sanalcp/addons/$child"
+        mkdir -p "$child_root"
+        sql "SELECT JSON_OBJECT('hotlink_enabled',hotlink_aktif,'hotlink_allowed',COALESCE(hotlink_izinli,''),'ip_access_mode',ip_erisim_modu,'www_redirect',www_yonlendir,'waf_enabled',waf_enabled,'waf_mode',COALESCE(waf_mode,''),'waf_paranoia',COALESCE(waf_paranoia,0)) FROM domains WHERE id=$child_id" > "$child_root/security.json"
+        sql "SELECT JSON_OBJECT('target_url',hedef_url,'code',kod) FROM domain_redirects WHERE domain_id=$child_id" > "$child_root/redirect.json"
+        sql "SELECT JSON_OBJECT('cidr',ip_cidr) FROM domain_ip_kurallari WHERE domain_id=$child_id ORDER BY id" > "$child_root/ip_rules.jsonl"
+        sql "SELECT JSON_OBJECT('x_content_type',hdr_x_content_type,'x_xss',hdr_x_xss,'referrer',hdr_referrer,'permissions',hdr_permissions,'csp_upgrade',hdr_csp_upgrade,'hsts',hdr_hsts,'hsts_max_age',hsts_max_age,'hsts_subdomains',hsts_subdomains,'hsts_preload',hsts_preload,'http3',http3,'cache_profile',cache_profili) FROM nginx_settings WHERE domain_id=$child_id" > "$child_root/nginx.json"
+        sql "SELECT JSON_OBJECT('profile',profil,'requests_per_minute',istek_dakika,'burst',burst,'block_bots',bot_engelle,'ip_exceptions',COALESCE(ip_istisnalari,''),'path_exceptions',COALESCE(yol_istisnalari,'')) FROM domain_rate_limits WHERE domain_id=$child_id" > "$child_root/rate_limit.json"
+        if [ -n "$cert_path" ] && [ -n "$key_path" ] && [ -f "$cert_path" ] && [ -f "$key_path" ]; then
+          cp "$cert_path" "$child_root/cert.pem"
+          cp "$key_path" "$child_root/key.pem"
+        fi
       done
 
   sql "SELECT DISTINCT db_name FROM db_accounts WHERE domain_id=$domain_id ORDER BY db_name" \

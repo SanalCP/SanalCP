@@ -366,6 +366,7 @@ type arsivEkler struct {
 	nativeFilters  string
 	nativeSubs     string
 	nativeAddons   string
+	nativeAddonDNS string
 	uyeler         map[string][]byte
 }
 
@@ -404,6 +405,7 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	e.nativeFilters = root + "/sanalcp/mail_filters.jsonl"
 	e.nativeSubs = root + "/sanalcp/subdomains.jsonl"
 	e.nativeAddons = root + "/sanalcp/addon_domains.jsonl"
+	e.nativeAddonDNS = root + "/sanalcp/addon_dns.jsonl"
 
 	istekler := append([]string{}, e.certAdaylari...)
 	istekler = append(istekler, e.keyAdaylari...)
@@ -412,8 +414,8 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	istekler = append(istekler, e.nativeDomain, e.nativeDNS, e.nativeMailbox)
 	istekler = append(istekler, e.nativeSecurity, e.nativeRedirect, e.nativeIPRules,
 		e.nativeNginx, e.nativeRate, e.nativeSpam, e.nativeAuto, e.nativeFilters)
-	istekler = append(istekler, e.nativeSubs, e.nativeAddons)
-	uyeler, err := readSmallTarMembers(archivePath, istekler)
+	istekler = append(istekler, e.nativeSubs, e.nativeAddons, e.nativeAddonDNS)
+	uyeler, err := readSmallTarMembersMatching(archivePath, istekler, []string{root + "/sanalcp/addons/"})
 	if err != nil {
 		return e, err
 	}
@@ -636,6 +638,10 @@ var errMemberNotFound = errors.New("arşiv üyesi bulunamadı")
 // yedeğinde aktarımı saatlere çıkarıyordu (yalnız SSL için 9 aday × tam
 // decompress). Bulunamayan üyeler sonuç haritasında hiç yer almaz.
 func readSmallTarMembers(archivePath string, wants []string) (map[string][]byte, error) {
+	return readSmallTarMembersMatching(archivePath, wants, nil)
+}
+
+func readSmallTarMembersMatching(archivePath string, wants, prefixes []string) (map[string][]byte, error) {
 	aranan := make(map[string]string, len(wants)) // temizlenmiş ad -> orijinal istek
 	for _, w := range wants {
 		if w != "" {
@@ -643,7 +649,13 @@ func readSmallTarMembers(archivePath string, wants []string) (map[string][]byte,
 		}
 	}
 	found := make(map[string][]byte, len(aranan))
-	if len(aranan) == 0 {
+	cleanPrefixes := make([]string, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		if prefix != "" {
+			cleanPrefixes = append(cleanPrefixes, strings.TrimSuffix(path.Clean(prefix), "/")+"/")
+		}
+	}
+	if len(aranan) == 0 && len(cleanPrefixes) == 0 {
 		return found, nil
 	}
 	f, err := os.Open(archivePath)
@@ -657,7 +669,8 @@ func readSmallTarMembers(archivePath string, wants []string) (map[string][]byte,
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	for len(found) < len(aranan) {
+	var prefixBytes int64
+	for len(cleanPrefixes) > 0 || len(found) < len(aranan) {
 		h, err := tr.Next()
 		if err == io.EOF {
 			break
@@ -665,12 +678,27 @@ func readSmallTarMembers(archivePath string, wants []string) (map[string][]byte,
 		if err != nil {
 			return nil, err
 		}
-		istek, ok := aranan[path.Clean(h.Name)]
-		if !ok || h.Typeflag != tar.TypeReg {
+		cleanName := path.Clean(h.Name)
+		istek, exact := aranan[cleanName]
+		prefixMatch := false
+		for _, prefix := range cleanPrefixes {
+			if strings.HasPrefix(cleanName, prefix) {
+				prefixMatch = true
+				istek = cleanName
+				break
+			}
+		}
+		if (!exact && !prefixMatch) || h.Typeflag != tar.TypeReg {
 			continue
 		}
 		if h.Size > maxMetadataBytes {
 			return nil, ErrArchiveTooLarge
+		}
+		if prefixMatch {
+			prefixBytes += h.Size
+			if prefixBytes > 32<<20 || len(found) >= 2048 {
+				return nil, ErrArchiveTooLarge
+			}
 		}
 		body, err := io.ReadAll(io.LimitReader(tr, maxMetadataBytes))
 		if err != nil {
