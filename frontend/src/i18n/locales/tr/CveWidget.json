@@ -1,7 +1,8 @@
 {
   "title": "Güvenlik Açıkları",
   "subtitle_with_count": "{{count}} güvenlik danışmanı",
-  "subtitle_idle": "CVE denetimi (AlmaLinux)",
+  "subtitle_package_count": "{{count}} bekleyen güvenlik paketi",
+  "subtitle_idle": "Sistem güvenlik denetimi",
   "scanning": "Taranıyor…",
   "rescan": "Yeniden tara",
   "severity": {
@@ -26,6 +27,9 @@
   "scanning_server": "Sunucu taranıyor…",
   "system_up_to_date": "Sistem güncel",
   "no_known_vulnerabilities": "Bilinen bir güvenlik açığı yok",
+  "no_pending_security_updates": "Bekleyen güvenlik güncellemesi yok",
+  "pending_security_packages": "bekleyen güvenlik paketi",
+  "apt_scan_note": "apt güvenlik depolarına göre paket taraması",
   "total_unique_cve": "Toplam",
   "unique_cve_suffix": "benzersiz CVE",
   "last_scan": "· son tarama {{date}}",
@@ -33,7 +37,7 @@
   "live_patch_kernels": "Canlı çekirdek yamalarını güncelle (reboot yok)",
   "updates_completed": "Güvenlik güncellemeleri tamamlandı.",
   "live_patch_applied": "Canlı çekirdek yaması uygulandı.",
-  "confirm_update": "Sunucudaki güvenlik güncellemeleri (dnf --security) kurulacak. Çekirdek (kernel) güncellemesi varsa etkin olması için yeniden başlatma gerekebilir. Devam edilsin mi?",
+  "confirm_update": "Sunucudaki güvenlik güncellemeleri kurulacak. Çekirdek (kernel) güncellemesi varsa etkin olması için yeniden başlatma gerekebilir. Devam edilsin mi?",
   "update_start_failed": "Güncelleme başlatılamadı",
   "live_patch_start_failed": "Canlı yama başlatılamadı",
   "unsupported": "Güvenlik açığı taraması bu işletim sisteminde desteklenmiyor."

@@ -212,11 +212,13 @@ func (b Bilgi) WebKullanici() string {
 func ApacheBackendDestekli() bool { return Mevcut().RHELMi() }
 
 // GuvenlikGuncellemeDestekli: CVE / güvenlik güncellemesi ekranı çalışır mı?
-//
-// v1'de Debian'da KAPALI: RHEL'in `dnf updateinfo --security` çıktısının
-// Debian'da doğrudan karşılığı yok (apt tarafında ayrı bir veri kaynağı ve
-// ayrıştırma gerekir). Yanlış "0 açık" göstermektense ekran kapatılıyor.
-func GuvenlikGuncellemeDestekli() bool { return Mevcut().RHELMi() }
+// RHEL'de dnf updateinfo ile CVE'ler, Debian ailesinde apt'nin security
+// depolarından bekleyen paket güncellemeleri taranır.
+func GuvenlikGuncellemeDestekli() bool {
+	return Mevcut().GuvenlikGuncellemeDestekli()
+}
+
+func (b Bilgi) GuvenlikGuncellemeDestekli() bool { return b.RHELMi() || b.DebianMi() }
 
 // MariaDBSoket: MariaDB unix soketinin yolu.
 //

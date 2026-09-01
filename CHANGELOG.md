@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.42** (2026-09-01)
+
+Debian ve Ubuntu sunucularda dashboard güvenlik denetimi etkinleştirildi. Panel,
+`apt` simülasyonu üzerinden yalnız dağıtımın `security` depolarından gelen bekleyen
+paketleri listeliyor; apt taşınabilir bir CVE/önem akışı sunmadığı için bunları
+yanıltıcı biçimde CVE veya kritik/önemli diye etiketlemiyor. Dashboard'daki tek
+tık güncelleme ve Araçlar'daki günlük otomatik güvenlik güncellemesi artık
+Debian/Ubuntu'da da çalışıyor; reboot gereksinimi `/var/run/reboot-required`
+üzerinden algılanıyor. Yeni kurulumlar `unattended-upgrades` paketini getiriyor,
+mevcut kurulumlarda paket yoksa panel güvenli `apt-get --only-upgrade` yoluna düşüyor.
+
 **0.9.41** (2026-09-01)
 
 Kurulum artık sunucuyu kendisi yeniden başlatıyor. Yeni kurulumda ilk yeniden

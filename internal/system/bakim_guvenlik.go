@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 )
 
 const (
@@ -46,6 +47,10 @@ func guvenlikAyariOku() guvenlikAyari {
 }
 
 func guvenlikBekleyen(ctx context.Context) int {
+	if osfam.Mevcut().DebianMi() {
+		b, _ := exec.CommandContext(ctx, "apt-get", "-s", "-o", "Debug::NoLocking=true", "dist-upgrade").CombinedOutput()
+		return len(aptGuvenlikPaketleriniAyristir(string(b)))
+	}
 	b, _ := exec.CommandContext(ctx, "dnf", "-q", "updateinfo", "list", "--security", "updates").Output()
 	n := 0
 	for _, s := range strings.Split(string(b), "\n") {
@@ -67,8 +72,7 @@ func GuvenlikGuncellemeDurum(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
 	a := guvenlikAyariOku()
-	_, dnfErr := exec.LookPath("dnf")
-	d := guvenlikDurum{OtomatikReboot: a.OtomatikReboot, Destekli: dnfErr == nil}
+	d := guvenlikDurum{OtomatikReboot: a.OtomatikReboot, Destekli: osfam.GuvenlikGuncellemeDestekli()}
 	d.Aktif = systemctlOzellik(ctx, "sanalcp-security-update.timer", "UnitFileState") == "enabled"
 	d.Calisiyor = systemctlOzellik(ctx, "sanalcp-security-update.service", "ActiveState") == "active"
 	d.SonCalisma = systemctlOzellik(ctx, "sanalcp-security-update.service", "ExecMainExitTimestamp")
@@ -100,6 +104,24 @@ if ` + reboot + `; then
   fi
 fi
 `
+	if osfam.Mevcut().DebianMi() {
+		betik = `#!/usr/bin/env bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
+/usr/bin/apt-get update
+if command -v unattended-upgrade >/dev/null 2>&1; then
+  unattended-upgrade -d
+else
+  mapfile -t security_packages < <(/usr/bin/apt-get -s -o Debug::NoLocking=true dist-upgrade | awk '/^Inst / { p=index($0,"("); if (p && tolower(substr($0,p)) ~ /security/) print $2 }' | sort -u)
+  if ((${#security_packages[@]})); then
+    /usr/bin/apt-get install -y --only-upgrade "${security_packages[@]}"
+  fi
+fi
+if ` + reboot + ` && [ -f /var/run/reboot-required ]; then
+  /usr/bin/systemctl reboot
+fi
+`
+	}
 	if err := atomikYaz(guvenlikBetikYolu, betik, 0700); err != nil {
 		return err
 	}
@@ -120,7 +142,15 @@ func GuvenlikGuncellemeKaydet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 400, "geçersiz istek gövdesi")
 		return
 	}
-	if _, err := exec.LookPath("dnf"); err != nil {
+	guncelleyici := "dnf"
+	if osfam.Mevcut().DebianMi() {
+		guncelleyici = "apt-get"
+	}
+	if !osfam.GuvenlikGuncellemeDestekli() {
+		httpx.WriteError(w, 400, "otomatik güvenlik güncellemesi bu sistemde desteklenmiyor")
+		return
+	}
+	if _, err := exec.LookPath(guncelleyici); err != nil {
 		httpx.WriteError(w, 400, "otomatik güvenlik güncellemesi bu sistemde desteklenmiyor")
 		return
 	}

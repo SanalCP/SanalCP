@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
 // Dashboard güvenlik-açığı (CVE) widget'ı.
-// Backend: GET /system/cve (cache'li dnf updateinfo özeti) · POST /system/cve/guncelle
-// (arka planda `dnf update --security`, sekme kapansa da sürer) · GET /system/cve/log (durum).
+// Backend RHEL'de CVE, Debian/Ubuntu'da apt security paketlerini özetler.
 // Kart kabuğu HomePage'teki <Kart> ile görsel olarak eşleşir (ayrı bileşen olduğu için tekrar tanımlı).
 
 type CveKayit = { id: string; severity: string; paket: string }
@@ -14,11 +13,13 @@ type CveOzet = {
   orta: number
   dusuk: number
   toplam_cve: number
+  toplam_paket?: number
   toplam_danisman: number
   son_tarama: string
   top_cve: CveKayit[] | null
   guncelleme_calisiyor: boolean
   reboot_gerekli: boolean
+  tarama_turu: 'cve' | 'paket'
   // Bu işletim sisteminde güvenlik açığı taraması yapılamıyor (bkz.
   // internal/system/cve.go). Yanlış "0 açık" göstermemek için widget
   // açıkça "desteklenmiyor" durumuna geçer.
@@ -145,7 +146,9 @@ export default function CveWidget() {
       : veri.onemli > 0 ? 'text-amber-500'
         : 'text-emerald-500'
 
-  const temiz = veri !== null && veri.toplam_cve === 0
+  const paketTaramasi = veri?.tarama_turu === 'paket'
+  const toplam = paketTaramasi ? (veri?.toplam_paket ?? 0) : (veri?.toplam_cve ?? 0)
+  const temiz = veri !== null && toplam === 0
   const top = veri?.top_cve ?? []
 
   // Desteklenmeyen işletim sisteminde sayıları hiç gösterme — "0 kritik açık"
@@ -182,7 +185,9 @@ export default function CveWidget() {
           <div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t('CveWidget:title')}</h3>
             <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
-              {veri ? t('CveWidget:subtitle_with_count', { count: veri.toplam_danisman }) : t('CveWidget:subtitle_idle')}
+              {veri
+                ? t(paketTaramasi ? 'CveWidget:subtitle_package_count' : 'CveWidget:subtitle_with_count', { count: veri.toplam_danisman })
+                : t('CveWidget:subtitle_idle')}
             </p>
           </div>
         </div>
@@ -250,7 +255,7 @@ export default function CveWidget() {
       ) : veri === null ? (
         <div className="flex items-center justify-center gap-2 py-6 text-xs text-slate-400">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-transparent dark:border-slate-600 dark:border-t-transparent" />
-          Sunucu taranıyor…
+          {t('CveWidget:scanning_server')}
         </div>
       ) : temiz ? (
         <div className="flex flex-col items-center gap-1.5 py-5 text-center">
@@ -258,12 +263,17 @@ export default function CveWidget() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-emerald-500"><path d="M20 6 9 17l-5-5" /></svg>
           </span>
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('CveWidget:system_up_to_date')}</p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">{t('CveWidget:no_known_vulnerabilities')}</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">{t(paketTaramasi ? 'CveWidget:no_pending_security_updates' : 'CveWidget:no_known_vulnerabilities')}</p>
         </div>
       ) : (
         <>
-          {/* önem özeti */}
-          <div className="mb-3 grid grid-cols-3 gap-2.5">
+          {/* apt taşınabilir CVE/önem vermez; Debian'da sahte seviye gösterme. */}
+          {paketTaramasi ? (
+            <div className="mb-3 rounded-xl border border-amber-100 bg-amber-50 p-3 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
+              <div className="text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{toplam}</div>
+              <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t('CveWidget:pending_security_packages')}</div>
+            </div>
+          ) : <div className="mb-3 grid grid-cols-3 gap-2.5">
             {(['kritik', 'onemli', 'orta'] as const).map((k) => (
               <div key={k} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center dark:border-slate-800 dark:bg-slate-950/40">
                 <div className={`text-2xl font-bold tabular-nums ${ONEM[k].metin}`}>{veri[k]}</div>
@@ -272,9 +282,11 @@ export default function CveWidget() {
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
           <p className="mb-3 text-[11px] text-slate-400 dark:text-slate-500">
-            {t('CveWidget:total_unique_cve')} <strong className="text-slate-600 dark:text-slate-300">{veri.toplam_cve}</strong> {t('CveWidget:unique_cve_suffix')}
+            {paketTaramasi
+              ? t('CveWidget:apt_scan_note')
+              : <>{t('CveWidget:total_unique_cve')} <strong className="text-slate-600 dark:text-slate-300">{veri.toplam_cve}</strong> {t('CveWidget:unique_cve_suffix')}</>}
             {veri.son_tarama ? <> {t('CveWidget:last_scan', { date: veri.son_tarama })}</> : null}
           </p>
 
@@ -284,7 +296,7 @@ export default function CveWidget() {
               {top.slice(0, 4).map((c) => (
                 <div key={c.id} className="-mx-2 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ONEM[c.severity]?.nokta ?? 'bg-slate-400'}`} />
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${paketTaramasi ? 'bg-amber-500' : (ONEM[c.severity]?.nokta ?? 'bg-slate-400')}`} />
                     <span className="font-mono text-[12px] text-slate-700 dark:text-slate-200">{c.id}</span>
                   </span>
                   <span className="min-w-0 truncate text-right text-[10px] text-slate-400 dark:text-slate-500" title={c.paket}>{c.paket}</span>

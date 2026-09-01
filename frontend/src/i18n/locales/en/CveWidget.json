@@ -1,7 +1,8 @@
 {
   "title": "Security Vulnerabilities",
   "subtitle_with_count": "{{count}} security advisories",
-  "subtitle_idle": "CVE audit (AlmaLinux)",
+  "subtitle_package_count": "{{count}} pending security packages",
+  "subtitle_idle": "System security audit",
   "scanning": "Scanning…",
   "rescan": "Rescan",
   "severity": {
@@ -26,6 +27,9 @@
   "scanning_server": "Scanning server…",
   "system_up_to_date": "System up to date",
   "no_known_vulnerabilities": "No known vulnerabilities",
+  "no_pending_security_updates": "No pending security updates",
+  "pending_security_packages": "pending security packages",
+  "apt_scan_note": "Package scan based on apt security repositories",
   "total_unique_cve": "Total",
   "unique_cve_suffix": "unique CVEs",
   "last_scan": "· last scan {{date}}",
@@ -33,7 +37,7 @@
   "live_patch_kernels": "Update live kernel patches (no reboot)",
   "updates_completed": "Security updates completed.",
   "live_patch_applied": "Live kernel patch applied.",
-  "confirm_update": "Security updates on the server (dnf --security) will be installed. If there is a kernel update, a reboot may be required for it to take effect. Continue?",
+  "confirm_update": "Security updates on the server will be installed. If there is a kernel update, a reboot may be required for it to take effect. Continue?",
   "update_start_failed": "Could not start the update",
   "live_patch_start_failed": "Could not start the live patch",
   "unsupported": "Vulnerability scanning is not supported on this operating system."

@@ -125,8 +125,7 @@ func PHPTablo() map[string]phpAyar
 | `internal/system/cve.go` | Güvenlik güncellemesi denetimi (`dnf updateinfo` → Debian'da karşılığı farklı) |
 
 `cve.go` en zoru: RHEL'in `dnf updateinfo --security` çıktısının Debian'da doğrudan
-karşılığı yok. Debian tarafında `apt list --upgradable` + `debian-security-support` ya da
-`unattended-upgrades` çıktısı kullanılacak; **v1'de bu ekran Debian'da "desteklenmiyor"
+karşılığı yok. İlk portta ekran Debian'da **"desteklenmiyor"
 diye kapatılabilir** (dürüst ve düşük riskli).
 
 ### 3.3 Paket ve servis adı haritası
@@ -1217,6 +1216,11 @@ sahibi `redis-server`, panel 200.
 ---
 
 ## 5j. Faz 6 — Apache backend + CVE ekranı ✅ (2026-08-19)
+
+> **2026-09-01 güncellemesi:** Aşağıdaki CVE ekranı kararı artık tarihsel
+> kayıttır. Debian/Ubuntu'da apt security depolarına dayalı paket taraması,
+> tek-tık güncelleme ve otomatik güvenlik güncellemesi desteklenmektedir.
+> apt doğrudan CVE/önem verisi sağlamadığından arayüz paket sayısı gösterir.
 
 Plandaki karar (§7.0, madde 3 ve 4): her ikisi de Debian ailesinde v1'de
 **kapalı**, ve *dürüstçe* kapalı — yarım çalışan bir ekran yerine "bu sunucuda

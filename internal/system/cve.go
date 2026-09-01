@@ -1,9 +1,10 @@
 package system
 
-// CVE / güvenlik denetimi — AlmaLinux `dnf updateinfo` (ALSA→CVE eşlemesi) üzerinden
-// sunucunun kendi OS'undaki bilinen açıkları özetler + tek-tık güvenlik güncellemesi.
+// CVE / güvenlik denetimi. RHEL'de `dnf updateinfo` ile CVE'leri, Debian
+// ailesinde apt'nin *-security depolarından bekleyen paketleri özetler.
 //
-// GÜVENLİK: komutlar SABİT (argv-only, kullanıcı girdisi yok). Tarama read-only.
+// GÜVENLİK: komutlar sabit, kullanıcı girdisi yok. Tarama paketleri değiştirmez;
+// Debian'da doğru sonuç için yalnız apt paket indeksini yeniler.
 // Güncelleme (dnf --security) uzun sürer + servis etkileyebilir → optimize/güncelleme
 // gibi systemd-run ile PID 1 altında AYRI transient unit'te koşar (sekme/panel kapansa
 // da ölmez, dnf-kilidi güvenli).
@@ -41,15 +42,18 @@ type CveOzet struct {
 	Orta                int        `json:"orta"`
 	Dusuk               int        `json:"dusuk"`
 	ToplamCve           int        `json:"toplam_cve"`
+	ToplamPaket         int        `json:"toplam_paket,omitempty"`
 	ToplamDanisman      int        `json:"toplam_danisman"`
 	SonTarama           string     `json:"son_tarama"`
 	TopCve              []CveKayit `json:"top_cve"`
 	GuncellemeCalisiyor bool       `json:"guncelleme_calisiyor"`
 	RebootGerekli       bool       `json:"reboot_gerekli"`
 	KernelCare          KcDurum    `json:"kernelcare"`
-	// Desteklenmiyor: bu işletim sisteminde güvenlik açığı taraması yapılamıyor.
-	// RHEL'in `dnf updateinfo --security` verisinin Debian/Ubuntu'da doğrudan
-	// karşılığı yok; yanlışlıkla "0 açık" göstermektense ekran açıkça kapatılır.
+	// TaramaTuru: "cve" (RHEL) veya "paket" (Debian/Ubuntu). apt güvenlik
+	// paketlerini bilir, fakat her paket için taşınabilir bir CVE/önem akışı
+	// sunmaz; arayüz bu nedenle Debian'da bunları CVE diye etiketlemez.
+	TaramaTuru string `json:"tarama_turu"`
+	// Desteklenmiyor: tanınmayan bir işletim sisteminde tarama yapılamıyor.
 	Desteklenmiyor bool   `json:"desteklenmiyor,omitempty"`
 	DestekNotu     string `json:"destek_notu,omitempty"`
 }
@@ -58,9 +62,7 @@ type CveOzet struct {
 func cveDesteklenmiyorYanit() CveOzet {
 	return CveOzet{
 		Desteklenmiyor: true,
-		DestekNotu: "Güvenlik açığı taraması bu işletim sisteminde henüz desteklenmiyor " +
-			"(yalnızca AlmaLinux/RHEL ailesi). Güncellemeleri sisteminizin kendi paket " +
-			"yöneticisiyle takip edin.",
+		DestekNotu:     "Güvenlik taraması bu işletim sisteminde desteklenmiyor.",
 	}
 }
 
@@ -90,6 +92,10 @@ func cveGuncellemeCalisiyor() bool {
 // başlatılana kadar "açık" görünür (dnf: "installed security update" ≠ "running version").
 // `dnf update --security` "Nothing to do" dese bile bu durumda sayı düşmez → kullanıcıya açıkla.
 func rebootGerekli() bool {
+	if osfam.Mevcut().DebianMi() {
+		_, err := os.Stat("/var/run/reboot-required")
+		return err == nil
+	}
 	running := strings.TrimSpace(runOut("uname", "-r"))
 	if running == "" {
 		return false
@@ -125,8 +131,8 @@ func cveEtiket(sev string) string {
 // cveTara — dnf updateinfo çıktısını parse eder (read-only).
 // Aynı CVE birden çok pakette görünebilir → BENZERSIZ CVE üzerinden sayarız
 // (CVE başına en yüksek önem). "486 satır" değil, gerçek benzersiz zafiyet sayısı.
-func cveTara() *CveOzet {
-	o := &CveOzet{SonTarama: time.Now().Format("2006-01-02 15:04")}
+func cveRHELTara() *CveOzet {
+	o := &CveOzet{SonTarama: time.Now().Format("2006-01-02 15:04"), TaramaTuru: "cve"}
 	// CVE listesi satırı: "CVE-2025-68724  Important/Sec. kernel-...x86_64"
 	sevOf := map[string]string{} // cveID -> en yüksek önem etiketi
 	pkgOf := map[string]string{} // cveID -> o önemdeki örnek paket
@@ -185,6 +191,68 @@ func cveTara() *CveOzet {
 	return o
 }
 
+// aptGuvenlikPaketleriniAyristir, `apt-get -s dist-upgrade` içindeki Inst
+// satırlarından kaynağı security olanları alır. Debian ve Ubuntu kaynak
+// etiketleri sırasıyla "Debian-Security" ve "*-security" içerir.
+func aptGuvenlikPaketleriniAyristir(cikti string) []CveKayit {
+	tekil := make(map[string]CveKayit)
+	for _, satir := range strings.Split(cikti, "\n") {
+		f := strings.Fields(satir)
+		adayBaslangici := strings.IndexByte(satir, '(')
+		if len(f) < 3 || f[0] != "Inst" || adayBaslangici < 0 ||
+			!strings.Contains(strings.ToLower(satir[adayBaslangici:]), "security") {
+			continue
+		}
+		paket := f[1]
+		aciklama := strings.TrimSpace(strings.TrimPrefix(satir, "Inst "+paket))
+		tekil[paket] = CveKayit{Id: paket, Paket: aciklama}
+	}
+	adlar := make([]string, 0, len(tekil))
+	for ad := range tekil {
+		adlar = append(adlar, ad)
+	}
+	sort.Strings(adlar)
+	sonuc := make([]CveKayit, 0, len(adlar))
+	for _, ad := range adlar {
+		sonuc = append(sonuc, tekil[ad])
+	}
+	return sonuc
+}
+
+func cveAptTara() (*CveOzet, error) {
+	// Paket indeksini yenile: installer apt-daily zamanlayıcılarını kilit
+	// çakışmasın diye kapatır; eski indeksle "temiz" demek yanıltıcı olur.
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
+	defer cancel()
+	if b, err := exec.CommandContext(ctx, "apt-get", "update").CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("apt paket indeksi yenilenemedi: %s", strings.TrimSpace(string(b)))
+	}
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel2()
+	b, err := exec.CommandContext(ctx2, "apt-get", "-s", "-o", "Debug::NoLocking=true", "dist-upgrade").CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("apt güvenlik taraması tamamlanamadı: %s", strings.TrimSpace(string(b)))
+	}
+	paketler := aptGuvenlikPaketleriniAyristir(string(b))
+	o := &CveOzet{
+		SonTarama: time.Now().Format("2006-01-02 15:04"), TaramaTuru: "paket",
+		ToplamPaket: len(paketler), ToplamDanisman: len(paketler),
+	}
+	if len(paketler) > 10 {
+		o.TopCve = paketler[:10]
+	} else {
+		o.TopCve = paketler
+	}
+	return o, nil
+}
+
+func cveTara() (*CveOzet, error) {
+	if osfam.Mevcut().DebianMi() {
+		return cveAptTara()
+	}
+	return cveRHELTara(), nil
+}
+
 // CveDurum — GET /system/cve : cache'li özet (yenile=1 ile zorla tara).
 func CveDurum(w http.ResponseWriter, r *http.Request) {
 	if !osfam.GuvenlikGuncellemeDestekli() {
@@ -212,7 +280,13 @@ func CveDurum(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, CveOzet{GuncellemeCalisiyor: true, RebootGerekli: reboot, KernelCare: kc})
 		return
 	}
-	cveCache = cveTara()
+	var err error
+	cveCache, err = cveTara()
+	if err != nil {
+		cveCache = nil
+		httpx.WriteError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
 	cveCacheTs = time.Now()
 	ozet := *cveCache
 	ozet.RebootGerekli = reboot
@@ -230,8 +304,18 @@ if command -v dnf >/dev/null 2>&1; then
   dnf -y --refresh update --security
 elif command -v yum >/dev/null 2>&1; then
   yum -y update --security
+elif command -v unattended-upgrade >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a unattended-upgrade -d
+elif command -v apt-get >/dev/null 2>&1; then
+  apt-get update
+  mapfile -t security_packages < <(apt-get -s -o Debug::NoLocking=true dist-upgrade | awk '/^Inst / { p=index($0,"("); if (p && tolower(substr($0,p)) ~ /security/) print $2 }' | sort -u)
+  if ((${#security_packages[@]})); then
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --only-upgrade "${security_packages[@]}"
+  else
+    echo "  (no pending security updates)"
+  fi
 else
-  echo "  (dnf/yum not found — update skipped)"
+  echo "  (supported security updater not found — update skipped)"
 fi
 echo
 echo "════════ ✓ Security updates complete ════════"
@@ -245,8 +329,18 @@ if command -v dnf >/dev/null 2>&1; then
   dnf -y --refresh update --security
 elif command -v yum >/dev/null 2>&1; then
   yum -y update --security
+elif command -v unattended-upgrade >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a unattended-upgrade -d
+elif command -v apt-get >/dev/null 2>&1; then
+  apt-get update
+  mapfile -t security_packages < <(apt-get -s -o Debug::NoLocking=true dist-upgrade | awk '/^Inst / { p=index($0,"("); if (p && tolower(substr($0,p)) ~ /security/) print $2 }' | sort -u)
+  if ((${#security_packages[@]})); then
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y --only-upgrade "${security_packages[@]}"
+  else
+    echo "  (bekleyen güvenlik güncellemesi yok)"
+  fi
 else
-  echo "  (dnf/yum bulunamadı — güncelleme atlandı)"
+  echo "  (desteklenen güvenlik güncelleyicisi bulunamadı — güncelleme atlandı)"
 fi
 echo
 echo "════════ ✓ Güvenlik güncellemeleri tamamlandı ════════"

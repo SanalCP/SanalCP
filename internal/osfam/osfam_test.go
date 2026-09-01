@@ -107,6 +107,17 @@ func TestAyristirBilinmeyenSistemVarsaymaz(t *testing.T) {
 	}
 }
 
+func TestGuvenlikGuncellemesiIkiAiledeDestekli(t *testing.T) {
+	for _, aile := range []Aile{RHEL, Debian} {
+		if !((Bilgi{Aile: aile}).GuvenlikGuncellemeDestekli()) {
+			t.Errorf("%s ailesinde güvenlik güncellemesi kapalı", aile)
+		}
+	}
+	if (Bilgi{Aile: Bilinmez}).GuvenlikGuncellemeDestekli() {
+		t.Fatal("bilinmeyen ailede güvenlik güncellemesi açık")
+	}
+}
+
 // ID bilinmiyor ama ID_LIKE tanınıyorsa aile ondan çözülmeli (türev dağıtımlar).
 func TestAyristirIDLikeIleCozer(t *testing.T) {
 	b := Ayristir("ID=linuxmint\nID_LIKE=\"ubuntu debian\"\nVERSION_ID=\"22\"\n")

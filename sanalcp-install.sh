@@ -278,6 +278,11 @@ BASE_SYS="$(paket_ad web) $(paket_ad db) certbot python3-certbot-nginx \
   $(paket_ad antivirus) $(paket_ad av-guncel) $(paket_ad apache-ara) tar openssl \
   jq $(paket_ad dns) $(paket_ad dns-arac) nftables unzip zip $(paket_ad cron) \
   $(paket_ad kota-xfs) $(paket_ad kota-ext) sudo bubblewrap rsync git curl acl lftp sshpass"
+if debian_mi; then
+  # Servis/timer kapalı kalır; panel bunu güvenlik taraması ve kendi kontrollü
+  # zamanlayıcısı için çağırır.
+  BASE_SYS="$BASE_SYS unattended-upgrades"
+fi
 if rhel_mi; then
   # httpd = the optional Apache backend (RHEL only, see osfam.ApacheBackendDestekli).
   # policycoreutils-python-utils/setools-console are SELinux tooling — Debian has none.

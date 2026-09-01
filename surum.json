@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.41",
-  "duyuru": "Kurulum artık sunucuyu kendisi yeniden başlatıyor. Yeni kurulumda ilk yeniden başlatma opsiyonel değildi ama operatöre bırakılıyordu: disk kotası GRUB'a yazılan rootflags=usrquota/uquota ile geliyor ve o bayrak çekirdeğe ancak açılışta ulaşıyor — reboot edilmeden panel plan limitlerini GÖSTERİR ama sistem HİÇBİRİNİ UYGULAMAZ. Kurulum sonunda artık 'yeniden başlatmak için bir tuşa basın' istemi çıkıyor ve tuşa basılınca sunucu yeniden başlatılıyor; istem, panel parolasının basıldığı kutudan sonra geldiği için parola ekranda kaybolmuyor. Terminal olmayan (otomasyon) kurulumlarda 10 saniyelik uyarıdan sonra otomatik yeniden başlatılır; --no-reboot veya SANALCP_REBOOT=0 ile kapatılabilir. AYRICA: kurulum sonundaki özet ekranı, 2026-08-20'de panel girişi root'tan ayrıldığından beri eski metni basıyordu — 'root + sunucunun root parolası' diyordu, oysa aynı kurulum panel root girişini kapatıyor ve gerçek bir admin hesabı üretiyor. Özet artık üretilen admin kullanıcı adını ve parolasını gösteriyor.",
+  "son_surum": "0.9.42",
+  "duyuru": "Debian ve Ubuntu sunucularda dashboard güvenlik denetimi etkinleştirildi. Panel apt security depolarından bekleyen paketleri listeliyor; tek tık ve günlük otomatik güvenlik güncellemeleri artık Debian/Ubuntu'da da çalışıyor. Yeniden başlatma gereksinimi de doğru algılanıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-01"
 }
