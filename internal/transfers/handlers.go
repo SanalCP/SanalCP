@@ -25,11 +25,13 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/cron"
+	"sanalcp/internal/domainek"
 	"sanalcp/internal/domains"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/mail"
 	"sanalcp/internal/provisioner"
+	"sanalcp/internal/subdomain"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -37,10 +39,12 @@ import (
 const MaxUploadBytes = int64(20 << 30)
 
 type Handlers struct {
-	DB      *sql.DB
-	Domains *domains.Handlers
-	Mail    *mail.Handlers
-	Cron    *cron.Handlers
+	DB        *sql.DB
+	Domains   *domains.Handlers
+	Mail      *mail.Handlers
+	Cron      *cron.Handlers
+	Addon     *domainek.Handlers
+	Subdomain *subdomain.Handlers
 }
 
 // Analyze accepts a cPanel full backup and returns an inventory. It never
@@ -99,20 +103,22 @@ func (h *Handlers) Analyze(w http.ResponseWriter, r *http.Request) {
 }
 
 type importResponse struct {
-	OK          bool             `json:"ok"`
-	DomainID    int64            `json:"domain_id"`
-	Domain      string           `json:"domain"`
-	SystemUser  string           `json:"system_user"`
-	WebFiles    int              `json:"web_files"`
-	Databases   []DBMap          `json:"databases"`
-	Credentials any              `json:"credentials"`
-	Mailboxes   []MailCredential `json:"mailboxes"`
-	Aliases     int              `json:"aliases"`
-	CronJobs    int              `json:"cron_jobs"`
-	SSLImported bool             `json:"ssl_imported"`
-	SSLExpires  string           `json:"ssl_expires,omitempty"`
-	Skipped     []string         `json:"skipped"`
-	Source      Inventory        `json:"source"`
+	OK           bool             `json:"ok"`
+	DomainID     int64            `json:"domain_id"`
+	Domain       string           `json:"domain"`
+	SystemUser   string           `json:"system_user"`
+	WebFiles     int              `json:"web_files"`
+	Databases    []DBMap          `json:"databases"`
+	Credentials  any              `json:"credentials"`
+	Mailboxes    []MailCredential `json:"mailboxes"`
+	Aliases      int              `json:"aliases"`
+	CronJobs     int              `json:"cron_jobs"`
+	SSLImported  bool             `json:"ssl_imported"`
+	SSLExpires   string           `json:"ssl_expires,omitempty"`
+	Skipped      []string         `json:"skipped"`
+	Subdomains   int              `json:"subdomains"`
+	AddonDomains int              `json:"addon_domains"`
+	Source       Inventory        `json:"source"`
 }
 
 type MailCredential struct {
@@ -273,6 +279,11 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "SanalCP metadata aktarılamadı: "+err.Error())
 		return
 	}
+	subCount, addonCount, err := h.importNativeChildDomains(r, tmpPath, ekler, inv, created.ID, created.SistemKullanici)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "alt/ek alan adları aktarılamadı: "+err.Error())
+		return
+	}
 	for i := range mailCreds {
 		if preserved[mailCreds[i].Email] {
 			mailCreds[i].Password = ""
@@ -302,6 +313,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		Databases: dbMaps, Credentials: created.Parolalar, Mailboxes: mailCreds,
 		Aliases: aliasCount, CronJobs: cronCount, SSLImported: sslImported,
 		SSLExpires: sslExpires, Source: inv, Skipped: skipped,
+		Subdomains: subCount, AddonDomains: addonCount,
 	})
 }
 
@@ -352,6 +364,8 @@ type arsivEkler struct {
 	nativeSpam     string
 	nativeAuto     string
 	nativeFilters  string
+	nativeSubs     string
+	nativeAddons   string
 	uyeler         map[string][]byte
 }
 
@@ -388,6 +402,8 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	e.nativeSpam = root + "/sanalcp/mail_spam.json"
 	e.nativeAuto = root + "/sanalcp/autoresponders.jsonl"
 	e.nativeFilters = root + "/sanalcp/mail_filters.jsonl"
+	e.nativeSubs = root + "/sanalcp/subdomains.jsonl"
+	e.nativeAddons = root + "/sanalcp/addon_domains.jsonl"
 
 	istekler := append([]string{}, e.certAdaylari...)
 	istekler = append(istekler, e.keyAdaylari...)
@@ -396,6 +412,7 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	istekler = append(istekler, e.nativeDomain, e.nativeDNS, e.nativeMailbox)
 	istekler = append(istekler, e.nativeSecurity, e.nativeRedirect, e.nativeIPRules,
 		e.nativeNginx, e.nativeRate, e.nativeSpam, e.nativeAuto, e.nativeFilters)
+	istekler = append(istekler, e.nativeSubs, e.nativeAddons)
 	uyeler, err := readSmallTarMembers(archivePath, istekler)
 	if err != nil {
 		return e, err

@@ -60,10 +60,28 @@ export_domain(){
     > "$root/sanalcp/autoresponders.jsonl"
   sql "SELECT JSON_OBJECT('local_part',m.local_part,'name',f.name,'match_field',f.match_field,'match_value',f.match_value,'action_type',f.action_type,'action_value',f.action_value,'priority',f.priority_n,'enabled',f.enabled) FROM mail_filters f JOIN mailboxes m ON m.id=f.mailbox_id WHERE f.domain_id=$domain_id ORDER BY m.local_part,f.priority_n,f.id" \
     > "$root/sanalcp/mail_filters.jsonl"
+  sql "SELECT JSON_OBJECT('label',alt_ad,'domain',tam_ad,'php_version',php_surum) FROM subdomanlar WHERE domain_id=$domain_id ORDER BY alt_ad" \
+    > "$root/sanalcp/subdomains.jsonl"
+  sql "SELECT JSON_OBJECT('domain',alan_adi,'parked',parked,'php_version',php_surum) FROM domains WHERE ana_domain_id=$domain_id ORDER BY alan_adi" \
+    > "$root/sanalcp/addon_domains.jsonl"
 
   if [ -d "/home/$sk/public_html" ]; then
     cp -a "/home/$sk/public_html/." "$root/homedir/public_html/"
   fi
+  sql "SELECT tam_ad FROM subdomanlar WHERE domain_id=$domain_id ORDER BY alt_ad" \
+    | while IFS= read -r child; do
+        [[ "$child" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "güvensiz alt alan adı"
+        [ -d "/home/$sk/subdomains/$child" ] || continue
+        mkdir -p "$root/homedir/subdomains/$child"
+        cp -a "/home/$sk/subdomains/$child/." "$root/homedir/subdomains/$child/"
+      done
+  sql "SELECT alan_adi FROM domains WHERE ana_domain_id=$domain_id AND parked=0 ORDER BY alan_adi" \
+    | while IFS= read -r child; do
+        [[ "$child" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "güvensiz ek alan adı"
+        [ -d "/home/$sk/domains/$child" ] || continue
+        mkdir -p "$root/homedir/domains/$child"
+        cp -a "/home/$sk/domains/$child/." "$root/homedir/domains/$child/"
+      done
 
   sql "SELECT DISTINCT db_name FROM db_accounts WHERE domain_id=$domain_id ORDER BY db_name" \
     | while IFS= read -r db_name; do

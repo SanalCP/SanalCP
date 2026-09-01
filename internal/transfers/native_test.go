@@ -61,3 +61,21 @@ func TestNativeTasimaGirdiDogrulama(t *testing.T) {
 		t.Fatal("tehlikeli Sieve klasör değeri kabul edildi")
 	}
 }
+
+func TestNativeChildMetadataHelpers(t *testing.T) {
+	for _, v := range []string{"7.4", "8.3", "8.10"} {
+		if !validPHPVersion(v) {
+			t.Fatalf("geçerli PHP sürümü reddedildi: %s", v)
+		}
+	}
+	for _, v := range []string{"", "83", "8.x", "8.3;id"} {
+		if validPHPVersion(v) {
+			t.Fatalf("geçersiz PHP sürümü kabul edildi: %s", v)
+		}
+	}
+	addons := []nativeAddonDomain{{Domain: "site.test", Parked: 0}, {Domain: "park.test", Parked: 1}}
+	got := addonNames(addons)
+	if len(got) != 1 || got[0] != "site.test" {
+		t.Fatalf("parked domain için gereksiz docroot seçildi: %v", got)
+	}
+}

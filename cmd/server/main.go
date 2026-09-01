@@ -300,7 +300,7 @@ func main() {
 	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
-	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH}
+	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH, Addon: ekH, Subdomain: subH}
 	transfers.RecoverRemoteJobs(d)
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
