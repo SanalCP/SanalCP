@@ -15,13 +15,14 @@
   },
   "password": {
     "title": "Parola",
-    "desc": "Bu, sunucunun root parolasını değiştirir (SSH erişimi dahil).",
+    "desc_account": "Bu, yalnızca panel hesabınızın parolasını değiştirir.",
+    "desc_root": "Bu, sunucunun root parolasını değiştirir (SSH erişimi dahil).",
     "current": "Mevcut parola",
     "new": "Yeni parola",
     "new_repeat": "Yeni parola (tekrar)",
     "change": "Parolayı Değiştir",
     "changing": "Değiştiriliyor…",
-    "changed": "Parola değiştirildi. (Sunucu root parolası güncellendi.)",
+    "changed": "Parola değiştirildi. Yeni parolanızla tekrar giriş yapın.",
     "change_failed": "Parola değiştirilemedi",
     "too_short": "Yeni parola en az 8 karakter olmalı.",
     "mismatch": "Yeni parolalar eşleşmiyor."

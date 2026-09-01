@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.43",
-  "duyuru": "v0.9.42 release binary'si eski Go 1.25.0 stdlib'iyle derlenmişti. Binary, yamalı Go 1.26.7 toolchain'iyle yeniden üretildi ve paketleme zincirine eski toolchain ile yayını engelleyen kontrol eklendi. Debian/Ubuntu güvenlik güncellemesi desteği aynen korunuyor.",
+  "son_surum": "0.9.44",
+  "duyuru": "Profil ve Tercihler ekranındaki parola açıklaması hesap türüne göre düzeltildi. Admin parolası yalnız panel hesabını değiştirir; başarılı değişiklikten sonra tüm oturumlar kapatılır ve yeni parolayla yeniden giriş gerekir.",
   "kritik": false,
   "yayin_tarihi": "2026-09-01"
 }

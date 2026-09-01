@@ -15,13 +15,14 @@
   },
   "password": {
     "title": "Password",
-    "desc": "This changes the server's root password (including SSH access).",
+    "desc_account": "This changes only your panel account password.",
+    "desc_root": "This changes the server's root password (including SSH access).",
     "current": "Current password",
     "new": "New password",
     "new_repeat": "New password (repeat)",
     "change": "Change Password",
     "changing": "Changing…",
-    "changed": "Password changed. (Server root password updated.)",
+    "changed": "Password changed. Sign in again with your new password.",
     "change_failed": "Could not change password",
     "too_short": "New password must be at least 8 characters.",
     "mismatch": "New passwords don't match."

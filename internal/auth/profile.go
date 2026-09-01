@@ -126,6 +126,9 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.parola", "root", true)
+		// auth_version tüm mevcut oturumları sunucuda geçersizleştirir;
+		// bu tarayıcıdaki HttpOnly çerezi de aynı yanıtta kaldır.
+		OturumCerezSil(w, r)
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
@@ -150,6 +153,7 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.parola", c.Username, true)
+	OturumCerezSil(w, r)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

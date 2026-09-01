@@ -51,6 +51,7 @@ function Uyari({ tip, mesaj }: { tip: 'ok' | 'err'; mesaj: string }) {
 export default function SettingsPage() {
   const { t } = useTranslation(['SettingsPage', 'common'])
   const guncelleAd = useAuth((s) => s.guncelleAd)
+  const cikis = useAuth((s) => s.cikis)
 
   // Nameserver: admin panel genelini, bayi kendi white-label çiftini yönetir.
   // Müşteriler bunu Bağlantı Bilgisi ekranında yalnız görüntüler.
@@ -137,8 +138,9 @@ export default function SettingsPage() {
     setPaYuk(true)
     try {
       await api.post('/me/parola', { mevcut, yeni })
-      setPaOk(t('SettingsPage:password.changed'))
-      setMevcut(''); setYeni(''); setYeni2(''); setTimeout(() => setPaOk(''), 5000)
+      // Backend auth_version'ı artırıp HttpOnly çerezi de siler. Yerel
+      // oturum durumunu hemen temizle; yeni parolayla yeniden giriş zorunlu olsun.
+      cikis()
     } catch (e) { setPaErr(apiHata(e, t('SettingsPage:password.change_failed'))) } finally { setPaYuk(false) }
   }
 
@@ -234,7 +236,7 @@ export default function SettingsPage() {
           } />
 
         {/* 2) Parola */}
-        <Kart baslik={t('SettingsPage:password.title')} aciklama={t('SettingsPage:password.desc')}
+        <Kart baslik={t('SettingsPage:password.title')} aciklama={t(ben?.adi === 'root' ? 'SettingsPage:password.desc_root' : 'SettingsPage:password.desc_account')}
           ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
           cocuk={
             <form onSubmit={parolaDegistir} className="space-y-4">

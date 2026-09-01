@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.44** (2026-09-01)
+
+Profil ve Tercihler ekranındaki parola açıklaması oturum açan hesaba göre
+düzeltildi. Panel yöneticisi (`admin`) artık açıkça yalnız kendi panel hesabının
+parolasını değiştirdiğini görür; root/SSH uyarısı yalnız panelde root hesabıyla
+oturum açılmışsa gösterilir. Başarılı parola değişikliğinde tüm mevcut oturumlar
+geçersizleştirilir, tarayıcıdaki oturum çerezi silinir ve kullanıcı yeni
+parolasıyla yeniden giriş yapmak üzere giriş ekranına gönderilir. Davranış
+backend regresyon testiyle korunur.
+
 **0.9.43** (2026-09-01)
 
 `v0.9.42` release assetleri yerel makinedeki eski Go 1.25.0 toolchain'iyle
