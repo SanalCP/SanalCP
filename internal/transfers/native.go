@@ -7,9 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"strings"
 
 	"sanalcp/internal/dns"
+	"sanalcp/internal/mail"
+	"sanalcp/internal/provisioner"
 )
 
 type nativeDomainMeta struct {
@@ -32,6 +36,68 @@ type nativeMailbox struct {
 	PasswordHash string `json:"password_hash"`
 	QuotaBytes   uint64 `json:"quota_bytes"`
 	Status       string `json:"status"`
+}
+
+type nativeSecurity struct {
+	HotlinkEnabled int    `json:"hotlink_enabled"`
+	HotlinkAllowed string `json:"hotlink_allowed"`
+	IPAccessMode   string `json:"ip_access_mode"`
+	WWWRedirect    int    `json:"www_redirect"`
+	WAFEnabled     *int   `json:"waf_enabled"`
+	WAFMode        string `json:"waf_mode"`
+	WAFParanoia    int    `json:"waf_paranoia"`
+}
+type nativeRedirect struct {
+	TargetURL string `json:"target_url"`
+	Code      int    `json:"code"`
+}
+type nativeIPRule struct {
+	CIDR string `json:"cidr"`
+}
+type nativeNginx struct {
+	XContentType   int    `json:"x_content_type"`
+	XXSS           int    `json:"x_xss"`
+	Referrer       int    `json:"referrer"`
+	Permissions    int    `json:"permissions"`
+	CSPUpgrade     int    `json:"csp_upgrade"`
+	HSTS           int    `json:"hsts"`
+	HSTSMaxAge     int    `json:"hsts_max_age"`
+	HSTSSubdomains int    `json:"hsts_subdomains"`
+	HSTSPreload    int    `json:"hsts_preload"`
+	HTTP3          int    `json:"http3"`
+	CacheProfile   string `json:"cache_profile"`
+}
+
+type nativeRate struct {
+	Profile        string `json:"profile"`
+	Requests       int    `json:"requests_per_minute"`
+	Burst          int    `json:"burst"`
+	BlockBots      int    `json:"block_bots"`
+	IPExceptions   string `json:"ip_exceptions"`
+	PathExceptions string `json:"path_exceptions"`
+}
+type nativeSpam struct {
+	Enabled int     `json:"enabled"`
+	Grey    float64 `json:"greylist_score"`
+	Header  float64 `json:"add_header_score"`
+	Reject  float64 `json:"reject_score"`
+}
+type nativeAuto struct {
+	LocalPart string `json:"local_part"`
+	Enabled   int    `json:"enabled"`
+	Subject   string `json:"subject"`
+	Body      string `json:"body"`
+	Interval  int    `json:"interval_days"`
+}
+type nativeFilter struct {
+	LocalPart   string `json:"local_part"`
+	Name        string `json:"name"`
+	MatchField  string `json:"match_field"`
+	MatchValue  string `json:"match_value"`
+	ActionType  string `json:"action_type"`
+	ActionValue string `json:"action_value"`
+	Priority    int    `json:"priority"`
+	Enabled     int    `json:"enabled"`
 }
 
 // importNativeMetadata yalnız native SanalCP üyeleri mevcutsa çalışır. cPanel,
@@ -107,7 +173,281 @@ func (h *Handlers) importNativeMetadata(ctx context.Context, ekler arsivEkler, d
 		}
 		preserved[local+"@"+targetDomain] = true
 	}
+	if err := h.importNativePortableSettings(ctx, ekler, domainID); err != nil {
+		return nil, err
+	}
 	return preserved, nil
+}
+
+func optionalJSON[T any](raw []byte) (*T, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, nil
+	}
+	var v T
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+func bit(v int) bool { return v == 0 || v == 1 }
+
+func (h *Handlers) importNativePortableSettings(ctx context.Context, e arsivEkler, domainID int64) error {
+	sec, err := optionalJSON[nativeSecurity](e.uyeler[e.nativeSecurity])
+	if err != nil {
+		return fmt.Errorf("güvenlik ayarları: %w", err)
+	}
+	redir, err := optionalJSON[nativeRedirect](e.uyeler[e.nativeRedirect])
+	if err != nil {
+		return fmt.Errorf("yönlendirme ayarı: %w", err)
+	}
+	rules, err := decodeJSONLines[nativeIPRule](e.uyeler[e.nativeIPRules])
+	if err != nil {
+		return fmt.Errorf("IP kuralları: %w", err)
+	}
+	ng, err := optionalJSON[nativeNginx](e.uyeler[e.nativeNginx])
+	if err != nil {
+		return fmt.Errorf("nginx ayarları: %w", err)
+	}
+	rate, err := optionalJSON[nativeRate](e.uyeler[e.nativeRate])
+	if err != nil {
+		return fmt.Errorf("hız limiti: %w", err)
+	}
+	spam, err := optionalJSON[nativeSpam](e.uyeler[e.nativeSpam])
+	if err != nil {
+		return fmt.Errorf("spam ayarı: %w", err)
+	}
+	autos, err := decodeJSONLines[nativeAuto](e.uyeler[e.nativeAuto])
+	if err != nil {
+		return fmt.Errorf("otomatik yanıtlayıcılar: %w", err)
+	}
+	filters, err := decodeJSONLines[nativeFilter](e.uyeler[e.nativeFilters])
+	if err != nil {
+		return fmt.Errorf("posta filtreleri: %w", err)
+	}
+
+	if sec != nil && (!bit(sec.HotlinkEnabled) || !bit(sec.WWWRedirect) || len(sec.HotlinkAllowed) > 4000 || !oneOf(sec.IPAccessMode, "kapali", "engelle", "izin_ver") || (sec.WAFEnabled != nil && !bit(*sec.WAFEnabled)) || !oneOf(sec.WAFMode, "", "on", "detect", "off") || sec.WAFParanoia < 0 || sec.WAFParanoia > 4) {
+		return errors.New("geçersiz güvenlik ayarı")
+	}
+	if redir != nil {
+		u, er := url.ParseRequestURI(redir.TargetURL)
+		if er != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(redir.TargetURL) > 2048 || (redir.Code != 301 && redir.Code != 302) {
+			return errors.New("geçersiz domain yönlendirmesi")
+		}
+	}
+	for _, r := range rules {
+		if !validIPOrCIDR(r.CIDR) {
+			return fmt.Errorf("geçersiz IP/CIDR: %s", r.CIDR)
+		}
+	}
+	if ng != nil && (!bits(ng.XContentType, ng.XXSS, ng.Referrer, ng.Permissions, ng.CSPUpgrade, ng.HSTS, ng.HSTSSubdomains, ng.HSTSPreload, ng.HTTP3) || ng.HSTSMaxAge < 0 || ng.HSTSMaxAge > 63072000 || !oneOf(ng.CacheProfile, "kapali", "genel", "wordpress", "prestashop", "ozel")) {
+		return errors.New("geçersiz nginx ayarı")
+	}
+	if rate != nil && (!oneOf(rate.Profile, "kapali", "dengeli", "siki", "ozel") || rate.Requests < 1 || rate.Requests > 60000 || rate.Burst < 0 || rate.Burst > 10000 || !bit(rate.BlockBots) || !validExceptionLines(rate.IPExceptions, true) || !validExceptionLines(rate.PathExceptions, false)) {
+		return errors.New("geçersiz hız limiti ayarı")
+	}
+	if spam != nil && (!bit(spam.Enabled) || spam.Grey < 0 || spam.Reject > 50 || spam.Grey > spam.Header || spam.Header > spam.Reject) {
+		return errors.New("geçersiz spam ayarı")
+	}
+	for _, a := range autos {
+		if !localPartRE.MatchString(a.LocalPart) || !bit(a.Enabled) || strings.TrimSpace(a.Subject) == "" || strings.TrimSpace(a.Body) == "" || len(a.Subject) > 255 || len(a.Body) > 10000 || a.Interval < 1 || a.Interval > 30 {
+			return errors.New("geçersiz otomatik yanıtlayıcı")
+		}
+	}
+	for _, f := range filters {
+		if !validNativeFilter(f) {
+			return errors.New("geçersiz posta filtresi")
+		}
+	}
+
+	tx, err := h.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if sec != nil {
+		var wafEnabled any
+		if sec.WAFEnabled != nil {
+			wafEnabled = *sec.WAFEnabled
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE domains SET hotlink_aktif=?,hotlink_izinli=?,ip_erisim_modu=?,www_yonlendir=?,waf_enabled=?,waf_mode=NULLIF(?,''),waf_paranoia=NULLIF(?,0) WHERE id=?`, sec.HotlinkEnabled, sec.HotlinkAllowed, sec.IPAccessMode, sec.WWWRedirect, wafEnabled, sec.WAFMode, sec.WAFParanoia, domainID)
+		if err != nil {
+			return err
+		}
+	}
+	if redir != nil {
+		_, err = tx.ExecContext(ctx, `INSERT INTO domain_redirects(domain_id,hedef_url,kod) VALUES(?,?,?) ON DUPLICATE KEY UPDATE hedef_url=VALUES(hedef_url),kod=VALUES(kod)`, domainID, redir.TargetURL, redir.Code)
+		if err != nil {
+			return err
+		}
+	}
+	_, hasIPRules := e.uyeler[e.nativeIPRules]
+	if hasIPRules {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM domain_ip_kurallari WHERE domain_id=?`, domainID); err != nil {
+			return err
+		}
+		for _, r := range rules {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO domain_ip_kurallari(domain_id,ip_cidr) VALUES(?,?)`, domainID, r.CIDR); err != nil {
+				return err
+			}
+		}
+	}
+	if ng != nil {
+		_, err = tx.ExecContext(ctx, `INSERT INTO nginx_settings(domain_id,hdr_x_content_type,hdr_x_xss,hdr_referrer,hdr_permissions,hdr_csp_upgrade,hdr_hsts,hsts_max_age,hsts_subdomains,hsts_preload,ek_direktifler,http3,cache_profili) VALUES(?,?,?,?,?,?,?,?,?,?, '',?,?) ON DUPLICATE KEY UPDATE hdr_x_content_type=VALUES(hdr_x_content_type),hdr_x_xss=VALUES(hdr_x_xss),hdr_referrer=VALUES(hdr_referrer),hdr_permissions=VALUES(hdr_permissions),hdr_csp_upgrade=VALUES(hdr_csp_upgrade),hdr_hsts=VALUES(hdr_hsts),hsts_max_age=VALUES(hsts_max_age),hsts_subdomains=VALUES(hsts_subdomains),hsts_preload=VALUES(hsts_preload),http3=VALUES(http3),cache_profili=VALUES(cache_profili)`, domainID, ng.XContentType, ng.XXSS, ng.Referrer, ng.Permissions, ng.CSPUpgrade, ng.HSTS, ng.HSTSMaxAge, ng.HSTSSubdomains, ng.HSTSPreload, ng.HTTP3, ng.CacheProfile)
+		if err != nil {
+			return err
+		}
+	}
+	if rate != nil {
+		_, err = tx.ExecContext(ctx, `INSERT INTO domain_rate_limits(domain_id,profil,istek_dakika,burst,bot_engelle,ip_istisnalari,yol_istisnalari) VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE profil=VALUES(profil),istek_dakika=VALUES(istek_dakika),burst=VALUES(burst),bot_engelle=VALUES(bot_engelle),ip_istisnalari=VALUES(ip_istisnalari),yol_istisnalari=VALUES(yol_istisnalari)`, domainID, rate.Profile, rate.Requests, rate.Burst, rate.BlockBots, rate.IPExceptions, rate.PathExceptions)
+		if err != nil {
+			return err
+		}
+	}
+	if spam != nil {
+		_, err = tx.ExecContext(ctx, `INSERT INTO mail_spam_settings(domain_id,enabled,greylist_score,add_header_score,reject_score) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled),greylist_score=VALUES(greylist_score),add_header_score=VALUES(add_header_score),reject_score=VALUES(reject_score)`, domainID, spam.Enabled, spam.Grey, spam.Header, spam.Reject)
+		if err != nil {
+			return err
+		}
+	}
+	mailIDs := map[string]int64{}
+	rows, er := tx.QueryContext(ctx, `SELECT local_part,id FROM mailboxes WHERE domain_id=?`, domainID)
+	if er != nil {
+		return er
+	}
+	for rows.Next() {
+		var l string
+		var id int64
+		if er = rows.Scan(&l, &id); er != nil {
+			rows.Close()
+			return er
+		}
+		mailIDs[l] = id
+	}
+	if er = rows.Err(); er != nil {
+		rows.Close()
+		return er
+	}
+	if er = rows.Close(); er != nil {
+		return er
+	}
+	_, hasAutos := e.uyeler[e.nativeAuto]
+	_, hasFilters := e.uyeler[e.nativeFilters]
+	if hasAutos {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM mail_autoresponders WHERE domain_id=?`, domainID); err != nil {
+			return err
+		}
+	}
+	if hasFilters {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM mail_filters WHERE domain_id=?`, domainID); err != nil {
+			return err
+		}
+	}
+	touched := map[int64]bool{}
+	for _, a := range autos {
+		id, ok := mailIDs[a.LocalPart]
+		if !ok {
+			return fmt.Errorf("yanıtlayıcı posta kutusu bulunamadı: %s", a.LocalPart)
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO mail_autoresponders(mailbox_id,domain_id,enabled,subject_text,body_text,interval_days) VALUES(?,?,?,?,?,?)`, id, domainID, a.Enabled, a.Subject, a.Body, a.Interval)
+		if err != nil {
+			return err
+		}
+		touched[id] = true
+	}
+	for _, f := range filters {
+		id, ok := mailIDs[f.LocalPart]
+		if !ok {
+			return fmt.Errorf("filtre posta kutusu bulunamadı: %s", f.LocalPart)
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO mail_filters(mailbox_id,domain_id,name,match_field,match_value,action_type,action_value,priority_n,enabled) VALUES(?,?,?,?,?,?,?,?,?)`, id, domainID, f.Name, f.MatchField, f.MatchValue, f.ActionType, f.ActionValue, f.Priority, f.Enabled)
+		if err != nil {
+			return err
+		}
+		touched[id] = true
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	if rate != nil {
+		if err = provisioner.RateLimitGlobalYaz(h.DB); err != nil {
+			return err
+		}
+	}
+	if sec != nil || redir != nil || hasIPRules || ng != nil || rate != nil {
+		if err = provisioner.RerenderVhost(h.DB, domainID); err != nil {
+			return err
+		}
+	}
+	if spam != nil {
+		if err = mail.ApplyRspamdSettings(h.DB); err != nil {
+			return err
+		}
+	}
+	for id := range touched {
+		if err = mail.ApplyMailboxSieve(ctx, h.DB, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func oneOf(s string, vals ...string) bool {
+	for _, v := range vals {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+func bits(v ...int) bool {
+	for _, x := range v {
+		if !bit(x) {
+			return false
+		}
+	}
+	return true
+}
+func validIPOrCIDR(s string) bool {
+	s = strings.TrimSpace(s)
+	if net.ParseIP(s) != nil {
+		return true
+	}
+	_, _, e := net.ParseCIDR(s)
+	return e == nil
+}
+func validExceptionLines(s string, ip bool) bool {
+	if len(s) > 20000 {
+		return false
+	}
+	for _, x := range strings.FieldsFunc(s, func(r rune) bool { return r == '\n' || r == '\r' || r == ',' }) {
+		x = strings.TrimSpace(x)
+		if x == "" {
+			continue
+		}
+		if ip {
+			if !validIPOrCIDR(x) {
+				return false
+			}
+		} else if !strings.HasPrefix(x, "/") || strings.ContainsAny(x, " \t\"'{};") {
+			return false
+		}
+	}
+	return true
+}
+func validNativeFilter(f nativeFilter) bool {
+	if !localPartRE.MatchString(f.LocalPart) || !bit(f.Enabled) || strings.TrimSpace(f.Name) == "" || len(f.Name) > 128 || strings.TrimSpace(f.MatchValue) == "" || len(f.MatchValue) > 255 || !oneOf(f.MatchField, "from", "to", "subject") || f.Priority < 0 || f.Priority > 100000 {
+		return false
+	}
+	switch f.ActionType {
+	case "move":
+		return len(f.ActionValue) > 0 && len(f.ActionValue) <= 64 && !strings.ContainsAny(f.ActionValue, "\r\n\"{};")
+	case "redirect":
+		p := strings.Split(f.ActionValue, "@")
+		return len(p) == 2 && localPartRE.MatchString(strings.ToLower(p[0])) && domainKesifGecerli(strings.ToLower(p[1]))
+	case "discard":
+		return f.ActionValue == ""
+	}
+	return false
 }
 
 func nativeDNSSafe(r nativeDNSRecord) bool {

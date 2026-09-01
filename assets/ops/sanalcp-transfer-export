@@ -44,6 +44,22 @@ export_domain(){
     > "$root/sanalcp/dns.jsonl"
   sql "SELECT JSON_OBJECT('local_part',local_part,'password_hash',password_hash,'quota_bytes',quota_bytes,'status',status) FROM mailboxes WHERE domain_id=$domain_id ORDER BY id" \
     > "$root/sanalcp/mailboxes.jsonl"
+  sql "SELECT JSON_OBJECT('hotlink_enabled',hotlink_aktif,'hotlink_allowed',COALESCE(hotlink_izinli,''),'ip_access_mode',ip_erisim_modu,'www_redirect',www_yonlendir,'waf_enabled',waf_enabled,'waf_mode',COALESCE(waf_mode,''),'waf_paranoia',COALESCE(waf_paranoia,0)) FROM domains WHERE id=$domain_id" \
+    > "$root/sanalcp/security.json"
+  sql "SELECT JSON_OBJECT('target_url',hedef_url,'code',kod) FROM domain_redirects WHERE domain_id=$domain_id" \
+    > "$root/sanalcp/redirect.json"
+  sql "SELECT JSON_OBJECT('cidr',ip_cidr) FROM domain_ip_kurallari WHERE domain_id=$domain_id ORDER BY id" \
+    > "$root/sanalcp/ip_rules.jsonl"
+  sql "SELECT JSON_OBJECT('x_content_type',hdr_x_content_type,'x_xss',hdr_x_xss,'referrer',hdr_referrer,'permissions',hdr_permissions,'csp_upgrade',hdr_csp_upgrade,'hsts',hdr_hsts,'hsts_max_age',hsts_max_age,'hsts_subdomains',hsts_subdomains,'hsts_preload',hsts_preload,'http3',http3,'cache_profile',cache_profili) FROM nginx_settings WHERE domain_id=$domain_id" \
+    > "$root/sanalcp/nginx.json"
+  sql "SELECT JSON_OBJECT('profile',profil,'requests_per_minute',istek_dakika,'burst',burst,'block_bots',bot_engelle,'ip_exceptions',COALESCE(ip_istisnalari,''),'path_exceptions',COALESCE(yol_istisnalari,'')) FROM domain_rate_limits WHERE domain_id=$domain_id" \
+    > "$root/sanalcp/rate_limit.json"
+  sql "SELECT JSON_OBJECT('enabled',enabled,'greylist_score',greylist_score,'add_header_score',add_header_score,'reject_score',reject_score) FROM mail_spam_settings WHERE domain_id=$domain_id" \
+    > "$root/sanalcp/mail_spam.json"
+  sql "SELECT JSON_OBJECT('local_part',m.local_part,'enabled',a.enabled,'subject',a.subject_text,'body',a.body_text,'interval_days',a.interval_days) FROM mail_autoresponders a JOIN mailboxes m ON m.id=a.mailbox_id WHERE a.domain_id=$domain_id ORDER BY m.local_part" \
+    > "$root/sanalcp/autoresponders.jsonl"
+  sql "SELECT JSON_OBJECT('local_part',m.local_part,'name',f.name,'match_field',f.match_field,'match_value',f.match_value,'action_type',f.action_type,'action_value',f.action_value,'priority',f.priority_n,'enabled',f.enabled) FROM mail_filters f JOIN mailboxes m ON m.id=f.mailbox_id WHERE f.domain_id=$domain_id ORDER BY m.local_part,f.priority_n,f.id" \
+    > "$root/sanalcp/mail_filters.jsonl"
 
   if [ -d "/home/$sk/public_html" ]; then
     cp -a "/home/$sk/public_html/." "$root/homedir/public_html/"

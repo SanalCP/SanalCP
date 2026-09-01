@@ -344,6 +344,14 @@ type arsivEkler struct {
 	nativeDomain   string
 	nativeDNS      string
 	nativeMailbox  string
+	nativeSecurity string
+	nativeRedirect string
+	nativeIPRules  string
+	nativeNginx    string
+	nativeRate     string
+	nativeSpam     string
+	nativeAuto     string
+	nativeFilters  string
 	uyeler         map[string][]byte
 }
 
@@ -372,12 +380,22 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	e.nativeDomain = root + "/sanalcp/domain.json"
 	e.nativeDNS = root + "/sanalcp/dns.jsonl"
 	e.nativeMailbox = root + "/sanalcp/mailboxes.jsonl"
+	e.nativeSecurity = root + "/sanalcp/security.json"
+	e.nativeRedirect = root + "/sanalcp/redirect.json"
+	e.nativeIPRules = root + "/sanalcp/ip_rules.jsonl"
+	e.nativeNginx = root + "/sanalcp/nginx.json"
+	e.nativeRate = root + "/sanalcp/rate_limit.json"
+	e.nativeSpam = root + "/sanalcp/mail_spam.json"
+	e.nativeAuto = root + "/sanalcp/autoresponders.jsonl"
+	e.nativeFilters = root + "/sanalcp/mail_filters.jsonl"
 
 	istekler := append([]string{}, e.certAdaylari...)
 	istekler = append(istekler, e.keyAdaylari...)
 	istekler = append(istekler, e.bundleAdaylari...)
 	istekler = append(istekler, e.aliasUyesi)
 	istekler = append(istekler, e.nativeDomain, e.nativeDNS, e.nativeMailbox)
+	istekler = append(istekler, e.nativeSecurity, e.nativeRedirect, e.nativeIPRules,
+		e.nativeNginx, e.nativeRate, e.nativeSpam, e.nativeAuto, e.nativeFilters)
 	uyeler, err := readSmallTarMembers(archivePath, istekler)
 	if err != nil {
 		return e, err

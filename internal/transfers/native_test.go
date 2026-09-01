@@ -1,6 +1,9 @@
 package transfers
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestDecodeJSONLines(t *testing.T) {
 	raw := []byte("{\"name\":\"@\",\"type\":\"A\",\"value\":\"192.0.2.1\",\"ttl\":300,\"priority\":0,\"active\":1}\n" +
@@ -28,5 +31,33 @@ func TestNativeDNSSafe(t *testing.T) {
 func TestDecodeJSONLinesBozukSatiriReddeder(t *testing.T) {
 	if _, err := decodeJSONLines[nativeMailbox]([]byte("{bozuk}\n")); err == nil {
 		t.Fatal("bozuk native metadata kabul edildi")
+	}
+}
+
+func TestNativeNginxJSONAlanlari(t *testing.T) {
+	var got nativeNginx
+	err := json.Unmarshal([]byte(`{"x_content_type":1,"x_xss":0,"referrer":1,"permissions":0,"csp_upgrade":1,"hsts":1,"hsts_max_age":31536000,"hsts_subdomains":1,"hsts_preload":0,"http3":1,"cache_profile":"wordpress"}`), &got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.XContentType != 1 || got.XXSS != 0 || got.HTTP3 != 1 || got.CacheProfile != "wordpress" {
+		t.Fatalf("nginx metadata alanları çözülemedi: %+v", got)
+	}
+}
+
+func TestNativeTasimaGirdiDogrulama(t *testing.T) {
+	if !validIPOrCIDR("192.0.2.0/24") || validIPOrCIDR("192.0.2.999") {
+		t.Fatal("IP/CIDR doğrulaması beklenmeyen sonuç verdi")
+	}
+	if !validExceptionLines("/wp-login.php\n/xmlrpc.php", false) || validExceptionLines("/ok; return 200", false) {
+		t.Fatal("yol istisnası doğrulaması beklenmeyen sonuç verdi")
+	}
+	good := nativeFilter{LocalPart: "admin", Name: "Sipariş", MatchField: "subject", MatchValue: "order", ActionType: "move", ActionValue: "Orders", Priority: 100, Enabled: 1}
+	if !validNativeFilter(good) {
+		t.Fatal("geçerli posta filtresi reddedildi")
+	}
+	good.ActionValue = `Bad"; discard;`
+	if validNativeFilter(good) {
+		t.Fatal("tehlikeli Sieve klasör değeri kabul edildi")
 	}
 }
