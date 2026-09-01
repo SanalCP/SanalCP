@@ -1963,20 +1963,16 @@ func PHPSocketFor(sk, surum string) (string, error) {
 // EnableTenantFPM/RollbackToSharedFPM içinde doğrudan kullanılır (recursion olmasın).
 func sharedSocketPath(sk, surum string) (string, error) {
 	surum = normalizePHP(surum)
-	// AppStream 8.3
-	if surum == "8.3" {
-		return "/run/php-fpm/" + sk + ".sock", nil
+	ay, ok := phpMap[surum]
+	if !ok || ay.FpmBin == "" || ay.SockDir == "" {
+		return "", fmt.Errorf("desteklenmeyen veya kurulmamış sürüm: %s", surum)
 	}
-	// Remi pattern: 5.6 -> 56, 7.4 -> 74, 8.2 -> 82
-	kod := strings.Replace(surum, ".", "", 1)
-	if len(kod) >= 2 {
-		socketDir := "/var/opt/remi/php" + kod + "/run/php-fpm"
-		// Servisin gerçekten var olduğunu kontrol et
-		if _, err := os.Stat("/opt/remi/php" + kod + "/root/usr/sbin/php-fpm"); err == nil {
-			return socketDir + "/" + sk + ".sock", nil
-		}
+	// Yalnız tablo girdisi yeterli değildir: hedefte ilgili sürüm gerçekten
+	// kurulu değilse var olmayan bir socket üretip nginx'i 502'ye düşürmeyelim.
+	if _, err := os.Stat(ay.FpmBin); err != nil {
+		return "", fmt.Errorf("desteklenmeyen veya kurulmamış sürüm: %s", surum)
 	}
-	return "", fmt.Errorf("desteklenmeyen veya kurulmamış sürüm: %s", surum)
+	return filepath.Join(ay.SockDir, sk+".sock"), nil
 }
 
 // buildProtectedBlocks: korumali_dizinler tablosundan nginx auth_basic location bloklari uretir.

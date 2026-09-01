@@ -577,15 +577,27 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	// Plan seçildiyse nginx web-sunucusu varsayılanlarını domain'e tohumla + vhost yenile
 	if req.PlanID != nil {
 		h.applyPlanNginxDefaults(r.Context(), id, *req.PlanID, pr.SistemKullanici, req.PHPSurum)
-		// Kaynak limitleri + per-tenant FPM (Seçenek A) — arka planda, kendi 5dk context'i
-		// (r.Context() HTTP request bitince iptal olur, cutover yarıda kalır). SetPlan ile aynı desen.
-		go func(did int64) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			if err := kaynaklimit.UygulaHepsi(ctx, h.DB, did); err != nil {
-				log.Printf("kaynaklimit apply (create) domain=%d: %v", did, err)
-			}
-		}(id)
+		// Domain hazır yanıtı verilmeden kaynak limitleri ve per-tenant FPM
+		// tamamlanmalıdır. Arka planda çalıştırmak aktarım sağlık kontrolüyle
+		// yarışıyordu: 502 gören rollback domaini silerken goroutine silinmiş
+		// vhost'u tekrar yazıp nginx -t'yi global olarak bozabiliyordu.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		if err := kaynaklimit.UygulaHepsi(ctx, h.DB, id); err != nil {
+			log.Printf("kaynaklimit apply (create) domain=%d: %v", id, err)
+		}
+		cancel()
+		// UygulaHepsi bazı alt-sistem hatalarını best-effort olarak loglayıp nil
+		// döndürür. API'nin "oluşturuldu" demesi için en azından seçilen FPM
+		// socket'inin gerçekten oluşmuş olması gerekir; aksi halde ilk istek 502
+		// verir ve uzak aktarım sağlık kontrolüyle yarışır.
+		socket, socketErr := provisioner.PHPSocketFor(pr.SistemKullanici, req.PHPSurum)
+		fi, statErr := os.Stat(socket)
+		if socketErr != nil || statErr != nil || fi.Mode()&os.ModeSocket == 0 {
+			_ = provisioner.Deprovision(req.AlanAdi, pr.SistemKullanici)
+			_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM domains WHERE id=?`, id)
+			httpx.WriteError(w, http.StatusInternalServerError, "PHP-FPM hazır değil; domain geri alındı")
+			return
+		}
 	}
 
 	// 3) FTP hesap (random parola)
