@@ -1,5 +1,5 @@
 {
-  "remote": { "title": "Canlı sunucudan keşfet (Faz 7)", "desc": "Önceden known_hosts'a eklenmiş sunucuya root SSH anahtarıyla bağlanır; parola saklanmaz. cPanel, Plesk ve DirectAdmin algılanır.", "discover": "SSH ile keşfet", "discovering": "Keşfediliyor…", "failed": "Uzak sunucu keşfedilemedi.", "domains": "Bulunan domain ({{count}})", "start": "Seçili siteyi aktar", "start_failed": "Uzak aktarım başlatılamadı.", "queued": "Aktarım sıraya alındı", "job": "Aktarım işi", "history": "Son uzak aktarım işleri" },
+  "remote": { "title": "Canlı sunucudan aktar", "desc": "Hedef panel yalnız aktarıma özel bir SSH anahtarı üretir; parola ve özel anahtar tarayıcıya gelmez. SanalCP, cPanel, Plesk ve DirectAdmin algılanır.", "prepare": "Bağlantıyı hazırla", "preparing": "Hazırlanıyor…", "prepare_failed": "SSH bağlantısı hazırlanamadı.", "public_key_title": "1. Bu public key'i eski sunucunun root authorized_keys dosyasına ekleyin", "public_key_desc": "Eski sunucuda /root/.ssh/authorized_keys dosyasına tek satır olarak ekleyin. Özel anahtar yalnız yeni sunucuda 0600 izinle saklanır.", "host_fingerprint": "2. Eski sunucunun SSH host key parmak izini doğrulayın", "trust": "Parmak izi doğru, güven", "trusted": "Host key doğrulandı", "trust_failed": "SSH host key kaydedilemedi veya değişti.", "discover": "Domainleri keşfet", "discovering": "Keşfediliyor…", "failed": "Uzak sunucu keşfedilemedi.", "domains": "Bulunan domain ({{count}})", "select_domains": "Aktarılacak domainler", "select_all": "Tümünü seç", "select_none": "Seçimi kaldır", "target_exists": "hedefte var", "start": "Seçili siteyi aktar", "start_selected": "Seçilenleri aktar ({{count}})", "start_failed": "Uzak aktarım başlatılamadı.", "partial_start_failed": "{{count}} domain için aktarım işi başlatılamadı; başlayan işler çalışmaya devam ediyor.", "queued": "Aktarım sıraya alındı", "job": "Aktarım işi", "history": "Son uzak aktarım işleri" },
   "title": "Hesap İçe Aktarma",
   "subtitle": "cPanel tam hesap yedeğini güvenli biçimde analiz edin. Arşiv bu aşamada açılmaz veya sunucuya kalıcı olarak kaydedilmez.",
   "breadcrumb": {
@@ -61,6 +61,7 @@
     "cron_imported": "{{count}} cron görevi aktarıldı.",
     "ssl_imported": "SSL sertifikası aktarıldı · son geçerlilik {{expires}}",
     "mailbox_passwords_title": "Yeni posta kutusu parolaları — şimdi kaydedin",
+    "password_preserved": "mevcut parola korundu",
     "aliases_imported": "{{count}} yönlendirme aktarıldı.",
     "skipped_prefix": "⚠ ",
     "manage_domain": "Domaini yönet →"

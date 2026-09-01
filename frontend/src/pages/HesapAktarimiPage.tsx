@@ -29,16 +29,17 @@ type Plan = { id: number; ad: string; php_surum?: string }
 type ImportResult = {
   domain_id: number; domain: string; system_user: string; web_files: number
   databases: { source: string; target: string; user: string }[]
-  mailboxes: { email: string; password: string }[]
+  mailboxes: { email: string; password: string; password_preserved?: boolean }[]
   aliases: number
   cron_jobs: number
   ssl_imported: boolean
   ssl_expires?: string
   credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
-type RemoteSite = { domain: string; hesap: string }
+type RemoteSite = { domain: string; hesap: string; php_version?: string; target_exists?: boolean }
 type RemoteInventory = { provider: string; surum: string; domainler: string[]; siteler: RemoteSite[] }
 type RemoteJob = { id: number; domain: string; durum: string; ilerleme: number; mesaj: string; target_domain_id?: number; source_http_status?: number; target_http_status?: number }
+type HostKeyInfo = { host: string; port: number; fingerprints: string[] }
 
 export default function HesapAktarimiPage() {
   const { t } = useTranslation(['HesapAktarimiPage', 'common'])
@@ -59,9 +60,12 @@ export default function HesapAktarimiPage() {
   const [sshPort, setSSHPort] = useState(22)
   const [sshKesif, setSSHKesif] = useState<RemoteInventory | null>(null)
   const [sshBusy, setSSHBusy] = useState(false)
-  const [sshSite, setSSHSite] = useState<RemoteSite | null>(null)
-  const [sshJob, setSSHJob] = useState<RemoteJob | null>(null)
+  const [sshSecili, setSSHSecili] = useState<string[]>([])
+  const [sshJobs, setSSHJobs] = useState<RemoteJob[]>([])
   const [sshGecmis, setSSHGecmis] = useState<RemoteJob[]>([])
+  const [sshPublicKey, setSSHPublicKey] = useState('')
+  const [sshHostKey, setSSHHostKey] = useState<HostKeyInfo | null>(null)
+  const [sshGuvenildi, setSSHGuvenildi] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -74,6 +78,31 @@ export default function HesapAktarimiPage() {
   }, [])
 
   useEffect(() => { api.get<RemoteJob[]>('/admin/transfers/remote/jobs').then(r => setSSHGecmis(r.data)).catch(() => {}) }, [])
+
+  async function sshHazirla() {
+    if (!sshHost) return
+    setSSHBusy(true); setHata(null); setSSHGuvenildi(false); setSSHKesif(null)
+    try {
+      const [key, hostKey] = await Promise.all([
+        api.post<{ public_key: string }>('/admin/transfers/remote/access-key'),
+        api.post<HostKeyInfo>('/admin/transfers/remote/host-key/scan', { host: sshHost, port: sshPort }),
+      ])
+      setSSHPublicKey(key.data.public_key); setSSHHostKey(hostKey.data)
+    } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.prepare_failed'))) }
+    finally { setSSHBusy(false) }
+  }
+
+  async function sshHostKeyOnayla() {
+    if (!sshHostKey) return
+    setSSHBusy(true); setHata(null)
+    try {
+      await api.post('/admin/transfers/remote/host-key/trust', {
+        host: sshHostKey.host, port: sshHostKey.port, fingerprints: sshHostKey.fingerprints,
+      })
+      setSSHGuvenildi(true)
+    } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.trust_failed'))) }
+    finally { setSSHBusy(false) }
+  }
 
   async function analizEt() {
     if (!dosya) return
@@ -100,32 +129,44 @@ export default function HesapAktarimiPage() {
     setSSHBusy(true); setHata(null); setSSHKesif(null)
     try {
       const r = await api.post<RemoteInventory>('/admin/transfers/remote/discover', { host: sshHost, port: sshPort, kullanici: 'root' })
-      setSSHKesif(r.data); setSSHSite(r.data.siteler?.[0] || null)
+      setSSHKesif(r.data); setSSHSecili([]); setSSHJobs([])
     } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.failed'))) }
     finally { setSSHBusy(false) }
   }
 
   async function uzakAktar() {
-    if (!sshKesif || !sshSite || !customerID) return
+    if (!sshKesif || sshSecili.length === 0 || !customerID) return
     setSSHBusy(true); setHata(null)
     try {
-      const r = await api.post<{ job_id: number }>('/admin/transfers/remote/start', {
-        host: sshHost, port: sshPort, provider: sshKesif.provider,
-        hesap: sshSite.hesap, domain: sshSite.domain, customer_id: Number(customerID),
-        plan_id: planID ? Number(planID) : null, php_version: phpVersion,
-      })
-      setSSHJob({ id: r.data.job_id, domain: sshSite.domain, durum: 'queued', ilerleme: 0, mesaj: t('HesapAktarimiPage:remote.queued') })
+      const seciliSiteler = sshKesif.siteler.filter(s => sshSecili.includes(s.domain))
+      const baslatmalar = await Promise.allSettled(seciliSiteler.map(async site => {
+        const r = await api.post<{ job_id: number }>('/admin/transfers/remote/start', {
+          host: sshHost, port: sshPort, provider: sshKesif.provider,
+          hesap: site.hesap, domain: site.domain, customer_id: Number(customerID),
+          plan_id: planID ? Number(planID) : null, php_version: site.php_version || phpVersion,
+        })
+        return { id: r.data.job_id, domain: site.domain, durum: 'queued', ilerleme: 0, mesaj: t('HesapAktarimiPage:remote.queued') } satisfies RemoteJob
+      }))
+      const sonuclar = baslatmalar.filter((s): s is PromiseFulfilledResult<RemoteJob> => s.status === 'fulfilled').map(s => s.value)
+      setSSHJobs(sonuclar)
+      const basarisiz = baslatmalar.length - sonuclar.length
+      if (basarisiz > 0) setHata(t('HesapAktarimiPage:remote.partial_start_failed', { count: basarisiz }))
     } catch (e) { setHata(apiHata(e, t('HesapAktarimiPage:remote.start_failed'))) }
     finally { setSSHBusy(false) }
   }
 
   useEffect(() => {
-    if (!sshJob || ['success', 'failed'].includes(sshJob.durum)) return
+    if (sshJobs.length === 0 || sshJobs.every(j => ['success', 'failed'].includes(j.durum))) return
     const timer = window.setInterval(() => {
-      api.get<RemoteJob>(`/admin/transfers/remote/jobs/${sshJob.id}`).then(r => setSSHJob(r.data)).catch(() => {})
+      const devamEden = sshJobs.filter(j => !['success', 'failed'].includes(j.durum))
+      Promise.all(devamEden.map(j => api.get<RemoteJob>(`/admin/transfers/remote/jobs/${j.id}`)))
+        .then(yanitlar => {
+          const guncel = new Map(yanitlar.map(r => [r.data.id, r.data]))
+          setSSHJobs(eski => eski.map(j => guncel.get(j.id) || j))
+        }).catch(() => {})
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [sshJob])
+  }, [sshJobs])
 
   async function iceAktar() {
     if (!dosya || !envanter || !customerID || !domain) return
@@ -172,25 +213,49 @@ export default function HesapAktarimiPage() {
         <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{t('HesapAktarimiPage:remote.title')}</h2>
         <p className="mt-1 text-xs text-slate-500">{t('HesapAktarimiPage:remote.desc')}</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input value={sshHost} onChange={e => setSSHHost(e.target.value)} placeholder="old-server.example.com" className={`${inputClass} flex-1`} />
-          <input type="number" min={1} max={65535} value={sshPort} onChange={e => setSSHPort(Number(e.target.value))} className={`${inputClass} sm:w-28`} />
-          <button onClick={() => void uzakKesfet()} disabled={!sshHost || sshBusy} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{sshBusy ? t('HesapAktarimiPage:remote.discovering') : t('HesapAktarimiPage:remote.discover')}</button>
+          <input value={sshHost} onChange={e => { setSSHHost(e.target.value); setSSHHostKey(null); setSSHGuvenildi(false); setSSHKesif(null) }} placeholder="old-server.example.com" className={`${inputClass} flex-1`} />
+          <input type="number" min={1} max={65535} value={sshPort} onChange={e => { setSSHPort(Number(e.target.value)); setSSHHostKey(null); setSSHGuvenildi(false); setSSHKesif(null) }} className={`${inputClass} sm:w-28`} />
+          <button onClick={() => void sshHazirla()} disabled={!sshHost || sshBusy} className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">{sshBusy ? t('HesapAktarimiPage:remote.preparing') : t('HesapAktarimiPage:remote.prepare')}</button>
         </div>
+        {sshPublicKey && sshHostKey && <div className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <div><strong>{t('HesapAktarimiPage:remote.public_key_title')}</strong><p className="mt-1">{t('HesapAktarimiPage:remote.public_key_desc')}</p></div>
+          <div className="flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[11px] text-slate-100">{sshPublicKey}</code><button type="button" onClick={() => navigator.clipboard?.writeText(sshPublicKey)} className="rounded border border-amber-300 px-3">{t('common:copy')}</button></div>
+          <div><strong>{t('HesapAktarimiPage:remote.host_fingerprint')}</strong>{sshHostKey.fingerprints.map(fp => <code key={fp} className="mt-1 block font-mono text-[11px]">{fp}</code>)}</div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void sshHostKeyOnayla()} disabled={sshBusy || sshGuvenildi} className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white disabled:opacity-50">{sshGuvenildi ? t('HesapAktarimiPage:remote.trusted') : t('HesapAktarimiPage:remote.trust')}</button>
+            <button type="button" onClick={() => void uzakKesfet()} disabled={sshBusy || !sshGuvenildi} className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white disabled:opacity-50">{sshBusy ? t('HesapAktarimiPage:remote.discovering') : t('HesapAktarimiPage:remote.discover')}</button>
+          </div>
+        </div>}
         {sshKesif && <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
           <strong>{sshKesif.provider}</strong>{sshKesif.surum && ` · ${sshKesif.surum}`}
           <div className="mt-1 text-xs">{t('HesapAktarimiPage:remote.domains', { count: sshKesif.domainler.length })}: {sshKesif.domainler.join(', ') || '—'}</div>
-          {['cpanel', 'plesk', 'directadmin'].includes(sshKesif.provider) && <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <select value={sshSite?.domain || ''} onChange={e => setSSHSite(sshKesif.siteler.find(s => s.domain === e.target.value) || null)} className={inputClass}>{sshKesif.siteler.map(s => <option key={s.domain} value={s.domain}>{s.domain} · {s.hesap}</option>)}</select>
-            <select value={customerID} onChange={e => setCustomerID(e.target.value)} className={inputClass}><option value="">{t('HesapAktarimiPage:target_section.select_customer')}</option>{customers.map(c => <option key={c.id} value={c.id}>{c.ad}</option>)}</select>
-            <button onClick={() => void uzakAktar()} disabled={!sshSite || !customerID || sshBusy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{t('HesapAktarimiPage:remote.start')}</button>
+          {['sanalcp', 'cpanel', 'plesk', 'directadmin'].includes(sshKesif.provider) && <div className="mt-3 space-y-3">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span>{t('HesapAktarimiPage:remote.select_domains')}</span>
+              <button type="button" className="text-brand-700 dark:text-brand-300" onClick={() => { const uygun = sshKesif.siteler.filter(s => !s.target_exists).map(s => s.domain); setSSHSecili(sshSecili.length === uygun.length ? [] : uygun) }}>
+                {sshSecili.length > 0 && sshSecili.length === sshKesif.siteler.filter(s => !s.target_exists).length ? t('HesapAktarimiPage:remote.select_none') : t('HesapAktarimiPage:remote.select_all')}
+              </button>
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-emerald-200 bg-white/70 p-2 dark:border-emerald-800 dark:bg-slate-900/40">
+              {sshKesif.siteler.map(site => <label key={site.domain} className={`flex items-center gap-2 rounded px-2 py-1.5 ${site.target_exists ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30'}`}>
+                <input type="checkbox" disabled={site.target_exists} checked={sshSecili.includes(site.domain)} onChange={e => setSSHSecili(eski => e.target.checked ? [...eski, site.domain] : eski.filter(d => d !== site.domain))} />
+                <span className="font-mono text-xs">{site.domain}</span><span className="ml-auto text-[11px] opacity-70">{site.hesap}{site.php_version ? ` · PHP ${site.php_version}` : ''}</span>
+                {site.target_exists && <span className="text-[10px] font-medium text-red-600">{t('HesapAktarimiPage:remote.target_exists')}</span>}
+              </label>)}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <select value={customerID} onChange={e => setCustomerID(e.target.value)} className={inputClass}><option value="">{t('HesapAktarimiPage:target_section.select_customer')}</option>{customers.map(c => <option key={c.id} value={c.id}>{c.ad}</option>)}</select>
+              <select value={planID} onChange={e => setPlanID(e.target.value)} className={inputClass}><option value="">{t('HesapAktarimiPage:target_section.default_plan')}</option>{plans.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}</select>
+              <button onClick={() => void uzakAktar()} disabled={sshSecili.length === 0 || !customerID || sshBusy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{t('HesapAktarimiPage:remote.start_selected', { count: sshSecili.length })}</button>
+            </div>
           </div>}
         </div>}
-        {sshJob && <div className={`mt-3 rounded-xl border p-3 text-sm ${sshJob.durum === 'failed' ? 'border-red-200 bg-red-50 text-red-700' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
-          <div className="flex justify-between"><strong>{t('HesapAktarimiPage:remote.job')} #{sshJob.id}</strong><span>{sshJob.ilerleme}% · {sshJob.durum}</span></div>
+        {sshJobs.map(sshJob => <div key={sshJob.id} className={`mt-3 rounded-xl border p-3 text-sm ${sshJob.durum === 'failed' ? 'border-red-200 bg-red-50 text-red-700' : sshJob.durum === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
+          <div className="flex justify-between"><strong>{sshJob.domain} · #{sshJob.id}</strong><span>{sshJob.ilerleme}% · {sshJob.durum}</span></div>
           <div className="mt-1 text-xs">{sshJob.mesaj}</div><div className="mt-2 h-1.5 rounded bg-white"><div className="h-full rounded bg-brand-600" style={{ width: `${sshJob.ilerleme}%` }} /></div>
           {(sshJob.source_http_status || sshJob.target_http_status) && <div className="mt-2 text-xs">HTTP: {sshJob.source_http_status || '—'} → {sshJob.target_http_status || '—'}</div>}
           {sshJob.target_domain_id && <Link className="mt-2 inline-block font-medium text-brand-700" to={`/abonelikler/${sshJob.target_domain_id}`}>{t('HesapAktarimiPage:result.manage_domain')}</Link>}
-        </div>}
+        </div>)}
         {sshGecmis.length > 0 && <details className="mt-3 text-xs text-slate-600 dark:text-slate-300"><summary>{t('HesapAktarimiPage:remote.history')}</summary><div className="mt-2 space-y-1">{sshGecmis.map(j => <div key={j.id} className="flex justify-between rounded bg-white/70 p-2 dark:bg-slate-900/50"><span>#{j.id} · {j.domain}</span><span>{j.ilerleme}% · {j.durum}</span></div>)}</div></details>}
       </div>
 
@@ -288,7 +353,7 @@ export default function HesapAktarimiPage() {
             {sonuc.databases.map(d => <p key={d.target} className="mt-1 text-xs font-mono text-emerald-700 dark:text-emerald-300">{d.source} → {d.target}</p>)}
             {sonuc.mailboxes.length > 0 && <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-white/60 dark:bg-slate-900/40 p-3">
               <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">{t('HesapAktarimiPage:result.mailbox_passwords_title')}</p>
-              {sonuc.mailboxes.map(m => <p key={m.email} className="text-xs font-mono text-amber-800 dark:text-amber-200">{m.email}: {m.password}</p>)}
+              {sonuc.mailboxes.map(m => <p key={m.email} className="text-xs font-mono text-amber-800 dark:text-amber-200">{m.email}: {m.password_preserved ? t('HesapAktarimiPage:result.password_preserved') : m.password}</p>)}
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('HesapAktarimiPage:result.aliases_imported', { count: sonuc.aliases })}</p>
             </div>}
             {sonuc.skipped?.map(s => <p key={s} className="mt-1 text-xs text-amber-700 dark:text-amber-300">{t('HesapAktarimiPage:result.skipped_prefix')}{s}</p>)}

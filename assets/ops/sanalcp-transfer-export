@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# SanalCP -> SanalCP aktarımı için salt-okunur kaynak dışa aktarıcı.
+# stdout protokoldür: inventory metin, export ise doğrudan tar.gz akışı üretir.
+set -euo pipefail
+
+die(){ echo "sanalcp-transfer-export: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || die "root gerekli"
+command -v mysql >/dev/null 2>&1 || die "mysql istemcisi bulunamadı"
+
+sql(){ mysql --batch --raw --skip-column-names panel -e "$1"; }
+domain_ok(){ [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]{1,251}[A-Za-z0-9])$ ]] && [[ "$1" == *.* ]] && [[ "$1" != *..* ]]; }
+user_ok(){ [[ "$1" =~ ^c_[a-z0-9_]{1,61}$ ]]; }
+
+inventory(){
+  echo "PROVIDER=sanalcp"
+  version=$(curl -fsS --max-time 2 http://127.0.0.1:8080/healthz 2>/dev/null \
+    | sed -n 's/.*"surum":"\([^"]*\)".*/\1/p' || true)
+  echo "VERSION=${version:-unknown}"
+  sql "SELECT CONCAT('SITE=',LOWER(alan_adi),'|',sistem_kullanici,'|',php_surum) FROM domains WHERE durum IN ('aktif','pasif') ORDER BY alan_adi"
+}
+
+export_domain(){
+  domain=${1,,}
+  domain_ok "$domain" || die "geçersiz domain"
+
+  row=$(sql "SELECT id,sistem_kullanici,php_surum FROM domains WHERE LOWER(alan_adi)='$domain' LIMIT 1")
+  [ -n "$row" ] || die "domain bulunamadı"
+  IFS=$'\t' read -r domain_id sk php_version <<<"$row"
+  [[ "$domain_id" =~ ^[0-9]+$ ]] || die "geçersiz domain kimliği"
+  user_ok "$sk" || die "güvensiz sistem kullanıcısı"
+
+  work=$(mktemp -d /tmp/sanalcp-transfer.XXXXXX)
+  trap 'rm -rf "$work"' EXIT
+  root="$work/cpmove-$sk"
+  mkdir -p "$root/cp/userdata/$sk" "$root/homedir/public_html" \
+    "$root/homedir/etc/$domain" "$root/homedir/mail/$domain" \
+    "$root/mysql" "$root/dnszones" "$root/sslcerts" "$root/sslkeys" "$root/va" "$root/sanalcp"
+  printf '%s\n' "$sk" > "$root/cp/backup_user"
+  printf 'main_domain: %s\nphp_version: %s\nsource_panel: sanalcp\n' \
+    "$domain" "$php_version" > "$root/cp/userdata/$sk/main"
+  sql "SELECT JSON_OBJECT('version',1,'domain',alan_adi,'source_ipv4',ipv4,'php_version',php_surum) FROM domains WHERE id=$domain_id" \
+    > "$root/sanalcp/domain.json"
+  sql "SELECT JSON_OBJECT('name',ad,'type',tip,'value',deger,'ttl',ttl,'priority',oncelik,'active',aktif) FROM dns_records WHERE domain_id=$domain_id ORDER BY id" \
+    > "$root/sanalcp/dns.jsonl"
+  sql "SELECT JSON_OBJECT('local_part',local_part,'password_hash',password_hash,'quota_bytes',quota_bytes,'status',status) FROM mailboxes WHERE domain_id=$domain_id ORDER BY id" \
+    > "$root/sanalcp/mailboxes.jsonl"
+
+  if [ -d "/home/$sk/public_html" ]; then
+    cp -a "/home/$sk/public_html/." "$root/homedir/public_html/"
+  fi
+
+  sql "SELECT DISTINCT db_name FROM db_accounts WHERE domain_id=$domain_id ORDER BY db_name" \
+    | while IFS= read -r db_name; do
+        [ -n "$db_name" ] || continue
+        [[ "$db_name" =~ ^[A-Za-z0-9_\$]+$ ]] || die "güvensiz veritabanı adı"
+        mysqldump --single-transaction --routines --triggers --events "$db_name" \
+          > "$root/mysql/$db_name.sql"
+      done
+
+  # Eski kurulumlarda db_accounts kaydı eksik olabilen varsayılan DB'yi de koru.
+  default_db=$(sql "SELECT COALESCE(db_adi,'') FROM domains WHERE id=$domain_id")
+  if [ -n "$default_db" ] && [[ "$default_db" =~ ^[A-Za-z0-9_\$]+$ ]] \
+      && [ ! -f "$root/mysql/$default_db.sql" ]; then
+    if sql "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='$default_db'" | grep -qx "$default_db"; then
+      mysqldump --single-transaction --routines --triggers --events "$default_db" \
+        > "$root/mysql/$default_db.sql"
+    fi
+  fi
+
+  sql "SELECT local_part FROM mailboxes WHERE domain_id=$domain_id ORDER BY local_part" \
+    | while IFS= read -r local_part; do
+        [[ "$local_part" =~ ^[A-Za-z0-9]([A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$ ]] || continue
+        printf '%s:*:1:0:99999:7:::\n' "$local_part" >> "$root/homedir/etc/$domain/shadow"
+        [ -d "/home/$sk/mail/$local_part" ] \
+          && cp -a "/home/$sk/mail/$local_part" "$root/homedir/mail/$domain/$local_part"
+      done
+  sql "SELECT source,destination FROM mail_aliases WHERE domain_id=$domain_id AND status='active' ORDER BY source" \
+    | while IFS=$'\t' read -r source destination; do
+        [ -n "$source" ] && [ -n "$destination" ] && printf '%s: %s\n' "$source" "$destination"
+      done > "$root/va/$domain"
+
+  if [ -f "/var/spool/cron/$sk" ]; then
+    cp "/var/spool/cron/$sk" "$root/cron"
+  fi
+  for zone in "/var/named/$domain.zone" "/var/named/$domain.db" "/etc/bind/zones/$domain.zone"; do
+    if [ -f "$zone" ]; then cp "$zone" "$root/dnszones/$domain.db"; break; fi
+  done
+
+  ssl_row=$(sql "SELECT COALESCE(cert_path,''),COALESCE(key_path,'') FROM domains WHERE id=$domain_id AND ssl_aktif=1")
+  if [ -n "$ssl_row" ]; then
+    IFS=$'\t' read -r cert_path key_path <<<"$ssl_row"
+    if [ -f "$cert_path" ] && [ -f "$key_path" ]; then
+      cp "$cert_path" "$root/sslcerts/$domain.crt"
+      cp "$key_path" "$root/sslkeys/$domain.key"
+    fi
+  fi
+
+  tar -C "$work" -czf - "cpmove-$sk"
+}
+
+case "${1:-}" in
+  inventory) inventory ;;
+  export) [ $# = 2 ] || die "kullanım: $0 export DOMAIN"; export_domain "$2" ;;
+  *) die "kullanım: $0 inventory | export DOMAIN" ;;
+esac

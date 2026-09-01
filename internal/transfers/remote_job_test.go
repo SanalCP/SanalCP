@@ -30,7 +30,7 @@ func TestUzakHesapSaglayiciyaGoreDogrulanir(t *testing.T) {
 }
 
 func TestTumSaglayicilarAkisArsiviUretir(t *testing.T) {
-	for _, p := range []string{"cpanel", "plesk", "directadmin"} {
+	for _, p := range []string{"sanalcp", "cpanel", "plesk", "directadmin"} {
 		hesap := "demo"
 		if p == "plesk" {
 			hesap = "example.com"
@@ -38,6 +38,12 @@ func TestTumSaglayicilarAkisArsiviUretir(t *testing.T) {
 		cmd, err := uzakPaketKomutu(remoteStartReq{Provider: p, Hesap: hesap, Domain: "example.com"})
 		if err != nil {
 			t.Fatalf("%s: %v", p, err)
+		}
+		if p == "sanalcp" {
+			if cmd != "sanalcp-transfer-export export example.com" {
+				t.Errorf("SanalCP native exporter kullanılmadı: %q", cmd)
+			}
+			continue
 		}
 		if !strings.Contains(cmd, "tar") || !strings.Contains(cmd, "cpmove-") {
 			t.Errorf("%s ortak arşiv sözleşmesini üretmedi", p)

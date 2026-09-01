@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,8 +33,10 @@ type UzakEnvanter struct {
 	Siteler   []UzakSite `json:"siteler"`
 }
 type UzakSite struct {
-	Domain string `json:"domain"`
-	Hesap  string `json:"hesap"`
+	Domain       string `json:"domain"`
+	Hesap        string `json:"hesap"`
+	PHPSurum     string `json:"php_version,omitempty"`
+	HedefteVarMi bool   `json:"target_exists,omitempty"`
 }
 
 // RemoteDiscover yalnız anahtar tabanlı, BatchMode ve doğrulanmış known_hosts ile
@@ -69,17 +70,34 @@ func (h *Handlers) RemoteDiscover(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, status, "SSH keşfi başarısız: "+err.Error())
 		return
 	}
+	rows, dbErr := h.DB.QueryContext(r.Context(), `SELECT LOWER(alan_adi) FROM domains`)
+	if dbErr != nil {
+		httpx.WriteError(w, 500, "hedef domain envanteri okunamadı")
+		return
+	}
+	hedefler := map[string]bool{}
+	for rows.Next() {
+		var domain string
+		if rows.Scan(&domain) == nil {
+			hedefler[domain] = true
+		}
+	}
+	_ = rows.Close()
+	for i := range env.Siteler {
+		env.Siteler[i].HedefteVarMi = hedefler[env.Siteler[i].Domain]
+	}
 	httpx.WriteJSON(w, 200, env)
 }
 
-const uzakKesifKomutu = `if [ -d /var/cpanel/users ]; then echo 'PROVIDER=cpanel'; /usr/local/cpanel/cpanel -V 2>/dev/null | head -1 | sed 's/^/VERSION=/'; find /var/cpanel/users -maxdepth 1 -type f -print 2>/dev/null | while read f; do u=${f##*/}; sed -n 's/^DNS=//p' "$f" | while read d; do echo "SITE=$d|$u"; done; done; elif command -v plesk >/dev/null 2>&1; then echo 'PROVIDER=plesk'; plesk version 2>/dev/null | head -1 | sed 's/^/VERSION=/'; plesk bin domain --list 2>/dev/null | while read d; do echo "SITE=$d|$d"; done; elif [ -x /usr/local/directadmin/directadmin ]; then echo 'PROVIDER=directadmin'; /usr/local/directadmin/directadmin v 2>/dev/null | head -1 | sed 's/^/VERSION=/'; find /usr/local/directadmin/data/users -name domains.list -type f -print 2>/dev/null | while read f; do u=${f%/domains.list}; u=${u##*/}; while read d; do echo "SITE=$d|$u"; done < "$f"; done; else echo 'PROVIDER=unknown'; fi`
+const uzakKesifKomutu = `if command -v sanalcp-transfer-export >/dev/null 2>&1; then sanalcp-transfer-export inventory; elif [ -d /var/cpanel/users ]; then echo 'PROVIDER=cpanel'; /usr/local/cpanel/cpanel -V 2>/dev/null | head -1 | sed 's/^/VERSION=/'; find /var/cpanel/users -maxdepth 1 -type f -print 2>/dev/null | while read f; do u=${f##*/}; sed -n 's/^DNS=//p' "$f" | while read d; do echo "SITE=$d|$u"; done; done; elif command -v plesk >/dev/null 2>&1; then echo 'PROVIDER=plesk'; plesk version 2>/dev/null | head -1 | sed 's/^/VERSION=/'; plesk bin domain --list 2>/dev/null | while read d; do echo "SITE=$d|$d"; done; elif [ -x /usr/local/directadmin/directadmin ]; then echo 'PROVIDER=directadmin'; /usr/local/directadmin/directadmin v 2>/dev/null | head -1 | sed 's/^/VERSION=/'; find /usr/local/directadmin/data/users -name domains.list -type f -print 2>/dev/null | while read f; do u=${f%/domains.list}; u=${u##*/}; while read d; do echo "SITE=$d|$u"; done < "$f"; done; else echo 'PROVIDER=unknown'; fi`
 
 const maxKesifCiktisi = 2 << 20
 
 func uzakKesfet(ctx context.Context, req uzakKesifReq) (UzakEnvanter, error) {
 	var out sinirliKesifCiktisi
 	out.max = maxKesifCiktisi
-	cmd := exec.CommandContext(ctx, sshBin, "-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "-oConnectTimeout=10", "-oConnectionAttempts=1", "-p", strconv.Itoa(req.Port), req.Kullanici+"@"+req.Host, uzakKesifKomutu)
+	args := append(uzakSSHArgs(req.Port), req.Kullanici+"@"+req.Host, uzakKesifKomutu)
+	cmd := exec.CommandContext(ctx, sshBin, args...)
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	err := cmd.Run()
@@ -107,8 +125,8 @@ func uzakKesfet(ctx context.Context, req uzakKesifReq) (UzakEnvanter, error) {
 			env.Surum = strings.TrimSpace(strings.TrimPrefix(line, "VERSION="))
 		}
 		if strings.HasPrefix(line, "SITE=") {
-			parca := strings.SplitN(strings.TrimPrefix(line, "SITE="), "|", 2)
-			if len(parca) != 2 {
+			parca := strings.SplitN(strings.TrimPrefix(line, "SITE="), "|", 3)
+			if len(parca) < 2 {
 				continue
 			}
 			d := strings.ToLower(strings.TrimSpace(parca[0]))
@@ -116,7 +134,11 @@ func uzakKesfet(ctx context.Context, req uzakKesifReq) (UzakEnvanter, error) {
 			if domainKesifGecerli(d) && uzakUserRe.MatchString(hesap) && !seen[d] {
 				seen[d] = true
 				env.Domainler = append(env.Domainler, d)
-				env.Siteler = append(env.Siteler, UzakSite{Domain: d, Hesap: hesap})
+				phpSurum := ""
+				if len(parca) == 3 && regexp.MustCompile(`^[0-9]+\.[0-9]+$`).MatchString(strings.TrimSpace(parca[2])) {
+					phpSurum = strings.TrimSpace(parca[2])
+				}
+				env.Siteler = append(env.Siteler, UzakSite{Domain: d, Hesap: hesap, PHPSurum: phpSurum})
 			}
 		}
 	}

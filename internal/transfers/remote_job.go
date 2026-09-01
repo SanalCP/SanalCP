@@ -46,6 +46,11 @@ type remoteJob struct {
 	TargetHTTP     int    `json:"target_http_status,omitempty"`
 }
 
+// Toplu seçim yüzlerce domain döndürebilir. Paketleme/mysqldump/SSH akışları
+// disk ve CPU yoğundur; en fazla iki domain aynı anda çalışsın, kalanı queued
+// durumunda güvenle sırasını beklesin.
+var remoteAktarimSem = make(chan struct{}, 2)
+
 func (h *Handlers) RemoteStart(w http.ResponseWriter, r *http.Request) {
 	var q remoteStartReq
 	if json.NewDecoder(r.Body).Decode(&q) != nil {
@@ -65,7 +70,7 @@ func (h *Handlers) RemoteStart(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 400, "geçersiz aktarım hedefi")
 		return
 	}
-	if q.Provider != "cpanel" && q.Provider != "plesk" && q.Provider != "directadmin" {
+	if q.Provider != "sanalcp" && q.Provider != "cpanel" && q.Provider != "plesk" && q.Provider != "directadmin" {
 		httpx.WriteError(w, 422, "desteklenmeyen kaynak panel")
 		return
 	}
@@ -137,6 +142,8 @@ func (h *Handlers) remoteJobOku(ctx context.Context, id int64) (remoteJob, error
 }
 
 func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
+	remoteAktarimSem <- struct{}{}
+	defer func() { <-remoteAktarimSem }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
 	h.remoteDurum(id, "packaging", 10, "Uzak site paketi hazırlanıyor")
@@ -155,7 +162,8 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 		h.remoteHata(id, err)
 		return
 	}
-	cmd := exec.CommandContext(ctx, sshBin, "-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "-oConnectTimeout=10", "-oConnectionAttempts=1", "-p", strconv.Itoa(q.Port), "root@"+q.Host, komut)
+	args := append(uzakSSHArgs(q.Port), "root@"+q.Host, komut)
+	cmd := exec.CommandContext(ctx, sshBin, args...)
 	lw := &sinirliYazici{w: f, kalan: MaxUploadBytes}
 	var stderr bytes.Buffer
 	cmd.Stdout = lw
@@ -207,6 +215,8 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 
 func uzakPaketKomutu(q remoteStartReq) (string, error) {
 	switch q.Provider {
+	case "sanalcp":
+		return fmt.Sprintf(`sanalcp-transfer-export export %s`, q.Domain), nil
 	case "cpanel":
 		return fmt.Sprintf(`d=$(mktemp -d /tmp/sanalcp-transfer.XXXXXX) || exit 1; trap 'rm -rf "$d"' EXIT; /scripts/pkgacct %s "$d" >/dev/null 2>&1 || exit 2; cat "$d/cpmove-%s.tar.gz"`, q.Hesap, q.Hesap), nil
 	case "plesk":
@@ -230,7 +240,8 @@ func ortakPaketSonEk(q remoteStartReq) string {
 
 func (h *Handlers) uzakHTTPDurumu(ctx context.Context, q remoteStartReq) int {
 	komut := fmt.Sprintf(`s=$(curl -ksS --max-time 8 -o /dev/null -w '%%{http_code}' --resolve %s:443:127.0.0.1 https://%s/ 2>/dev/null); test "$s" != 000 || s=$(curl -sS --max-time 8 -o /dev/null -w '%%{http_code}' -H 'Host: %s' http://127.0.0.1/ 2>/dev/null); printf '%%s' "$s"`, q.Domain, q.Domain, q.Domain)
-	out, err := exec.CommandContext(ctx, sshBin, "-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "-oConnectTimeout=10", "-oConnectionAttempts=1", "-p", strconv.Itoa(q.Port), "root@"+q.Host, komut).Output()
+	args := append(uzakSSHArgs(q.Port), "root@"+q.Host, komut)
+	out, err := exec.CommandContext(ctx, sshBin, args...).Output()
 	if err != nil {
 		return 0
 	}

@@ -116,8 +116,9 @@ type importResponse struct {
 }
 
 type MailCredential struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email             string `json:"email"`
+	Password          string `json:"password"`
+	PasswordPreserved bool   `json:"password_preserved,omitempty"`
 }
 
 type DBMap struct {
@@ -267,6 +268,17 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "e-posta aktarılamadı: "+err.Error())
 		return
 	}
+	preserved, err := h.importNativeMetadata(r.Context(), ekler, created.ID)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "SanalCP metadata aktarılamadı: "+err.Error())
+		return
+	}
+	for i := range mailCreds {
+		if preserved[mailCreds[i].Email] {
+			mailCreds[i].Password = ""
+			mailCreds[i].PasswordPreserved = true
+		}
+	}
 	cronCount, err := h.importCron(r, inv, created.ID, created.SistemKullanici)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "cron görevleri aktarılamadı: "+err.Error())
@@ -329,6 +341,9 @@ type arsivEkler struct {
 	keyAdaylari    []string
 	bundleAdaylari []string
 	aliasUyesi     string
+	nativeDomain   string
+	nativeDNS      string
+	nativeMailbox  string
 	uyeler         map[string][]byte
 }
 
@@ -354,11 +369,15 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 		root + "/homedir/ssl/" + domain + ".cabundle",
 	}
 	e.aliasUyesi = root + "/va/" + domain
+	e.nativeDomain = root + "/sanalcp/domain.json"
+	e.nativeDNS = root + "/sanalcp/dns.jsonl"
+	e.nativeMailbox = root + "/sanalcp/mailboxes.jsonl"
 
 	istekler := append([]string{}, e.certAdaylari...)
 	istekler = append(istekler, e.keyAdaylari...)
 	istekler = append(istekler, e.bundleAdaylari...)
 	istekler = append(istekler, e.aliasUyesi)
+	istekler = append(istekler, e.nativeDomain, e.nativeDNS, e.nativeMailbox)
 	uyeler, err := readSmallTarMembers(archivePath, istekler)
 	if err != nil {
 		return e, err

@@ -1,5 +1,5 @@
 {
-  "remote": { "title": "Discover from a live server (Phase 7)", "desc": "Connects using a root SSH key to a server already present in known_hosts; no password is stored. Detects cPanel, Plesk, and DirectAdmin.", "discover": "Discover over SSH", "discovering": "Discovering…", "failed": "Could not discover the remote server.", "domains": "Discovered domains ({{count}})", "start": "Transfer selected site", "start_failed": "Could not start remote transfer.", "queued": "Transfer queued", "job": "Transfer job", "history": "Recent remote transfer jobs" },
+  "remote": { "title": "Transfer from a live server", "desc": "The target panel generates a dedicated transfer SSH key; passwords and the private key never reach the browser. Detects SanalCP, cPanel, Plesk, and DirectAdmin.", "prepare": "Prepare connection", "preparing": "Preparing…", "prepare_failed": "Could not prepare the SSH connection.", "public_key_title": "1. Add this public key to root authorized_keys on the old server", "public_key_desc": "Add it as one line to /root/.ssh/authorized_keys on the old server. The private key remains only on the new server with mode 0600.", "host_fingerprint": "2. Verify the old server SSH host key fingerprint", "trust": "Fingerprint is correct, trust it", "trusted": "Host key verified", "trust_failed": "The SSH host key could not be saved or it changed.", "discover": "Discover domains", "discovering": "Discovering…", "failed": "Could not discover the remote server.", "domains": "Discovered domains ({{count}})", "select_domains": "Domains to transfer", "select_all": "Select all", "select_none": "Clear selection", "target_exists": "already on target", "start": "Transfer selected site", "start_selected": "Transfer selected ({{count}})", "start_failed": "Could not start remote transfer.", "partial_start_failed": "Transfer jobs could not be started for {{count}} domains; jobs that started will continue running.", "queued": "Transfer queued", "job": "Transfer job", "history": "Recent remote transfer jobs" },
   "title": "Account Import",
   "subtitle": "Safely analyze a full cPanel account backup. The archive is not extracted or permanently stored on the server at this stage.",
   "breadcrumb": {
@@ -61,6 +61,7 @@
     "cron_imported": "{{count}} cron jobs imported.",
     "ssl_imported": "SSL certificate imported · expires on {{expires}}",
     "mailbox_passwords_title": "New mailbox passwords — save them now",
+    "password_preserved": "existing password preserved",
     "aliases_imported": "{{count}} aliases imported.",
     "skipped_prefix": "⚠ ",
     "manage_domain": "Manage domain →"
