@@ -67,7 +67,21 @@ SELECT anahtar,tur,baslik,aciklama,durum,ilerleme,mesaj,yol,baslangic,bitis FROM
     COALESCE(DATE_FORMAT(j.bitis,'%Y-%m-%d %H:%i:%s'),'') COLLATE utf8mb4_unicode_ci,j.baslangic
   FROM av_taramalar j LEFT JOIN domains d ON d.id=j.domain_id
   WHERE j.baslangic>=NOW()-INTERVAL 7 DAY
-) x ORDER BY (durum IN ('bekliyor','calisiyor')) DESC,sirala DESC LIMIT 40`
+) x
+WHERE x.durum IN ('bekliyor','calisiyor')
+   OR NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=x.anahtar)
+ORDER BY (durum IN ('bekliyor','calisiyor')) DESC,sirala DESC LIMIT 40`
+
+const temizleSQL = `INSERT IGNORE INTO islem_merkezi_gizlenenler(anahtar)
+SELECT anahtar FROM (
+  SELECT CONCAT('import:',id) anahtar FROM import_jobs WHERE durum NOT IN ('queued','running') AND created_at>=NOW()-INTERVAL 7 DAY
+  UNION ALL
+  SELECT CONCAT('remote:',id) FROM remote_transfer_jobs WHERE status NOT IN ('queued','packaging','downloading','importing') AND created_at>=NOW()-INTERVAL 7 DAY
+  UNION ALL
+  SELECT CONCAT('laravel:',id) FROM laravel_deploy_jobs WHERE status NOT IN ('queued','running') AND created_at>=NOW()-INTERVAL 7 DAY
+  UNION ALL
+  SELECT CONCAT('antivirus:',id) FROM av_taramalar WHERE durum<>'calisiyor' AND baslangic>=NOW()-INTERVAL 7 DAY
+) x`
 
 func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(), listeSQL)
@@ -92,6 +106,20 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
+// Temizle, tamamlanmış işlemleri kaynak geçmişini silmeden işlem merkezinde
+// gizler. Devam eden işler yanlışlıkla kaybolmaz; yeni işler yeni anahtarlarıyla
+// yine görünür.
+func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
+	res, err := h.DB.ExecContext(r.Context(), temizleSQL)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "işlemler temizlenemedi")
+		return
+	}
+	n, _ := res.RowsAffected()
+	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM islem_merkezi_gizlenenler WHERE gizlendi_at<NOW()-INTERVAL 30 DAY`)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "temizlenen": n})
+}
+
 func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	if h.Senkronize != nil {
 		h.Senkronize()
@@ -102,9 +130,9 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
     (SELECT COUNT(*) FROM remote_transfer_jobs WHERE status IN ('queued','packaging','downloading','importing'))+
     (SELECT COUNT(*) FROM laravel_deploy_jobs WHERE status IN ('queued','running'))+
     (SELECT COUNT(*) FROM av_taramalar WHERE durum='calisiyor') aktif,
-    (SELECT COUNT(*) FROM import_jobs WHERE durum='failed' AND created_at>=NOW()-INTERVAL 1 DAY)+
-    (SELECT COUNT(*) FROM remote_transfer_jobs WHERE status='failed' AND created_at>=NOW()-INTERVAL 1 DAY)+
-    (SELECT COUNT(*) FROM laravel_deploy_jobs WHERE status IN ('failed','rolled_back') AND created_at>=NOW()-INTERVAL 1 DAY) basarisiz,
+    (SELECT COUNT(*) FROM import_jobs j WHERE durum='failed' AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('import:',j.id)))+
+    (SELECT COUNT(*) FROM remote_transfer_jobs j WHERE status='failed' AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('remote:',j.id)))+
+    (SELECT COUNT(*) FROM laravel_deploy_jobs j WHERE status IN ('failed','rolled_back') AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('laravel:',j.id))) basarisiz,
     (SELECT COUNT(*) FROM guvenlik_bildirimleri WHERE durum='acik') bildirim,
     (SELECT COUNT(*) FROM guvenlik_bildirimleri WHERE durum='acik' AND seviye='kritik') kritik`).Scan(&aktif, &basarisiz, &bildirim, &kritik)
 	if err != nil {

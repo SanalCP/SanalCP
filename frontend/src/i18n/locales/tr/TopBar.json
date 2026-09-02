@@ -12,6 +12,8 @@
     "title": "İşlemler ve Bildirimler",
     "subtitle": "Uzun işlemler ve önemli olaylar",
     "refresh": "Yenile",
+    "clear": "Temizle",
+    "clear_failed": "İşlemler temizlenemedi.",
     "close": "İşlem merkezini kapat",
     "active": "Aktif işlem",
     "failed_24h": "24 saatte hata",

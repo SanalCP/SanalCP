@@ -705,6 +705,7 @@ func main() {
 				r.With(middleware.AdminOnly).Get("/guvenlik-bildirimleri/ozet", guvenlikOlayH.Ozet)
 				r.With(middleware.AdminOnly).Put("/guvenlik-bildirimleri/{id}", guvenlikOlayH.Durum)
 				r.With(middleware.AdminOnly).Get("/islemler", islemMerkeziH.Liste)
+				r.With(middleware.AdminOnly).Delete("/islemler", islemMerkeziH.Temizle)
 				r.With(middleware.AdminOnly).Get("/islemler/ozet", islemMerkeziH.Ozet)
 				// Panel hesapları (admin + bayi). Kapsam daraltması handler
 				// içindedir: bayi yalnız kendi altındaki hesapları görür/yönetir

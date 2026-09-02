@@ -8,6 +8,34 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+func TestTemizleTamamlananIslemleriGizler(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectExec(temizleSQL).WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectExec(`DELETE FROM islem_merkezi_gizlenenler WHERE gizlendi_at<NOW()-INTERVAL 30 DAY`).WillReturnResult(sqlmock.NewResult(0, 0))
+	w := httptest.NewRecorder()
+	(&Handlers{DB: db}).Temizle(w, httptest.NewRequest("DELETE", "/api/v1/islemler", nil))
+	if w.Code != 200 {
+		t.Fatalf("durum=%d govde=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		OK         bool  `json:"ok"`
+		Temizlenen int64 `json:"temizlenen"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.OK || got.Temizlenen != 3 {
+		t.Fatalf("beklenmeyen yanıt: %#v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestListeBoskenNullDegilDiziDondurur(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {

@@ -12,6 +12,8 @@
     "title": "Operations & Notifications",
     "subtitle": "Long-running operations and important events",
     "refresh": "Refresh",
+    "clear": "Clear",
+    "clear_failed": "Operations could not be cleared.",
     "close": "Close operations center",
     "active": "Active operations",
     "failed_24h": "Failed in 24h",
