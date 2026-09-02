@@ -197,6 +197,11 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 	}
 	hedefHTTP := yerelHTTPDurumu(ctx, q.Domain)
 	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET target_domain_id=?,target_http_status=? WHERE id=?`, sonuc.DomainID, nullStatus(hedefHTTP), id)
+	if !httpSaglikli(kaynakHTTP) {
+		_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message=?,finished_at=NOW() WHERE id=?`,
+			fmt.Sprintf("Aktarım tamamlandı; kaynak site HTTP %d verdiği için web sağlığı doğrulanamadı", kaynakHTTP), id)
+		return
+	}
 	if httpSaglikli(kaynakHTTP) && !httpSaglikli(hedefHTTP) {
 		r := httptest.NewRequest(http.MethodDelete, "/api/v1/domains/"+strconv.FormatInt(sonuc.DomainID, 10), nil).WithContext(ctx)
 		if err := h.rollbackDomain(r, sonuc.DomainID); err != nil {
