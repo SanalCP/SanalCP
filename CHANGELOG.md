@@ -13,6 +13,33 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.45** (2026-09-02)
+
+SanalCP sunucuları arasında native domain aktarımı eklendi. Hedef panelden
+kaynak sunucuya doğrulanmış SSH anahtarıyla bağlanılarak ana domainler
+keşfedilebilir ve seçilen hesaplar toplu aktarılabilir. Web dosyaları,
+veritabanları, DNS kayıtları, SSL sertifikaları, posta kutuları ve Maildir
+mesajları, alias/otomatik yanıt/filtre/spam ayarları, cron görevleri, alt ve ek
+alan adları ile taşınabilir güvenlik/nginx ayarları korunur.
+
+Aktarım işleri sınırlı eşzamanlılıkla ayrı ayrı izlenir; tek domainin hatası
+diğer işleri etkilemez. Kaynağa göre bozulan hedef otomatik geri alınır.
+Yönlendirmeli sitelerde sağlık kontrolü artık `www` hedefini yerel sunucuda
+takip eder. Kaynak zaten sağlıksızsa bu durum yanıltıcı başarı metni yerine
+açıkça bildirilir.
+
+Debian/Ubuntu hedeflerde PHP-FPM soket yolu işletim sistemi eşlemesinden
+çözülür ve domain hazır olmadan önce tenant FPM gerçekten doğrulanır. Native
+aktarımı kullanan WordPress sitelerinde varsayılan/çoklu veritabanı eşlemesi
+korunur; `wp-config.php` hedefte üretilen güvenli DB kimlik bilgilerine göre
+uyarlanır. Web kökü dışındaki uygulama yapılandırma dosyaları taşınırken SSH
+anahtarları, kabuk geçmişi ve sistem profilleri özellikle dışarıda bırakılır.
+
+Canlı kabul testlerinde küçük/toplu domainler, 560 MiB ve 9.779 dosyalı çoklu
+veritabanı kullanan WordPress sitesi, SSL/DNS ve tam posta senaryosu (IMAPS,
+SMTP AUTH, alias, Sieve klasörü ve ekli mesaj) kaynak/hedef karşılaştırmasıyla
+doğrulandı. Frontend `browserslist` güvenlik bildirimleri de giderildi.
+
 **0.9.44** (2026-09-01)
 
 Profil ve Tercihler ekranındaki parola açıklaması oturum açan hesaba göre

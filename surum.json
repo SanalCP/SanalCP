@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.44",
-  "duyuru": "Profil ve Tercihler ekranındaki parola açıklaması hesap türüne göre düzeltildi. Admin parolası yalnız panel hesabını değiştirir; başarılı değişiklikten sonra tüm oturumlar kapatılır ve yeni parolayla yeniden giriş gerekir.",
+  "son_surum": "0.9.45",
+  "duyuru": "SanalCP sunucuları arasında güvenli ve toplu domain aktarımı eklendi. Web, veritabanı, DNS, SSL, posta, alt/ek domainler ve taşınabilir panel ayarları aktarılır; başarısız hedefler otomatik geri alınır.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-01"
+  "yayin_tarihi": "2026-09-02"
 }
