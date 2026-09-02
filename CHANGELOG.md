@@ -13,6 +13,14 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.46** (2026-09-02)
+
+Üst çubuktaki İşlemler ve Bildirimler menüsüne `Temizle` işlemi eklendi.
+Tamamlanmış ve başarısız işler artık kaynak işlem geçmişi silinmeden listeden
+kalıcı olarak gizlenebilir; temizlenen başarısız işler bildirim rozetinden de
+düşer. Bekleyen ve çalışan işler yanlışlıkla temizlenmez, yeni işler normal
+şekilde görünmeye devam eder.
+
 **0.9.45** (2026-09-02)
 
 SanalCP sunucuları arasında native domain aktarımı eklendi. Hedef panelden
