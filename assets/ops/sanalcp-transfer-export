@@ -38,7 +38,7 @@ export_domain(){
   printf '%s\n' "$sk" > "$root/cp/backup_user"
   printf 'main_domain: %s\nphp_version: %s\nsource_panel: sanalcp\n' \
     "$domain" "$php_version" > "$root/cp/userdata/$sk/main"
-  sql "SELECT JSON_OBJECT('version',1,'domain',alan_adi,'source_ipv4',ipv4,'php_version',php_surum) FROM domains WHERE id=$domain_id" \
+  sql "SELECT JSON_OBJECT('version',1,'domain',alan_adi,'source_ipv4',ipv4,'php_version',php_surum,'default_db',COALESCE(db_adi,'')) FROM domains WHERE id=$domain_id" \
     > "$root/sanalcp/domain.json"
   sql "SELECT JSON_OBJECT('name',ad,'type',tip,'value',deger,'ttl',ttl,'priority',oncelik,'active',aktif) FROM dns_records WHERE domain_id=$domain_id ORDER BY id" \
     > "$root/sanalcp/dns.jsonl"

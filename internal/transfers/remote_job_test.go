@@ -64,6 +64,13 @@ func TestHTTPSaglikSiniri(t *testing.T) {
 	}
 }
 
+func TestNativeVarsayilanVeritabaniOnceEslestirilir(t *testing.T) {
+	got := nativeDatabaseSources([]string{"demo_extra", "demo_main"}, []byte(`{"version":1,"default_db":"demo_main"}`))
+	if len(got) != 2 || got[0] != "demo_main" || got[1] != "demo_extra" {
+		t.Fatalf("varsayılan veritabanı sırası hatalı: %#v", got)
+	}
+}
+
 func TestUzakPaketHesabiYalnizGuvenliUnixAdi(t *testing.T) {
 	for _, s := range []string{"root;id", "x$(id)", "../root", "UPPER"} {
 		if uzakUserRe.MatchString(s) {

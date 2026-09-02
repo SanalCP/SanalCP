@@ -20,6 +20,23 @@ type nativeDomainMeta struct {
 	Version    int    `json:"version"`
 	Domain     string `json:"domain"`
 	SourceIPv4 string `json:"source_ipv4"`
+	DefaultDB  string `json:"default_db"`
+}
+
+func nativeDatabaseSources(sources []string, raw []byte) []string {
+	out := append([]string(nil), sources...)
+	var meta nativeDomainMeta
+	if json.Unmarshal(raw, &meta) != nil || meta.DefaultDB == "" {
+		return out
+	}
+	for i, name := range out {
+		if name == meta.DefaultDB {
+			copy(out[1:i+1], out[0:i])
+			out[0] = name
+			break
+		}
+	}
+	return out
 }
 
 type nativeDNSRecord struct {

@@ -239,7 +239,7 @@ func ortakPaketSonEk(q remoteStartReq) string {
 }
 
 func (h *Handlers) uzakHTTPDurumu(ctx context.Context, q remoteStartReq) int {
-	komut := fmt.Sprintf(`s=$(curl -ksS --max-time 8 -o /dev/null -w '%%{http_code}' --resolve %s:443:127.0.0.1 https://%s/ 2>/dev/null); test "$s" != 000 || s=$(curl -sS --max-time 8 -o /dev/null -w '%%{http_code}' -H 'Host: %s' http://127.0.0.1/ 2>/dev/null); printf '%%s' "$s"`, q.Domain, q.Domain, q.Domain)
+	komut := fmt.Sprintf(`s=$(curl -ksS -L --max-redirs 3 --max-time 12 -o /dev/null -w '%%{http_code}' --resolve %s:443:127.0.0.1 --resolve www.%s:443:127.0.0.1 https://%s/ 2>/dev/null); test "$s" != 000 || s=$(curl -sS --max-time 8 -o /dev/null -w '%%{http_code}' -H 'Host: %s' http://127.0.0.1/ 2>/dev/null); printf '%%s' "$s"`, q.Domain, q.Domain, q.Domain, q.Domain)
 	args := append(uzakSSHArgs(q.Port), "root@"+q.Host, komut)
 	out, err := exec.CommandContext(ctx, sshBin, args...).Output()
 	if err != nil {
@@ -250,15 +250,14 @@ func (h *Handlers) uzakHTTPDurumu(ctx context.Context, q remoteStartReq) int {
 }
 
 func yerelHTTPDurumu(ctx context.Context, domain string) int {
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1/", nil)
-	req.Host = domain
-	c := &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := c.Do(req)
+	args := []string{"-ksS", "-L", "--max-redirs", "3", "--max-time", "12", "-o", "/dev/null", "-w", "%{http_code}",
+		"--resolve", domain + ":443:127.0.0.1", "--resolve", "www." + domain + ":443:127.0.0.1", "https://" + domain + "/"}
+	out, err := exec.CommandContext(ctx, "curl", args...).Output()
 	if err != nil {
 		return 0
 	}
-	defer resp.Body.Close()
-	return resp.StatusCode
+	v, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	return v
 }
 
 func httpSaglikli(v int) bool { return v >= 200 && v < 500 }

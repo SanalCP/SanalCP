@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -231,7 +232,10 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		SistemKullanici string `json:"sistem_kullanici"`
 		DBAdi           string `json:"db_adi"`
 		DBUser          string `json:"db_user"`
-		Parolalar       any    `json:"olusturulan_parolalar"`
+		Parolalar       struct {
+			FTP string `json:"ftp"`
+			DB  string `json:"db"`
+		} `json:"olusturulan_parolalar"`
 	}
 	if err := json.Unmarshal(cw.Body.Bytes(), &created); err != nil || created.ID <= 0 {
 		httpx.WriteError(w, http.StatusInternalServerError, "oluşturulan domain yanıtı okunamadı")
@@ -262,7 +266,8 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	dbMaps := databaseMappings(inv.Databases, created.SistemKullanici, created.DBAdi, created.DBUser)
+	dbSources := nativeDatabaseSources(inv.Databases, ekler.uyeler[ekler.nativeDomain])
+	dbMaps := databaseMappings(dbSources, created.SistemKullanici, created.DBAdi, created.DBUser)
 	for i, m := range dbMaps {
 		if i > 0 {
 			if err := hesaplar.MySQLCreateDBForUser(h.DB, created.ID, m.Target, created.DBUser); err != nil {
@@ -273,6 +278,10 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := restoreDatabases(tmpPath, inv.ArchiveRoot, dbMaps); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
+		return
+	}
+	if err := rewriteWordPressDBConfig(created.SistemKullanici, dbMaps, created.DBUser, created.Parolalar.DB); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "WordPress veritabanı ayarı güncellenemedi: "+err.Error())
 		return
 	}
 	mailCreds, aliasCount, err := h.importMail(r, tmpPath, ekler, inv, created.ID, created.AlanAdi, created.SistemKullanici)
@@ -321,6 +330,46 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		SSLExpires: sslExpires, Source: inv, Skipped: skipped,
 		Subdomains: subCount, AddonDomains: addonCount,
 	})
+}
+
+var wpDBNameRE = regexp.MustCompile(`(?m)define\s*\(\s*['"]DB_NAME['"]\s*,\s*['"]([^'"]+)['"]\s*\)\s*;`)
+var wpDBUserRE = regexp.MustCompile(`(?m)define\s*\(\s*['"]DB_USER['"]\s*,\s*['"][^'"]*['"]\s*\)\s*;`)
+var wpDBPassRE = regexp.MustCompile(`(?m)define\s*\(\s*['"]DB_PASSWORD['"]\s*,\s*['"][^'"]*['"]\s*\)\s*;`)
+
+func rewriteWordPressDBConfig(sk string, maps []DBMap, dbUser, dbPass string) error {
+	p := "/home/" + sk + "/public_html/wp-config.php"
+	b, err := os.ReadFile(p)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if len(b) > 2<<20 {
+		return errors.New("wp-config.php çok büyük")
+	}
+	m := wpDBNameRE.FindSubmatch(b)
+	if len(m) != 2 {
+		return nil
+	}
+	targetDB := ""
+	for _, dm := range maps {
+		if dm.Source == string(m[1]) {
+			targetDB = dm.Target
+			break
+		}
+	}
+	if targetDB == "" {
+		return fmt.Errorf("wp-config.php veritabanı dump listesinde yok: %s", m[1])
+	}
+	escape := func(s string) string {
+		s = strings.ReplaceAll(s, `\`, `\\`)
+		return strings.ReplaceAll(s, `'`, `\'`)
+	}
+	b = wpDBNameRE.ReplaceAll(b, []byte("define('DB_NAME', '"+escape(targetDB)+"');"))
+	b = wpDBUserRE.ReplaceAll(b, []byte("define('DB_USER', '"+escape(dbUser)+"');"))
+	b = wpDBPassRE.ReplaceAll(b, []byte("define('DB_PASSWORD', '"+escape(dbPass)+"');"))
+	return os.WriteFile(p, b, 0o600)
 }
 
 func (h *Handlers) importSSL(r *http.Request, ekler arsivEkler, inv Inventory, domainID int64, targetDomain string) (bool, string, string, error) {
