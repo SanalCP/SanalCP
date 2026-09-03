@@ -1060,14 +1060,60 @@ func restoreWeb(archivePath, root, sk string) error {
 	}
 	defer f.Close()
 	member := root + "/homedir/public_html"
+	// --warning=no-timestamp: kaynak sunucuda ileri tarihli mtime taşıyan dosyalar
+	// (ör. PrestaShop var/cache) on binlerce zararsız uyarı üretip gerçek hatayı
+	// çıktının içinde boğuyordu. Uyarı zaten çıkış kodunu etkilemiyor.
 	cmd := exec.Command("runuser", "-u", sk, "--", "tar", "-xz", "-f", "-", "-C", target,
-		"--strip-components=3", member)
+		"--strip-components=3", "--warning=no-timestamp", member)
 	cmd.Stdin = f
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("tar: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("tar: %s", tarHataOzeti(out, err))
 	}
 	_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
 	return nil
+}
+
+// tarHataOzeti — tar'ın ölümcül nedeni ÇIKTININ SONUNDA olur. Çıktıyı baştan
+// kırpmak (uyarı seli + 1000 karakterlik kısaltma) tam da o satırı yok ediyordu:
+// hata mesajı binlerce "time stamp ... in the future" uyarısından ibaret kalıyor,
+// asıl neden ("Cannot write: Disk quota exceeded" gibi) hiç görünmüyordu.
+func tarHataOzeti(out []byte, err error) string {
+	tutulan := []string{}
+	for _, satir := range strings.Split(string(out), "\n") {
+		satir = strings.TrimSpace(satir)
+		if satir == "" || tarGurultusu(satir) {
+			continue
+		}
+		tutulan = append(tutulan, satir)
+	}
+	if len(tutulan) == 0 {
+		ham := strings.Join(strings.Fields(string(out)), " ")
+		if ham == "" {
+			return err.Error()
+		}
+		return sonKarakterler(ham, 400)
+	}
+	if len(tutulan) > 6 {
+		tutulan = tutulan[len(tutulan)-6:]
+	}
+	return sonKarakterler(strings.Join(tutulan, "; "), 500)
+}
+
+// tarGurultusu — çıkış kodunu etkilemeyen, teşhis değeri olmayan tar uyarıları.
+func tarGurultusu(satir string) bool {
+	for _, iz := range []string{"s in the future", "Removing leading", "socket ignored"} {
+		if strings.Contains(satir, iz) {
+			return true
+		}
+	}
+	return false
+}
+
+func sonKarakterler(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return "…" + s[len(s)-n:]
 }
 
 // restoreNativeHome, yalnız SanalCP dışa aktarıcısının web kökü dışında

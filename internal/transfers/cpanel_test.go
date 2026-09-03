@@ -175,3 +175,29 @@ func TestParseCronJobsCapsAndPreservesFiveFieldTasks(t *testing.T) {
 		t.Fatalf("unexpected cron cap: jobs=%d skipped=%d", len(got), skipped)
 	}
 }
+
+// tar'ın ölümcül nedeni çıktının SONUNDA olur; uyarı seli baştan kırpılınca
+// gerçek hata (ör. kota) mesajdan tamamen düşüyordu.
+func TestTarHataOzetiUyariSeliniAtipGercekNedeniKorur(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < 500; i++ {
+		b.WriteString("tar: var/cache/prod/x: time stamp 2027-08-31 20:31:55 is 31323162.2 s in the future\n")
+	}
+	b.WriteString("tar: public_html/img/big.bin: Cannot write: Disk quota exceeded\n")
+	b.WriteString("tar: Exiting with failure status due to previous errors\n")
+
+	got := tarHataOzeti([]byte(b.String()), errors.New("exit status 2"))
+	if !strings.Contains(got, "Disk quota exceeded") {
+		t.Fatalf("gerçek neden kayboldu: %q", got)
+	}
+	if strings.Contains(got, "in the future") {
+		t.Fatalf("uyarı seli sızdı: %q", got)
+	}
+}
+
+func TestTarHataOzetiSadeceGurultuVarsaHamCiktiyaDuser(t *testing.T) {
+	got := tarHataOzeti([]byte("tar: a: time stamp is 5 s in the future\n"), errors.New("exit status 2"))
+	if got == "" {
+		t.Fatal("boş özet")
+	}
+}
