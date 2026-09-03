@@ -13,6 +13,14 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.54** (2026-09-03)
+
+0.9.53'ün release commit'i, `package-release.sh`'nin bu sürümde yeniden derlediği
+`assets/sanalcp-seed-admin` binary'sini içermiyordu; `assets/SHA256SUMS` ise onun
+yeni özetiyle üretilmişti. Manifest ile dosya uyuşmadığı için kurulum
+(`sanalcp-install.sh`, `sha256sum -c`) o etikette durur. 0.9.54 aynı içeriği
+tutarlı asset ağacıyla yayınlar; **0.9.53 kullanılmamalıdır.**
+
 **0.9.53** (2026-09-03)
 
 `golang.org/x/crypto` v0.55.0 → v0.56.0. Bu sürüm, `x/crypto/ssh` istemcisinde
