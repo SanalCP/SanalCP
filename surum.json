@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.50",
-  "duyuru": "Aktarımda hedef sağlık ölçümü sertifikası olmayan domainlerde catch-all vhost'un HTTP 500'ünü ölçüyordu; ölçüm düzeltildi. Catch-all vhost'ları artık iç yönlendirme döngüsüne girmiyor ve hata özeti tüm ilgili günlükleri tarıyor.",
+  "son_surum": "0.9.51",
+  "duyuru": "Aktarımda tar hata mesajı, ileri tarihli dosyaların ürettiği binlerce zararsız uyarı yüzünden gerçek nedeni gizliyordu; uyarılar susturuldu ve mesaj artık hatanın kendisini gösteriyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }

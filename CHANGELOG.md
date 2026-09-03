@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.51** (2026-09-03)
+
+Web dosyaları çıkarılırken oluşan tar hataları okunabilir hâle geldi. Kaynak
+sunucuda ileri tarihli değişiklik zamanı taşıyan dosyalar (ör. PrestaShop
+`var/cache`) on binlerce zararsız "time stamp ... in the future" uyarısı
+üretiyordu; hata metni baştan kırpıldığı için tar'ın çıktının sonunda bildirdiği
+asıl neden mesajda hiç görünmüyordu. Uyarılar `--warning=no-timestamp` ile
+susturuldu (çıkış kodunu zaten etkilemiyorlardı) ve hata özeti artık gürültü
+satırlarını eleyip çıktının sonunu koruyor.
+
 **0.9.50** (2026-09-03)
 
 Canlı aktarımda hedef sitenin sağlık ölçümü yalnızca HTTPS üzerinden
