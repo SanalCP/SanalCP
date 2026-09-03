@@ -1,6 +1,6 @@
 module sanalcp
 
-go 1.25.0
+go 1.26.0
 
 // Go 1.25 dil sürümüne geçerken DAVRANIŞ değişikliklerini bilerek sabitliyoruz.
 // (go direktifini bump'lamak, GODEBUG varsayılanlarını da 1.25'e taşır.)
@@ -8,8 +8,9 @@ go 1.25.0
 // 1.25'e çıkış zorunluydu: prometheus/client_golang v1.24.1, golang.org/x/crypto
 // v0.55.0 ve golang.org/x/sys v0.47.0 `go >= 1.25.0` istiyor. 1.24 hattı ise
 // artık yama almıyor (1.27.0 çıkınca 1.24 ve 1.25 destekten düştü) — bu yüzden
-// binary go1.26 toolchain'i ile derleniyor. Dil sürümünün 1.25'te kalması
-// sorun değil: stdlib açıklarını kapatan şey, derleyen toolchain'dir.
+// binary go1.26 toolchain'i ile derleniyor. Dil sürümü 1.26.0'a çıkarıldı:
+// golang.org/x/crypto v0.56.0 (GO-2026-6354/6355 düzeltmesi) kendi go.mod'unda
+// `go 1.26.0` istiyor, daha düşük bir direktifle modül grafiği derlenmiyor.
 //
 //   multipathtcp=0 — 1.24'te dinleyiciler varsayılan olarak MPTCP soketi olur.
 //     Ölçüldü: 1.23 ile 0, 1.24 ile 3 MPTCP soketi (panel + cliSrv + mail policy).
@@ -38,6 +39,19 @@ go 1.25.0
 //     FPM unit'lerine yazılıyor (internal/kaynaklimit), panelin kendisine değil.
 //   decoratemappings=1 — anonim bellek eşlemeleri /proc/self/maps'te adlandırılır.
 //     Yalnız gözlemlenebilirlik; davranış etkisi yok.
+//
+// 1.26'da değişen üç ayar tek tek incelendi, hiçbiri pin gerektirmedi:
+//   cryptocustomrand=0 — ed25519.GenerateKey(nil) artık uygulamanın değiştirdiği
+//     crypto/rand.Reader'ı KULLANMAZ. Yalnız `random == nil` yolunu etkiler;
+//     paneldeki tek çağrı ed25519.GenerateKey(rand.Reader) (sshaccess.go) yani
+//     reader açıkça veriliyor ve rand.Reader hiçbir yerde değiştirilmiyor.
+//   tlssecpmlkem=1 — TLS'te SecP256r1MLKEM768 anahtar değişimi açılır. tlsmlkem
+//     ile aynı sınıf (o da bilerek yeni davranışta bırakılmıştı); tek Go TLS el
+//     sıkışması monitor.go'daki dış probe.
+//   urlstrictcolons=1 — http/https URL'lerinde host kısmında birden çok iki nokta
+//     artık reddedilir (eskiden sonuncusu port ayracı sayılırdı). Bu, parser
+//     karışıklığına dayanan bir sorunun düzeltmesi (go.dev/issue/75223); geçerli
+//     URL'leri etkilemez ve SSRF denetimleri açısından daha güvenli taraftır.
 godebug (
 	multipathtcp=0
 	x509rsacrt=0
@@ -51,7 +65,7 @@ require (
 	github.com/openwall/yescrypt-go v1.0.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 )
 
