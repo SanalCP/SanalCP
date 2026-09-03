@@ -78,3 +78,30 @@ func TestUzakPaketHesabiYalnizGuvenliUnixAdi(t *testing.T) {
 		}
 	}
 }
+
+// FPM'in açılış NOTICE'leri teşhis değeri taşımaz; gerçek hata satırlarını
+// gölgelememeleri gerekir (bkz. hedefHataOzeti).
+func TestHataSatirlariAcilisGurultusunuEler(t *testing.T) {
+	gurultu := "[03-Sep-2026 07:22:36] NOTICE: configuration file /etc/php-fpm-tenant/c_x/php-fpm.conf test is successful\n" +
+		"[03-Sep-2026 07:22:38] NOTICE: fpm is running, pid 178293\n" +
+		"[03-Sep-2026 07:22:38] NOTICE: ready to handle connections\n" +
+		"[03-Sep-2026 07:22:38] NOTICE: systemd monitor interval set to 10000ms\n"
+	if got := hataSatirlari(gurultu); got != "" {
+		t.Fatalf("açılış gürültüsü elenmeliydi: %q", got)
+	}
+	ile := gurultu + `[03-Sep-2026 07:22:41] NOTICE: PHP message: PHP Fatal error: Uncaught PDOException: SQLSTATE[HY000] [1045] Access denied in /home/c_x/public_html/db.php:9` + "\n"
+	got := hataSatirlari(ile)
+	if !strings.Contains(got, "PDOException") {
+		t.Fatalf("gerçek hata satırı kayboldu: %q", got)
+	}
+	if strings.Contains(got, "fpm is running") {
+		t.Fatalf("açılış satırı sızdı: %q", got)
+	}
+}
+
+func TestHataSatirlariNginxHatasiniYakalar(t *testing.T) {
+	tail := "2026/09/03 07:22:41 [error] 812#812: *3 FastCGI sent in stderr: \"PHP message: ...\" while reading response header from upstream, client: 127.0.0.1\n"
+	if got := hataSatirlari(tail); !strings.Contains(got, "[error]") {
+		t.Fatalf("nginx hata satırı yakalanamadı: %q", got)
+	}
+}

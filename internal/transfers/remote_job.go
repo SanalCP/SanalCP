@@ -196,7 +196,7 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 		h.remoteHata(id, errors.New("import sonucu okunamadı"))
 		return
 	}
-	hedefHTTP := yerelHTTPDurumu(ctx, q.Domain)
+	hedefHTTP := yerelHTTPDurumu(ctx, q.Domain, hedefSSLVar(h.DB, sonuc.DomainID))
 	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET target_domain_id=?,target_http_status=? WHERE id=?`, sonuc.DomainID, nullStatus(hedefHTTP), id)
 	if !httpSaglikli(kaynakHTTP) {
 		_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message=?,finished_at=NOW() WHERE id=?`,
@@ -226,15 +226,80 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 
 func (h *Handlers) hedefHataOzeti(domainID int64, domain string) string {
 	var sk string
-	if h.DB.QueryRow(`SELECT sistem_kullanici FROM domains WHERE id=?`, domainID).Scan(&sk) != nil || !regexp.MustCompile(`^c_[a-z0-9_]+$`).MatchString(sk) {
+	if h.DB.QueryRow(`SELECT sistem_kullanici FROM domains WHERE id=?`, domainID).Scan(&sk) != nil || !sistemKullaniciRe.MatchString(sk) {
 		return ""
 	}
-	for _, p := range []string{"/var/log/php-fpm/tenant-" + sk + ".log", "/var/log/nginx/" + domain + ".error.log", "/home/" + sk + "/.gpanel/php_debug.log"} {
-		if s := dosyaSonu(p, 600); s != "" {
-			return s
+	// TÜM kaynaklar taranır. "İlk boş olmayan dosyayı döndür" yaklaşımı yanıltıcıydı:
+	// per-tenant FPM günlüğü her açılışta NOTICE satırları yazdığı için nginx hata
+	// günlüğüne hiç sıra gelmiyordu.
+	kaynaklar := []struct{ ad, yol string }{
+		{"php-fpm", "/var/log/php-fpm/tenant-" + sk + ".log"},
+		{"nginx", "/var/log/nginx/" + domain + ".error.log"},
+		{"php-debug", "/home/" + sk + "/.gpanel/php_debug.log"},
+		// Sertifikası olmayan domainde 443 isteği eşleşmeyen-SNI güvenlik ağına
+		// düşer; hata orada, domainin kendi günlüğünde DEĞİL, kayda geçer.
+		{"nginx-default443", "/var/log/nginx/default443.error.log"},
+		{"nginx-default80", "/var/log/nginx/default80.error.log"},
+	}
+	parcalar := []string{}
+	for _, k := range kaynaklar {
+		if s := hataSatirlari(dosyaSonu(k.yol, 8000)); s != "" {
+			parcalar = append(parcalar, k.ad+": "+s)
 		}
 	}
-	return "PHP/nginx hata günlüğünde ayrıntı bulunamadı"
+	if len(parcalar) == 0 {
+		return "PHP/nginx hata günlüğünde ayrıntı bulunamadı" + govdeIpucu(domain)
+	}
+	return kisalt(strings.Join(parcalar, " | "), 1200) + govdeIpucu(domain)
+}
+
+var sistemKullaniciRe = regexp.MustCompile(`^c_[a-z0-9_]+$`)
+
+// hataIzleri — bir günlük satırının teşhis değeri taşıdığını gösteren imzalar.
+// FPM'in açılış NOTICE'leri (fpm is running / ready to handle connections /
+// configuration file ... test is successful) bilerek dışarıda bırakılır.
+var hataIzleri = []string{
+	"PHP message", "PHP Fatal", "PHP Parse", "PHP Warning", "Fatal error", "Parse error",
+	"ERROR:", "WARNING:", "[error]", "[crit]", "[alert]", "[emerg]",
+}
+
+func hataSatirlari(tail string) string {
+	secilen := []string{}
+	for _, satir := range strings.Split(tail, "\n") {
+		satir = strings.TrimSpace(satir)
+		if satir == "" {
+			continue
+		}
+		for _, iz := range hataIzleri {
+			if strings.Contains(satir, iz) {
+				secilen = append(secilen, satir)
+				break
+			}
+		}
+	}
+	if len(secilen) == 0 {
+		return ""
+	}
+	// En yeni satırlar en değerlisi; sondan en fazla 5 tanesi yeter.
+	if len(secilen) > 5 {
+		secilen = secilen[len(secilen)-5:]
+	}
+	return strings.Join(secilen, " ")
+}
+
+// govdeIpucu — 500'ü nginx'in mi yoksa uygulamanın mı ürettiğini ayırt etmek
+// günlükler sessiz kaldığında tek ipucu olabiliyor.
+func govdeIpucu(domain string) string {
+	args := []string{"-ksS", "--max-time", "8", "-H", "Host: " + domain, "http://127.0.0.1/"}
+	out, err := exec.Command("curl", args...).Output()
+	if err != nil {
+		return ""
+	}
+	govde := strings.Join(strings.Fields(string(out)), " ")
+	if govde == "" {
+		return "; hedef gövdesi boş (PHP çıktısız sonlandı)"
+	}
+	return "; hedef gövdesi: " + kisalt(govde, 200)
 }
 
 func dosyaSonu(p string, limit int64) string {
@@ -258,11 +323,7 @@ func dosyaSonu(p string, limit int64) string {
 	if _, err = f.ReadAt(buf, start); err != nil && err != io.EOF {
 		return ""
 	}
-	s := strings.Join(strings.Fields(string(buf)), " ")
-	if len(s) > 500 {
-		s = s[len(s)-500:]
-	}
-	return s
+	return string(buf)
 }
 
 func uzakPaketKomutu(q remoteStartReq) (string, error) {
@@ -291,7 +352,10 @@ func ortakPaketSonEk(q remoteStartReq) string {
 }
 
 func (h *Handlers) uzakHTTPDurumu(ctx context.Context, q remoteStartReq) int {
-	komut := fmt.Sprintf(`s=$(curl -ksS -L --max-redirs 3 --max-time 12 -o /dev/null -w '%%{http_code}' --resolve %s:443:127.0.0.1 --resolve www.%s:443:127.0.0.1 https://%s/ 2>/dev/null); test "$s" != 000 || s=$(curl -sS --max-time 8 -o /dev/null -w '%%{http_code}' -H 'Host: %s' http://127.0.0.1/ 2>/dev/null); printf '%%s' "$s"`, q.Domain, q.Domain, q.Domain, q.Domain)
+	// Hedef ölçümüyle SİMETRİK olmalı (bkz. yerelHTTPDurumu): 443 sağlıklı bir
+	// yanıt vermezse kaynak da düz HTTP üzerinden sorulur, aksi hâlde sertifikası
+	// olmayan bir kaynak sitede catch-all vhost'un durumu ölçülürdü.
+	komut := fmt.Sprintf(`s=$(curl -ksS -L --max-redirs 3 --max-time 12 -o /dev/null -w '%%{http_code}' --resolve %s:443:127.0.0.1 --resolve www.%s:443:127.0.0.1 https://%s/ 2>/dev/null); case "$s" in 2??|3??|4??) ;; *) f=$(curl -sS --max-time 8 -o /dev/null -w '%%{http_code}' -H 'Host: %s' http://127.0.0.1/ 2>/dev/null); case "$f" in 2??|3??|4??) s=$f ;; *) [ "$s" = 000 ] && s=$f ;; esac ;; esac; printf '%%s' "$s"`, q.Domain, q.Domain, q.Domain, q.Domain)
 	args := append(uzakSSHArgs(q.Port), "root@"+q.Host, komut)
 	out, err := exec.CommandContext(ctx, sshBin, args...).Output()
 	if err != nil {
@@ -301,15 +365,50 @@ func (h *Handlers) uzakHTTPDurumu(ctx context.Context, q remoteStartReq) int {
 	return v
 }
 
-func yerelHTTPDurumu(ctx context.Context, domain string) int {
-	args := []string{"-ksS", "-L", "--max-redirs", "3", "--max-time", "12", "-o", "/dev/null", "-w", "%{http_code}",
-		"--resolve", domain + ":443:127.0.0.1", "--resolve", "www." + domain + ":443:127.0.0.1", "https://" + domain + "/"}
+// yerelHTTPDurumu — hedef sitenin sağlığı. Yeni aktarılan domainde henüz
+// sertifika yoksa 443 isteği eşleşmeyen-SNI güvenlik ağına (_default443) düşer;
+// o vhost'un durumu sitenin durumu DEĞİLDİR. Bu yüzden SSL kapalıyken ölçüm düz
+// HTTP üzerinden yapılır. SSL açıkken düz HTTP'ye DÜŞÜLMEZ: port 80 vhost'u
+// https'e 301 verdiği için bozuk bir site "sağlıklı" görünürdü.
+func yerelHTTPDurumu(ctx context.Context, domain string, sslVar bool) int {
+	if !sslVar {
+		return yerelDuzHTTPDurumu(ctx, domain)
+	}
+	s := yerelHTTPSDurumu(ctx, domain)
+	if httpSaglikli(s) {
+		return s
+	}
+	if h := yerelDuzHTTPDurumu(ctx, domain); httpSaglikli(h) {
+		return h
+	}
+	return s
+}
+
+func yerelHTTPSDurumu(ctx context.Context, domain string) int {
+	return curlDurumu(ctx, "-ksS", "-L", "--max-redirs", "3", "--max-time", "12", "-o", "/dev/null", "-w", "%{http_code}",
+		"--resolve", domain+":443:127.0.0.1", "--resolve", "www."+domain+":443:127.0.0.1", "https://"+domain+"/")
+}
+
+func yerelDuzHTTPDurumu(ctx context.Context, domain string) int {
+	return curlDurumu(ctx, "-sS", "--max-time", "8", "-o", "/dev/null", "-w", "%{http_code}",
+		"-H", "Host: "+domain, "http://127.0.0.1/")
+}
+
+func curlDurumu(ctx context.Context, args ...string) int {
 	out, err := exec.CommandContext(ctx, "curl", args...).Output()
 	if err != nil {
 		return 0
 	}
 	v, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 	return v
+}
+
+func hedefSSLVar(db *sql.DB, domainID int64) bool {
+	var aktif int
+	if db.QueryRow(`SELECT ssl_aktif FROM domains WHERE id=?`, domainID).Scan(&aktif) != nil {
+		return false
+	}
+	return aktif == 1
 }
 
 func httpSaglikli(v int) bool { return v >= 200 && v < 500 }
