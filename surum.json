@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.48",
-  "duyuru": "Özel PHP uygulamalarının config.php içindeki DB_HOST, DB_NAME, DB_USER ve DB_PASS sabitleri hesap aktarımında hedef veritabanına güvenle uyarlanır; keşifte PDO/MySQL gereksinimleri denetlenir.",
+  "son_surum": "0.9.49",
+  "duyuru": "Özel PHP uygulamalarının config.php dosyasındaki DB sabitleri hesap aktarımında yeniden yazılırken satır sonundaki noktalı virgül siliniyor ve site HTTP 500 veriyordu; düzeltildi. Per-tenant PHP-FPM günlüğü artık PHP fatal ve parse hatalarını da kaydediyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }

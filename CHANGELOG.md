@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.49** (2026-09-03)
+
+Canlı hesap aktarımında özel PHP uygulamalarının `config.php` dosyasındaki
+`DB_HOST`, `DB_NAME`, `DB_USER` ve `DB_PASS` sabitleri hedefe uyarlanırken satır
+sonundaki noktalı virgül siliniyordu. Bu, dosyayı ayrıştırılamaz hâle getiriyor,
+aktarılan site HTTP 500 döndüğü için sağlık karşılaştırması başarısız oluyor ve
+hedef otomatik geri alınıyordu. Sabitler artık noktalı virgülleri bozmadan
+güncelleniyor; regresyon testiyle korunuyor.
+
+Per-tenant PHP-FPM ana süreci `notice` seviyesinde günlük tutuyor. Önceki
+`warning` seviyesi, FPM'in worker çıktısından yakaladığı `PHP message: ...`
+satırlarını da elediği için PHP fatal ve parse hataları
+`/var/log/php-fpm/tenant-<kullanıcı>.log` dosyasına hiç yazılmıyordu; aktarım
+hataları artık gerçek PHP hata metniyle raporlanabiliyor.
+
 **0.9.48** (2026-09-03)
 
 Özel PHP uygulamalarının kök `config.php` dosyasında kullandığı `DB_HOST`,
