@@ -45,8 +45,9 @@ export default function DomainDatabaseYonetPage() {
     }
   }
 
-  // phpMyAdmin erişimi: liste sayfasından kaldırıldı, spec gereği burada duruyor
-  // (tablo seviyesi yönetim panelde YOK — pma bunun karşılığı). Uç herhangi bir
+  // phpMyAdmin erişimi: liste sayfasından kaldırıldı, spec gereği bu sayfada
+  // duruyor (tablo seviyesi yönetim panelde YOK — pma bunun karşılığı). Buton
+  // Bakım kartında, diğer bakım eylemlerinin yanında yer alır. Uç herhangi bir
   // db_accounts.id kabul eder; bu DB'nin ilk kullanıcısı yeterli.
   async function pmaAc() {
     if (!detay || detay.kullanicilar.length === 0) return
@@ -84,15 +85,6 @@ export default function DomainDatabaseYonetPage() {
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 font-mono">{dbAdi}</h1>
         <div className="flex items-center gap-3">
-          {detay && detay.kullanicilar.length > 0 && (
-            <button
-              onClick={pmaAc}
-              title={t('DomainDatabaseYonetPage:pma_open_title')}
-              className="text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1 rounded"
-            >
-              {t('DomainDatabaseYonetPage:pma_button')}
-            </button>
-          )}
           <Link
             to={`/abonelikler/${id}/veritabanlari`}
             className="text-sm text-slate-500 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -140,7 +132,12 @@ export default function DomainDatabaseYonetPage() {
             </div>
           </div>
 
-          <BakimKarti domainId={id!} dbAdi={dbAdi!} t={t} />
+          <BakimKarti
+            domainId={id!}
+            dbAdi={dbAdi!}
+            t={t}
+            onPma={detay.kullanicilar.length > 0 ? pmaAc : undefined}
+          />
         </div>
       ) : null}
 
@@ -360,7 +357,11 @@ function KullaniciEkleModal({ domainId, dbAdi, onKapat, onTamam }: {
   )
 }
 
-function BakimKarti({ domainId, dbAdi, t }: { domainId: string; dbAdi: string; t: (k: string, opts?: Record<string, unknown>) => string }) {
+function BakimKarti({ domainId, dbAdi, t, onPma }: {
+  domainId: string; dbAdi: string
+  t: (k: string, opts?: Record<string, unknown>) => string
+  onPma?: () => void
+}) {
   const [isleniyor, setIsleniyor] = useState<string | null>(null)
   const [sonucMetni, setSonucMetni] = useState<string | null>(null)
   const [hata, setHata] = useState<string | null>(null)
@@ -413,6 +414,16 @@ function BakimKarti({ domainId, dbAdi, t }: { domainId: string; dbAdi: string; t
         <button onClick={() => mysqlcheckCalistir('onar')} disabled={!!isleniyor} className="ta-secondary-button">
           {isleniyor === 'onar' ? t('DomainDatabaseYonetPage:repairing') : t('DomainDatabaseYonetPage:repair_button')}
         </button>
+        {onPma && (
+          <button
+            onClick={onPma}
+            disabled={!!isleniyor}
+            title={t('DomainDatabaseYonetPage:pma_open_title')}
+            className="ta-success-button"
+          >
+            {t('DomainDatabaseYonetPage:pma_button')}
+          </button>
+        )}
       </div>
 
       {hata && <div className="mt-3 ta-form-error">{hata}</div>}
