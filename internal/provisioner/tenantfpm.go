@@ -372,7 +372,10 @@ func renderTenantGlobalCfg(sk string) string {
 	return fmt.Sprintf(`[global]
 pid = %s/php-fpm.pid
 error_log = %s/tenant-%s.log
-log_level = warning
+; log_level=warning PHP'nin kendi hata mesajlarini da yutar: FPM, worker
+; stderr'inden yakaladigi "PHP message: ..." satirlarini NOTICE seviyesinde
+; yazar. Fatal/parse hatalarinin per-tenant logda gorunmesi icin notice sart.
+log_level = notice
 daemonize = no
 include=%s/pool.conf
 `, tenantRunDir(sk), tenantLogDir, sk, tenantCfgDir(sk))
