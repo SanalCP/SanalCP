@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.47",
-  "duyuru": "Canlı hesap aktarımına PHP sürümü, uygulama ve modül uyumluluk ön kontrolü eklendi. Laravel, Symfony ve PrestaShop veritabanı ayarları hedefe uyarlanır; başarısız sağlık kontrolünde gerçek PHP/nginx hata özeti gösterilir.",
+  "son_surum": "0.9.48",
+  "duyuru": "Özel PHP uygulamalarının config.php içindeki DB_HOST, DB_NAME, DB_USER ve DB_PASS sabitleri hesap aktarımında hedef veritabanına güvenle uyarlanır; keşifte PDO/MySQL gereksinimleri denetlenir.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }

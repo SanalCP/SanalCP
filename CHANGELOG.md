@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.48** (2026-09-03)
+
+Özel PHP uygulamalarının kök `config.php` dosyasında kullandığı `DB_HOST`,
+`DB_NAME`, `DB_USER` ve `DB_PASS` sabitleri canlı hesap aktarımı sırasında
+hedefte oluşturulan veritabanı kimliklerine göre güncellenir. Keşif bu uygulama
+biçimini tanır ve PDO/MySQL modülü gereksinimlerini hedefle karşılaştırır.
+
 **0.9.47** (2026-09-03)
 
 Canlı hesap aktarımında domain keşfi artık kaynak PHP sürümünü, uygulama türünü
