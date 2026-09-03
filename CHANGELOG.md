@@ -13,6 +13,30 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.50** (2026-09-03)
+
+Canlı aktarımda hedef sitenin sağlık ölçümü yalnızca HTTPS üzerinden
+yapılıyordu. Yeni aktarılan domainde henüz sertifika yoksa 443 isteği
+eşleşmeyen-SNI güvenlik ağına (`_default443`) düşüyor; ölçülen şey sitenin
+değil o catch-all vhost'un durumu oluyordu. SSL kapalıyken ölçüm artık düz HTTP
+üzerinden gerçek vhost'a yapılıyor; kaynak tarafındaki ölçüm de aynı kurala
+göre simetrik hâle getirildi (SSL açıkken düz HTTP'ye düşülmez, aksi hâlde 80
+portunun 301'i bozuk bir siteyi sağlıklı gösterirdi).
+
+Catch-all vhost'ları `try_files $uri /index.html;` kullanıyordu ve kurulum
+`/var/www/_default80/index.html` dosyasını hiç oluşturmuyordu. Son parametre bir
+URI olduğu için nginx sonsuz iç yönlendirmeye girip **her bilinmeyen host'a HTTP
+500** döndürüyordu. `try_files` artık `=404` ile bitiyor ve kurulum ile
+`sanalcp-update` belge kökünü bir bilgilendirme sayfasıyla birlikte oluşturuyor.
+
+Aktarım hata özeti yeniden yazıldı. Önceki sürüm ilk boş olmayan günlük
+dosyasını döndürüyordu; per-tenant PHP-FPM günlüğü her açılışta NOTICE satırı
+yazdığı için nginx hata günlüğüne hiç sıra gelmiyordu. Özet artık PHP-FPM,
+nginx, PHP debug ve catch-all vhost günlüklerinin tamamını tarıyor, FPM açılış
+satırlarını eliyor, yalnız gerçek hata satırlarını topluyor ve 500'ü nginx'in mi
+uygulamanın mı ürettiğini ayırt etmek için hedefin HTTP gövdesinden kısa bir
+ipucu ekliyor.
+
 **0.9.49** (2026-09-03)
 
 Canlı hesap aktarımında özel PHP uygulamalarının `config.php` dosyasındaki

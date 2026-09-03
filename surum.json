@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.49",
-  "duyuru": "Özel PHP uygulamalarının config.php dosyasındaki DB sabitleri hesap aktarımında yeniden yazılırken satır sonundaki noktalı virgül siliniyor ve site HTTP 500 veriyordu; düzeltildi. Per-tenant PHP-FPM günlüğü artık PHP fatal ve parse hatalarını da kaydediyor.",
+  "son_surum": "0.9.50",
+  "duyuru": "Aktarımda hedef sağlık ölçümü sertifikası olmayan domainlerde catch-all vhost'un HTTP 500'ünü ölçüyordu; ölçüm düzeltildi. Catch-all vhost'ları artık iç yönlendirme döngüsüne girmiyor ve hata özeti tüm ilgili günlükleri tarıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }
