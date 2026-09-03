@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.46",
-  "duyuru": "İşlemler ve Bildirimler menüsüne tamamlanan kayıtları temizleme özelliği eklendi. İşlem geçmişi silinmeden temizlenen kayıtlar ve bunlara ait hata rozeti gizlenir; aktif işlemler korunur.",
+  "son_surum": "0.9.47",
+  "duyuru": "Canlı hesap aktarımına PHP sürümü, uygulama ve modül uyumluluk ön kontrolü eklendi. Laravel, Symfony ve PrestaShop veritabanı ayarları hedefe uyarlanır; başarısız sağlık kontrolünde gerçek PHP/nginx hata özeti gösterilir.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-02"
+  "yayin_tarihi": "2026-09-03"
 }

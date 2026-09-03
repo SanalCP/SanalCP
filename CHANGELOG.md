@@ -13,6 +13,19 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.47** (2026-09-03)
+
+Canlı hesap aktarımında domain keşfi artık kaynak PHP sürümünü, uygulama türünü
+ve uygulamanın kullandığı PHP modüllerini hedef sunucuyla karşılaştırır. Eksik
+PHP sürümü veya modülü bulunan hesaplar nedenleriyle birlikte uyumsuz gösterilir
+ve toplu seçime dahil edilmez.
+
+WordPress'e ek olarak Laravel, Symfony ve PrestaShop veritabanı yapılandırmaları
+hedefte oluşturulan yeni veritabanı adı ve kimlik bilgilerine göre güncellenir.
+Taşınmış framework cache'leri güvenle temizlenir. Sağlık kontrolü HTTP 500 ile
+sonuçlanırsa rollback öncesindeki güncel PHP-FPM/nginx hata özeti aktarım işine
+kaydedilir.
+
 **0.9.46** (2026-09-02)
 
 Üst çubuktaki İşlemler ve Bildirimler menüsüne `Temizle` işlemi eklendi.
