@@ -105,3 +105,18 @@ func TestHataSatirlariNginxHatasiniYakalar(t *testing.T) {
 		t.Fatalf("nginx hata satırı yakalanamadı: %q", got)
 	}
 }
+
+// Aktarım başarılı olsa bile eksik kalanlar yöneticiye görünmeli; bu site
+// sessizce kırık kalmasının tek sebebiydi.
+func TestBasariMesajiAtlananlariEkler(t *testing.T) {
+	got := basariMesaji("Aktarım tamamlandı", []string{"", "  ", "src/, vendor/ aktarılmadı"})
+	if !strings.Contains(got, "DİKKAT") || !strings.Contains(got, "vendor/") {
+		t.Fatalf("atlananlar mesaja girmedi: %q", got)
+	}
+	if bos := basariMesaji("Aktarım tamamlandı", []string{" ", ""}); bos != "Aktarım tamamlandı" {
+		t.Fatalf("boş uyarı listesi mesajı bozdu: %q", bos)
+	}
+	if bos := basariMesaji("Aktarım tamamlandı", nil); bos != "Aktarım tamamlandı" {
+		t.Fatalf("nil uyarı listesi mesajı bozdu: %q", bos)
+	}
+}

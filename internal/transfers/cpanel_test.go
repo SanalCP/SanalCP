@@ -201,3 +201,23 @@ func TestTarHataOzetiSadeceGurultuVarsaHamCiktiyaDuser(t *testing.T) {
 		t.Fatal("boş özet")
 	}
 }
+
+func TestHomeAtlananlarOzetiGuvensizAdlariEler(t *testing.T) {
+	ekler := arsivEkler{nativeHomeAtla: "m", uyeler: map[string][]byte{
+		"m": []byte("src\nvendor\n\n../etc\nkotu; rm -rf /\nsql\n"),
+	}}
+	got := homeAtlananlarOzeti(ekler)
+	for _, want := range []string{"src/", "vendor/", "sql/"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q yok: %s", want, got)
+		}
+	}
+	for _, kotu := range []string{"..", "rm -rf"} {
+		if strings.Contains(got, kotu) {
+			t.Errorf("güvensiz ad sızdı (%s): %s", kotu, got)
+		}
+	}
+	if bos := homeAtlananlarOzeti(arsivEkler{uyeler: map[string][]byte{}}); bos != "" {
+		t.Fatalf("üye yokken özet üretildi: %q", bos)
+	}
+}

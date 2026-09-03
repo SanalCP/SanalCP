@@ -322,6 +322,9 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 	if sslWarning != "" {
 		skipped = append(skipped, sslWarning)
 	}
+	if not := homeAtlananlarOzeti(ekler); not != "" {
+		skipped = append(skipped, not)
+	}
 	committed = true
 	httpx.WriteJSON(w, http.StatusCreated, importResponse{
 		OK: true, DomainID: created.ID, Domain: created.AlanAdi,
@@ -373,6 +376,37 @@ func rewriteWordPressDBConfig(sk string, maps []DBMap, dbUser, dbPass string) er
 	return os.WriteFile(p, b, 0o600)
 }
 
+// homeAtlananlarOzeti — kaynak ana dizininde AKTARILMAYAN dizinlerin listesi.
+// Panel modeli uygulamanın public_html içinde durmasını varsayar; web kökünün
+// üstünde kod tutan siteler (ör. src/ + vendor/ + bootstrap.php) hedefte
+// sessizce kırılıyordu: aktarım "başarılı" görünüyor, site fatal veriyordu.
+// Kapsamı büyütmek yerine ne bırakıldığını AÇIKÇA bildiriyoruz.
+func homeAtlananlarOzeti(ekler arsivEkler) string {
+	raw, ok := ekler.uyeler[ekler.nativeHomeAtla]
+	if !ok {
+		return ""
+	}
+	adlar := []string{}
+	for _, satir := range strings.Split(string(raw), "\n") {
+		satir = strings.TrimSpace(satir)
+		// İçerik KAYNAK sunucudan gelir; mesaja yalnız güvenli adlar girsin.
+		if !homeDizinAdiRE.MatchString(satir) {
+			continue
+		}
+		adlar = append(adlar, satir+"/")
+		if len(adlar) == 12 {
+			adlar = append(adlar, "…")
+			break
+		}
+	}
+	if len(adlar) == 0 {
+		return ""
+	}
+	return "kaynak ana dizinindeki şu dizinler aktarılmadı (yalnız public_html taşınır; gerekiyorsa elle kopyalayın): " + strings.Join(adlar, ", ")
+}
+
+var homeDizinAdiRE = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
 func rewriteApplicationDBConfigs(sk string, maps []DBMap, dbUser, dbPass string) error {
 	if err := rewriteWordPressDBConfig(sk, maps, dbUser, dbPass); err != nil {
 		return err
@@ -390,6 +424,12 @@ func rewriteApplicationDBConfigs(sk string, maps []DBMap, dbUser, dbPass string)
 		if err := rewriteDBConfigFile(root+c.name, maps, dbUser, dbPass, c.fn); err != nil {
 			return fmt.Errorf("%s: %w", c.name, err)
 		}
+	}
+	// Bazı uygulamalar .env'i web kökünün ÜSTÜNDE tutar; exporter bu dosyayı
+	// native_home ile taşıyor. Taşıdığımız hâlde DB bilgilerini uyarlamazsak
+	// dosya hedefe KAYNAK sunucunun parolasıyla gider ve uygulama bağlanamaz.
+	if err := rewriteDBConfigFile("/home/"+sk+"/.env", maps, dbUser, dbPass, rewriteDotEnvDB); err != nil {
+		return fmt.Errorf("ana dizin .env: %w", err)
 	}
 	// Eski framework cache'leri mutlak yol, eski DB bilgisi ve eski sunucunun
 	// zaman damgalarını taşır. Uygulama ilk istekte kendi kullanıcısıyla yeniden üretir.
@@ -604,6 +644,7 @@ type arsivEkler struct {
 	nativeSubs     string
 	nativeAddons   string
 	nativeAddonDNS string
+	nativeHomeAtla string
 	uyeler         map[string][]byte
 }
 
@@ -643,6 +684,7 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	e.nativeSubs = root + "/sanalcp/subdomains.jsonl"
 	e.nativeAddons = root + "/sanalcp/addon_domains.jsonl"
 	e.nativeAddonDNS = root + "/sanalcp/addon_dns.jsonl"
+	e.nativeHomeAtla = root + "/sanalcp/home_skipped.txt"
 
 	istekler := append([]string{}, e.certAdaylari...)
 	istekler = append(istekler, e.keyAdaylari...)
@@ -651,7 +693,7 @@ func okuArsivEkleri(archivePath string, inv Inventory) (arsivEkler, error) {
 	istekler = append(istekler, e.nativeDomain, e.nativeDNS, e.nativeMailbox)
 	istekler = append(istekler, e.nativeSecurity, e.nativeRedirect, e.nativeIPRules,
 		e.nativeNginx, e.nativeRate, e.nativeSpam, e.nativeAuto, e.nativeFilters)
-	istekler = append(istekler, e.nativeSubs, e.nativeAddons, e.nativeAddonDNS)
+	istekler = append(istekler, e.nativeSubs, e.nativeAddons, e.nativeAddonDNS, e.nativeHomeAtla)
 	uyeler, err := readSmallTarMembersMatching(archivePath, istekler, []string{root + "/sanalcp/addons/"})
 	if err != nil {
 		return e, err

@@ -190,7 +190,8 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 		return
 	}
 	var sonuc struct {
-		DomainID int64 `json:"domain_id"`
+		DomainID int64    `json:"domain_id"`
+		Skipped  []string `json:"skipped"`
 	}
 	if json.Unmarshal(rr.Body.Bytes(), &sonuc) != nil || sonuc.DomainID < 1 {
 		h.remoteHata(id, errors.New("import sonucu okunamadı"))
@@ -200,7 +201,7 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET target_domain_id=?,target_http_status=? WHERE id=?`, sonuc.DomainID, nullStatus(hedefHTTP), id)
 	if !httpSaglikli(kaynakHTTP) {
 		_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message=?,finished_at=NOW() WHERE id=?`,
-			fmt.Sprintf("Aktarım tamamlandı; kaynak site HTTP %d verdiği için web sağlığı doğrulanamadı", kaynakHTTP), id)
+			basariMesaji(fmt.Sprintf("Aktarım tamamlandı; kaynak site HTTP %d verdiği için web sağlığı doğrulanamadı", kaynakHTTP), sonuc.Skipped), id)
 		return
 	}
 	if httpSaglikli(kaynakHTTP) && !httpSaglikli(hedefHTTP) {
@@ -221,7 +222,24 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 		h.remoteHata(id, errors.New(mesaj))
 		return
 	}
-	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message='Aktarım ve sağlık kontrolü tamamlandı',finished_at=NOW() WHERE id=?`, id)
+	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message=?,finished_at=NOW() WHERE id=?`,
+		basariMesaji("Aktarım ve sağlık kontrolü tamamlandı", sonuc.Skipped), id)
+}
+
+// basariMesaji — import'un "atlandı" uyarılarını başarı mesajına ekler. Aktarım
+// başarılı olsa da eksik kalan şeyler (aktarılmayan ana dizin dizinleri, SSL)
+// yöneticiye GÖRÜNMELİ; aksi hâlde site sessizce kırık kalıyor.
+func basariMesaji(taban string, atlananlar []string) string {
+	temiz := []string{}
+	for _, a := range atlananlar {
+		if a = strings.TrimSpace(a); a != "" {
+			temiz = append(temiz, a)
+		}
+	}
+	if len(temiz) == 0 {
+		return taban
+	}
+	return kisalt(taban+" — DİKKAT: "+strings.Join(temiz, "; "), 1500)
 }
 
 func (h *Handlers) hedefHataOzeti(domainID int64, domain string) string {
