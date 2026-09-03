@@ -140,6 +140,31 @@ func TestRewriteApplicationDatabaseConfigs(t *testing.T) {
 	}
 }
 
+// Regresyon: replacePHPValue eşleşmenin tamamını değiştirdiği için desenler
+// sonlandırıcı ';' kapsarsa noktalı virgüller silinir; config.php parse error
+// verir ve aktarılan site HTTP 500'e düşer.
+func TestRewritePHPConstDBNoktaliVirgulleriKorur(t *testing.T) {
+	in := "<?php\nconst DB_HOST = 'localhost';\nconst DB_NAME = 'old_db';\nconst DB_USER = 'old';\nconst DB_PASS = 'pass';\nconst DB_CHARSET = 'utf8mb4';\n"
+	got, changed, err := rewritePHPConstDB([]byte(in), []DBMap{{Source: "old_db", Target: "c_site_main"}}, "c_site_db", "gizli")
+	if err != nil || !changed {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	for _, want := range []string{
+		"const DB_HOST = '127.0.0.1';",
+		"const DB_NAME = 'c_site_main';",
+		"const DB_USER = 'c_site_db';",
+		"const DB_PASS = 'gizli';",
+		"const DB_CHARSET = 'utf8mb4';",
+	} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("%q yok; çıktı:\n%s", want, got)
+		}
+	}
+	if a, b := strings.Count(in, ";"), strings.Count(string(got), ";"); a != b {
+		t.Errorf("noktalı virgül sayısı değişti: %d -> %d; çıktı:\n%s", a, b, got)
+	}
+}
+
 func TestParseCronJobsCapsAndPreservesFiveFieldTasks(t *testing.T) {
 	var body strings.Builder
 	for i := 0; i < 101; i++ {

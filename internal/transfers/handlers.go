@@ -434,10 +434,14 @@ var envDBUserRE = regexp.MustCompile(`(?m)^DB_USERNAME\s*=.*$`)
 var envDBPassRE = regexp.MustCompile(`(?m)^DB_PASSWORD\s*=.*$`)
 var envDBHostRE = regexp.MustCompile(`(?m)^DB_HOST\s*=.*$`)
 var symfonyDBURLRE = regexp.MustCompile(`(?m)^DATABASE_URL\s*=\s*["']?[^\s"']+/([^?\s"']+)(\?[^\s"']*)?["']?\s*$`)
-var phpConstDBNameRE = regexp.MustCompile(`(?m)(\bconst\s+DB_NAME\s*=\s*)['"]([^'"]+)['"]\s*;`)
-var phpConstDBUserRE = regexp.MustCompile(`(?m)(\bconst\s+DB_USER\s*=\s*)['"][^'"]*['"]\s*;`)
-var phpConstDBPassRE = regexp.MustCompile(`(?m)(\bconst\s+DB_PASS(?:WORD)?\s*=\s*)['"][^'"]*['"]\s*;`)
-var phpConstDBHostRE = regexp.MustCompile(`(?m)(\bconst\s+DB_HOST\s*=\s*)['"][^'"]*['"]\s*;`)
+
+// DİKKAT: replacePHPValue eşleşmenin TAMAMINI grup 1 + yeni değerle değiştirir.
+// Bu yüzden desenler sonlandırıcı ';' KAPSAMAMALIDIR; kapsarsa noktalı virgül
+// silinir ve config.php parse error verip site HTTP 500'e düşer.
+var phpConstDBNameRE = regexp.MustCompile(`(?m)(\bconst\s+DB_NAME\s*=\s*)['"]([^'"]+)['"]`)
+var phpConstDBUserRE = regexp.MustCompile(`(?m)(\bconst\s+DB_USER\s*=\s*)['"][^'"]*['"]`)
+var phpConstDBPassRE = regexp.MustCompile(`(?m)(\bconst\s+DB_PASS(?:WORD)?\s*=\s*)['"][^'"]*['"]`)
+var phpConstDBHostRE = regexp.MustCompile(`(?m)(\bconst\s+DB_HOST\s*=\s*)['"][^'"]*['"]`)
 
 func rewriteDotEnvDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
 	m := envDBNameRE.FindSubmatch(b)
