@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.51",
-  "duyuru": "Aktarımda tar hata mesajı, ileri tarihli dosyaların ürettiği binlerce zararsız uyarı yüzünden gerçek nedeni gizliyordu; uyarılar susturuldu ve mesaj artık hatanın kendisini gösteriyor.",
+  "son_surum": "0.9.52",
+  "duyuru": "Veritabanı detayında phpMyAdmin bağlantısı, sayfa başlığındaki ince bağlantı yerine Bakım kartındaki diğer eylemlerin yanında yeşil bir buton olarak yer alıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }

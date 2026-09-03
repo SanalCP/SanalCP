@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.52** (2026-09-03)
+
+Veritabanı detay sayfasındaki phpMyAdmin bağlantısı, sayfa başlığının sağındaki
+ince bağlantı olmaktan çıkıp **Bakım** kartına taşındı; Yedekle, Geri Yükle,
+Optimize Et ve Onar butonlarının yanında yeşil zeminli bir buton olarak duruyor.
+Tasarım sistemine bu buton için `ta-success-button` sınıfı eklendi.
+
 **0.9.51** (2026-09-03)
 
 Web dosyaları çıkarılırken oluşan tar hataları okunabilir hâle geldi. Kaynak
