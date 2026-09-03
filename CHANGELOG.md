@@ -13,6 +13,19 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.53** (2026-09-03)
+
+`golang.org/x/crypto` v0.55.0 → v0.56.0. Bu sürüm, `x/crypto/ssh` istemcisinde
+hizmet reddine yol açabilen iki açığı kapatıyor (GO-2026-6354, GO-2026-6355);
+açık semboller (`ssh.Dial`, `ssh.NewClientConn`) panelde gerçekten çağrılıyor —
+uzak sunucu erişimi ve hesap aktarımı bu yolu kullanıyor.
+
+Bağımlılık kendi `go.mod`'unda `go 1.26.0` istediği için modülün dil sürümü
+1.25.0'dan 1.26.0'a çıkarıldı. Go 1.26 ile varsayılanı değişen üç GODEBUG ayarı
+(`cryptocustomrand`, `tlssecpmlkem`, `urlstrictcolons`) tek tek incelendi;
+hiçbiri bu kod tabanında davranış değişikliği doğurmadığı için pin gerekmedi —
+gerekçeler `go.mod` içinde belgelendi.
+
 **0.9.52** (2026-09-03)
 
 Veritabanı detay sayfasındaki phpMyAdmin bağlantısı, sayfa başlığının sağındaki
