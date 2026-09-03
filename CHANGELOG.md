@@ -13,6 +13,22 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.55** (2026-09-03)
+
+Canlı aktarımda web kökünün **üstünde** duran `.env` dosyasının veritabanı
+bilgileri de hedefe uyarlanıyor. Dosya zaten taşınıyordu, ancak yeniden yazma
+yalnız `public_html/.env` yolunu tarıyordu; bu yüzden `/home/<kullanıcı>/.env`
+hedefe kaynak sunucunun veritabanı parolasıyla gidiyor ve uygulama bağlanamıyordu.
+
+Ana dizindeki **dizinler** aktarılmaya devam etmiyor — panel modeli uygulamanın
+`public_html` içinde durmasını varsayar ve ana dizini serbestçe kopyalamak
+panel-yönetimli içeriği (`logs/`, `tmp/`, `ssl/`, `.ssh/`) de taşırdı. Fakat
+artık **sessiz değil**: dışa aktarıcı geride kalan dizinleri listeliyor, içe
+aktarma bunu sonuç ekranında uyarı olarak, canlı aktarım ise iş mesajında
+"DİKKAT" satırı olarak gösteriyor. Web kökünün üstünde kod tutan siteler
+(ör. `src/` + `vendor/` + `bootstrap.php`) daha önce hedefte fatal verdiği hâlde
+aktarım "başarılı" görünüyordu.
+
 **0.9.54** (2026-09-03)
 
 0.9.53'ün release commit'i, `package-release.sh`'nin bu sürümde yeniden derlediği

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.54",
-  "duyuru": "golang.org/x/crypto v0.56.0'a yükseltildi: SSH istemcisinde hizmet reddine yol açabilen GO-2026-6354 ve GO-2026-6355 açıkları kapatıldı. v0.9.53 etiketi eksik bir asset ile çıktığı için bu sürümle değiştirildi.",
+  "son_surum": "0.9.55",
+  "duyuru": "Aktarımda web kökünün üstündeki .env dosyasının veritabanı bilgileri de hedefe uyarlanıyor; ana dizinde aktarılmayan dizinler artık aktarım sonucunda açıkça bildiriliyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }
