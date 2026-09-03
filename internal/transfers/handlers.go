@@ -14,6 +14,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -280,8 +281,8 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
 		return
 	}
-	if err := rewriteWordPressDBConfig(created.SistemKullanici, dbMaps, created.DBUser, created.Parolalar.DB); err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "WordPress veritabanı ayarı güncellenemedi: "+err.Error())
+	if err := rewriteApplicationDBConfigs(created.SistemKullanici, dbMaps, created.DBUser, created.Parolalar.DB); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "uygulama veritabanı ayarı güncellenemedi: "+err.Error())
 		return
 	}
 	mailCreds, aliasCount, err := h.importMail(r, tmpPath, ekler, inv, created.ID, created.AlanAdi, created.SistemKullanici)
@@ -370,6 +371,162 @@ func rewriteWordPressDBConfig(sk string, maps []DBMap, dbUser, dbPass string) er
 	b = wpDBUserRE.ReplaceAll(b, []byte("define('DB_USER', '"+escape(dbUser)+"');"))
 	b = wpDBPassRE.ReplaceAll(b, []byte("define('DB_PASSWORD', '"+escape(dbPass)+"');"))
 	return os.WriteFile(p, b, 0o600)
+}
+
+func rewriteApplicationDBConfigs(sk string, maps []DBMap, dbUser, dbPass string) error {
+	if err := rewriteWordPressDBConfig(sk, maps, dbUser, dbPass); err != nil {
+		return err
+	}
+	root := "/home/" + sk + "/public_html/"
+	for _, c := range []struct {
+		name string
+		fn   func([]byte, []DBMap, string, string) ([]byte, bool, error)
+	}{
+		{".env", rewriteDotEnvDB},
+		{"app/config/parameters.php", rewritePrestaParametersDB},
+		{"config/settings.inc.php", rewritePrestaLegacyDB},
+	} {
+		if err := rewriteDBConfigFile(root+c.name, maps, dbUser, dbPass, c.fn); err != nil {
+			return fmt.Errorf("%s: %w", c.name, err)
+		}
+	}
+	// Eski framework cache'leri mutlak yol, eski DB bilgisi ve eski sunucunun
+	// zaman damgalarını taşır. Uygulama ilk istekte kendi kullanıcısıyla yeniden üretir.
+	_ = os.RemoveAll(root + "var/cache")
+	for _, p := range []string{"bootstrap/cache/config.php", "bootstrap/cache/packages.php", "bootstrap/cache/services.php"} {
+		_ = os.Remove(root + p)
+	}
+	return nil
+}
+
+type dbConfigRewriter func([]byte, []DBMap, string, string) ([]byte, bool, error)
+
+func rewriteDBConfigFile(p string, maps []DBMap, user, pass string, fn dbConfigRewriter) error {
+	b, err := os.ReadFile(p)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if len(b) > 2<<20 {
+		return errors.New("yapılandırma dosyası çok büyük")
+	}
+	out, changed, err := fn(b, maps, user, pass)
+	if err != nil || !changed {
+		return err
+	}
+	return os.WriteFile(p, out, 0o600)
+}
+
+func mappedDB(source string, maps []DBMap) (string, error) {
+	for _, m := range maps {
+		if m.Source == source {
+			return m.Target, nil
+		}
+	}
+	return "", fmt.Errorf("veritabanı dump listesinde yok: %s", source)
+}
+
+var envDBNameRE = regexp.MustCompile(`(?m)^DB_DATABASE\s*=\s*["']?([^\s"']+)["']?\s*$`)
+var envDBUserRE = regexp.MustCompile(`(?m)^DB_USERNAME\s*=.*$`)
+var envDBPassRE = regexp.MustCompile(`(?m)^DB_PASSWORD\s*=.*$`)
+var envDBHostRE = regexp.MustCompile(`(?m)^DB_HOST\s*=.*$`)
+var symfonyDBURLRE = regexp.MustCompile(`(?m)^DATABASE_URL\s*=\s*["']?[^\s"']+/([^?\s"']+)(\?[^\s"']*)?["']?\s*$`)
+
+func rewriteDotEnvDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	m := envDBNameRE.FindSubmatch(b)
+	if len(m) != 2 {
+		sm := symfonyDBURLRE.FindSubmatch(b)
+		if len(sm) != 3 {
+			return b, false, nil
+		}
+		target, err := mappedDB(string(sm[1]), maps)
+		if err != nil {
+			return nil, false, err
+		}
+		u := &url.URL{Scheme: "mysql", User: url.UserPassword(user, pass), Host: "127.0.0.1:3306", Path: "/" + target, RawQuery: strings.TrimPrefix(string(sm[2]), "?")}
+		return replaceWholeMatch(b, symfonyDBURLRE, "DATABASE_URL="+u.String()), true, nil
+	}
+	target, err := mappedDB(string(m[1]), maps)
+	if err != nil {
+		return nil, false, err
+	}
+	quote := func(s string) string {
+		return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`, "\n", `\n`).Replace(s) + `"`
+	}
+	b = replaceWholeMatch(b, envDBNameRE, "DB_DATABASE="+quote(target))
+	b = replaceWholeMatch(b, envDBUserRE, "DB_USERNAME="+quote(user))
+	b = replaceWholeMatch(b, envDBPassRE, "DB_PASSWORD="+quote(pass))
+	b = replaceWholeMatch(b, envDBHostRE, "DB_HOST=127.0.0.1")
+	return b, true, nil
+}
+
+func replaceWholeMatch(b []byte, re *regexp.Regexp, value string) []byte {
+	return re.ReplaceAllFunc(b, func([]byte) []byte { return []byte(value) })
+}
+
+func phpArrayValueRE(key string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)(['"]` + key + `['"]\s*=>\s*)['"][^'"]*['"]`)
+}
+func phpDefineValueRE(key string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)(define\s*\(\s*['"]` + key + `['"]\s*,\s*)['"][^'"]*['"]`)
+}
+func phpQuoted(s string) string {
+	return `'` + strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), `'`, `\'`) + `'`
+}
+func replacePHPValue(b []byte, re *regexp.Regexp, value string) []byte {
+	return re.ReplaceAllFunc(b, func(match []byte) []byte {
+		parts := re.FindSubmatch(match)
+		if len(parts) != 2 {
+			return match
+		}
+		return append(append([]byte{}, parts[1]...), []byte(phpQuoted(value))...)
+	})
+}
+
+func rewritePrestaParametersDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	re := phpArrayValueRE("database_name")
+	m := re.FindSubmatch(b)
+	if len(m) == 0 {
+		return b, false, nil
+	}
+	valueRE := regexp.MustCompile(`['"]([^'"]*)['"]\s*$`)
+	vm := valueRE.FindSubmatch(m[0])
+	if len(vm) != 2 {
+		return b, false, nil
+	}
+	target, err := mappedDB(string(vm[1]), maps)
+	if err != nil {
+		return nil, false, err
+	}
+	b = replacePHPValue(b, re, target)
+	b = replacePHPValue(b, phpArrayValueRE("database_user"), user)
+	b = replacePHPValue(b, phpArrayValueRE("database_password"), pass)
+	b = replacePHPValue(b, phpArrayValueRE("database_host"), "127.0.0.1")
+	return b, true, nil
+}
+
+func rewritePrestaLegacyDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	re := phpDefineValueRE("_DB_NAME_")
+	m := re.FindSubmatch(b)
+	if len(m) == 0 {
+		return b, false, nil
+	}
+	valueRE := regexp.MustCompile(`['"]([^'"]*)['"]\s*$`)
+	vm := valueRE.FindSubmatch(m[0])
+	if len(vm) != 2 {
+		return b, false, nil
+	}
+	target, err := mappedDB(string(vm[1]), maps)
+	if err != nil {
+		return nil, false, err
+	}
+	b = replacePHPValue(b, re, target)
+	b = replacePHPValue(b, phpDefineValueRE("_DB_USER_"), user)
+	b = replacePHPValue(b, phpDefineValueRE("_DB_PASSWD_"), pass)
+	b = replacePHPValue(b, phpDefineValueRE("_DB_SERVER_"), "127.0.0.1")
+	return b, true, nil
 }
 
 func (h *Handlers) importSSL(r *http.Request, ekler arsivEkler, inv Inventory, domainID int64, targetDomain string) (bool, string, string, error) {

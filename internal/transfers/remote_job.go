@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -203,6 +204,7 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 		return
 	}
 	if httpSaglikli(kaynakHTTP) && !httpSaglikli(hedefHTTP) {
+		hataOzeti := h.hedefHataOzeti(sonuc.DomainID, q.Domain)
 		r := httptest.NewRequest(http.MethodDelete, "/api/v1/domains/"+strconv.FormatInt(sonuc.DomainID, 10), nil).WithContext(ctx)
 		if err := h.rollbackDomain(r, sonuc.DomainID); err != nil {
 			h.remoteHata(id, fmt.Errorf("sağlık karşılaştırması başarısız: kaynak HTTP %d, hedef HTTP %d; hedef rollback başarısız: %w", kaynakHTTP, hedefHTTP, err))
@@ -212,10 +214,55 @@ func (h *Handlers) remoteCalistir(id int64, q remoteStartReq) {
 			h.remoteHata(id, fmt.Errorf("hedef silindi fakat aktarım kaydı güncellenemedi: %w", err))
 			return
 		}
-		h.remoteHata(id, fmt.Errorf("sağlık karşılaştırması başarısız: kaynak HTTP %d, hedef HTTP %d; hedef geri alındı", kaynakHTTP, hedefHTTP))
+		mesaj := fmt.Sprintf("sağlık karşılaştırması başarısız: kaynak HTTP %d, hedef HTTP %d; hedef geri alındı", kaynakHTTP, hedefHTTP)
+		if hataOzeti != "" {
+			mesaj += "; hata: " + hataOzeti
+		}
+		h.remoteHata(id, errors.New(mesaj))
 		return
 	}
 	_, _ = h.DB.Exec(`UPDATE remote_transfer_jobs SET status='success',progress=100,message='Aktarım ve sağlık kontrolü tamamlandı',finished_at=NOW() WHERE id=?`, id)
+}
+
+func (h *Handlers) hedefHataOzeti(domainID int64, domain string) string {
+	var sk string
+	if h.DB.QueryRow(`SELECT sistem_kullanici FROM domains WHERE id=?`, domainID).Scan(&sk) != nil || !regexp.MustCompile(`^c_[a-z0-9_]+$`).MatchString(sk) {
+		return ""
+	}
+	for _, p := range []string{"/var/log/php-fpm/tenant-" + sk + ".log", "/var/log/nginx/" + domain + ".error.log", "/home/" + sk + "/.gpanel/php_debug.log"} {
+		if s := dosyaSonu(p, 600); s != "" {
+			return s
+		}
+	}
+	return "PHP/nginx hata günlüğünde ayrıntı bulunamadı"
+}
+
+func dosyaSonu(p string, limit int64) string {
+	f, err := os.Open(p)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		return ""
+	}
+	if time.Since(st.ModTime()) > 5*time.Minute {
+		return ""
+	}
+	start := st.Size() - limit
+	if start < 0 {
+		start = 0
+	}
+	buf := make([]byte, st.Size()-start)
+	if _, err = f.ReadAt(buf, start); err != nil && err != io.EOF {
+		return ""
+	}
+	s := strings.Join(strings.Fields(string(buf)), " ")
+	if len(s) > 500 {
+		s = s[len(s)-500:]
+	}
+	return s
 }
 
 func uzakPaketKomutu(q remoteStartReq) (string, error) {

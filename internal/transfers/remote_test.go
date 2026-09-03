@@ -36,3 +36,19 @@ func TestDomainKesifGecerli(t *testing.T) {
 		t.Fatal("geçersiz domain kabul edildi")
 	}
 }
+
+func TestOnKontrolEksikPHPModulleriniBildirir(t *testing.T) {
+	s := UzakSite{Domain: "example.com", PHPSurum: "8.2", KaynakModuller: []string{"curl", "gd"}, Uyarilar: []string{"requires:curl", "requires:gd"}}
+	onKontrol(&s, map[string]phpHedef{"8.2": {yuklu: true, moduller: map[string]bool{"curl": true}}})
+	if s.Tasinabilir || len(s.EksikModuller) != 1 || s.EksikModuller[0] != "gd" {
+		t.Fatalf("beklenmeyen ön kontrol: %+v", s)
+	}
+}
+
+func TestOnKontrolUyumluSiteyiTasınabilirYapar(t *testing.T) {
+	s := UzakSite{Domain: "example.com", PHPSurum: "8.3", KaynakModuller: []string{"curl"}, Uyarilar: []string{"requires:curl"}}
+	onKontrol(&s, map[string]phpHedef{"8.3": {yuklu: true, moduller: map[string]bool{"curl": true}}})
+	if !s.Tasinabilir || s.KontrolDurumu != "compatible" || len(s.Engeller) != 0 {
+		t.Fatalf("beklenmeyen ön kontrol: %+v", s)
+	}
+}

@@ -36,7 +36,11 @@ type ImportResult = {
   ssl_expires?: string
   credentials?: { ftp?: string; db?: string }; skipped: string[]
 }
-type RemoteSite = { domain: string; hesap: string; php_version?: string; target_exists?: boolean }
+type RemoteSite = {
+  domain: string; hesap: string; php_version?: string; application?: string
+  target_exists?: boolean; transferable: boolean; check_status: 'compatible' | 'incompatible'
+  source_modules?: string[]; missing_modules?: string[]; blockers?: string[]; warnings?: string[]
+}
 type RemoteInventory = { provider: string; surum: string; domainler: string[]; siteler: RemoteSite[] }
 type RemoteJob = { id: number; domain: string; durum: string; ilerleme: number; mesaj: string; target_domain_id?: number; source_http_status?: number; target_http_status?: number }
 type HostKeyInfo = { host: string; port: number; fingerprints: string[] }
@@ -232,15 +236,19 @@ export default function HesapAktarimiPage() {
           {['sanalcp', 'cpanel', 'plesk', 'directadmin'].includes(sshKesif.provider) && <div className="mt-3 space-y-3">
             <div className="flex items-center justify-between text-xs font-medium">
               <span>{t('HesapAktarimiPage:remote.select_domains')}</span>
-              <button type="button" className="text-brand-700 dark:text-brand-300" onClick={() => { const uygun = sshKesif.siteler.filter(s => !s.target_exists).map(s => s.domain); setSSHSecili(sshSecili.length === uygun.length ? [] : uygun) }}>
-                {sshSecili.length > 0 && sshSecili.length === sshKesif.siteler.filter(s => !s.target_exists).length ? t('HesapAktarimiPage:remote.select_none') : t('HesapAktarimiPage:remote.select_all')}
+              <button type="button" className="text-brand-700 dark:text-brand-300" onClick={() => { const uygun = sshKesif.siteler.filter(s => s.transferable && !s.target_exists).map(s => s.domain); setSSHSecili(sshSecili.length === uygun.length ? [] : uygun) }}>
+                {sshSecili.length > 0 && sshSecili.length === sshKesif.siteler.filter(s => s.transferable && !s.target_exists).length ? t('HesapAktarimiPage:remote.select_none') : t('HesapAktarimiPage:remote.select_all')}
               </button>
             </div>
             <div className="max-h-56 overflow-y-auto rounded-lg border border-emerald-200 bg-white/70 p-2 dark:border-emerald-800 dark:bg-slate-900/40">
-              {sshKesif.siteler.map(site => <label key={site.domain} className={`flex items-center gap-2 rounded px-2 py-1.5 ${site.target_exists ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30'}`}>
-                <input type="checkbox" disabled={site.target_exists} checked={sshSecili.includes(site.domain)} onChange={e => setSSHSecili(eski => e.target.checked ? [...eski, site.domain] : eski.filter(d => d !== site.domain))} />
-                <span className="font-mono text-xs">{site.domain}</span><span className="ml-auto text-[11px] opacity-70">{site.hesap}{site.php_version ? ` · PHP ${site.php_version}` : ''}</span>
-                {site.target_exists && <span className="text-[10px] font-medium text-red-600">{t('HesapAktarimiPage:remote.target_exists')}</span>}
+              {sshKesif.siteler.map(site => <label key={site.domain} className={`block rounded px-2 py-1.5 ${!site.transferable ? 'cursor-not-allowed bg-red-50/70 dark:bg-red-950/20' : 'cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30'}`}>
+                <span className="flex items-center gap-2">
+                  <input type="checkbox" disabled={!site.transferable} checked={sshSecili.includes(site.domain)} onChange={e => setSSHSecili(eski => e.target.checked ? [...eski, site.domain] : eski.filter(d => d !== site.domain))} />
+                  <span className="font-mono text-xs">{site.domain}</span>
+                  <span className="ml-auto text-[11px] opacity-70">{site.hesap}{site.php_version ? ` · PHP ${site.php_version}` : ''}{site.application && site.application !== 'unknown' ? ` · ${site.application}` : ''}</span>
+                  <span className={`text-[10px] font-semibold ${site.transferable ? 'text-emerald-700' : 'text-red-600'}`}>{site.transferable ? t('HesapAktarimiPage:remote.compatible') : t('HesapAktarimiPage:remote.incompatible')}</span>
+                </span>
+                {!!site.blockers?.length && <span className="mt-1 block pl-6 text-[11px] text-red-700 dark:text-red-300">{site.blockers.join(' · ')}</span>}
               </label>)}
             </div>
             <div className="grid gap-2 sm:grid-cols-3">

@@ -111,6 +111,34 @@ func TestDatabaseMappingsAreNamespacedAndUnique(t *testing.T) {
 	}
 }
 
+func TestRewriteApplicationDatabaseConfigs(t *testing.T) {
+	maps := []DBMap{{Source: "old_db", Target: "c_site_main"}}
+	tests := []struct {
+		name  string
+		in    string
+		fn    dbConfigRewriter
+		wants []string
+	}{
+		{"laravel", "DB_HOST=mysql\nDB_DATABASE=old_db\nDB_USERNAME=old\nDB_PASSWORD=oldpass\n", rewriteDotEnvDB, []string{`DB_HOST=127.0.0.1`, `DB_DATABASE="c_site_main"`, `DB_USERNAME="c_site_db"`, `DB_PASSWORD="p\$a\\ss"`}},
+		{"symfony", `DATABASE_URL="mysql://old:pass@localhost:3306/old_db?serverVersion=8.0"`, rewriteDotEnvDB, []string{`mysql://c_site_db:p$a%5Css@127.0.0.1:3306/c_site_main?serverVersion=8.0`}},
+		{"prestashop-modern", `return ['parameters'=>['database_host'=>'localhost','database_name'=>'old_db','database_user'=>'old','database_password'=>'pass']];`, rewritePrestaParametersDB, []string{`'database_name'=>'c_site_main'`, `'database_user'=>'c_site_db'`, `'database_password'=>'p$`}},
+		{"prestashop-legacy", `define('_DB_SERVER_', 'localhost'); define('_DB_NAME_', 'old_db'); define('_DB_USER_', 'old'); define('_DB_PASSWD_', 'pass');`, rewritePrestaLegacyDB, []string{`define('_DB_NAME_', 'c_site_main')`, `define('_DB_USER_', 'c_site_db')`}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, changed, err := tt.fn([]byte(tt.in), maps, "c_site_db", `p$a\ss`)
+			if err != nil || !changed {
+				t.Fatalf("changed=%v err=%v", changed, err)
+			}
+			for _, want := range tt.wants {
+				if !strings.Contains(string(got), want) {
+					t.Errorf("%q yok; çıktı: %s", want, got)
+				}
+			}
+		})
+	}
+}
+
 func TestParseCronJobsCapsAndPreservesFiveFieldTasks(t *testing.T) {
 	var body strings.Builder
 	for i := 0; i < 101; i++ {
