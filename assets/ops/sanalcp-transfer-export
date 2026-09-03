@@ -82,6 +82,22 @@ export_domain(){
         esac
         cp -a -- "$home_file" "$root/homedir/native_home/$base"
       done
+  # Ana dizindeki DIZINLER aktarilmaz: panel modeli uygulamanin public_html
+  # icinde durmasini varsayar ve ana dizini serbestce kopyalamak panel-yonetimli
+  # (logs/, tmp/, ssl/, .ssh/, .sanalcp/) icerigi de tasirdi. Ama SESSIZ kalmak
+  # siteyi kiriyordu: web kokunun ustunde src/ + vendor/ tutan bir site hedefte
+  # fatal verdigi halde aktarim "basarili" gorunuyordu. Neyin birakildigini
+  # hedefe bildiriyoruz; import bunu aktarim sonucunda gosterir.
+  find "/home/$sk" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null \
+    | LC_ALL=C sort \
+    | while IFS= read -r home_dir; do
+        case "$home_dir" in
+          public_html|subdomains|domains|mail|logs|tmp|ssl|etc|cgi-bin) continue ;;
+          .*) continue ;;
+        esac
+        printf '%s\n' "$home_dir"
+      done > "$root/sanalcp/home_skipped.txt"
+
   sql "SELECT tam_ad FROM subdomanlar WHERE domain_id=$domain_id ORDER BY alt_ad" \
     | while IFS= read -r child; do
         [[ "$child" =~ ^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$ ]] || die "güvensiz alt alan adı"
