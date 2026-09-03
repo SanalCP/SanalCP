@@ -407,35 +407,50 @@ func homeAtlananlarOzeti(ekler arsivEkler) string {
 
 var homeDizinAdiRE = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
+// hedefDBHost — panel MySQL hesaplarını YALNIZ '<kullanıcı>@localhost' olarak
+// açar. Yapılandırmaya 127.0.0.1 yazmak TCP bağlantısı demektir; o host için
+// yetki kaydı olmadığından uygulama "Access denied (1698)" alır. Panelin ve
+// yöneticinin `mysql -u … -p…` denemeleri sokete gittiği için bu SESSİZ kalıyor,
+// yalnız site kırılıyordu (bkz. ajanda.uygulamasi.tr, 2026-09-03).
+const hedefDBHost = "localhost"
+
 func rewriteApplicationDBConfigs(sk string, maps []DBMap, dbUser, dbPass string) error {
 	if err := rewriteWordPressDBConfig(sk, maps, dbUser, dbPass); err != nil {
 		return err
 	}
-	root := "/home/" + sk + "/public_html/"
-	for _, c := range []struct {
-		name string
-		fn   func([]byte, []DBMap, string, string) ([]byte, bool, error)
+	web := "/home/" + sk + "/public_html/"
+	// PHP yapılandırmaları aynı bilgiyi const / define / dizi biçimlerinden
+	// herhangi biriyle tutabiliyor; hepsi denenir, eşleşmeyen dosyayı
+	// değiştirmeden döner.
+	phpBicimleri := []dbConfigRewriter{rewritePHPConstDB, rewritePHPDefineDB, rewritePHPArrayDB}
+	hedefler := []struct {
+		yol  string
+		adim []dbConfigRewriter
 	}{
-		{".env", rewriteDotEnvDB},
-		{"config.php", rewritePHPConstDB},
-		{"app/config/parameters.php", rewritePrestaParametersDB},
-		{"config/settings.inc.php", rewritePrestaLegacyDB},
-	} {
-		if err := rewriteDBConfigFile(root+c.name, maps, dbUser, dbPass, c.fn); err != nil {
-			return fmt.Errorf("%s: %w", c.name, err)
-		}
+		{web + ".env", []dbConfigRewriter{rewriteDotEnvDB}},
+		{web + "config.php", phpBicimleri},
+		{web + "config.local.php", phpBicimleri},
+		{web + "app/config/parameters.php", []dbConfigRewriter{rewritePrestaParametersDB}},
+		{web + "config/settings.inc.php", []dbConfigRewriter{rewritePrestaLegacyDB}},
+		// Web kökünün ÜSTÜ: exporter bu düz dosyaları native_home ile taşıyor.
+		// Taşıdığımız hâlde DB bilgilerini uyarlamazsak dosya hedefe KAYNAK
+		// sunucunun parolasıyla gider ve uygulama bağlanamaz.
+		{"/home/" + sk + "/.env", []dbConfigRewriter{rewriteDotEnvDB}},
+		{"/home/" + sk + "/config.php", phpBicimleri},
+		{"/home/" + sk + "/config.local.php", phpBicimleri},
 	}
-	// Bazı uygulamalar .env'i web kökünün ÜSTÜNDE tutar; exporter bu dosyayı
-	// native_home ile taşıyor. Taşıdığımız hâlde DB bilgilerini uyarlamazsak
-	// dosya hedefe KAYNAK sunucunun parolasıyla gider ve uygulama bağlanamaz.
-	if err := rewriteDBConfigFile("/home/"+sk+"/.env", maps, dbUser, dbPass, rewriteDotEnvDB); err != nil {
-		return fmt.Errorf("ana dizin .env: %w", err)
+	for _, h := range hedefler {
+		for _, fn := range h.adim {
+			if err := rewriteDBConfigFile(h.yol, maps, dbUser, dbPass, fn); err != nil {
+				return fmt.Errorf("%s: %w", strings.TrimPrefix(h.yol, "/home/"+sk+"/"), err)
+			}
+		}
 	}
 	// Eski framework cache'leri mutlak yol, eski DB bilgisi ve eski sunucunun
 	// zaman damgalarını taşır. Uygulama ilk istekte kendi kullanıcısıyla yeniden üretir.
-	_ = os.RemoveAll(root + "var/cache")
+	_ = os.RemoveAll(web + "var/cache")
 	for _, p := range []string{"bootstrap/cache/config.php", "bootstrap/cache/packages.php", "bootstrap/cache/services.php"} {
-		_ = os.Remove(root + p)
+		_ = os.Remove(web + p)
 	}
 	return nil
 }
@@ -494,7 +509,7 @@ func rewriteDotEnvDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, e
 		if err != nil {
 			return nil, false, err
 		}
-		u := &url.URL{Scheme: "mysql", User: url.UserPassword(user, pass), Host: "127.0.0.1:3306", Path: "/" + target, RawQuery: strings.TrimPrefix(string(sm[2]), "?")}
+		u := &url.URL{Scheme: "mysql", User: url.UserPassword(user, pass), Host: hedefDBHost + ":3306", Path: "/" + target, RawQuery: strings.TrimPrefix(string(sm[2]), "?")}
 		return replaceWholeMatch(b, symfonyDBURLRE, "DATABASE_URL="+u.String()), true, nil
 	}
 	target, err := mappedDB(string(m[1]), maps)
@@ -507,7 +522,7 @@ func rewriteDotEnvDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, e
 	b = replaceWholeMatch(b, envDBNameRE, "DB_DATABASE="+quote(target))
 	b = replaceWholeMatch(b, envDBUserRE, "DB_USERNAME="+quote(user))
 	b = replaceWholeMatch(b, envDBPassRE, "DB_PASSWORD="+quote(pass))
-	b = replaceWholeMatch(b, envDBHostRE, "DB_HOST=127.0.0.1")
+	b = replaceWholeMatch(b, envDBHostRE, "DB_HOST="+hedefDBHost)
 	return b, true, nil
 }
 
@@ -527,7 +542,7 @@ func rewritePHPConstDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool,
 	b = replacePHPValue(b, phpConstDBNameRE, target)
 	b = replacePHPValue(b, phpConstDBUserRE, user)
 	b = replacePHPValue(b, phpConstDBPassRE, pass)
-	b = replacePHPValue(b, phpConstDBHostRE, "127.0.0.1")
+	b = replacePHPValue(b, phpConstDBHostRE, hedefDBHost)
 	return b, true, nil
 }
 
@@ -550,6 +565,60 @@ func replacePHPValue(b []byte, re *regexp.Regexp, value string) []byte {
 	})
 }
 
+// rewritePHPDefineDB — define('DB_NAME', '…') biçimi. wp-config.php dışındaki
+// elle yazılmış config.php dosyalarında yaygın; const biçimini tanıyıp bunu
+// atlamak siteyi kaynak sunucunun parolasıyla bırakıyordu.
+func rewritePHPDefineDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	re := phpDefineValueRE("DB_NAME")
+	target, ok, err := phpIlkDegerdenHedef(b, re, maps)
+	if err != nil || !ok {
+		return b, false, err
+	}
+	b = replacePHPValue(b, re, target)
+	b = replacePHPValue(b, phpDefineValueRE("DB_USER"), user)
+	// DB_PASS deseni DB_PASSWORD'ü YAKALAMAZ: ad hemen tırnakla biter.
+	b = replacePHPValue(b, phpDefineValueRE("DB_PASS"), pass)
+	b = replacePHPValue(b, phpDefineValueRE("DB_PASSWORD"), pass)
+	b = replacePHPValue(b, phpDefineValueRE("DB_HOST"), hedefDBHost)
+	return b, true, nil
+}
+
+// rewritePHPArrayDB — `return ['db_name' => '…', 'db_pass' => '…']` biçimi
+// (ör. web kökü üstündeki config.local.php).
+func rewritePHPArrayDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	re := phpArrayValueRE("db_name")
+	target, ok, err := phpIlkDegerdenHedef(b, re, maps)
+	if err != nil || !ok {
+		return b, false, err
+	}
+	b = replacePHPValue(b, re, target)
+	b = replacePHPValue(b, phpArrayValueRE("db_user"), user)
+	b = replacePHPValue(b, phpArrayValueRE("db_pass"), pass)
+	b = replacePHPValue(b, phpArrayValueRE("db_password"), pass)
+	b = replacePHPValue(b, phpArrayValueRE("db_host"), hedefDBHost)
+	return b, true, nil
+}
+
+// phpIlkDegerdenHedef — desenin ilk eşleşmesindeki tırnaklı değeri kaynak DB
+// adı sayıp dump listesinden hedef adı çözer.
+func phpIlkDegerdenHedef(b []byte, re *regexp.Regexp, maps []DBMap) (string, bool, error) {
+	m := re.FindSubmatch(b)
+	if len(m) == 0 {
+		return "", false, nil
+	}
+	vm := phpSonDegerRE.FindSubmatch(m[0])
+	if len(vm) != 2 {
+		return "", false, nil
+	}
+	target, err := mappedDB(string(vm[1]), maps)
+	if err != nil {
+		return "", false, err
+	}
+	return target, true, nil
+}
+
+var phpSonDegerRE = regexp.MustCompile(`['"]([^'"]*)['"]\s*$`)
+
 func rewritePrestaParametersDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
 	re := phpArrayValueRE("database_name")
 	m := re.FindSubmatch(b)
@@ -568,7 +637,7 @@ func rewritePrestaParametersDB(b []byte, maps []DBMap, user, pass string) ([]byt
 	b = replacePHPValue(b, re, target)
 	b = replacePHPValue(b, phpArrayValueRE("database_user"), user)
 	b = replacePHPValue(b, phpArrayValueRE("database_password"), pass)
-	b = replacePHPValue(b, phpArrayValueRE("database_host"), "127.0.0.1")
+	b = replacePHPValue(b, phpArrayValueRE("database_host"), hedefDBHost)
 	return b, true, nil
 }
 
@@ -590,7 +659,7 @@ func rewritePrestaLegacyDB(b []byte, maps []DBMap, user, pass string) ([]byte, b
 	b = replacePHPValue(b, re, target)
 	b = replacePHPValue(b, phpDefineValueRE("_DB_USER_"), user)
 	b = replacePHPValue(b, phpDefineValueRE("_DB_PASSWD_"), pass)
-	b = replacePHPValue(b, phpDefineValueRE("_DB_SERVER_"), "127.0.0.1")
+	b = replacePHPValue(b, phpDefineValueRE("_DB_SERVER_"), hedefDBHost)
 	return b, true, nil
 }
 

@@ -119,9 +119,9 @@ func TestRewriteApplicationDatabaseConfigs(t *testing.T) {
 		fn    dbConfigRewriter
 		wants []string
 	}{
-		{"laravel", "DB_HOST=mysql\nDB_DATABASE=old_db\nDB_USERNAME=old\nDB_PASSWORD=oldpass\n", rewriteDotEnvDB, []string{`DB_HOST=127.0.0.1`, `DB_DATABASE="c_site_main"`, `DB_USERNAME="c_site_db"`, `DB_PASSWORD="p\$a\\ss"`}},
-		{"symfony", `DATABASE_URL="mysql://old:pass@localhost:3306/old_db?serverVersion=8.0"`, rewriteDotEnvDB, []string{`mysql://c_site_db:p$a%5Css@127.0.0.1:3306/c_site_main?serverVersion=8.0`}},
-		{"custom-php-const", `const DB_HOST = 'localhost'; const DB_NAME = 'old_db'; const DB_USER = 'old'; const DB_PASS = 'pass';`, rewritePHPConstDB, []string{`DB_HOST = '127.0.0.1'`, `DB_NAME = 'c_site_main'`, `DB_USER = 'c_site_db'`, `DB_PASS = 'p$a\\ss'`}},
+		{"laravel", "DB_HOST=mysql\nDB_DATABASE=old_db\nDB_USERNAME=old\nDB_PASSWORD=oldpass\n", rewriteDotEnvDB, []string{`DB_HOST=localhost`, `DB_DATABASE="c_site_main"`, `DB_USERNAME="c_site_db"`, `DB_PASSWORD="p\$a\\ss"`}},
+		{"symfony", `DATABASE_URL="mysql://old:pass@localhost:3306/old_db?serverVersion=8.0"`, rewriteDotEnvDB, []string{`mysql://c_site_db:p$a%5Css@localhost:3306/c_site_main?serverVersion=8.0`}},
+		{"custom-php-const", `const DB_HOST = 'localhost'; const DB_NAME = 'old_db'; const DB_USER = 'old'; const DB_PASS = 'pass';`, rewritePHPConstDB, []string{`DB_HOST = 'localhost'`, `DB_NAME = 'c_site_main'`, `DB_USER = 'c_site_db'`, `DB_PASS = 'p$a\\ss'`}},
 		{"prestashop-modern", `return ['parameters'=>['database_host'=>'localhost','database_name'=>'old_db','database_user'=>'old','database_password'=>'pass']];`, rewritePrestaParametersDB, []string{`'database_name'=>'c_site_main'`, `'database_user'=>'c_site_db'`, `'database_password'=>'p$`}},
 		{"prestashop-legacy", `define('_DB_SERVER_', 'localhost'); define('_DB_NAME_', 'old_db'); define('_DB_USER_', 'old'); define('_DB_PASSWD_', 'pass');`, rewritePrestaLegacyDB, []string{`define('_DB_NAME_', 'c_site_main')`, `define('_DB_USER_', 'c_site_db')`}},
 	}
@@ -150,7 +150,7 @@ func TestRewritePHPConstDBNoktaliVirgulleriKorur(t *testing.T) {
 		t.Fatalf("changed=%v err=%v", changed, err)
 	}
 	for _, want := range []string{
-		"const DB_HOST = '127.0.0.1';",
+		"const DB_HOST = 'localhost';",
 		"const DB_NAME = 'c_site_main';",
 		"const DB_USER = 'c_site_db';",
 		"const DB_PASS = 'gizli';",
@@ -219,5 +219,82 @@ func TestHomeAtlananlarOzetiGuvensizAdlariEler(t *testing.T) {
 	}
 	if bos := homeAtlananlarOzeti(arsivEkler{uyeler: map[string][]byte{}}); bos != "" {
 		t.Fatalf("üye yokken özet üretildi: %q", bos)
+	}
+}
+
+// Panel MySQL hesabını YALNIZ '<kullanıcı>@localhost' açar; yapılandırmaya
+// 127.0.0.1 yazmak TCP'ye zorlar ve uygulama 1698 "Access denied" alır.
+func TestDBHostAsla127OlmazHepsiLocalhost(t *testing.T) {
+	maps := []DBMap{{Source: "old_db", Target: "c_site_main"}}
+	girdiler := []struct {
+		ad string
+		in string
+		fn dbConfigRewriter
+	}{
+		{"const", "<?php\nconst DB_HOST = '10.0.0.9';\nconst DB_NAME = 'old_db';\n", rewritePHPConstDB},
+		{"define", "<?php\ndefine('DB_HOST', '10.0.0.9');\ndefine('DB_NAME', 'old_db');\n", rewritePHPDefineDB},
+		{"dizi", "<?php\nreturn ['db_host' => '10.0.0.9', 'db_name' => 'old_db'];\n", rewritePHPArrayDB},
+		{"dotenv", "DB_HOST=10.0.0.9\nDB_DATABASE=old_db\n", rewriteDotEnvDB},
+		{"presta-legacy", "<?php define('_DB_SERVER_', '10.0.0.9'); define('_DB_NAME_', 'old_db');", rewritePrestaLegacyDB},
+	}
+	for _, g := range girdiler {
+		t.Run(g.ad, func(t *testing.T) {
+			got, changed, err := g.fn([]byte(g.in), maps, "c_site_db", "gizli")
+			if err != nil || !changed {
+				t.Fatalf("changed=%v err=%v", changed, err)
+			}
+			if strings.Contains(string(got), "127.0.0.1") {
+				t.Errorf("127.0.0.1 yazıldı: %s", got)
+			}
+			if !strings.Contains(string(got), "localhost") {
+				t.Errorf("localhost yok: %s", got)
+			}
+		})
+	}
+}
+
+// panel.boomptstudio.com: define() biçimi tanınmadığı için kaynak parolasıyla
+// kalıyordu. pole.secureserver.tr: dizi biçimi aynı şekilde atlanıyordu.
+func TestDefineVeDiziBicimleriDBBilgileriniUyarlar(t *testing.T) {
+	maps := []DBMap{{Source: "eski_db", Target: "c_site_main"}}
+
+	def := "<?php\ndefine('DB_HOST', 'localhost');\ndefine('DB_NAME', 'eski_db');\ndefine('DB_USER', 'eski_kul');\ndefine('DB_PASS', 'eskiparola');\ndefine('DB_CHARSET', 'utf8mb4');\n"
+	got, changed, err := rewritePHPDefineDB([]byte(def), maps, "c_site_db", "yeniparola")
+	if err != nil || !changed {
+		t.Fatalf("define: changed=%v err=%v", changed, err)
+	}
+	for _, want := range []string{"define('DB_NAME', 'c_site_main')", "define('DB_USER', 'c_site_db')", "define('DB_PASS', 'yeniparola')", "define('DB_CHARSET', 'utf8mb4')"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("define: %q yok; çıktı: %s", want, got)
+		}
+	}
+	if strings.Contains(string(got), "eskiparola") || strings.Contains(string(got), "eski_kul") {
+		t.Errorf("define: kaynak kimliği kaldı: %s", got)
+	}
+
+	dizi := "<?php\nreturn [\n    'db_host'    => 'localhost',\n    'db_name'    => 'eski_db',\n    'db_user'    => 'eski_kul',\n    'db_pass'    => 'eskiparola',\n    'db_charset' => 'utf8mb4',\n];\n"
+	got, changed, err = rewritePHPArrayDB([]byte(dizi), maps, "c_site_db", "yeniparola")
+	if err != nil || !changed {
+		t.Fatalf("dizi: changed=%v err=%v", changed, err)
+	}
+	for _, want := range []string{"'db_name'    => 'c_site_main'", "'db_user'    => 'c_site_db'", "'db_pass'    => 'yeniparola'", "'db_charset' => 'utf8mb4'"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("dizi: %q yok; çıktı: %s", want, got)
+		}
+	}
+	if strings.Contains(string(got), "eskiparola") {
+		t.Errorf("dizi: kaynak parolası kaldı: %s", got)
+	}
+}
+
+// DB_PASS deseni DB_PASSWORD'ü yutmamalı (aksi hâlde biri bozulurdu).
+func TestDefineDBPassDesenisDBPasswordUYutmaz(t *testing.T) {
+	in := "<?php define('DB_NAME','eski_db'); define('DB_PASSWORD','eskiparola');"
+	got, changed, err := rewritePHPDefineDB([]byte(in), []DBMap{{Source: "eski_db", Target: "c_site_main"}}, "u", "yeni")
+	if err != nil || !changed {
+		t.Fatalf("changed=%v err=%v", changed, err)
+	}
+	if !strings.Contains(string(got), "define('DB_PASSWORD','yeni')") {
+		t.Fatalf("DB_PASSWORD uyarlanmadı: %s", got)
 	}
 }
