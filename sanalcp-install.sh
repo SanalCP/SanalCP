@@ -633,6 +633,22 @@ grep -q "client_max_body_size 10240m" /etc/nginx/nginx.conf || \
 if debian_mi && [ -e /etc/nginx/sites-enabled/default ]; then
   rm -f /etc/nginx/sites-enabled/default && ok "Debian default site removed (it would collide with _default80.conf)"
 fi
+# Catch-all vhost'larinin belge koku. Dosya yoksa `try_files ... /index.html`
+# sonsuz ic yonlendirmeye girer ve nginx HTTP 500 doner; sertifikasi henuz
+# olmayan her domain bu vhost'a dustugu icin o 500 site hatasi sanilir.
+mkdir -p /var/www/_default80
+if [ ! -f /var/www/_default80/index.html ]; then
+  cat > /var/www/_default80/index.html <<'SANALCP_DEFAULT_HTML'
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site yapılandırılmadı</title>
+<style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f8fafc;color:#0f172a;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}.k{max-width:520px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:44px;text-align:center}h1{font-size:20px;margin:0 0 8px}p{color:#64748b;line-height:1.6;margin:0}</style>
+</head><body><div class="k"><h1>Bu adres için yapılandırılmış bir site yok</h1>
+<p>Alan adı bu sunucuya yönlendirilmiş ancak henüz bir siteyle eşleştirilmemiş.</p></div></body></html>
+SANALCP_DEFAULT_HTML
+  chmod 644 /var/www/_default80/index.html
+fi
 cp "$A/nginx/_panel.conf"     /etc/nginx/conf.d/_panel.conf
 cp "$A/nginx/_default80.conf" /etc/nginx/conf.d/_default80.conf
 cp "$A/nginx/_default443.conf" /etc/nginx/conf.d/_default443.conf
