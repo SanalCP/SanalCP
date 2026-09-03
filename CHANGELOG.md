@@ -13,6 +13,26 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.56** (2026-09-03)
+
+**Kritik.** Aktarımda yapılandırma dosyalarına yazılan veritabanı sunucusu adresi
+`127.0.0.1` yerine artık `localhost`. Panel MySQL hesaplarını yalnız
+`<kullanıcı>@localhost` olarak açıyor; `127.0.0.1` TCP bağlantısı demek olduğu ve
+o host için yetki kaydı bulunmadığı için aktarılan uygulama
+`Access denied (1698)` alıyordu. Hata sessizdi: hem panelin hem yöneticinin
+`mysql -u … -p…` denemeleri sokete gittiği için kimlikler "çalışıyor" görünüyor,
+yalnız site kırılıyordu — ve veritabanı hatasını yutan uygulamalarda bu
+"parola kabul edilmiyor" gibi görünüyordu.
+
+PHP yapılandırmalarında iki biçim daha tanınıyor: `define('DB_NAME', '…')`
+(wp-config.php dışındaki elle yazılmış `config.php` dosyalarında yaygın) ve
+`return ['db_name' => '…', 'db_pass' => '…']` dizi biçimi. Her iki biçim de
+hedefin veritabanı adı, kullanıcısı ve parolasıyla güncelleniyor.
+
+Yeniden yazma artık `config.local.php` dosyasını ve web kökünün üstündeki
+`config.php` / `config.local.php` dosyalarını da kapsıyor; aynı dosyada const,
+define ve dizi biçimlerinin hepsi sırayla deneniyor.
+
 **0.9.55** (2026-09-03)
 
 Canlı aktarımda web kökünün **üstünde** duran `.env` dosyasının veritabanı

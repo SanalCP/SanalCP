@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.55",
-  "duyuru": "Aktarımda web kökünün üstündeki .env dosyasının veritabanı bilgileri de hedefe uyarlanıyor; ana dizinde aktarılmayan dizinler artık aktarım sonucunda açıkça bildiriliyor.",
+  "son_surum": "0.9.56",
+  "duyuru": "KRİTİK aktarım düzeltmesi: yapılandırmalara yazılan DB_HOST artık 127.0.0.1 değil localhost — panel MySQL hesaplarını yalnız @localhost açtığı için aktarılan siteler veritabanına bağlanamıyordu. Ayrıca define() ve dizi biçimindeki PHP yapılandırmaları da uyarlanıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-03"
 }
