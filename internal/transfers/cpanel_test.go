@@ -121,6 +121,7 @@ func TestRewriteApplicationDatabaseConfigs(t *testing.T) {
 	}{
 		{"laravel", "DB_HOST=mysql\nDB_DATABASE=old_db\nDB_USERNAME=old\nDB_PASSWORD=oldpass\n", rewriteDotEnvDB, []string{`DB_HOST=127.0.0.1`, `DB_DATABASE="c_site_main"`, `DB_USERNAME="c_site_db"`, `DB_PASSWORD="p\$a\\ss"`}},
 		{"symfony", `DATABASE_URL="mysql://old:pass@localhost:3306/old_db?serverVersion=8.0"`, rewriteDotEnvDB, []string{`mysql://c_site_db:p$a%5Css@127.0.0.1:3306/c_site_main?serverVersion=8.0`}},
+		{"custom-php-const", `const DB_HOST = 'localhost'; const DB_NAME = 'old_db'; const DB_USER = 'old'; const DB_PASS = 'pass';`, rewritePHPConstDB, []string{`DB_HOST = '127.0.0.1'`, `DB_NAME = 'c_site_main'`, `DB_USER = 'c_site_db'`, `DB_PASS = 'p$a\\ss'`}},
 		{"prestashop-modern", `return ['parameters'=>['database_host'=>'localhost','database_name'=>'old_db','database_user'=>'old','database_password'=>'pass']];`, rewritePrestaParametersDB, []string{`'database_name'=>'c_site_main'`, `'database_user'=>'c_site_db'`, `'database_password'=>'p$`}},
 		{"prestashop-legacy", `define('_DB_SERVER_', 'localhost'); define('_DB_NAME_', 'old_db'); define('_DB_USER_', 'old'); define('_DB_PASSWD_', 'pass');`, rewritePrestaLegacyDB, []string{`define('_DB_NAME_', 'c_site_main')`, `define('_DB_USER_', 'c_site_db')`}},
 	}

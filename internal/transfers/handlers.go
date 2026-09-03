@@ -383,6 +383,7 @@ func rewriteApplicationDBConfigs(sk string, maps []DBMap, dbUser, dbPass string)
 		fn   func([]byte, []DBMap, string, string) ([]byte, bool, error)
 	}{
 		{".env", rewriteDotEnvDB},
+		{"config.php", rewritePHPConstDB},
 		{"app/config/parameters.php", rewritePrestaParametersDB},
 		{"config/settings.inc.php", rewritePrestaLegacyDB},
 	} {
@@ -433,6 +434,10 @@ var envDBUserRE = regexp.MustCompile(`(?m)^DB_USERNAME\s*=.*$`)
 var envDBPassRE = regexp.MustCompile(`(?m)^DB_PASSWORD\s*=.*$`)
 var envDBHostRE = regexp.MustCompile(`(?m)^DB_HOST\s*=.*$`)
 var symfonyDBURLRE = regexp.MustCompile(`(?m)^DATABASE_URL\s*=\s*["']?[^\s"']+/([^?\s"']+)(\?[^\s"']*)?["']?\s*$`)
+var phpConstDBNameRE = regexp.MustCompile(`(?m)(\bconst\s+DB_NAME\s*=\s*)['"]([^'"]+)['"]\s*;`)
+var phpConstDBUserRE = regexp.MustCompile(`(?m)(\bconst\s+DB_USER\s*=\s*)['"][^'"]*['"]\s*;`)
+var phpConstDBPassRE = regexp.MustCompile(`(?m)(\bconst\s+DB_PASS(?:WORD)?\s*=\s*)['"][^'"]*['"]\s*;`)
+var phpConstDBHostRE = regexp.MustCompile(`(?m)(\bconst\s+DB_HOST\s*=\s*)['"][^'"]*['"]\s*;`)
 
 func rewriteDotEnvDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
 	m := envDBNameRE.FindSubmatch(b)
@@ -466,6 +471,22 @@ func replaceWholeMatch(b []byte, re *regexp.Regexp, value string) []byte {
 	return re.ReplaceAllFunc(b, func([]byte) []byte { return []byte(value) })
 }
 
+func rewritePHPConstDB(b []byte, maps []DBMap, user, pass string) ([]byte, bool, error) {
+	m := phpConstDBNameRE.FindSubmatch(b)
+	if len(m) != 3 {
+		return b, false, nil
+	}
+	target, err := mappedDB(string(m[2]), maps)
+	if err != nil {
+		return nil, false, err
+	}
+	b = replacePHPValue(b, phpConstDBNameRE, target)
+	b = replacePHPValue(b, phpConstDBUserRE, user)
+	b = replacePHPValue(b, phpConstDBPassRE, pass)
+	b = replacePHPValue(b, phpConstDBHostRE, "127.0.0.1")
+	return b, true, nil
+}
+
 func phpArrayValueRE(key string) *regexp.Regexp {
 	return regexp.MustCompile(`(?m)(['"]` + key + `['"]\s*=>\s*)['"][^'"]*['"]`)
 }
@@ -478,7 +499,7 @@ func phpQuoted(s string) string {
 func replacePHPValue(b []byte, re *regexp.Regexp, value string) []byte {
 	return re.ReplaceAllFunc(b, func(match []byte) []byte {
 		parts := re.FindSubmatch(match)
-		if len(parts) != 2 {
+		if len(parts) < 2 {
 			return match
 		}
 		return append(append([]byte{}, parts[1]...), []byte(phpQuoted(value))...)
