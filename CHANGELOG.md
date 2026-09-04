@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.60** (2026-09-04)
+
+Domainler sayfasında domain adının üzerine gelindiğinde sitenin 250×250 canlı
+önizlemesi gösteriliyor. Önizleme yalnız ihtiyaç anında yükleniyor; böylece
+domain listesi açılırken tüm siteler için iframe oluşturulmuyor. Kart imlecin
+sağında açılıyor, ekranda yer kalmadığında otomatik olarak sola geçiyor ve
+tablonun kaydırma alanı tarafından kesilmiyor. Klavye odağı da destekleniyor;
+SSL bulunmayan domainlerde güvenli bir bilgilendirme gösteriliyor.
+
 **0.9.59** (2026-09-04)
 
 Domainler ekranındaki **Sahibini değiştir** işlemi artık doğrudan aktif bayiyi

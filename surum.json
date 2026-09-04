@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.59",
-  "duyuru": "Domain sahipliğini bayiye devretme düzeltildi. Seçilen domain artık hedef bayinin panelinde görünür ve Domainler tablosundaki Bayi sütunu doğru bayi adını gösterir. Yayın paketlemesine zorunlu gofmt kontrolü de eklendi.",
+  "son_surum": "0.9.60",
+  "duyuru": "Domainler sayfasında domain adının üzerine gelindiğinde sitenin 250×250 canlı önizlemesi gösterilir. Önizleme yalnız ihtiyaç anında yüklenir ve ekran kenarına göre otomatik konumlanır.",
   "kritik": false,
   "yayin_tarihi": "2026-09-04"
 }

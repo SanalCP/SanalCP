@@ -19,6 +19,8 @@
     "button": "Create Domain"
   },
   "table": {
+    "preview_title": "{{domain}} preview",
+    "preview_https_only": "SSL is required for preview",
     "domain_name": "Domain Name",
     "system_user": "System User",
     "reseller": "Reseller",

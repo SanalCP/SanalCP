@@ -1,7 +1,8 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 // sp-mobil-v1
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
@@ -65,6 +66,94 @@ function fmtKB(kb: number) {
   if (kb < 1024) return kb + ' KB'
   if (kb < 1024 * 1024) return (kb / 1024).toFixed(1) + ' MB'
   return (kb / 1024 / 1024).toFixed(2) + ' GB'
+}
+
+function DomainHoverPreview({ domain }: { domain: Domain }) {
+  const { t } = useTranslation('DomainsPage')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const previewVersion = useRef(0)
+  const [konum, setKonum] = useState<{ top: number; left: number } | null>(null)
+
+  function ac(x: number, y: number, gecikme = 180) {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      previewVersion.current = Date.now()
+      const boyut = 250
+      const bosluk = 14
+      // Öncelik imlecin sağıdır; kart ekrandan taşacaksa soluna geçir.
+      const left = x + bosluk + boyut <= window.innerWidth
+        ? x + bosluk
+        : Math.max(bosluk, x - boyut - bosluk)
+      const top = Math.min(
+        Math.max(bosluk, y - 24),
+        Math.max(bosluk, window.innerHeight - boyut - bosluk),
+      )
+      setKonum({ top, left })
+    }, gecikme)
+  }
+
+  function kapat() {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = null
+    setKonum(null)
+  }
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
+  const onizleme = konum && createPortal(
+    <div
+      id={`domain-preview-${domain.id}`}
+      role="tooltip"
+      className="fixed z-[100] h-[250px] w-[250px] overflow-hidden rounded-xl border border-slate-200 bg-slate-900 shadow-2xl dark:border-slate-700 pointer-events-none"
+      style={{ top: konum.top, left: konum.left }}
+    >
+      {domain.ssl ? (
+        <iframe
+          src={`https://${domain.alan_adi}/?sanalcp_preview=${previewVersion.current}`}
+          title={t('table.preview_title', { domain: domain.alan_adi })}
+          sandbox="allow-scripts allow-same-origin"
+          tabIndex={-1}
+          aria-hidden
+          className="origin-top-left"
+          style={{ width: '400%', height: '400%', transform: 'scale(0.25)', border: 0, background: '#fff' }}
+        />
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center px-5 text-center">
+          <svg className="mb-2 h-9 w-9 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+          <div className="text-xs font-medium text-white/70">{t('table.preview_https_only')}</div>
+          <div className="mt-1 text-[10px] text-white/40">{domain.alan_adi}</div>
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-3 pb-2 pt-8 text-xs font-semibold text-white truncate">
+        {domain.alan_adi}
+      </div>
+    </div>,
+    document.body,
+  )
+
+  return (
+    <>
+      <Link
+        to={`/abonelikler/${domain.id}`}
+        onMouseEnter={e => ac(e.clientX, e.clientY)}
+        onMouseLeave={kapat}
+        onFocus={e => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          ac(rect.right, rect.top + rect.height / 2, 0)
+        }}
+        onBlur={kapat}
+        aria-describedby={konum ? `domain-preview-${domain.id}` : undefined}
+        className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium"
+      >
+        {domain.alan_adi}
+      </Link>
+      {onizleme}
+    </>
+  )
 }
 
 export default function DomainsPage() {
@@ -518,9 +607,7 @@ export default function DomainsPage() {
                       </td>
                       <td className={T.hucreBaslikSecimli}>
                         <span className="inline-flex items-center gap-1.5">
-                          <Link to={`/abonelikler/${d.id}`} className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">
-                            {d.alan_adi}
-                          </Link>
+                          <DomainHoverPreview domain={d} />
                           <a
                             href={`https://${d.alan_adi}`}
                             target="_blank"

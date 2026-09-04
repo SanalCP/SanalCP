@@ -19,6 +19,8 @@
     "button": "Domain Oluştur"
   },
   "table": {
+    "preview_title": "{{domain}} önizleme",
+    "preview_https_only": "Önizleme için SSL gerekli",
     "domain_name": "Domain Adı",
     "system_user": "Sistem Kullanıcısı",
     "reseller": "Bayi",
