@@ -1260,9 +1260,11 @@ func Provision(alanAdi, phpSurum string) (*Result, error) {
 func Deprovision(alanAdi, sk string) error {
 	cfgPath := "/etc/nginx/conf.d/dom_" + sk + ".conf"
 	_ = os.Remove(cfgPath)
-	// Subdomain vhost'ları (sub_<sk>_*.conf) da temizle — domain silinince bunlar
-	// orphan kalıyordu; SSL'li bir subdomain vhost'u silinmiş cert'e referansla
-	// nginx -t'yi GLOBAL kırıp yeni domain oluşturmayı bile engelliyordu.
+	// Eski alt alan adı vhost'ları (sub_<sk>_*.conf) da temizle. Alt alan adı
+	// sistemi kaldırıldı ama bu temizlik DURUYOR: göçünü çalıştırmamış bir
+	// kurulumda diskte hâlâ bu conf'lar olabilir ve domain silinince orphan
+	// kalırlar; SSL'li bir tanesi silinmiş cert'e referansla nginx -t'yi GLOBAL
+	// kırıp yeni domain oluşturmayı bile engelliyordu.
 	if subs, _ := filepath.Glob("/etc/nginx/conf.d/sub_" + sk + "_*.conf"); len(subs) > 0 {
 		for _, s := range subs {
 			_ = os.Remove(s)

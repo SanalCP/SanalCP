@@ -160,8 +160,8 @@ func (h *Handlers) Goster(w http.ResponseWriter, r *http.Request) {
 	_ = h.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM mailboxes WHERE domain_id=?`, id).Scan(&o.EpostaSayi.Kullanim)
 	o.EpostaSayi.Limit = maxEmail
 
-	// Domain sayısı: bu zaten 1 — ama abonelik kapsamında subdomain'leri saymak gerek
-	// (Plesk modeli: subscription primary + 0 subdomain) — şimdilik kendisi = 1
+	// Domain sayısı: her site kendi domain hesabı olduğu için abonelik başına
+	// daima 1 (alt alan adı sistemi kaldırıldı, bkz. migrations/0084).
 	o.DomainSayi.Kullanim = 1
 	o.DomainSayi.Limit = maxDom
 

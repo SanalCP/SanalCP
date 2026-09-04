@@ -34,10 +34,10 @@
     "ssl_expires": " — expires {{date}}",
     "ssl_none": "No SSL",
     "open_site": "Open site in new tab",
-    "add_subdomain": "+ Subdomain",
     "manage": "Manage →",
     "ssl_self_signed": "Self-signed certificate — visitors will see a browser security warning. Try Let's Encrypt from the SSL page.",
-    "subdomain_badge": "subdomain"
+    "customer": "Panel owner (customer)",
+    "customer_none": "unassigned"
   },
   "create_modal": {
     "title": "Create New Domain",
@@ -119,10 +119,11 @@
     "title": "Change domain owner",
     "desc": "The {{count}} selected domain(s) will be linked to the customer you pick below.",
     "none": "— Unassigned (belongs to the administrator) —",
-    "hint": "To hand a domain over to another reseller, pick a customer that belongs to them. If the reseller has no customer record yet, they must create one from their own panel first — customer records you create as an administrator stay bound to you.",
+    "hint": "This changes panel ownership ONLY: the domain shows up in the selected customer's panel account. The system user, files, FTP and database stay with the old account — the Linux account is not moved. To hand a domain over to another reseller, pick a customer that belongs to them; customer records you create as an administrator stay bound to you.",
     "apply": "Apply",
     "applying": "Applying…",
-    "success": "Owner updated for {{count}} domain(s).",
+    "success": "Panel owner updated for {{count}} domain(s).",
+    "partial": "⚠ Owner updated for only {{count}} of {{total}} domain(s). Please check the list.",
     "error": "Could not change the owner",
     "load_error": "Could not load the customer list"
   },

@@ -8,7 +8,6 @@
   "database": "Veritabanı",
   "ftp_account": "FTP Hesabı",
   "mail_box": "E-posta Kutusu",
-  "subdomain": "Subdomain",
   "unit_account": "hesap",
   "unit_box": "kutu",
   "unit_domain": "domain",
@@ -24,5 +23,6 @@
   "dns_records": "DNS kayıt",
   "cron_jobs": "Cron işi",
   "backup": "Yedek",
-  "backup_size": "Yedek boyutu"
+  "backup_size": "Yedek boyutu",
+  "domain_count": "Domain sayısı"
 }

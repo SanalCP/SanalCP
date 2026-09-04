@@ -33,7 +33,6 @@ import (
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/mail"
 	"sanalcp/internal/provisioner"
-	"sanalcp/internal/subdomain"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -46,7 +45,6 @@ type Handlers struct {
 	Mail      *mail.Handlers
 	Cron      *cron.Handlers
 	Addon     *domainek.Handlers
-	Subdomain *subdomain.Handlers
 }
 
 // Analyze accepts a cPanel full backup and returns an inventory. It never
@@ -118,6 +116,9 @@ type importResponse struct {
 	SSLImported  bool             `json:"ssl_imported"`
 	SSLExpires   string           `json:"ssl_expires,omitempty"`
 	Skipped      []string         `json:"skipped"`
+	// Subdomains: kaynak panelde alt alan adı olan ve hedefte BAĞIMSIZ domain
+	// olarak açılan site sayısı. Panelde alt alan adı sistemi kaldırıldı;
+	// aktarım bunları atlamak yerine yükseltir.
 	Subdomains   int              `json:"subdomains"`
 	AddonDomains int              `json:"addon_domains"`
 	Source       Inventory        `json:"source"`

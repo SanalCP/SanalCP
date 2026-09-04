@@ -18,8 +18,8 @@ type Domain = {
   php_surum?: string; is_demo?: boolean
   olusturulma?: string; plan_id?: number; plan_ad?: string
   ssl?: boolean; ssl_bitis?: string; ssl_kaynak?: string
-  alt_alanlar?: { id: number; tam_ad: string; php_surum: string; ssl?: boolean; ssl_kaynak?: string }[]
   bayi_adi?: string; bayi_paket_adi?: string
+  customer_id?: number; musteri_ad?: string
   ipv4?: string
 }
 type Plan = { id: number; ad: string; disk_kota_mb?: number }
@@ -316,7 +316,7 @@ export default function DomainsPage() {
     // adı listede GÖRÜNÜR ama ARANAMAZ olurdu.
     return metneGoreSirala(items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
       || (d.bayi_adi || '').toLowerCase().includes(s)
-      || (d.alt_alanlar || []).some(a => a.tam_ad.toLowerCase().includes(s))), d => d.alan_adi)
+      || (d.musteri_ad || '').toLowerCase().includes(s)), d => d.alan_adi)
   }, [items, q])
 
   function togga(id: number) {
@@ -370,9 +370,17 @@ export default function DomainsPage() {
     const customer_id = sahipHedef === '' ? null : Number(sahipHedef)
     setIsleniyor(true); setHata(null)
     try {
-      await api.post('/domains/toplu/sahip', { ids, customer_id })
-      setBasari(t('DomainsPage:owner_modal.success', { count: ids.length }))
-      setTimeout(() => setBasari(null), 4000)
+      // Sunucunun DOĞRULADIĞI sayıyı kullan: ids.length ile mesaj yazmak, hiçbir
+      // satır yazılmasa bile "3 domain güncellendi" demek olurdu.
+      const { data } = await api.post<{ dogrulanan?: number; istenen?: number }>(
+        '/domains/toplu/sahip', { ids, customer_id })
+      const dogrulanan = data?.dogrulanan ?? ids.length
+      if (dogrulanan < ids.length) {
+        setUyari(t('DomainsPage:owner_modal.partial', { count: dogrulanan, total: ids.length }))
+      } else {
+        setBasari(t('DomainsPage:owner_modal.success', { count: dogrulanan }))
+        setTimeout(() => setBasari(null), 4000)
+      }
       setSahipAcik(false); setSecili(new Set()); yukle()
     } catch (e) { setHata(apiHata(e, t('DomainsPage:owner_modal.error'))) }
     finally { setIsleniyor(false) }
@@ -536,8 +544,17 @@ export default function DomainsPage() {
                         </span>
                         {d.is_demo && <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">{t('DomainsPage:table.demo')}</span>}
                       </td>
+                      {/* Sistem kullanıcısı = Linux tenant (dosyalar/FTP/DB burada durur,
+                          "Sahip değiştir" bunu DEĞİŞTİRMEZ). Altındaki müşteri satırı ise
+                          panel sahipliğidir ve sahip değiştirmede güncellenen tek alandır —
+                          gösterilmediği sürece işlem başarılı olsa bile tablo aynı kalıyordu. */}
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.system_user')}>
-                        <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{d.sistem_kullanici}</span>
+                        <span className="inline-flex flex-col leading-tight">
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-400">{d.sistem_kullanici}</span>
+                          {d.musteri_ad
+                            ? <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5" title={t('DomainsPage:table.customer')}>{d.musteri_ad}</span>
+                            : <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 italic">{t('DomainsPage:table.customer_none')}</span>}
+                        </span>
                       </td>
                       <td className={T.hucre} data-etiket={t('DomainsPage:table.reseller')}>
                         {d.bayi_adi ? (
@@ -567,46 +584,10 @@ export default function DomainsPage() {
                         <span className="font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{d.olusturulma || '-'}</span>
                       </td>
                       <td className={`${T.hucreAksiyon} lg:text-right`}>
-                        <Link to={`/abonelikler/${d.id}/subdomainler`} className="text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 lg:mr-3">{t('DomainsPage:table.add_subdomain')}</Link>
                         <Link to={`/abonelikler/${d.id}`} className="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300">{t('DomainsPage:table.manage')}</Link>
                       </td>
                     </tr>
 
-                    {/* Alt alan adları — ana domainin ALTINDA girintili satırlar.
-                        colSpan tek hücre: mobil kart düzeni data-etiket'e dayandığı
-                        için normal hücrelere bölmek orada anlamsız satırlar üretirdi.
-                        Seçim kutusu YOK: toplu işlemler domain üzerinde çalışır,
-                        alt alan adı ayrı bir domain değildir. */}
-                    {(d.alt_alanlar || []).map(alt => (
-                      <tr key={`s-${alt.id}`} className="lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/50 transition">
-                        <td colSpan={10} className="py-1.5 lg:pl-12 pl-4 pr-4">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="text-slate-300 dark:text-slate-600 select-none font-mono text-xs">↳</span>
-                            <Link to={`/abonelikler/${d.id}/subdomainler`}
-                              className="text-sm text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 hover:underline">
-                              {alt.tam_ad}
-                            </Link>
-                            <a href={`https://${alt.tam_ad}`} target="_blank" rel="noopener noreferrer"
-                              title={t('DomainsPage:table.open_site')}
-                              onClick={e => e.stopPropagation()}
-                              className="text-slate-300 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 transition">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
-                            <SSLIkon ssl={alt.ssl} kaynak={alt.ssl_kaynak} kucuk
-                              baslik={!alt.ssl
-                                ? t('DomainsPage:table.ssl_none')
-                                : alt.ssl_kaynak === 'self-signed'
-                                  ? t('DomainsPage:table.ssl_self_signed')
-                                  : t('DomainsPage:table.ssl_active')} />
-                            {alt.php_surum && (
-                              <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">PHP {alt.php_surum}</span>
-                            )}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
                     </Fragment>
                   )
                 })}

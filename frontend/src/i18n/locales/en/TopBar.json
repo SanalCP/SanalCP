@@ -22,7 +22,13 @@
     "empty": "No operations in the last 7 days.",
     "load_failed": "Operations could not be loaded.",
     "retry": "Try again",
-    "states": { "bekliyor": "Queued", "calisiyor": "Running", "basarili": "Successful", "basarisiz": "Failed", "geri_alindi": "Rolled back" }
+    "states": {
+      "bekliyor": "Queued",
+      "calisiyor": "Running",
+      "basarili": "Successful",
+      "basarisiz": "Failed",
+      "geri_alindi": "Rolled back"
+    }
   },
   "account_menu": "Account menu",
   "theme_toggle_title": "Theme: {{theme}} — click to change",
@@ -35,61 +41,216 @@
     "kullanici": "user"
   },
   "pages": {
-    "home": { "baslik": "Home", "aciklama": "Panel overview" },
-    "domains": { "baslik": "Domains", "aciklama": "Domain names and subscriptions" },
-    "dns": { "baslik": "DNS Management", "aciklama": "Global DNS records" },
-    "mail": { "baslik": "Email Accounts", "aciklama": "Mailboxes and mail" },
-    "databases": { "baslik": "Databases", "aciklama": "MySQL databases" },
-    "ssl": { "baslik": "SSL Certificates", "aciklama": "TLS and certificate management" },
-    "wordpress": { "baslik": "WordPress", "aciklama": "WordPress sites" },
-    "plans": { "baslik": "Service Plans", "aciklama": "Package and quota plans" },
-    "users": { "baslik": "Users", "aciklama": "Panel accounts" },
-    "customers": { "baslik": "Customers", "aciklama": "Customer and contact records" },
-    "server_status": { "baslik": "Server Status", "aciklama": "Resource and service summary" },
-    "monitor": { "baslik": "Server Monitoring", "aciklama": "Live server metrics and logs" },
-    "stats": { "baslik": "Statistics", "aciklama": "Usage statistics" },
-    "services": { "baslik": "Services", "aciklama": "System services" },
-    "php_versions": { "baslik": "PHP Versions", "aciklama": "PHP version management" },
-    "php_modules": { "baslik": "PHP Modules", "aciklama": "PHP extension management" },
-    "packages": { "baslik": "Package Manager", "aciklama": "System packages" },
-    "dns_template": { "baslik": "DNS Template", "aciklama": "Default DNS records" },
-    "firewall": { "baslik": "Firewall", "aciklama": "Firewall rules" },
-    "security_log": { "baslik": "Security Log", "aciklama": "Security events" },
-    "security_notifications": { "baslik": "Security Notifications", "aciklama": "Correlated events" },
-    "backup": { "baslik": "Backup", "aciklama": "Server backup management" },
-    "transfer": { "baslik": "Account Transfer", "aciklama": "Account and site migration" },
-    "tools_settings": { "baslik": "Tools & Settings", "aciklama": "Panel tools" },
-    "profile": { "baslik": "Profile & Preferences", "aciklama": "Account and security settings" }
+    "home": {
+      "baslik": "Home",
+      "aciklama": "Panel overview"
+    },
+    "domains": {
+      "baslik": "Domains",
+      "aciklama": "Domain names and subscriptions"
+    },
+    "dns": {
+      "baslik": "DNS Management",
+      "aciklama": "Global DNS records"
+    },
+    "mail": {
+      "baslik": "Email Accounts",
+      "aciklama": "Mailboxes and mail"
+    },
+    "databases": {
+      "baslik": "Databases",
+      "aciklama": "MySQL databases"
+    },
+    "ssl": {
+      "baslik": "SSL Certificates",
+      "aciklama": "TLS and certificate management"
+    },
+    "wordpress": {
+      "baslik": "WordPress",
+      "aciklama": "WordPress sites"
+    },
+    "plans": {
+      "baslik": "Service Plans",
+      "aciklama": "Package and quota plans"
+    },
+    "users": {
+      "baslik": "Users",
+      "aciklama": "Panel accounts"
+    },
+    "customers": {
+      "baslik": "Customers",
+      "aciklama": "Customer and contact records"
+    },
+    "server_status": {
+      "baslik": "Server Status",
+      "aciklama": "Resource and service summary"
+    },
+    "monitor": {
+      "baslik": "Server Monitoring",
+      "aciklama": "Live server metrics and logs"
+    },
+    "stats": {
+      "baslik": "Statistics",
+      "aciklama": "Usage statistics"
+    },
+    "services": {
+      "baslik": "Services",
+      "aciklama": "System services"
+    },
+    "php_versions": {
+      "baslik": "PHP Versions",
+      "aciklama": "PHP version management"
+    },
+    "php_modules": {
+      "baslik": "PHP Modules",
+      "aciklama": "PHP extension management"
+    },
+    "packages": {
+      "baslik": "Package Manager",
+      "aciklama": "System packages"
+    },
+    "dns_template": {
+      "baslik": "DNS Template",
+      "aciklama": "Default DNS records"
+    },
+    "firewall": {
+      "baslik": "Firewall",
+      "aciklama": "Firewall rules"
+    },
+    "security_log": {
+      "baslik": "Security Log",
+      "aciklama": "Security events"
+    },
+    "security_notifications": {
+      "baslik": "Security Notifications",
+      "aciklama": "Correlated events"
+    },
+    "backup": {
+      "baslik": "Backup",
+      "aciklama": "Server backup management"
+    },
+    "transfer": {
+      "baslik": "Account Transfer",
+      "aciklama": "Account and site migration"
+    },
+    "tools_settings": {
+      "baslik": "Tools & Settings",
+      "aciklama": "Panel tools"
+    },
+    "profile": {
+      "baslik": "Profile & Preferences",
+      "aciklama": "Account and security settings"
+    }
   },
   "domain_pages": {
-    "overview": { "baslik": "Overview", "aciklama": "Domain summary" },
-    "files": { "baslik": "File Manager", "aciklama": "Files and directories" },
-    "webserver": { "baslik": "Apache & nginx", "aciklama": "Web server settings" },
-    "php": { "baslik": "PHP Settings", "aciklama": "PHP and FPM configuration" },
-    "composer": { "baslik": "Composer", "aciklama": "PHP package management" },
-    "performance": { "baslik": "Performance", "aciklama": "Site performance settings" },
-    "redis": { "baslik": "Redis Cache", "aciklama": "Cache management" },
-    "wordpress": { "baslik": "WordPress", "aciklama": "WordPress tools" },
-    "dns": { "baslik": "DNS Management", "aciklama": "Domain DNS records" },
-    "subdomains": { "baslik": "Subdomains", "aciklama": "Subdomain names" },
-    "addon_domains": { "baslik": "Addon Domains", "aciklama": "Alias domains" },
-    "ssl": { "baslik": "SSL/TLS", "aciklama": "HTTPS certificate" },
-    "databases": { "baslik": "Databases", "aciklama": "MySQL databases" },
-    "ftp": { "baslik": "FTP Accounts", "aciklama": "FTP access" },
-    "mail": { "baslik": "Email", "aciklama": "Mailboxes" },
-    "backups": { "baslik": "Backups", "aciklama": "Domain backups" },
-    "clone": { "baslik": "Clone Site", "aciklama": "Site cloning" },
-    "git": { "baslik": "Git", "aciklama": "Git deploy" },
-    "cron": { "baslik": "Scheduled Tasks", "aciklama": "Cron jobs" },
-    "ssh": { "baslik": "SSH Access", "aciklama": "Terminal access" },
-    "logs": { "baslik": "Logs", "aciklama": "Access and error logs" },
-    "waf": { "baslik": "WAF", "aciklama": "Web application firewall" },
-    "rate_limit": { "baslik": "Bot & Rate Limiting", "aciklama": "Traffic profiles and exceptions" },
-    "access_control": { "baslik": "Access Control", "aciklama": "IP access rules" },
-    "password_protect": { "baslik": "Password Protected Directories", "aciklama": "Directory password" },
-    "imunify": { "baslik": "Imunify", "aciklama": "Malware scanning" },
-    "stats": { "baslik": "Statistics", "aciklama": "Domain usage data" },
-    "connection_info": { "baslik": "Connection Info", "aciklama": "FTP and database credentials" },
+    "overview": {
+      "baslik": "Overview",
+      "aciklama": "Domain summary"
+    },
+    "files": {
+      "baslik": "File Manager",
+      "aciklama": "Files and directories"
+    },
+    "webserver": {
+      "baslik": "Apache & nginx",
+      "aciklama": "Web server settings"
+    },
+    "php": {
+      "baslik": "PHP Settings",
+      "aciklama": "PHP and FPM configuration"
+    },
+    "composer": {
+      "baslik": "Composer",
+      "aciklama": "PHP package management"
+    },
+    "performance": {
+      "baslik": "Performance",
+      "aciklama": "Site performance settings"
+    },
+    "redis": {
+      "baslik": "Redis Cache",
+      "aciklama": "Cache management"
+    },
+    "wordpress": {
+      "baslik": "WordPress",
+      "aciklama": "WordPress tools"
+    },
+    "dns": {
+      "baslik": "DNS Management",
+      "aciklama": "Domain DNS records"
+    },
+    "addon_domains": {
+      "baslik": "Addon Domains",
+      "aciklama": "Alias domains"
+    },
+    "ssl": {
+      "baslik": "SSL/TLS",
+      "aciklama": "HTTPS certificate"
+    },
+    "databases": {
+      "baslik": "Databases",
+      "aciklama": "MySQL databases"
+    },
+    "ftp": {
+      "baslik": "FTP Accounts",
+      "aciklama": "FTP access"
+    },
+    "mail": {
+      "baslik": "Email",
+      "aciklama": "Mailboxes"
+    },
+    "backups": {
+      "baslik": "Backups",
+      "aciklama": "Domain backups"
+    },
+    "clone": {
+      "baslik": "Clone Site",
+      "aciklama": "Site cloning"
+    },
+    "git": {
+      "baslik": "Git",
+      "aciklama": "Git deploy"
+    },
+    "cron": {
+      "baslik": "Scheduled Tasks",
+      "aciklama": "Cron jobs"
+    },
+    "ssh": {
+      "baslik": "SSH Access",
+      "aciklama": "Terminal access"
+    },
+    "logs": {
+      "baslik": "Logs",
+      "aciklama": "Access and error logs"
+    },
+    "waf": {
+      "baslik": "WAF",
+      "aciklama": "Web application firewall"
+    },
+    "rate_limit": {
+      "baslik": "Bot & Rate Limiting",
+      "aciklama": "Traffic profiles and exceptions"
+    },
+    "access_control": {
+      "baslik": "Access Control",
+      "aciklama": "IP access rules"
+    },
+    "password_protect": {
+      "baslik": "Password Protected Directories",
+      "aciklama": "Directory password"
+    },
+    "imunify": {
+      "baslik": "Imunify",
+      "aciklama": "Malware scanning"
+    },
+    "stats": {
+      "baslik": "Statistics",
+      "aciklama": "Domain usage data"
+    },
+    "connection_info": {
+      "baslik": "Connection Info",
+      "aciklama": "FTP and database credentials"
+    },
     "open_domain_suffix": " · open domain"
   }
 }

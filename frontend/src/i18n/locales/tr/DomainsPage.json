@@ -34,10 +34,10 @@
     "ssl_expires": " — bitiş {{date}}",
     "ssl_none": "SSL yok",
     "open_site": "Siteyi yeni sekmede aç",
-    "add_subdomain": "+ Subdomain",
     "manage": "Yönet →",
     "ssl_self_signed": "Self-signed sertifika — ziyaretçiler tarayıcıda güvenlik uyarısı görür. SSL sayfasından Let's Encrypt deneyin.",
-    "subdomain_badge": "alt alan"
+    "customer": "Panel sahibi (müşteri)",
+    "customer_none": "sahipsiz"
   },
   "create_modal": {
     "title": "Yeni Domain Oluştur",
@@ -119,10 +119,11 @@
     "title": "Domain sahibini değiştir",
     "desc": "Seçili {{count}} domain aşağıda seçtiğiniz müşteriye bağlanacak.",
     "none": "— Sahipsiz (doğrudan yöneticiye ait) —",
-    "hint": "Domaini başka bir bayiye devretmek için, o bayiye ait bir müşteri seçin. Bayinin müşteri kaydı yoksa önce bayi kendi panelinden müşteri hesabı açmalıdır — yönetici olarak açtığınız müşteri kayıtları size bağlı kalır.",
+    "hint": "Bu işlem YALNIZCA panel sahipliğini değiştirir: domain, seçtiğiniz müşterinin panel hesabında görünür. Sistem kullanıcısı, dosyalar, FTP ve veritabanı eski hesapta kalır — Linux hesabı taşınmaz. Domaini başka bir bayiye devretmek için o bayiye ait bir müşteri seçin; yönetici olarak açtığınız müşteri kayıtları size bağlı kalır.",
     "apply": "Uygula",
     "applying": "Uygulanıyor…",
-    "success": "{{count}} domainin sahibi güncellendi.",
+    "success": "{{count}} domainin panel sahibi güncellendi.",
+    "partial": "⚠ {{total}} domainden yalnız {{count}} tanesinin sahibi güncellendi. Listeyi kontrol edin.",
     "error": "Sahip değiştirilemedi",
     "load_error": "Müşteri listesi alınamadı"
   },

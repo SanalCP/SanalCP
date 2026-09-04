@@ -66,7 +66,7 @@ export default function DomainKaynakKart({ domainId }: { domainId: number | stri
         <Bar etiket={t('DomainKaynakKart:database')} k={ozet.db_sayisi.kullanim} l={ozet.db_sayisi.limit} birim="DB" renk="emerald" />
         <Bar etiket={t('DomainKaynakKart:ftp_account')} k={ozet.ftp_sayisi.kullanim} l={ozet.ftp_sayisi.limit} birim={t('DomainKaynakKart:unit_account')} renk="amber" />
         <Bar etiket={t('DomainKaynakKart:mail_box')} k={ozet.eposta_sayi.kullanim} l={ozet.eposta_sayi.limit} birim={t('DomainKaynakKart:unit_box')} renk="rose" />
-        <Bar etiket={t('DomainKaynakKart:subdomain')} k={ozet.domain_sayi.kullanim} l={ozet.domain_sayi.limit} birim={t('DomainKaynakKart:unit_domain')} renk="violet" />
+        <Bar etiket={t('DomainKaynakKart:domain_count')} k={ozet.domain_sayi.kullanim} l={ozet.domain_sayi.limit} birim={t('DomainKaynakKart:unit_domain')} renk="violet" />
       </div>
 
       {/* Yapılandırma Özeti */}

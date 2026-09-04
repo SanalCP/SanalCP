@@ -1,0 +1,20 @@
+-- 0084 — Alt alan adı (subdomain) sistemi kaldırıldı.
+--
+-- Panel CloudPanel modeline geçti: her site kendi Linux kullanıcısı, kendi
+-- PHP-FPM servisi ve kendi FTP/veritabanı hesabı olan BAĞIMSIZ bir domain
+-- hesabıdır. Alt alan adı üreten uçlar (POST/PUT /domains/{id}/subdomain)
+-- kaldırıldı; mevcut kayıtlar internal/altalangoc ile bağımsız domain
+-- hesaplarına taşınır (POST /api/v1/altalan-goc).
+--
+-- 🔴 TABLO KASITLI OLARAK DROP EDİLMİYOR. İki sebep:
+--
+--   1. assets/ops/sanalcp-transfer-export bu tabloyu sorguluyor
+--      ("SELECT ... FROM subdomanlar WHERE domain_id=$domain_id"). DROP,
+--      aktarım dışa aktarma betiğini her çalıştırmada kırardı. Boş tablo boş
+--      bir subdomains.jsonl üretir ve içe aktarma tarafı hiçbir şey yapmaz.
+--   2. Göç kayıt kayıt ilerliyor; tablo, göç tamamlanana kadar hangi sitelerin
+--      hâlâ taşınmadığının tek kaydı.
+--
+-- Gerçek DROP, tüm kurulumlarda göç tamamlanıp export betiği güncellendikten
+-- SONRA ayrı bir sürümde yapılacak.
+ALTER TABLE subdomanlar COMMENT = 'KALDIRILDI 0.9.58 - bos kalmali, bkz. migrations/0084';

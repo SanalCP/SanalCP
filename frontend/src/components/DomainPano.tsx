@@ -26,7 +26,6 @@ const ICONS = {
   wordpress: 'M12 21a9 9 0 100-18 9 9 0 000 18zm0 0c2.5-2.5 3-6 3-9s-.5-6.5-3-9m0 18c-2.5-2.5-3-6-3-9s.5-6.5 3-9M3.6 9h16.8M3.6 15h16.8',
   prestashop: 'M12 3l7 4v10l-7 4-7-4V7l7-4z',
   laravel: 'M12 2l9 5v10l-9 5-9-5V7l9-5zm0 4L7 8.8v6.4l5 2.8 5-2.8V8.8L12 6z',
-  subdomain: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064',
   ekdomain:  'M9 12h6m-6 4h3m-3-8h6M5 6h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z',
   dns:       'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01',
   cloudflare:'M12 4a5 5 0 014.9 4H18a4 4 0 010 8H7a5 5 0 010-10c.4 0 .8 0 1.2.1A5 5 0 0112 4z',
@@ -65,7 +64,6 @@ export default function DomainPano({ domain }: { domain: Domain }) {
       <Grup baslik={t('DomainPano:groups.domain_dns')}>
         <ToolCard etiket={t('DomainPano:items.dns')}          aciklama={t('DomainPano:items.dns_desc')} ikon={ICONS.dns}       renk="sky"  onClick={git('dns')} />
         <ToolCard etiket={t('DomainPano:items.cloudflare')} aciklama={t('DomainPano:items.cloudflare_desc')} ikon={ICONS.cloudflare} renk="amber" onClick={git('cloudflare')} />
-        <ToolCard etiket={t('DomainPano:items.subdomains')}          aciklama={t('DomainPano:items.subdomains_desc')}   ikon={ICONS.subdomain} renk="teal" onClick={git('subdomainler')} />
         <ToolCard etiket={t('DomainPano:items.addon_domains')}        aciklama={t('DomainPano:items.addon_domains_desc')} ikon={ICONS.ekdomain} renk="indigo" onClick={git('ek-alanlar')} />
       </Grup>
 

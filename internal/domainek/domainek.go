@@ -156,6 +156,11 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		phpSurum = hb.phpSurum
 	}
 
+	// subdomanlar kontrolü KASITLI OLARAK DURUYOR. Alt alan adı sistemi
+	// kaldırıldı ama tablo DROP edilmedi (bkz. migrations/0084): göçünü henüz
+	// çalıştırmamış bir kurulumda hâlâ satır — ve diskte hâlâ sub_*.conf —
+	// olabilir. Kontrol kalkarsa aynı server_name için İKİ nginx server bloğu
+	// üretilir ve hangisinin kazanacağı yükleme sırasına kalır.
 	var n int
 	_ = h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM domains WHERE alan_adi=?`, alanAdi).Scan(&n)
 	if n == 0 {

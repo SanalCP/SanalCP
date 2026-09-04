@@ -8,7 +8,6 @@
   "database": "Database",
   "ftp_account": "FTP Account",
   "mail_box": "Mailbox",
-  "subdomain": "Subdomain",
   "unit_account": "accounts",
   "unit_box": "boxes",
   "unit_domain": "domains",
@@ -24,5 +23,6 @@
   "dns_records": "DNS records",
   "cron_jobs": "Cron jobs",
   "backup": "Backup",
-  "backup_size": "Backup size"
+  "backup_size": "Backup size",
+  "domain_count": "Domain count"
 }

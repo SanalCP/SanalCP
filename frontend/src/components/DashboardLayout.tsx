@@ -52,7 +52,6 @@ const ICONS = {
   apache:      'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
   composer:    'M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3v6M9 12h6',
   redis:       'M13 10V3L4 14h7v7l9-11h-7z',
-  subdomain:   'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064',
   ekdomain:    'M9 12h6m-6 4h3m-3-8h6M5 6h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z',
   kopya:       'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
   iceaktarim:  'M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4',
@@ -93,6 +92,7 @@ function nav(t: TFunction): NavGroup[] {
     { to: '/sistem/php-modulleri', etiket: t('DashboardLayout:items.php_modules'),   ikon: ICONS.puzzle },
     { to: '/araclar/paketler',     etiket: t('DashboardLayout:items.package_manager'), ikon: ICONS.paket },
     { to: '/backup-yonetimi',      etiket: t('DashboardLayout:items.backup_management'), ikon: ICONS.yedek },
+    { to: '/araclar/altalan-goc',  etiket: t('DashboardLayout:items.subdomain_migration'), ikon: ICONS.ekdomain },
   ]},
   { baslik: t('DashboardLayout:groups.monitoring'), baslikKey: 'monitoring', items: [
     { to: '/izleme',               etiket: t('DashboardLayout:items.server_monitoring'), ikon: ICONS.izleme },
@@ -159,7 +159,6 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
     ]},
     { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
       { to: y('/dns'),           etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
-      { to: y('/subdomainler'),  etiket: t('DashboardLayout:items.subdomains'),   ikon: ICONS.subdomain },
       { to: y('/ek-alanlar'),    etiket: t('DashboardLayout:items.addon_domains'), ikon: ICONS.ekdomain },
       { to: y('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
     ]},

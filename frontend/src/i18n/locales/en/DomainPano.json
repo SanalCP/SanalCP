@@ -18,8 +18,6 @@
     "dns_desc": "A, MX, TXT, CNAME records",
     "cloudflare": "Cloudflare",
     "cloudflare_desc": "DNS, proxy and cache management",
-    "subdomains": "Subdomains",
-    "subdomains_desc": "Subdomains",
     "addon_domains": "Addon Domains",
     "addon_domains_desc": "Addon/parked domains · redirects",
     "mail_accounts": "Email Accounts",

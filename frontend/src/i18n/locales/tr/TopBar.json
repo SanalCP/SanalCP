@@ -22,7 +22,13 @@
     "empty": "Son 7 günde işlem bulunmuyor.",
     "load_failed": "İşlemler yüklenemedi.",
     "retry": "Tekrar dene",
-    "states": { "bekliyor": "Bekliyor", "calisiyor": "Çalışıyor", "basarili": "Başarılı", "basarisiz": "Başarısız", "geri_alindi": "Geri alındı" }
+    "states": {
+      "bekliyor": "Bekliyor",
+      "calisiyor": "Çalışıyor",
+      "basarili": "Başarılı",
+      "basarisiz": "Başarısız",
+      "geri_alindi": "Geri alındı"
+    }
   },
   "account_menu": "Hesap menüsü",
   "theme_toggle_title": "Tema: {{theme}} — tıkla değiştir",
@@ -35,61 +41,216 @@
     "kullanici": "kullanıcı"
   },
   "pages": {
-    "home": { "baslik": "Anasayfa", "aciklama": "Panel özeti" },
-    "domains": { "baslik": "Domainler", "aciklama": "Alan adları ve abonelikler" },
-    "dns": { "baslik": "DNS Yönetimi", "aciklama": "Genel DNS kayıtları" },
-    "mail": { "baslik": "E-posta Hesapları", "aciklama": "Posta kutuları ve mail" },
-    "databases": { "baslik": "Veritabanları", "aciklama": "MySQL veritabanları" },
-    "ssl": { "baslik": "SSL Sertifikaları", "aciklama": "TLS ve sertifika yönetimi" },
-    "wordpress": { "baslik": "WordPress", "aciklama": "WordPress siteleri" },
-    "plans": { "baslik": "Hizmet Planları", "aciklama": "Paket ve kota planları" },
-    "users": { "baslik": "Kullanıcılar", "aciklama": "Panel hesapları" },
-    "customers": { "baslik": "Müşteriler", "aciklama": "Müşteri ve iletişim kayıtları" },
-    "server_status": { "baslik": "Sunucu Durumu", "aciklama": "Kaynak ve servis özeti" },
-    "monitor": { "baslik": "Sunucu İzleme", "aciklama": "Canlı sunucu metrikleri ve günlükler" },
-    "stats": { "baslik": "İstatistikler", "aciklama": "Kullanım istatistikleri" },
-    "services": { "baslik": "Servisler", "aciklama": "Sistem servisleri" },
-    "php_versions": { "baslik": "PHP Sürümleri", "aciklama": "PHP sürüm yönetimi" },
-    "php_modules": { "baslik": "PHP Modülleri", "aciklama": "PHP eklenti yönetimi" },
-    "packages": { "baslik": "Paket Yöneticisi", "aciklama": "Sistem paketleri" },
-    "dns_template": { "baslik": "DNS Şablonu", "aciklama": "Varsayılan DNS kayıtları" },
-    "firewall": { "baslik": "Güvenlik Duvarı", "aciklama": "Firewall kuralları" },
-    "security_log": { "baslik": "Güvenlik Günlüğü", "aciklama": "Güvenlik olayları" },
-    "security_notifications": { "baslik": "Güvenlik Bildirimleri", "aciklama": "İlişkilendirilmiş olaylar" },
-    "backup": { "baslik": "Yedekleme", "aciklama": "Sunucu yedek yönetimi" },
-    "transfer": { "baslik": "Hesap Aktarımı", "aciklama": "Hesap ve site taşıma" },
-    "tools_settings": { "baslik": "Araçlar ve Ayarlar", "aciklama": "Panel araçları" },
-    "profile": { "baslik": "Profil ve Tercihler", "aciklama": "Hesap ve güvenlik ayarları" }
+    "home": {
+      "baslik": "Anasayfa",
+      "aciklama": "Panel özeti"
+    },
+    "domains": {
+      "baslik": "Domainler",
+      "aciklama": "Alan adları ve abonelikler"
+    },
+    "dns": {
+      "baslik": "DNS Yönetimi",
+      "aciklama": "Genel DNS kayıtları"
+    },
+    "mail": {
+      "baslik": "E-posta Hesapları",
+      "aciklama": "Posta kutuları ve mail"
+    },
+    "databases": {
+      "baslik": "Veritabanları",
+      "aciklama": "MySQL veritabanları"
+    },
+    "ssl": {
+      "baslik": "SSL Sertifikaları",
+      "aciklama": "TLS ve sertifika yönetimi"
+    },
+    "wordpress": {
+      "baslik": "WordPress",
+      "aciklama": "WordPress siteleri"
+    },
+    "plans": {
+      "baslik": "Hizmet Planları",
+      "aciklama": "Paket ve kota planları"
+    },
+    "users": {
+      "baslik": "Kullanıcılar",
+      "aciklama": "Panel hesapları"
+    },
+    "customers": {
+      "baslik": "Müşteriler",
+      "aciklama": "Müşteri ve iletişim kayıtları"
+    },
+    "server_status": {
+      "baslik": "Sunucu Durumu",
+      "aciklama": "Kaynak ve servis özeti"
+    },
+    "monitor": {
+      "baslik": "Sunucu İzleme",
+      "aciklama": "Canlı sunucu metrikleri ve günlükler"
+    },
+    "stats": {
+      "baslik": "İstatistikler",
+      "aciklama": "Kullanım istatistikleri"
+    },
+    "services": {
+      "baslik": "Servisler",
+      "aciklama": "Sistem servisleri"
+    },
+    "php_versions": {
+      "baslik": "PHP Sürümleri",
+      "aciklama": "PHP sürüm yönetimi"
+    },
+    "php_modules": {
+      "baslik": "PHP Modülleri",
+      "aciklama": "PHP eklenti yönetimi"
+    },
+    "packages": {
+      "baslik": "Paket Yöneticisi",
+      "aciklama": "Sistem paketleri"
+    },
+    "dns_template": {
+      "baslik": "DNS Şablonu",
+      "aciklama": "Varsayılan DNS kayıtları"
+    },
+    "firewall": {
+      "baslik": "Güvenlik Duvarı",
+      "aciklama": "Firewall kuralları"
+    },
+    "security_log": {
+      "baslik": "Güvenlik Günlüğü",
+      "aciklama": "Güvenlik olayları"
+    },
+    "security_notifications": {
+      "baslik": "Güvenlik Bildirimleri",
+      "aciklama": "İlişkilendirilmiş olaylar"
+    },
+    "backup": {
+      "baslik": "Yedekleme",
+      "aciklama": "Sunucu yedek yönetimi"
+    },
+    "transfer": {
+      "baslik": "Hesap Aktarımı",
+      "aciklama": "Hesap ve site taşıma"
+    },
+    "tools_settings": {
+      "baslik": "Araçlar ve Ayarlar",
+      "aciklama": "Panel araçları"
+    },
+    "profile": {
+      "baslik": "Profil ve Tercihler",
+      "aciklama": "Hesap ve güvenlik ayarları"
+    }
   },
   "domain_pages": {
-    "overview": { "baslik": "Genel Bakış", "aciklama": "Domain özeti" },
-    "files": { "baslik": "Dosya Yöneticisi", "aciklama": "Dosyalar ve dizinler" },
-    "webserver": { "baslik": "Apache & nginx", "aciklama": "Web sunucusu ayarları" },
-    "php": { "baslik": "PHP Ayarları", "aciklama": "PHP ve FPM yapılandırması" },
-    "composer": { "baslik": "Composer", "aciklama": "PHP paket yönetimi" },
-    "performance": { "baslik": "Performans", "aciklama": "Site performans ayarları" },
-    "redis": { "baslik": "Redis Cache", "aciklama": "Önbellek yönetimi" },
-    "wordpress": { "baslik": "WordPress", "aciklama": "WordPress araçları" },
-    "dns": { "baslik": "DNS Yönetimi", "aciklama": "Domain DNS kayıtları" },
-    "subdomains": { "baslik": "Subdomainler", "aciklama": "Alt alan adları" },
-    "addon_domains": { "baslik": "Ek Alan Adları", "aciklama": "Alias domainler" },
-    "ssl": { "baslik": "SSL/TLS", "aciklama": "HTTPS sertifikası" },
-    "databases": { "baslik": "Veritabanları", "aciklama": "MySQL veritabanları" },
-    "ftp": { "baslik": "FTP Hesapları", "aciklama": "FTP erişimi" },
-    "mail": { "baslik": "E-posta", "aciklama": "Posta kutuları" },
-    "backups": { "baslik": "Yedekler", "aciklama": "Domain yedekleri" },
-    "clone": { "baslik": "Siteyi Kopyala", "aciklama": "Site klonlama" },
-    "git": { "baslik": "Git", "aciklama": "Git deploy" },
-    "cron": { "baslik": "Zamanlanmış Görevler", "aciklama": "Cron işleri" },
-    "ssh": { "baslik": "SSH Erişimi", "aciklama": "Terminal erişimi" },
-    "logs": { "baslik": "Günlükler", "aciklama": "Erişim ve hata logları" },
-    "waf": { "baslik": "WAF", "aciklama": "Web uygulama güvenlik duvarı" },
-    "rate_limit": { "baslik": "Bot ve Hız Sınırı", "aciklama": "Trafik profilleri ve istisnalar" },
-    "access_control": { "baslik": "Erişim Kontrolü", "aciklama": "IP erişim kuralları" },
-    "password_protect": { "baslik": "Şifre Korumalı Dizinler", "aciklama": "Dizin parolası" },
-    "imunify": { "baslik": "Imunify", "aciklama": "Zararlı yazılım taraması" },
-    "stats": { "baslik": "İstatistikler", "aciklama": "Domain kullanım verileri" },
-    "connection_info": { "baslik": "Bağlantı Bilgisi", "aciklama": "FTP ve veritabanı bilgileri" },
+    "overview": {
+      "baslik": "Genel Bakış",
+      "aciklama": "Domain özeti"
+    },
+    "files": {
+      "baslik": "Dosya Yöneticisi",
+      "aciklama": "Dosyalar ve dizinler"
+    },
+    "webserver": {
+      "baslik": "Apache & nginx",
+      "aciklama": "Web sunucusu ayarları"
+    },
+    "php": {
+      "baslik": "PHP Ayarları",
+      "aciklama": "PHP ve FPM yapılandırması"
+    },
+    "composer": {
+      "baslik": "Composer",
+      "aciklama": "PHP paket yönetimi"
+    },
+    "performance": {
+      "baslik": "Performans",
+      "aciklama": "Site performans ayarları"
+    },
+    "redis": {
+      "baslik": "Redis Cache",
+      "aciklama": "Önbellek yönetimi"
+    },
+    "wordpress": {
+      "baslik": "WordPress",
+      "aciklama": "WordPress araçları"
+    },
+    "dns": {
+      "baslik": "DNS Yönetimi",
+      "aciklama": "Domain DNS kayıtları"
+    },
+    "addon_domains": {
+      "baslik": "Ek Alan Adları",
+      "aciklama": "Alias domainler"
+    },
+    "ssl": {
+      "baslik": "SSL/TLS",
+      "aciklama": "HTTPS sertifikası"
+    },
+    "databases": {
+      "baslik": "Veritabanları",
+      "aciklama": "MySQL veritabanları"
+    },
+    "ftp": {
+      "baslik": "FTP Hesapları",
+      "aciklama": "FTP erişimi"
+    },
+    "mail": {
+      "baslik": "E-posta",
+      "aciklama": "Posta kutuları"
+    },
+    "backups": {
+      "baslik": "Yedekler",
+      "aciklama": "Domain yedekleri"
+    },
+    "clone": {
+      "baslik": "Siteyi Kopyala",
+      "aciklama": "Site klonlama"
+    },
+    "git": {
+      "baslik": "Git",
+      "aciklama": "Git deploy"
+    },
+    "cron": {
+      "baslik": "Zamanlanmış Görevler",
+      "aciklama": "Cron işleri"
+    },
+    "ssh": {
+      "baslik": "SSH Erişimi",
+      "aciklama": "Terminal erişimi"
+    },
+    "logs": {
+      "baslik": "Günlükler",
+      "aciklama": "Erişim ve hata logları"
+    },
+    "waf": {
+      "baslik": "WAF",
+      "aciklama": "Web uygulama güvenlik duvarı"
+    },
+    "rate_limit": {
+      "baslik": "Bot ve Hız Sınırı",
+      "aciklama": "Trafik profilleri ve istisnalar"
+    },
+    "access_control": {
+      "baslik": "Erişim Kontrolü",
+      "aciklama": "IP erişim kuralları"
+    },
+    "password_protect": {
+      "baslik": "Şifre Korumalı Dizinler",
+      "aciklama": "Dizin parolası"
+    },
+    "imunify": {
+      "baslik": "Imunify",
+      "aciklama": "Zararlı yazılım taraması"
+    },
+    "stats": {
+      "baslik": "İstatistikler",
+      "aciklama": "Domain kullanım verileri"
+    },
+    "connection_info": {
+      "baslik": "Bağlantı Bilgisi",
+      "aciklama": "FTP ve veritabanı bilgileri"
+    },
     "open_domain_suffix": " · açık domain"
   }
 }

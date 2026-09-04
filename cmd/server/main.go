@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"sanalcp/internal/accounts"
+	"sanalcp/internal/altalangoc"
 	"sanalcp/internal/antivirus"
 	"sanalcp/internal/apps"
 	"sanalcp/internal/auth"
@@ -78,7 +79,6 @@ import (
 	"sanalcp/internal/sitekopya"
 	"sanalcp/internal/siteratelimit"
 	"sanalcp/internal/sshaccess"
-	"sanalcp/internal/subdomain"
 	"sanalcp/internal/system"
 	"sanalcp/internal/transfers"
 	"sanalcp/internal/users"
@@ -297,10 +297,10 @@ func main() {
 	wafH := &waf.Handlers{DB: d}
 	rateLimitH := &siteratelimit.Handlers{DB: d}
 	redisH := &redis.Handlers{DB: d}
-	subH := &subdomain.Handlers{DB: d, IPv4: ipv4}
+	altAlanGocH := &altalangoc.Handlers{DB: d, IPv4: ipv4}
 	ekH := &domainek.Handlers{DB: d, IPv4: ipv4}
 	mailH := &mail.Handlers{DB: d}
-	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH, Addon: ekH, Subdomain: subH}
+	transfersH := &transfers.Handlers{DB: d, Domains: domainsH, Mail: mailH, Cron: cronH, Addon: ekH}
 	transfers.RecoverRemoteJobs(d)
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
@@ -462,6 +462,11 @@ func main() {
 				r.With(middleware.BayiVeUstu).Post("/domains", domainsH.Create)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}", domainsH.Delete)
 				r.With(middleware.AdminOnly).Post("/domains/toplu/sahip", domainsH.TopluSahip)
+				// Alt alan adı göçü: mevcut subdomain kayıtlarını bağımsız domain
+				// hesabına taşır. Kota kontrolü YOK (bkz. internal/altalangoc paket
+				// başlığı), bu yüzden yalnız admin.
+				r.With(middleware.AdminOnly).Get("/altalan-goc", altAlanGocH.Envanter)
+				r.With(middleware.AdminOnly).Post("/altalan-goc", altAlanGocH.Calistir)
 				r.With(middleware.AdminOnly).Post("/domains/toplu/durum", domainsH.TopluDurum)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/php", domainsH.SetPHP)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ssh", sshH.Goster)
@@ -549,13 +554,6 @@ func main() {
 				r.With(middleware.AdminOnly).Post("/firewall/otoban/temizle", fwH.OtoBanTemizle)
 				r.With(middleware.AdminOnly).Delete("/firewall/{id}", fwH.Sil)
 				r.With(middleware.AdminOnly).Post("/firewall/{id}/durum", fwH.Durum)
-				r.With(middleware.MusteriScope).Get("/domains/{id}/subdomain", subH.Liste)
-				r.With(middleware.MusteriScope).Post("/domains/{id}/subdomain", subH.Olustur)
-				r.With(middleware.MusteriScope).Put("/domains/{id}/subdomain/{sid}", subH.Guncelle)
-				r.With(middleware.MusteriScope).Delete("/domains/{id}/subdomain/{sid}", subH.Sil)
-				r.With(middleware.MusteriScope).Get("/domains/{id}/subdomain/{sid}/ssl", subH.SSLDurum)
-				r.With(middleware.MusteriScope).Post("/domains/{id}/subdomain/{sid}/ssl", subH.SSLKur)
-				r.With(middleware.MusteriScope).Delete("/domains/{id}/subdomain/{sid}/ssl", subH.SSLKaldir)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/ek", ekH.Liste)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/ek", ekH.Olustur)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/ek/{ekid}", ekH.Sil)

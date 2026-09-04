@@ -65,7 +65,6 @@ function domainSayfalari(t: TFunc): readonly [string, string, string][] {
     ['/redis', t('TopBar:domain_pages.redis.baslik'), t('TopBar:domain_pages.redis.aciklama')],
     ['/wordpress', t('TopBar:domain_pages.wordpress.baslik'), t('TopBar:domain_pages.wordpress.aciklama')],
     ['/dns', t('TopBar:domain_pages.dns.baslik'), t('TopBar:domain_pages.dns.aciklama')],
-    ['/subdomainler', t('TopBar:domain_pages.subdomains.baslik'), t('TopBar:domain_pages.subdomains.aciklama')],
     ['/ek-alanlar', t('TopBar:domain_pages.addon_domains.baslik'), t('TopBar:domain_pages.addon_domains.aciklama')],
     ['/ssl', t('TopBar:domain_pages.ssl.baslik'), t('TopBar:domain_pages.ssl.aciklama')],
     ['/veritabanlari', t('TopBar:domain_pages.databases.baslik'), t('TopBar:domain_pages.databases.aciklama')],

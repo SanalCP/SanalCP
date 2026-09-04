@@ -48,6 +48,7 @@ const PaketDetayPage = lazySayfa(() => import('@/pages/PaketDetayPage'))
 const PHPSurumleriPage = lazySayfa(() => import('@/pages/PHPSurumleriPage'))
 const AraclarAyarlarPage = lazySayfa(() => import('@/pages/AraclarAyarlarPage'))
 const DNSSablonuPage = lazySayfa(() => import('@/pages/DNSSablonuPage'))
+const AltAlanGocPage = lazySayfa(() => import('@/pages/AltAlanGocPage'))
 const ServislerPage = lazySayfa(() => import('@/pages/ServislerPage'))
 const AppsPage = lazySayfa(() => import('@/pages/AppsPage'))
 const FirewallPage = lazySayfa(() => import('@/pages/FirewallPage'))
@@ -56,7 +57,6 @@ const DomainWordPressPage = lazySayfa(() => import('@/pages/DomainWordPressPage'
 const DomainPrestaShopPage = lazySayfa(() => import('@/pages/DomainPrestaShopPage'))
 const DomainLaravelPage = lazySayfa(() => import('@/pages/DomainLaravelPage'))
 const DomainAppsPage = lazySayfa(() => import('@/pages/DomainAppsPage'))
-const DomainSubdomainlerPage = lazySayfa(() => import('@/pages/DomainSubdomainlerPage'))
 const DomainEkAlanlarPage = lazySayfa(() => import('@/pages/DomainEkAlanlarPage'))
 const DomainErisimKontrolPage = lazySayfa(() => import('@/pages/DomainErisimKontrolPage'))
 const IstatistiklerPage = lazySayfa(() => import('@/pages/IstatistiklerPage'))
@@ -121,7 +121,6 @@ export default function App() {
         <Route path="abonelikler/:id/prestashop"    element={<DomainPrestaShopPage />} />
         <Route path="abonelikler/:id/laravel"       element={<DomainLaravelPage />} />
         <Route path="abonelikler/:id/uygulamalar"   element={<DomainAppsPage />} />
-        <Route path="abonelikler/:id/subdomainler"  element={<DomainSubdomainlerPage />} />
         <Route path="abonelikler/:id/ek-alanlar"    element={<DomainEkAlanlarPage />} />
         <Route path="abonelikler/:id/erisim-kontrol" element={<DomainErisimKontrolPage />} />
         <Route path="abonelikler/:id/cron"          element={<DomainCronPage />} />
@@ -141,6 +140,7 @@ export default function App() {
         <Route path="araclar/php-surumler"           element={<PHPSurumleriPage />} />
         <Route path="araclar/servisler"              element={<ServislerPage />} />
         <Route path="araclar/dns-sablonu"            element={<DNSSablonuPage />} />
+        <Route path="araclar/altalan-goc"            element={<AltAlanGocPage />} />
         <Route path="abonelikler/:id/:slug" element={<ToolPage />} />
         <Route path="hizmet-planlari"      element={<ServicePlansPage />} />
 

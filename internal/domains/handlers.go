@@ -2,17 +2,14 @@ package domains
 
 import (
 	"context"
-	"crypto/x509"
 	"database/sql"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -68,72 +65,13 @@ type Domain struct {
 	// boş = doğrudan admin'e ait (bkz. migrations/0048 "NULL = doğrudan admin").
 	BayiAdi      string `json:"bayi_adi,omitempty"`
 	BayiPaketAdi string `json:"bayi_paket_adi,omitempty"` // bayinin bağlı olduğu bayi paketi (varsa)
-	// AltAlanlar: bu domaine bağlı alt alan adları (subdomanlar tablosu).
-	// Listede ana domainin altında girintili gösterilir. TEK sorguyla topluca
-	// çekilir — domain başına ayrı istek atmak 14 domainde 14 ek sorgu demekti.
-	AltAlanlar []AltAlan `json:"alt_alanlar,omitempty"`
-}
-
-// AltAlan: domain listesinde gösterilen alt alan adı özeti. Yönetim ekranının
-// (DomainSubdomainlerPage) döndürdüğü tam kayıt değil — listede yalnız ad ve
-// PHP sürümü gösteriliyor.
-type AltAlan struct {
-	ID       int64  `json:"id"`
-	TamAd    string `json:"tam_ad"`
-	PHPSurum string `json:"php_surum"`
-	// SSL / SSLKaynak: ana domaindekiyle AYNI üç durumlu rozet için.
-	//
-	// Ana domainden farkı, kaynağın DB'de tutulmaması: subdomain SSL'i
-	// yalnızca dosya sisteminde yaşıyor (internal/subdomain/ssl.go) ve
-	// SSLKur kurduğu tipi hiçbir yere yazmıyor. Bu yüzden kaynak
-	// SERTİFİKANIN KENDİSİNDEN okunuyor — issuer == subject ise self-signed.
-	// Sütun eklemeye göre avantajı: geriye dönük çalışır (mevcut sertifikalar
-	// için de doğru sonuç verir) ve DB ile gerçeğin ayrışma ihtimali yoktur.
-	SSL       bool   `json:"ssl"`
-	SSLKaynak string `json:"ssl_kaynak,omitempty"`
-}
-
-// altAlanSSL: subdomain sertifikasının durumunu ve kaynağını dosya sisteminden
-// okur. Yol deseni internal/subdomain/ssl.go ile aynı: ~/ssl/<tam_ad>.crt|.key
-//
-// Sertifika okunamaz/çözümlenemezse kaynak BOŞ döner (bilinmiyor) — arayüz
-// bilinmeyeni yeşil gösterir, çünkü kırmızı yanlış alarm olurdu.
-func altAlanSSL(sk, tamAd string) (aktif bool, kaynak string) {
-	crt := filepath.Join("/home", sk, "ssl", tamAd+".crt")
-	key := filepath.Join("/home", sk, "ssl", tamAd+".key")
-	if _, err := os.Stat(crt); err != nil {
-		return false, ""
-	}
-	if _, err := os.Stat(key); err != nil {
-		return false, ""
-	}
-	return true, sertifikaKaynagi(crt)
-}
-
-// sertifikaKaynagi: PEM sertifikanın kendi kendini imzalayıp imzalamadığına
-// bakarak kaynağı belirler. Okunamaz/çözümlenemez sertifikada BOŞ döner
-// (bilinmiyor) — arayüz bilinmeyeni yeşil gösterir, kırmızı yanlış alarm olurdu.
-//
-// altAlanSSL'den ayrı tutulmasının sebebi /home altına sabitlenmiş olmaması:
-// asıl karar mantığı budur ve gerçek sertifikalarla test edilebilmelidir.
-func sertifikaKaynagi(crtYol string) string {
-	ham, err := os.ReadFile(crtYol)
-	if err != nil {
-		return ""
-	}
-	blok, _ := pem.Decode(ham)
-	if blok == nil {
-		return ""
-	}
-	c, err := x509.ParseCertificate(blok.Bytes)
-	if err != nil {
-		return ""
-	}
-	// Kendi kendini imzalayan sertifikada veren ile konu aynıdır.
-	if c.Issuer.String() == c.Subject.String() {
-		return "self-signed"
-	}
-	return "letsencrypt"
+	// CustomerID/MusteriAd: domain'in bağlı olduğu müşteri kaydı — "Sahip
+	// değiştir" (TopluSahip) YALNIZCA bunu günceller. Listede gösterilmediği
+	// sürece işlem başarılı olsa bile tablo birebir aynı kalır ve özellik
+	// bozukmuş gibi görünür (canlıda yaşandı); bu yüzden sütuna taşındı.
+	// sistem_kullanici bu işlemle DEĞİŞMEZ — dosyalar/FTP/DB eski tenant'ta kalır.
+	CustomerID *int64 `json:"customer_id,omitempty"`
+	MusteriAd  string `json:"musteri_ad,omitempty"`
 }
 
 type Handlers struct {
@@ -147,7 +85,7 @@ const selectAll = `SELECT d.id, d.alan_adi, d.sistem_kullanici, d.php_surum, d.s
   COALESCE(d.notlar,''), DATE_FORMAT(d.olusturulma,'%Y-%m-%d'),
   d.plan_id, COALESCE(p.ad,''), d.ssh_erisim, COALESCE(d.askida,0),
   COALESCE(bu.username,''), COALESCE(brp.ad,''), COALESCE(d.site_tipi,'php'),
-  COALESCE(d.ssl_kaynak,'')
+  COALESCE(d.ssl_kaynak,''), d.customer_id, COALESCE(cu.ad,'')
   FROM domains d
   LEFT JOIN service_plans p ON p.id=d.plan_id
   LEFT JOIN customers cu ON cu.id = d.customer_id
@@ -158,13 +96,14 @@ const selectAll = `SELECT d.id, d.alan_adi, d.sistem_kullanici, d.php_surum, d.s
 func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 	var d Domain
 	var ssl, demo, sshE, askida int
-	var planID sql.NullInt64
+	var planID, custID sql.NullInt64
 	err := rs.Scan(&d.ID, &d.AlanAdi, &d.SistemKullanici, &d.PHPSurum, &ssl,
 		&d.SSLBitis, &d.Durum, &d.IPv4, &d.FTPHost, &d.FTPUser,
 		&d.DBHost, &d.DBUser, &d.DBAdi, &d.WebRoot, &d.BoyutKB, &d.TrafikKB, &demo,
 		&d.Notlar, &d.Olusturulma,
 		&planID, &d.PlanAd, &sshE, &askida,
-		&d.BayiAdi, &d.BayiPaketAdi, &d.SiteTipi, &d.SSLKaynak)
+		&d.BayiAdi, &d.BayiPaketAdi, &d.SiteTipi, &d.SSLKaynak,
+		&custID, &d.MusteriAd)
 	d.SSL = ssl == 1
 	d.IsDemo = demo == 1
 	d.SshErisim = sshE == 1
@@ -172,6 +111,10 @@ func scan(rs interface{ Scan(...any) error }) (Domain, error) {
 	if planID.Valid {
 		v := planID.Int64
 		d.PlanID = &v
+	}
+	if custID.Valid {
+		v := custID.Int64
+		d.CustomerID = &v
 	}
 	return d, err
 }
@@ -197,51 +140,7 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, d)
 	}
-	h.altAlanlariEkle(r, out)
 	httpx.WriteJSON(w, http.StatusOK, out)
-}
-
-// altAlanlariEkle: listedeki domainlerin alt alan adlarını TEK sorguda çeker
-// ve ilgili domaine iliştirir.
-//
-// Kapsam: yalnızca ZATEN döndürülmüş domain id'leri sorgulanır. Böylece
-// listenin kapsam filtresi (admin/bayi/müşteri) burada da geçerli kalır —
-// ayrı bir yetki kontrolü gerekmez, sızdıracak bir şey yoktur.
-//
-// Hata durumunda sessizce geçilir: alt alan listesi tamamlayıcı bilgidir,
-// tek bir sorgu hatası yüzünden tüm domain listesini düşürmek doğru olmaz.
-func (h *Handlers) altAlanlariEkle(r *http.Request, liste []Domain) {
-	if len(liste) == 0 {
-		return
-	}
-	idx := make(map[int64]int, len(liste))
-	args := make([]any, 0, len(liste))
-	ph := make([]string, 0, len(liste))
-	for i := range liste {
-		idx[liste[i].ID] = i
-		args = append(args, liste[i].ID)
-		ph = append(ph, "?")
-	}
-	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT domain_id, id, tam_ad, php_surum FROM subdomanlar
-		 WHERE domain_id IN (`+strings.Join(ph, ",")+`) ORDER BY tam_ad`, args...)
-	if err != nil {
-		log.Printf("alt alan listesi okunamadı: %v", err)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var dID int64
-		var a AltAlan
-		if err := rows.Scan(&dID, &a.ID, &a.TamAd, &a.PHPSurum); err != nil {
-			continue
-		}
-		if i, ok := idx[dID]; ok {
-			a.SSL, a.SSLKaynak = altAlanSSL(liste[i].SistemKullanici, a.TamAd)
-			liste[i].AltAlanlar = append(liste[i].AltAlanlar, a)
-		}
-	}
-	_ = rows.Err()
 }
 
 func (h *Handlers) Get(w http.ResponseWriter, r *http.Request) {
@@ -420,22 +319,6 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.QueryRowContext(r.Context(), `SELECT id FROM domains WHERE alan_adi=?`, req.AlanAdi).Scan(&existing)
 	if err == nil {
 		httpx.WriteError(w, http.StatusConflict, "bu alan adı zaten kayıtlı")
-		return
-	}
-	// Aynı ad bir ALT ALAN olarak duruyorsa engelle. Kontrol yalnız ters yönde
-	// vardı (subdomain oluştururken domains'e bakılıyordu); bu yön açıkta
-	// kaldığı için aynı server_name'e sahip İKİ nginx server bloğu üretilebilir
-	// ve hangisinin kazanacağı nginx'in yükleme sırasına kalırdı.
-	//
-	// Alt alan adını tam domaine yükseltmek MEŞRU bir istek (kendi Linux
-	// kullanıcısı → kendi PHP-FPM servisi → farklı PHP sürümü), bu yüzden mesaj
-	// ne yapılacağını söylüyor: önce alt alan adını sil.
-	var altVar int64
-	if e := h.DB.QueryRowContext(r.Context(),
-		`SELECT domain_id FROM subdomanlar WHERE tam_ad=?`, req.AlanAdi).Scan(&altVar); e == nil {
-		httpx.WriteError(w, http.StatusConflict,
-			"bu ad şu anda bir alt alan adı olarak kullanılıyor. Ayrı bir domain olarak eklemek "+
-				"için önce ilgili domainin Alt Alan Adları sayfasından silin.")
 		return
 	}
 
@@ -1274,8 +1157,25 @@ func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+err.Error())
 		return
 	}
+	// RowsAffected DEĞİŞEN satırı sayar: zaten o müşteride olan domainlerde 0
+	// döner. Arayüz bunu "hiçbir şey olmadı" diye gösterirse yanıltıcı olur,
+	// tersine hiç yazılmamış olsa da 0 döner. Bu yüzden asıl ölçüt istenen
+	// sahipliğe SAHİP OLAN satır sayısı — tekrar okuyup onu döndürüyoruz.
 	n, _ := res.RowsAffected()
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "guncellenen": n})
+	sonKosul := `customer_id IS NULL`
+	sonArgs := []any{}
+	if req.CustomerID != nil && *req.CustomerID > 0 {
+		sonKosul = `customer_id = ?`
+		sonArgs = append(sonArgs, *req.CustomerID)
+	}
+	sonArgs = append(sonArgs, args[1:]...)
+	var dogrulanan int64
+	_ = h.DB.QueryRowContext(r.Context(),
+		`SELECT COUNT(*) FROM domains WHERE `+sonKosul+
+			` AND id IN (`+strings.Join(placeholders, ",")+`)`, sonArgs...).Scan(&dogrulanan)
+
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "guncellenen": n, "dogrulanan": dogrulanan, "istenen": len(req.IDs)})
 }
 
 // TopluDurum: aktif/pasif toggle

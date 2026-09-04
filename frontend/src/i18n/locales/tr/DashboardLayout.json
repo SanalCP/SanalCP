@@ -53,7 +53,6 @@
     "composer": "Composer",
     "performance": "Performans",
     "redis_cache": "Redis Cache",
-    "subdomains": "Subdomainler",
     "addon_domains": "Ek Alan Adları",
     "ssl_tls": "SSL/TLS",
     "ftp_accounts": "FTP Hesapları",
@@ -72,7 +71,8 @@
     "file_manager": "Dosya Yöneticisi",
     "dns_settings": "DNS Ayarları",
     "git_deploy": "Git Deploy",
-    "import": "İçe Aktarma"
+    "import": "İçe Aktarma",
+    "subdomain_migration": "Alt Alan Adı Göçü"
   },
   "server_management_back": "Sunucu Yönetimi",
   "close_menu_aria": "Menüyü kapat",

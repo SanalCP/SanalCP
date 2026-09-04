@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"sanalcp/internal/adlar"
+	"sanalcp/internal/altalangoc"
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/dns"
 	"sanalcp/internal/provisioner"
@@ -67,8 +68,8 @@ func (h *Handlers) importNativeChildDomains(r *http.Request, archivePath string,
 	if err != nil {
 		return 0, 0, fmt.Errorf("ek alan metadata: %w", err)
 	}
-	if len(subs) > 0 && h.Subdomain == nil {
-		return 0, 0, errors.New("alt alan sağlayıcısı hazır değil")
+	if len(subs) > 0 && h.Domains == nil {
+		return 0, 0, errors.New("domain sağlayıcısı hazır değil")
 	}
 	if len(addons) > 0 && h.Addon == nil {
 		return 0, 0, errors.New("ek alan sağlayıcısı hazır değil")
@@ -90,13 +91,23 @@ func (h *Handlers) importNativeChildDomains(r *http.Request, archivePath string,
 		seen[addons[i].Domain] = true
 	}
 
-	for i := range subs {
-		body := []byte(fmt.Sprintf(`{"alt_ad":%q,"php_surum":%q}`, subs[i].Label, subs[i].PHPVersion))
-		req := domainRequest(r, http.MethodPost, "/subdomain", parentID, bytes.NewReader(body))
-		rr := httptest.NewRecorder()
-		h.Subdomain.Olustur(rr, req)
-		if rr.Code < 200 || rr.Code >= 300 {
-			return i, 0, fmt.Errorf("%s: %s", subs[i].Domain, strings.TrimSpace(rr.Body.String()))
+	// Alt alan adları hedefte BAĞIMSIZ domain olarak açılır — panelde alt alan
+	// adı sistemi kaldırıldı (CloudPanel modeli). Kaynak panel eski sürüm
+	// olabileceği için arşiv hâlâ subdomains.jsonl taşıyor; aktarımın kayıpsız
+	// kalması için bunlar atlanmaz, yükseltilir.
+	//
+	// Sahiplik ana domainden devralınır: aktarılan alt alan adı, ana domainin
+	// müşterisinde görünmeli.
+	subSK := make(map[string]string, len(subs))
+	if len(subs) > 0 {
+		customerID, sahipBayi := altalangoc.Sahiplik(r.Context(), h.DB, parentID)
+		for i := range subs {
+			_, yeniSK, err := altalangoc.TenantOlustur(r.Context(), h.DB,
+				subs[i].Domain, subs[i].PHPVersion, h.Domains.IPv4, customerID, sahipBayi)
+			if err != nil {
+				return i, 0, fmt.Errorf("%s: %w", subs[i].Domain, err)
+			}
+			subSK[subs[i].Domain] = yeniSK
 		}
 	}
 	for i := range addons {
@@ -108,7 +119,9 @@ func (h *Handlers) importNativeChildDomains(r *http.Request, archivePath string,
 			return len(subs), i, fmt.Errorf("%s: %s", addons[i].Domain, strings.TrimSpace(rr.Body.String()))
 		}
 	}
-	if err := restoreNativeChildTrees(archivePath, inv.ArchiveRoot, sk, "subdomains", subNames(subs)); err != nil {
+	// Alt alan adı dosyaları ana tenant'ın ~/subdomains'ine DEĞİL, her birinin
+	// kendi yeni tenant'ının public_html'ine açılır.
+	if err := restoreNativeSubdomainTrees(archivePath, inv.ArchiveRoot, subSK); err != nil {
 		return len(subs), len(addons), fmt.Errorf("alt alan dosyaları: %w", err)
 	}
 	if err := restoreNativeChildTrees(archivePath, inv.ArchiveRoot, sk, "domains", addonNames(addons)); err != nil {
@@ -245,12 +258,49 @@ func validPHPVersion(s string) bool {
 	return true
 }
 
-func subNames(in []nativeSubdomain) []string {
-	out := make([]string, 0, len(in))
-	for _, x := range in {
-		out = append(out, x.Domain)
+// restoreNativeSubdomainTrees: arşivdeki her alt alan adı ağacını KENDİ yeni
+// tenant'ının public_html'ine açar.
+//
+// restoreNativeChildTrees'ten farkı hedefin ad başına değişmesi: üye yolu
+// root/homedir/subdomains/<ad>/… olduğundan 4 bileşen atılır ve içerik doğrudan
+// /home/<yeniSK>/public_html altına düşer. Arşiv ad başına bir kez açılır —
+// tek tar çağrısı bütün adları alamaz, çünkü her adın hedefi farklı.
+func restoreNativeSubdomainTrees(archivePath, root string, adSK map[string]string) error {
+	if len(adSK) == 0 {
+		return nil
 	}
-	return out
+	if root == "" {
+		return errors.New("güvensiz kaynak")
+	}
+	if err := archivex.Tara(archivePath, archivex.TurTarGz); err != nil {
+		return err
+	}
+	for ad, sk := range adSK {
+		if !adlar.SKGecerli(sk) || provisioner.ValidateDomain(ad) != nil {
+			return errors.New("güvensiz alt alan hedefi: " + ad)
+		}
+		target := "/home/" + sk + "/public_html"
+		f, err := os.Open(archivePath)
+		if err != nil {
+			return err
+		}
+		cmd := exec.Command("runuser", "-u", sk, "--",
+			"tar", "-xz", "-f", "-", "-C", target, "--strip-components=4",
+			root+"/homedir/subdomains/"+ad)
+		cmd.Stdin = f
+		out, err := cmd.CombinedOutput()
+		f.Close()
+		if err != nil {
+			// "Not found" = kaynakta o ağaç yok; boş bir alt alan adı aktarımı
+			// düşürmemeli (restoreNativeChildTrees ile aynı tolerans).
+			if strings.Contains(string(out), "Not found") {
+				continue
+			}
+			return fmt.Errorf("tar %s: %s", ad, strings.TrimSpace(string(out)))
+		}
+		_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
+	}
+	return nil
 }
 func addonNames(in []nativeAddonDomain) []string {
 	out := []string{}
