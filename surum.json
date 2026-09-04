@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.56",
-  "duyuru": "KRİTİK aktarım düzeltmesi: yapılandırmalara yazılan DB_HOST artık 127.0.0.1 değil localhost — panel MySQL hesaplarını yalnız @localhost açtığı için aktarılan siteler veritabanına bağlanamıyordu. Ayrıca define() ve dizi biçimindeki PHP yapılandırmaları da uyarlanıyor.",
-  "kritik": true,
-  "yayin_tarihi": "2026-09-03"
+  "son_surum": "0.9.57",
+  "duyuru": "Ana sayfadaki Sunucu Bilgileri kartına toplam RAM miktarı eklendi (çekirdek sayısının altında).",
+  "kritik": false,
+  "yayin_tarihi": "2026-09-04"
 }

@@ -13,6 +13,11 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.57** (2026-09-04)
+
+Ana sayfadaki "Sunucu Bilgileri" kartına, çekirdek sayısının altına toplam
+bellek (RAM) miktarı eklendi.
+
 **0.9.56** (2026-09-03)
 
 **Kritik.** Aktarımda yapılandırma dosyalarına yazılan veritabanı sunucusu adresi
