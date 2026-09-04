@@ -547,6 +547,7 @@ export default function HomePage() {
             <KV etiket={t('HomePage:sunucu_bilgi.kernel')} deger={s.sistem.kernel || '—'} />
             <KV etiket={t('HomePage:sunucu_bilgi.cpu')} deger={s.sistem.cpu_modeli || '—'} />
             <KV etiket={t('HomePage:sunucu_bilgi.cores')} deger={t('HomePage:sunucu_bilgi.cores_value', { count: s.sistem.cpu_cekirdek })} />
+            <KV etiket={t('HomePage:sunucu_bilgi.ram')} deger={fmtGB(s.bellek.toplam_kb)} />
             <KV etiket={t('HomePage:sunucu_bilgi.uptime')} deger={formatUptime(s.uptime_sn, i18n.language)} />
             <KV etiket={t('HomePage:sunucu_bilgi.panel_version')} deger={s.sistem.panel_surum || '—'} />
           </div>

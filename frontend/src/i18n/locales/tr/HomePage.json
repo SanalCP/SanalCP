@@ -126,6 +126,7 @@
     "cpu": "İşlemci",
     "cores": "Çekirdek sayısı",
     "cores_value": "{{count}} vCPU",
+    "ram": "Bellek (RAM)",
     "uptime": "Çalışma süresi",
     "panel_version": "Panel sürümü"
   },

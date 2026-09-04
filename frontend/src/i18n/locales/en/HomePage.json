@@ -126,6 +126,7 @@
     "cpu": "Processor",
     "cores": "Core count",
     "cores_value": "{{count}} vCPU",
+    "ram": "Memory (RAM)",
     "uptime": "Uptime",
     "panel_version": "Panel version"
   },
