@@ -43,18 +43,18 @@ import (
 
 // Kayit: göç edilecek tek bir alt alan adının envanter satırı.
 type Kayit struct {
-	ID          int64  `json:"id"` // subdomanlar.id
-	TamAd       string `json:"tam_ad"`
-	AltAd       string `json:"alt_ad"`
-	PHPSurum    string `json:"php_surum"`
-	AnaDomainID int64  `json:"ana_domain_id"`
-	AnaAlanAdi  string `json:"ana_alan_adi"`
-	EskiSK      string `json:"eski_sk"`
-	HedefSK     string `json:"hedef_sk"`
-	KaynakDizin string `json:"kaynak_dizin"`
-	BoyutKB     int64  `json:"boyut_kb"`
-	DosyaSayisi int    `json:"dosya_sayisi"`
-	SertifikaVar bool  `json:"sertifika_var"`
+	ID           int64  `json:"id"` // subdomanlar.id
+	TamAd        string `json:"tam_ad"`
+	AltAd        string `json:"alt_ad"`
+	PHPSurum     string `json:"php_surum"`
+	AnaDomainID  int64  `json:"ana_domain_id"`
+	AnaAlanAdi   string `json:"ana_alan_adi"`
+	EskiSK       string `json:"eski_sk"`
+	HedefSK      string `json:"hedef_sk"`
+	KaynakDizin  string `json:"kaynak_dizin"`
+	BoyutKB      int64  `json:"boyut_kb"`
+	DosyaSayisi  int    `json:"dosya_sayisi"`
+	SertifikaVar bool   `json:"sertifika_var"`
 	// SymlinkVar: kaynak ağaçta symlink bulundu. Alt alan adı ana hesabın
 	// vendor/ gibi dizinlerini paylaşıyor olabilir; göçten sonra bu bağ KOPAR.
 	// Ön kontrol bunu engel saymaz ama işaretler — operatör elle bakmalı.

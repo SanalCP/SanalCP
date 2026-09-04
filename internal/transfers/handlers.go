@@ -40,11 +40,11 @@ import (
 const MaxUploadBytes = int64(20 << 30)
 
 type Handlers struct {
-	DB        *sql.DB
-	Domains   *domains.Handlers
-	Mail      *mail.Handlers
-	Cron      *cron.Handlers
-	Addon     *domainek.Handlers
+	DB      *sql.DB
+	Domains *domains.Handlers
+	Mail    *mail.Handlers
+	Cron    *cron.Handlers
+	Addon   *domainek.Handlers
 }
 
 // Analyze accepts a cPanel full backup and returns an inventory. It never
@@ -103,25 +103,25 @@ func (h *Handlers) Analyze(w http.ResponseWriter, r *http.Request) {
 }
 
 type importResponse struct {
-	OK           bool             `json:"ok"`
-	DomainID     int64            `json:"domain_id"`
-	Domain       string           `json:"domain"`
-	SystemUser   string           `json:"system_user"`
-	WebFiles     int              `json:"web_files"`
-	Databases    []DBMap          `json:"databases"`
-	Credentials  any              `json:"credentials"`
-	Mailboxes    []MailCredential `json:"mailboxes"`
-	Aliases      int              `json:"aliases"`
-	CronJobs     int              `json:"cron_jobs"`
-	SSLImported  bool             `json:"ssl_imported"`
-	SSLExpires   string           `json:"ssl_expires,omitempty"`
-	Skipped      []string         `json:"skipped"`
+	OK          bool             `json:"ok"`
+	DomainID    int64            `json:"domain_id"`
+	Domain      string           `json:"domain"`
+	SystemUser  string           `json:"system_user"`
+	WebFiles    int              `json:"web_files"`
+	Databases   []DBMap          `json:"databases"`
+	Credentials any              `json:"credentials"`
+	Mailboxes   []MailCredential `json:"mailboxes"`
+	Aliases     int              `json:"aliases"`
+	CronJobs    int              `json:"cron_jobs"`
+	SSLImported bool             `json:"ssl_imported"`
+	SSLExpires  string           `json:"ssl_expires,omitempty"`
+	Skipped     []string         `json:"skipped"`
 	// Subdomains: kaynak panelde alt alan adı olan ve hedefte BAĞIMSIZ domain
 	// olarak açılan site sayısı. Panelde alt alan adı sistemi kaldırıldı;
 	// aktarım bunları atlamak yerine yükseltir.
-	Subdomains   int              `json:"subdomains"`
-	AddonDomains int              `json:"addon_domains"`
-	Source       Inventory        `json:"source"`
+	Subdomains   int       `json:"subdomains"`
+	AddonDomains int       `json:"addon_domains"`
+	Source       Inventory `json:"source"`
 }
 
 type MailCredential struct {

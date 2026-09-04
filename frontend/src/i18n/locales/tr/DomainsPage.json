@@ -117,15 +117,15 @@
   },
   "owner_modal": {
     "title": "Domain sahibini değiştir",
-    "desc": "Seçili {{count}} domain aşağıda seçtiğiniz müşteriye bağlanacak.",
+    "desc": "Seçili {{count}} domain aşağıda seçtiğiniz bayiye devredilecek.",
     "none": "— Sahipsiz (doğrudan yöneticiye ait) —",
-    "hint": "Bu işlem YALNIZCA panel sahipliğini değiştirir: domain, seçtiğiniz müşterinin panel hesabında görünür. Sistem kullanıcısı, dosyalar, FTP ve veritabanı eski hesapta kalır — Linux hesabı taşınmaz. Domaini başka bir bayiye devretmek için o bayiye ait bir müşteri seçin; yönetici olarak açtığınız müşteri kayıtları size bağlı kalır.",
+    "hint": "Bu işlem panel sahipliğini değiştirir: domain seçtiğiniz bayinin panelinde görünür. Sistem kullanıcısı, dosyalar, FTP ve veritabanı değişmez.",
     "apply": "Uygula",
     "applying": "Uygulanıyor…",
     "success": "{{count}} domainin panel sahibi güncellendi.",
     "partial": "⚠ {{total}} domainden yalnız {{count}} tanesinin sahibi güncellendi. Listeyi kontrol edin.",
     "error": "Sahip değiştirilemedi",
-    "load_error": "Müşteri listesi alınamadı"
+    "load_error": "Bayi listesi alınamadı"
   },
   "wp_redirect": {
     "text": "{{domain}} oluşturuldu. WordPress kurulumunu tamamlamak için site başlığı ve yönetici bilgilerini girmeniz gerekiyor.",

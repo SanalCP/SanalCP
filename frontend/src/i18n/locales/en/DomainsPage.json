@@ -117,15 +117,15 @@
   },
   "owner_modal": {
     "title": "Change domain owner",
-    "desc": "The {{count}} selected domain(s) will be linked to the customer you pick below.",
+    "desc": "The {{count}} selected domain(s) will be transferred to the reseller you pick below.",
     "none": "— Unassigned (belongs to the administrator) —",
-    "hint": "This changes panel ownership ONLY: the domain shows up in the selected customer's panel account. The system user, files, FTP and database stay with the old account — the Linux account is not moved. To hand a domain over to another reseller, pick a customer that belongs to them; customer records you create as an administrator stay bound to you.",
+    "hint": "This changes panel ownership: the domain appears in the selected reseller's panel. The system user, files, FTP and database remain unchanged.",
     "apply": "Apply",
     "applying": "Applying…",
     "success": "Panel owner updated for {{count}} domain(s).",
     "partial": "⚠ Owner updated for only {{count}} of {{total}} domain(s). Please check the list.",
     "error": "Could not change the owner",
-    "load_error": "Could not load the customer list"
+    "load_error": "Could not load the reseller list"
   },
   "wp_redirect": {
     "text": "{{domain}} has been created. To finish the WordPress installation you need to enter the site title and administrator details.",

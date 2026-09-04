@@ -65,10 +65,9 @@ type Domain struct {
 	// boş = doğrudan admin'e ait (bkz. migrations/0048 "NULL = doğrudan admin").
 	BayiAdi      string `json:"bayi_adi,omitempty"`
 	BayiPaketAdi string `json:"bayi_paket_adi,omitempty"` // bayinin bağlı olduğu bayi paketi (varsa)
-	// CustomerID/MusteriAd: domain'in bağlı olduğu müşteri kaydı — "Sahip
-	// değiştir" (TopluSahip) YALNIZCA bunu günceller. Listede gösterilmediği
-	// sürece işlem başarılı olsa bile tablo birebir aynı kalır ve özellik
-	// bozukmuş gibi görünür (canlıda yaşandı); bu yüzden sütuna taşındı.
+	// CustomerID/MusteriAd: domain'in bağlı olduğu müşteri kaydı. "Sahip
+	// değiştir" (TopluSahip), bu müşterinin owner_user_id değerini güncelleyerek
+	// domaini bayi kapsamına alır; customer_id ve sistem kullanıcısı değişmez.
 	// sistem_kullanici bu işlemle DEĞİŞMEZ — dosyalar/FTP/DB eski tenant'ta kalır.
 	CustomerID *int64 `json:"customer_id,omitempty"`
 	MusteriAd  string `json:"musteri_ad,omitempty"`
@@ -1113,10 +1112,12 @@ func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "silinen": dbName})
 }
 
-// TopluSahip: birden çok domain'in customer_id'sini güncelle
+// TopluSahip: birden çok domain'in bağlı olduğu müşteriyi hedef bayiye devret.
+// Görünürlük domains.customer_id -> customers.owner_user_id zincirinden
+// çözüldüğü için zincirin gerçek bayi sahipliği alanı güncellenir.
 type topluSahipReq struct {
 	IDs        []int64 `json:"ids"`
-	CustomerID *int64  `json:"customer_id"`
+	BayiUserID *int64  `json:"bayi_user_id"`
 }
 
 func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
@@ -1129,29 +1130,26 @@ func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "boş ids")
 		return
 	}
-	// customer_id NULL veya pozitif olabilir
-	if req.CustomerID != nil && *req.CustomerID > 0 {
-		var exists int
-		_ = h.DB.QueryRowContext(r.Context(),
-			`SELECT COUNT(*) FROM customers WHERE id=?`, *req.CustomerID).Scan(&exists)
-		if exists == 0 {
-			httpx.WriteError(w, http.StatusBadRequest, "müşteri bulunamadı")
-			return
-		}
+	hedefBayi, sahipHata := h.sahipBayiCoz(r, req.BayiUserID)
+	if sahipHata != "" {
+		httpx.WriteError(w, http.StatusBadRequest, sahipHata)
+		return
 	}
 	// IN clause icin placeholder
 	placeholders := make([]string, len(req.IDs))
-	args := []any{}
-	if req.CustomerID != nil && *req.CustomerID > 0 {
-		args = append(args, *req.CustomerID)
-	} else {
-		args = append(args, nil)
+	var sahip any
+	if hedefBayi != nil {
+		sahip = *hedefBayi
 	}
+	args := []any{sahip}
 	for i, id := range req.IDs {
 		placeholders[i] = "?"
 		args = append(args, id)
 	}
-	sql := `UPDATE domains SET customer_id=? WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+	sql := `UPDATE customers c
+		JOIN domains d ON d.customer_id = c.id
+		SET c.owner_user_id=?
+		WHERE d.id IN (` + strings.Join(placeholders, ",") + `)`
 	res, err := h.DB.ExecContext(r.Context(), sql, args...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "güncelleme: "+err.Error())
@@ -1162,17 +1160,17 @@ func (h *Handlers) TopluSahip(w http.ResponseWriter, r *http.Request) {
 	// tersine hiç yazılmamış olsa da 0 döner. Bu yüzden asıl ölçüt istenen
 	// sahipliğe SAHİP OLAN satır sayısı — tekrar okuyup onu döndürüyoruz.
 	n, _ := res.RowsAffected()
-	sonKosul := `customer_id IS NULL`
+	sonKosul := `c.owner_user_id IS NULL`
 	sonArgs := []any{}
-	if req.CustomerID != nil && *req.CustomerID > 0 {
-		sonKosul = `customer_id = ?`
-		sonArgs = append(sonArgs, *req.CustomerID)
+	if hedefBayi != nil {
+		sonKosul = `c.owner_user_id = ?`
+		sonArgs = append(sonArgs, *hedefBayi)
 	}
 	sonArgs = append(sonArgs, args[1:]...)
 	var dogrulanan int64
 	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COUNT(*) FROM domains WHERE `+sonKosul+
-			` AND id IN (`+strings.Join(placeholders, ",")+`)`, sonArgs...).Scan(&dogrulanan)
+		`SELECT COUNT(*) FROM domains d JOIN customers c ON c.id=d.customer_id WHERE `+sonKosul+
+			` AND d.id IN (`+strings.Join(placeholders, ",")+`)`, sonArgs...).Scan(&dogrulanan)
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "guncellenen": n, "dogrulanan": dogrulanan, "istenen": len(req.IDs)})

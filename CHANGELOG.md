@@ -13,6 +13,18 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.59** (2026-09-04)
+
+Domainler ekranındaki **Sahibini değiştir** işlemi artık doğrudan aktif bayiyi
+seçtiriyor ve domainin bağlı müşteri kaydındaki bayi sahipliğini güncelliyor.
+Önceki sürüm yalnız müşteri bağlantısını değiştiriyor, gerçek bayi sahipliği
+alanına dokunmadığı için işlem başarılı görünse bile Bayi sütununda “admin”
+kalıyor ve domain hedef bayinin panelinde görünmüyordu.
+
+Ayrıca v0.9.58 kaynaklarında gözden kaçan Go biçimlendirme hataları düzeltildi.
+Release paketleme betiğine zorunlu `gofmt` kontrolü eklendi; biçimsiz bir Go
+dosyası varsa paketleme artık test ve derleme aşamasına geçmeden duruyor.
+
 **0.9.58** (2026-09-04)
 
 **Kritik — davranış değişikliği.** Alt alan adı (subdomain) sistemi kaldırıldı.

@@ -33,7 +33,14 @@ echo "== Release toolchain: $GO_TOOLCHAIN =="
 EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct 2>/dev/null || date +%s)}"
 BUILD_DATE="$(date -u -d "@$EPOCH" +%Y-%m-%d)"
 
-echo "== Go test/vet =="
+echo "== Go format/test/vet =="
+unformatted="$(find cmd internal scripts -type f -name '*.go' -exec gofmt -l {} +)"
+if [ -n "$unformatted" ]; then
+  echo "gofmt gerekli dosyalar:" >&2
+  echo "$unformatted" >&2
+  echo "düzeltmek için: find cmd internal scripts -type f -name '*.go' -exec gofmt -w {} +" >&2
+  exit 1
+fi
 go test ./...
 go vet ./...
 

@@ -87,7 +87,6 @@ export default function DomainsPage() {
   const benimRolum = useAuth((s) => s.kullanici?.rol)
   const adminMiyim = benimRolum === 'admin'
   const [sahipAcik, setSahipAcik] = useState(false)
-  const [musteriler, setMusteriler] = useState<{ id: number; ad: string; eposta: string }[]>([])
   const [sahipHedef, setSahipHedef] = useState<string>('')
   const [silOnay, setSilOnay] = useState(false)
   const [silOnayMetin, setSilOnayMetin] = useState('')
@@ -358,22 +357,21 @@ export default function DomainsPage() {
   async function sahipAc() {
     setSahipHedef(''); setSahipAcik(true)
     try {
-      const { data } = await api.get<{ id: number; ad: string; eposta: string }[]>('/customers')
-      setMusteriler(data || [])
+      const { data } = await api.get<{ id: number; kullanici_adi: string; ad_soyad?: string; rol: string; durum: string }[]>('/users')
+      setBayiler((data || []).filter(u => u.rol === 'reseller' && u.durum === 'active'))
     } catch (e) { setHata(apiHata(e, t('DomainsPage:owner_modal.load_error'))) }
   }
 
   async function sahipUygula() {
     const ids = Array.from(secili)
-    // Boş seçim = sahipliği KALDIR (customer_id NULL). Backend bunu destekliyor;
-    // domain sahipsiz kalır ve doğrudan admin'e döner.
-    const customer_id = sahipHedef === '' ? null : Number(sahipHedef)
+    // Boş seçim = customers.owner_user_id NULL; domain doğrudan admin'e döner.
+    const bayi_user_id = sahipHedef === '' ? null : Number(sahipHedef)
     setIsleniyor(true); setHata(null)
     try {
       // Sunucunun DOĞRULADIĞI sayıyı kullan: ids.length ile mesaj yazmak, hiçbir
       // satır yazılmasa bile "3 domain güncellendi" demek olurdu.
       const { data } = await api.post<{ dogrulanan?: number; istenen?: number }>(
-        '/domains/toplu/sahip', { ids, customer_id })
+        '/domains/toplu/sahip', { ids, bayi_user_id })
       const dogrulanan = data?.dogrulanan ?? ids.length
       if (dogrulanan < ids.length) {
         setUyari(t('DomainsPage:owner_modal.partial', { count: dogrulanan, total: ids.length }))
@@ -904,8 +902,8 @@ export default function DomainsPage() {
           <select value={sahipHedef} onChange={e => setSahipHedef(e.target.value)}
             className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
             <option value="">{t('DomainsPage:owner_modal.none')}</option>
-            {musteriler.map(m => (
-              <option key={m.id} value={m.id}>{m.ad}{m.eposta ? ` — ${m.eposta}` : ''}</option>
+            {bayiler.map(b => (
+              <option key={b.id} value={b.id}>{b.ad_soyad ? `${b.kullanici_adi} — ${b.ad_soyad}` : b.kullanici_adi}</option>
             ))}
           </select>
           <p className="text-xs text-slate-500 dark:text-slate-400">
