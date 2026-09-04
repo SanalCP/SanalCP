@@ -13,6 +13,34 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.58** (2026-09-04)
+
+**Kritik — davranış değişikliği.** Alt alan adı (subdomain) sistemi kaldırıldı.
+Panel tek bir modele geçti: her site kendi Linux kullanıcısı, kendi PHP-FPM
+servisi ve kendi FTP/veritabanı hesabı olan **bağımsız bir domain hesabıdır**.
+`blog.alan.com` gibi bir adres isteyen artık onu doğrudan yeni bir domain olarak
+ekler. Böylece her sitenin dosyaları ayrı bir ev dizininde izole olur ve her site
+kendi PHP sürümünü kullanabilir — alt alan adı modelinin yapamadığı tek şey buydu.
+
+Yeni alt alan adı oluşturulamaz; ilgili sayfa, menü girdileri ve API uçları
+kaldırıldı. Panelinizde alt alan adı varsa **Sunucu → Alt Alan Adı Göçü**
+ekranından taşıyın: her kayıt için yeni bir Linux kullanıcısı açılır, dosyalar
+yeni hesabın `public_html` dizinine kopyalanır, sertifika taşınır, eski nginx
+yapılandırması ve ana bölgedeki A kaydı temizlenir. Önce kuru çalıştırmayı
+deneyin; kaynak dizin diskte bırakılır, böylece geri dönebilirsiniz.
+
+Not: alt alan adının kendi veritabanı yoktu, ana domainin veritabanını
+kullanıyordu. Göçten sonra uygulama aynı veritabanına bağlanmayı sürdürür ve
+çalışır; panelde yeni domain için ayrı ve boş bir veritabanı görünür.
+
+**Ek alan adı (addon/parked) sistemi etkilenmedi**, olduğu gibi duruyor.
+Başka bir panelden aktarımda kaynaktaki alt alan adları artık atlanmaz —
+hedefte bağımsız domain hesabı olarak açılır.
+
+Ayrıca Domainler listesine "panel sahibi (müşteri)" bilgisi eklendi. "Sahip
+değiştir" işlemi yalnız bu bağı güncelliyor ama listede gösterilmediği için
+işlem başarılı olduğu hâlde hiçbir şey değişmemiş gibi görünüyordu.
+
 **0.9.57** (2026-09-04)
 
 Ana sayfadaki "Sunucu Bilgileri" kartına, çekirdek sayısının altına toplam

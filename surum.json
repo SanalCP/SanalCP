@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.57",
-  "duyuru": "Ana sayfadaki Sunucu Bilgileri kartına toplam RAM miktarı eklendi (çekirdek sayısının altında).",
-  "kritik": false,
+  "son_surum": "0.9.58",
+  "duyuru": "Alt alan adı (subdomain) sistemi kaldırıldı. Artık her site kendi Linux kullanıcısı, PHP-FPM servisi, FTP ve veritabanı hesabı olan bağımsız bir domain hesabıdır; blog.alan.com gibi bir adres için doğrudan yeni domain eklenir. Panelinizde alt alan adı varsa Sunucu → Alt Alan Adı Göçü ekranından dosyalarıyla birlikte bağımsız hesaba taşıyın.",
+  "kritik": true,
   "yayin_tarihi": "2026-09-04"
 }
