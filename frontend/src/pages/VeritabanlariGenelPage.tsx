@@ -2,6 +2,8 @@
 // hangi veritabanının diski yediğini görmek için buradaki tek yer. Satır
 // aksiyonları (phpMyAdmin/parola/sil) domain-özel veritabanı sayfasıyla aynı
 // /databases/:id uçlarını kullanır.
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalUyari } from '@/lib/dialog'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -32,7 +34,6 @@ function boyutYaz(kb: number, t: (k: string, opts?: Record<string, unknown>) => 
 export default function VeritabanlariGenelPage() {
   const { t } = useTranslation(['VeritabanlariGenelPage', 'common'])
   const [paroliGoster, setParolaGoster] = useState<Record<number, boolean>>({})
-  const [kopya, setKopya] = useState<number | null>(null)
   const [silinecek, setSilinecek] = useState<Satir | null>(null)
   const [pwResetFor, setPwResetFor] = useState<Satir | null>(null)
   const [yenile, setYenile] = useState(0)
@@ -42,21 +43,16 @@ export default function VeritabanlariGenelPage() {
       const { data } = await api.post<{ signon_url: string }>(`/databases/${s.id}/pma-token`)
       window.open(data.signon_url, '_blank', 'noopener')
     } catch (e) {
-      alert(apiHata(e, t('VeritabanlariGenelPage:pma_token_failed')))
+      await modalUyari(apiHata(e, t('VeritabanlariGenelPage:pma_token_failed')))
     }
   }
 
   async function sil() {
     if (!silinecek) return
     try { await api.delete(`/databases/${silinecek.id}`); setSilinecek(null); setYenile(v => v + 1) }
-    catch (e) { alert(apiHata(e, t('VeritabanlariGenelPage:delete_failed'))) }
+    catch (e) { await modalUyari(apiHata(e, t('VeritabanlariGenelPage:delete_failed'))) }
   }
 
-  function kopyala(s: Satir) {
-    navigator.clipboard.writeText(s.db_parola)
-    setKopya(s.id)
-    setTimeout(() => setKopya(null), 1500)
-  }
 
   const kolonlar: Kolon<Satir>[] = [
     {
@@ -88,9 +84,7 @@ export default function VeritabanlariGenelPage() {
             {paroliGoster[s.id] ? s.db_parola : '••••••••'}
           </button>
           {paroliGoster[s.id] && (
-            <button onClick={() => kopyala(s)} className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 rounded" title={t('VeritabanlariGenelPage:copy')}>
-              {kopya === s.id ? '✓' : '⧉'}
-            </button>
+            <KopyalaButton metin={s.db_parola} className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 rounded" title={t('VeritabanlariGenelPage:copy')} />
           )}
         </div>
       ),

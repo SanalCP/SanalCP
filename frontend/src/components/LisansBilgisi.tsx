@@ -1,36 +1,15 @@
+import KopyalaButton from '@/components/KopyalaButton'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 
 type SurumBilgi = { mevcut?: string; build_tarihi?: string; kurulum_kimlik: string }
 
-function panoYaz(text: string): boolean {
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {})
-    return true
-  }
-  try {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.setAttribute('readonly', '')
-    ta.style.position = 'fixed'
-    ta.style.top = '0'
-    ta.style.left = '0'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.focus()
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-    return true
-  } catch { return false }
-}
 
 export default function LisansBilgisi() {
   const { t } = useTranslation(['LisansBilgisi'])
   const [bilgi, setBilgi] = useState<SurumBilgi | null>(null)
   const [hata, setHata] = useState('')
-  const [kopyalandi, setKopyalandi] = useState(false)
 
   const yukle = useCallback(async () => {
     try {
@@ -43,13 +22,6 @@ export default function LisansBilgisi() {
 
   useEffect(() => { void yukle() }, [yukle])
 
-  function kopyala() {
-    if (!bilgi?.kurulum_kimlik) return
-    if (panoYaz(bilgi.kurulum_kimlik)) {
-      setKopyalandi(true)
-      setTimeout(() => setKopyalandi(false), 2000)
-    }
-  }
 
   return (
     <div className="h-full rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -70,13 +42,7 @@ export default function LisansBilgisi() {
               <code className="flex-1 truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
                 {bilgi.kurulum_kimlik}
               </code>
-              <button
-                type="button"
-                onClick={kopyala}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                {kopyalandi ? t('LisansBilgisi:copied') : t('LisansBilgisi:copy')}
-              </button>
+              <KopyalaButton metin={bilgi.kurulum_kimlik} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800" />
             </div>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -57,7 +58,7 @@ export default function DomainEkAlanlarPage() {
   }
 
   async function sil(ek: Ek) {
-    if (!confirm(t('DomainEkAlanlarPage:confirm_delete', { ad: ek.alan_adi, docroot_notice: ek.parked ? '' : t('DomainEkAlanlarPage:docroot_removed') }))) return
+    if (!(await modalOnay(t('DomainEkAlanlarPage:confirm_delete', { ad: ek.alan_adi, docroot_notice: ek.parked ? '' : t('DomainEkAlanlarPage:docroot_removed') })))) return
     setHata(null); setOk(null)
     try { await api.delete(`/domains/${id}/ek/${ek.id}`); yukle() }
     catch (err) { setHata(apiHata(err, t('DomainEkAlanlarPage:delete_failed'))) }
@@ -75,7 +76,7 @@ export default function DomainEkAlanlarPage() {
   }
 
   async function yonlendirmeKaldir() {
-    if (!confirm(t('DomainEkAlanlarPage:confirm_remove_redirect'))) return
+    if (!(await modalOnay(t('DomainEkAlanlarPage:confirm_remove_redirect')))) return
     setHata(null); setOk(null)
     try { await api.delete(`/domains/${id}/yonlendirme`); setHedefUrl(''); yukle() }
     catch (err) { setHata(apiHata(err, t('DomainEkAlanlarPage:redirect_remove_failed'))) }

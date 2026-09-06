@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 // sp-mobil-v1
+import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -90,27 +91,6 @@ function normalize(s: string) {
   return s.toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
-function panoYaz(text: string): boolean {
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {})
-    return true
-  }
-  try {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.setAttribute('readonly', '')
-    ta.style.position = 'fixed'
-    ta.style.top = '0'
-    ta.style.left = '0'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.focus()
-    ta.select()
-    document.execCommand('copy')
-    document.body.removeChild(ta)
-    return true
-  } catch { return false }
-}
 
 export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; menuAcik?: boolean }) {
   const { t } = useTranslation(['TopBar', 'common'])
@@ -123,7 +103,6 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
   const [menuAcikProfil, setMenuAcik] = useState(false)
   const [tema, setTema] = useState<Theme>(getTheme())
   const [sunucuIp, setSunucuIp] = useState<string | null>(null)
-  const [ipKopyalandi, setIpKopyalandi] = useState(false)
   const [arama, setArama] = useState('')
   const [aramaAcik, setAramaAcik] = useState(false)
   const [aramaYukleniyor, setAramaYukleniyor] = useState(false)
@@ -136,7 +115,6 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
 
   const SAYFALAR = useMemo(() => sayfalar(t), [t])
   const DOMAIN_SAYFALARI = useMemo(() => domainSayfalari(t), [t])
-
 
   const sonuclar = useMemo(() => {
     const q = normalize(arama.trim())
@@ -232,12 +210,6 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
       .catch(() => {})
   }, [])
 
-  function ipKopyala() {
-    if (!sunucuIp) return
-    panoYaz(sunucuIp)
-    setIpKopyalandi(true)
-    setTimeout(() => setIpKopyalandi(false), 1800)
-  }
 
   function temaDegistir() {
     const siradaki: Theme = tema === 'light' ? 'dark' : tema === 'dark' ? 'system' : 'light'
@@ -329,20 +301,12 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
 
       <div className="flex-none lg:flex-1 flex items-center justify-end gap-0.5 sm:gap-1">
         {sunucuIp && (
-          <button
-            onClick={ipKopyala}
-            title={t('TopBar:ip_copy_title')}
-            className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-mono text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition"
-          >
+          <KopyalaButton metin={sunucuIp} icerigiKoru title={t('TopBar:ip_copy_title')} className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-mono text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition">
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
             </svg>
-            {ipKopyalandi ? (
-              <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium">{t('TopBar:ip_copied')}</span>
-            ) : (
-              <span>{sunucuIp}</span>
-            )}
-          </button>
+            <span>{sunucuIp}</span>
+          </KopyalaButton>
         )}
         <LanguageSwitcher />
         <button onClick={temaDegistir}

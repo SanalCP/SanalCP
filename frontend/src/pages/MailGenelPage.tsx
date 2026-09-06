@@ -1,5 +1,6 @@
 // Sunucu geneli e-posta bakışı: hangi domainde posta barındırma açık, kaç
 // kutu ve yönlendirme var. Kutu eklemek/silmek domain sayfasında.
+import { modalOnay } from '@/lib/dialog'
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -97,7 +98,7 @@ export default function MailGenelPage() {
   useEffect(queueYukle, [queueYukle])
 
   async function queueAction(action: 'flush'|'delete'|'hold'|'release'|'requeue', queue_id = '') {
-    if (action === 'delete' && !confirm(t('MailGenelPage:confirm_delete_queue', { id: queue_id }))) return
+    if (action === 'delete' && !(await modalOnay(t('MailGenelPage:confirm_delete_queue', { id: queue_id })))) return
     setQueueIslem(action + queue_id); setQueueHata(null)
     try {
       await api.post('/admin/mail/queue', { action, queue_id })

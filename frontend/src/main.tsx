@@ -2,6 +2,7 @@ import React, { Suspense } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import DialogHost from '@/components/DialogHost'
 import './styles.css'
 import HataSiniri from '@/components/HataSiniri'
 import { bootTheme } from '@/lib/theme'
@@ -34,6 +35,7 @@ async function baslat() {
         }>
           <BrowserRouter>
             <App />
+            <DialogHost />
           </BrowserRouter>
         </Suspense>
       </HataSiniri>

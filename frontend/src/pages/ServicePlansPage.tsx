@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalUyari } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -59,7 +60,7 @@ export default function ServicePlansPage() {
       await api.delete(`/plans/${silinecek.id}`)
       setSilinecek(null); yukle()
     } catch (e) {
-      alert(apiHata(e, t('ServicePlansPage:errors.delete_failed')))
+      await modalUyari(apiHata(e, t('ServicePlansPage:errors.delete_failed')))
     }
   }
 

@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -51,7 +52,7 @@ export default function NameserverAyari() {
   }
 
   async function tasi() {
-    if (!confirm(t('NameserverAyari:migrate_confirm'))) return
+    if (!(await modalOnay(t('NameserverAyari:migrate_confirm')))) return
     setTasiniyor(true); setHata(null); setBasari(null)
     try {
       const { data } = await api.post('/dns/nameserver-tasi', {})

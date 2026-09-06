@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
@@ -79,7 +80,7 @@ export default function DomainFTPPage() {
                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-2">{t('DomainFTPPage:save_hint')}</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 bg-white dark:bg-slate-800 px-3 py-2 font-mono text-sm text-slate-900 dark:text-slate-100 rounded border border-emerald-200 dark:border-emerald-800 break-all">{yeniPw}</code>
-                  <button onClick={() => { navigator.clipboard.writeText(yeniPw); }} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded">{t('common:copy')}</button>
+                  <KopyalaButton metin={yeniPw} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded" />
                 </div>
               </div>
             )}

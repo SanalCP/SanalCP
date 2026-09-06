@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.60",
-  "duyuru": "Domainler sayfasında domain adının üzerine gelindiğinde sitenin 250×250 canlı önizlemesi gösterilir. Önizleme yalnız ihtiyaç anında yüklenir ve ekran kenarına göre otomatik konumlanır.",
+  "son_surum": "0.9.61",
+  "duyuru": "Klasik tarayıcı uyarıları, onay ve metin girişleri tasarıma uygun modallara dönüştürüldü. Tüm kopyalama butonlarına gerçek sonuca bağlı Kopyalandı bildirimi ve görsel geri bildirim eklendi.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-04"
+  "yayin_tarihi": "2026-09-06"
 }

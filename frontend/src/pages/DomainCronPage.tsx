@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay, modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -59,12 +60,12 @@ export default function DomainCronPage() {
   }, [id, yukle])
 
   async function sil(g: Gorev) {
-    if (!confirm(t('DomainCronPage:confirmDelete', { command: g.komut.slice(0, 60) }))) return
+    if (!(await modalOnay(t('DomainCronPage:confirmDelete', { command: g.komut.slice(0, 60) })))) return
     try {
       await api.delete(`/domains/${id}/cron/${g.idx}`)
       yukle()
     } catch (e) {
-      alert(apiHata(e, t('DomainCronPage:errors.deleteFailed')))
+      await modalUyari(apiHata(e, t('DomainCronPage:errors.deleteFailed')))
     }
   }
 

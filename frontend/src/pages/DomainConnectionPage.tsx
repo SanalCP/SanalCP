@@ -1,45 +1,12 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import Modal from '@/components/Modal'
-
-function panoYaz(text: string, promptMesaj: string): boolean {
-  // 1) Modern API (HTTPS / localhost only) — kullanıcı gesture içindeyse async ok
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(() => {})
-    return true
-  }
-  // 2) Fallback: textarea + execCommand
-  try {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.setAttribute('readonly', '')
-    ta.style.position = 'fixed'
-    ta.style.top = '0'
-    ta.style.left = '0'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.focus()
-    ta.select()
-    ta.setSelectionRange(0, text.length)
-    const ok = document.execCommand('copy')
-    document.body.removeChild(ta)
-    if (ok) return true
-  } catch {}
-  // 3) Son çare: prompt — kullanıcı Ctrl+C ile manuel kopyalar
-  try {
-    window.prompt(promptMesaj, text)
-    return true
-  } catch {
-    return false
-  }
-}
-
-
 
 type Domain = {
   id: number; alan_adi: string; ipv4: string
@@ -57,7 +24,6 @@ export default function DomainConnectionPage() {
   const { id } = useParams()
   const [domain, setDomain] = useState<Domain | null>(null)
   const [hata, setHata] = useState<string | null>(null)
-  const [kopya, setKopya] = useState<string | null>(null)
   const [parolaModal, setParolaModal] = useState<{ tip: 'ftp' | 'db'; cikti?: string } | null>(null)
   const [ns, setNS] = useState<NS | null>(null)
 
@@ -68,11 +34,6 @@ export default function DomainConnectionPage() {
     api.get<NS>(`/domains/${id}/nameserver`).then(r => setNS(r.data)).catch(() => { /* kart gizlenir */ })
   }, [id])
 
-  function kopyala(deg: string) {
-    panoYaz(deg, t('DomainConnectionPage:copy_prompt_fallback'))
-    setKopya(deg)
-    setTimeout(() => setKopya(null), 1800)
-  }
 
   return (
     <div className="w-full px-6 py-5">
@@ -95,29 +56,29 @@ export default function DomainConnectionPage() {
       {domain && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <Kart baslik={t('DomainConnectionPage:ftp_sftp')} renk="sky" ikon="M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z">
-            <Sat e={t('DomainConnectionPage:server')} d={domain.ftp_host} onKopya={kopyala} kopya={kopya} />
-            <Sat e={t('DomainConnectionPage:port')} d="21" onKopya={kopyala} kopya={kopya} />
-            <Sat e={t('DomainConnectionPage:username')} d={domain.ftp_user} onKopya={kopyala} kopya={kopya} mono />
+            <Sat e={t('DomainConnectionPage:server')} d={domain.ftp_host} />
+            <Sat e={t('DomainConnectionPage:port')} d="21" />
+            <Sat e={t('DomainConnectionPage:username')} d={domain.ftp_user} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="ftp" onAc={() => setParolaModal({ tip: 'ftp' })} />
-            <Sat e={t('DomainConnectionPage:home_dir')} d={`/home/${domain.sistem_kullanici}`} onKopya={kopyala} kopya={kopya} mono />
+            <Sat e={t('DomainConnectionPage:home_dir')} d={`/home/${domain.sistem_kullanici}`} mono />
             <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:ftp_manage_link')}</Link>
           </Kart>
 
           <Kart baslik={t('DomainConnectionPage:mysql_mariadb')} renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
-            <Sat e={t('DomainConnectionPage:server')} d={domain.db_host} onKopya={kopyala} kopya={kopya} />
-            <Sat e={t('DomainConnectionPage:port')} d="3306" onKopya={kopyala} kopya={kopya} />
-            <Sat e={t('DomainConnectionPage:database')} d={domain.db_adi} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e={t('DomainConnectionPage:username')} d={domain.db_user} onKopya={kopyala} kopya={kopya} mono />
+            <Sat e={t('DomainConnectionPage:server')} d={domain.db_host} />
+            <Sat e={t('DomainConnectionPage:port')} d="3306" />
+            <Sat e={t('DomainConnectionPage:database')} d={domain.db_adi} mono />
+            <Sat e={t('DomainConnectionPage:username')} d={domain.db_user} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="db" onAc={() => setParolaModal({ tip: 'db' })} />
             <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:db_manage_link')}</Link>
           </Kart>
 
           <Kart baslik={t('DomainConnectionPage:web')} renk="amber" ikon="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" cift>
-            <Sat e={t('DomainConnectionPage:web_root')} d={domain.web_root} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e="IPv4" d={domain.ipv4} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e={t('DomainConnectionPage:system_user')} d={domain.sistem_kullanici} onKopya={kopyala} kopya={kopya} mono />
-            <Sat e={t('DomainConnectionPage:http_url')} d={`http://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
-            <Sat e={t('DomainConnectionPage:https_url')} d={`https://${domain.alan_adi}/`} onKopya={kopyala} kopya={kopya} />
+            <Sat e={t('DomainConnectionPage:web_root')} d={domain.web_root} mono />
+            <Sat e="IPv4" d={domain.ipv4} mono />
+            <Sat e={t('DomainConnectionPage:system_user')} d={domain.sistem_kullanici} mono />
+            <Sat e={t('DomainConnectionPage:http_url')} d={`http://${domain.alan_adi}/`} />
+            <Sat e={t('DomainConnectionPage:https_url')} d={`https://${domain.alan_adi}/`} />
           </Kart>
 
           {ns && (
@@ -125,8 +86,8 @@ export default function DomainConnectionPage() {
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
                 {t('DomainConnectionPage:nameservers_desc')}
               </p>
-              <Sat e="NS1" d={ns.ns1} onKopya={kopyala} kopya={kopya} mono />
-              <Sat e="NS2" d={ns.ns2} onKopya={kopyala} kopya={kopya} mono />
+              <Sat e="NS1" d={ns.ns1} mono />
+              <Sat e="NS2" d={ns.ns2} mono />
               {ns.uyari && (
                 <p className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-300">
                   {ns.uyari}
@@ -144,7 +105,6 @@ export default function DomainConnectionPage() {
           ftpUser={domain?.ftp_user || ''}
           dbUser={domain?.db_user || ''}
           onKapat={() => setParolaModal(null)}
-          onKopya={kopyala}
         />
       )}
     </div>
@@ -173,33 +133,17 @@ function Kart({ baslik, renk, ikon, children, cift }: { baslik: string; renk: st
   )
 }
 
-function Sat({ e, d, mono, onKopya, kopya }: { e: string; d: string; mono?: boolean; onKopya?: (s: string) => void; kopya?: string | null }) {
+function Sat({ e, d, mono }: { e: string; d: string; mono?: boolean }) {
   const { t } = useTranslation(['DomainConnectionPage'])
-  const aktif = !!onKopya
-  const kopyalandi = kopya === d
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
       <dt className="text-slate-500 dark:text-slate-500 text-xs uppercase tracking-wider">{e}</dt>
       <dd className="text-right flex items-center gap-2 group">
-        {aktif ? (
-          <button
-            type="button"
-            onClick={() => onKopya!(d)}
-            className="flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
-            title={t('DomainConnectionPage:click_to_copy_title')}
-          >
-            <span className={`${mono ? 'font-mono text-xs' : 'text-sm'} text-slate-800 dark:text-slate-200 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 transition`}>
-              {d}
-            </span>
-          </button>
-        ) : (
-          <span className={mono ? 'font-mono text-xs' : 'text-sm'}>{d}</span>
-        )}
-        {kopyalandi && (
-          <span className="text-[10px] uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded font-medium animate-pulse">
-            {t('DomainConnectionPage:copied')}
+        <KopyalaButton metin={d} icerigiKoru className="flex flex-wrap items-center justify-end gap-2 cursor-pointer bg-transparent border-0 p-0" title={t('DomainConnectionPage:click_to_copy_title')}>
+          <span className={`${mono ? 'font-mono text-xs' : 'text-sm'} text-slate-800 dark:text-slate-200 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 transition`}>
+            {d}
           </span>
-        )}
+        </KopyalaButton>
       </dd>
     </div>
   )
@@ -222,8 +166,8 @@ function Parola({ e, onAc }: { e: string; id: string; tip: string; onAc: () => v
   )
 }
 
-function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }:
-  { tip: 'ftp' | 'db'; domainId: string; ftpUser: string; dbUser: string; onKapat: () => void; onKopya: (s: string) => void }) {
+function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat }:
+  { tip: 'ftp' | 'db'; domainId: string; ftpUser: string; dbUser: string; onKapat: () => void }) {
   const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const [yeni, setYeni] = useState<string | null>(null)
   const [isleniyor, setIsleniyor] = useState(false)
@@ -326,23 +270,11 @@ function ParolaSifirlaModal({ tip, domainId, ftpUser, dbUser, onKapat, onKopya }
 
 function KopyaButton({ text, renk }: { text: string; renk: 'amber' | 'emerald' }) {
   const { t } = useTranslation(['DomainConnectionPage', 'common'])
-  const [k, setK] = useState(false)
   const bg: Record<string, string> = {
     amber: 'bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 text-amber-800 dark:text-amber-200',
     emerald: 'bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200',
   }
   return (
-    <button
-      onClick={() => {
-        const ok = panoYaz(text, t('DomainConnectionPage:copy_prompt_fallback'))
-        if (ok) {
-          setK(true)
-          setTimeout(() => setK(false), 1500)
-        }
-      }}
-      className={`text-[10px] px-2 py-1 rounded font-medium transition ${bg[renk]} ${k ? 'ring-2 ring-emerald-400' : ''}`}
-    >
-      {k ? t('DomainConnectionPage:copied') : t('common:copy')}
-    </button>
+    <KopyalaButton metin={text} className={`text-[10px] px-2 py-1 rounded font-medium transition ${bg[renk]}`} />
   )
 }

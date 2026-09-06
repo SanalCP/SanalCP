@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -88,7 +89,7 @@ export default function FirewallPage() {
   }
 
   async function otobanTemizle() {
-    if (!confirm(t('FirewallPage:autoban.confirm_clear'))) return
+    if (!(await modalOnay(t('FirewallPage:autoban.confirm_clear')))) return
     setHata(null); setBasari(null); setMesgul('otoban-temizle')
     try {
       const { data } = await api.post('/firewall/otoban/temizle')
@@ -99,7 +100,7 @@ export default function FirewallPage() {
   }
 
   async function sablonUygula(s: typeof SABLONLAR[number]) {
-    if (!confirm(t('FirewallPage:confirm_apply', { ad: s.ad, portlar: s.portlar }))) return
+    if (!(await modalOnay(t('FirewallPage:confirm_apply', { ad: s.ad, portlar: s.portlar })))) return
     setHata(null); setBasari(null); setMesgul('sablon:' + s.key)
     try {
       const { data } = await api.post('/firewall/sablon', { sablon: s.key })
@@ -126,7 +127,7 @@ export default function FirewallPage() {
 
   async function sil(k: Kural) {
     const ozet = k.tip === 'kapat' ? t('FirewallPage:port_close_label', { port: k.port }) : `${k.ip}${k.port ? ':' + k.port : ''} ${k.tip}`
-    if (!confirm(t('FirewallPage:confirm_delete', { ozet }))) return
+    if (!(await modalOnay(t('FirewallPage:confirm_delete', { ozet })))) return
     setHata(null); setBasari(null); setMesgul('sil:' + k.id)
     try { await api.delete(`/firewall/${k.id}`); yukle() }
     catch (err) { setHata(apiHata(err, t('FirewallPage:delete_failed'))) }

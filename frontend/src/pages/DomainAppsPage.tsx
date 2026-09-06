@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -94,7 +95,7 @@ export default function DomainAppsPage() {
   }
 
   async function sil(k: Kurulu) {
-    if (!confirm(t('DomainAppsPage:confirm_delete', { ad: k.ad, yol: k.dizin }))) return
+    if (!(await modalOnay(t('DomainAppsPage:confirm_delete', { ad: k.ad, yol: k.dizin })))) return
     const key = k.tur + k.dizin
     setMesgul(key); setHata(null)
     try {

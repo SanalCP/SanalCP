@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AxiosProgressEvent } from 'axios'
@@ -122,7 +123,7 @@ export default function DomainIceAktarimPage() {
 
   async function arsivUygula() {
     if (!ozet) return
-    if (temizle && !confirm(t('DomainIceAktarimPage:files.confirm_wipe', { hedef }))) return
+    if (temizle && !(await modalOnay(t('DomainIceAktarimPage:files.confirm_wipe', { hedef })))) return
     sifirlaMesaj(); setCikariliyor(true)
     try {
       const { data } = await api.post(`/domains/${id}/ice-aktarim/arsiv-uygula`, {
@@ -139,7 +140,7 @@ export default function DomainIceAktarimPage() {
 
   async function dumpYukle() {
     if (!dump || !dbAdi) return
-    if (bosalt && !confirm(t('DomainIceAktarimPage:db.confirm_wipe', { db: dbAdi }))) return
+    if (bosalt && !(await modalOnay(t('DomainIceAktarimPage:db.confirm_wipe', { db: dbAdi })))) return
     sifirlaMesaj(); setDumpYukleniyor(true); setDumpIlerleme(0)
     const form = new FormData()
     form.append('dump', dump)

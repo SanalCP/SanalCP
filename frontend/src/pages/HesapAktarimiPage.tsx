@@ -1,3 +1,4 @@
+import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AxiosProgressEvent } from 'axios'
@@ -223,7 +224,7 @@ export default function HesapAktarimiPage() {
         </div>
         {sshPublicKey && sshHostKey && <div className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
           <div><strong>{t('HesapAktarimiPage:remote.public_key_title')}</strong><p className="mt-1">{t('HesapAktarimiPage:remote.public_key_desc')}</p></div>
-          <div className="flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[11px] text-slate-100">{sshPublicKey}</code><button type="button" onClick={() => navigator.clipboard?.writeText(sshPublicKey)} className="rounded border border-amber-300 px-3">{t('common:copy')}</button></div>
+          <div className="flex gap-2"><code className="min-w-0 flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[11px] text-slate-100">{sshPublicKey}</code><KopyalaButton metin={sshPublicKey} className="rounded border border-amber-300 px-3" /></div>
           <div><strong>{t('HesapAktarimiPage:remote.host_fingerprint')}</strong>{sshHostKey.fingerprints.map(fp => <code key={fp} className="mt-1 block font-mono text-[11px]">{fp}</code>)}</div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void sshHostKeyOnayla()} disabled={sshBusy || sshGuvenildi} className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white disabled:opacity-50">{sshGuvenildi ? t('HesapAktarimiPage:remote.trusted') : t('HesapAktarimiPage:remote.trust')}</button>

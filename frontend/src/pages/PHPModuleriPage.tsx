@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalUyari, modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -40,7 +41,7 @@ export default function PHPModuleriPage() {
 
   async function toggle(e: Ext) {
     if (ZORUNLU.has(e.adi.toLowerCase())) {
-      alert(t('PHPModuleriPage:core_module_alert'))
+      await modalUyari(t('PHPModuleriPage:core_module_alert'))
       return
     }
     const yeniAktif = !e.aktif
@@ -62,7 +63,7 @@ export default function PHPModuleriPage() {
   }
 
   async function ioncubeKur() {
-    if (!confirm(t('PHPModuleriPage:ioncube_install_confirm', { version: aktifSurum }))) return
+    if (!(await modalOnay(t('PHPModuleriPage:ioncube_install_confirm', { version: aktifSurum })))) return
     setYuk(true); setHata(null)
     try {
       const r = await api.post('/php-extensions/ioncube-kur', { surum: aktifSurum })
@@ -79,7 +80,7 @@ export default function PHPModuleriPage() {
   }
 
   async function ioncubeKaldir() {
-    if (!confirm(t('PHPModuleriPage:ioncube_remove_confirm', { version: aktifSurum }))) return
+    if (!(await modalOnay(t('PHPModuleriPage:ioncube_remove_confirm', { version: aktifSurum })))) return
     setYuk(true); setHata(null)
     try {
       await api.post('/php-extensions/ioncube-kaldir', { surum: aktifSurum })
@@ -94,9 +95,9 @@ export default function PHPModuleriPage() {
 
   async function peclKur(paket: string) {
     if (!paket.match(/^[a-zA-Z0-9_-]+$/)) {
-      alert(t('PHPModuleriPage:pecl_invalid_name_alert')); return
+      await modalUyari(t('PHPModuleriPage:pecl_invalid_name_alert')); return
     }
-    if (!confirm(t('PHPModuleriPage:pecl_install_confirm', { package: paket, version: aktifSurum }))) return
+    if (!(await modalOnay(t('PHPModuleriPage:pecl_install_confirm', { package: paket, version: aktifSurum })))) return
     setPeclModal(false); setYuk(true)
     try {
       const r = await api.post('/php-extensions/pecl-install', { surum: aktifSurum, paket })

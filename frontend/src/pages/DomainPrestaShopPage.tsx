@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -42,8 +43,8 @@ export default function DomainPrestaShopPage() {
     catch (e) { setHata(apiHata(e, t('DomainPrestaShopPage:operation_failed'))) }
     finally { setMesgul('') }
   }
-  function bakim() {
-    if (!durum || !confirm(t(durum.bakim ? 'DomainPrestaShopPage:confirm_disable' : 'DomainPrestaShopPage:confirm_enable'))) return
+  async function bakim() {
+    if (!durum || !(await modalOnay(t(durum.bakim ? 'DomainPrestaShopPage:confirm_disable' : 'DomainPrestaShopPage:confirm_enable')))) return
     void calistir('bakim', () => api.post(`/domains/${id}/prestashop/bakim`, { dizin, aktif: !durum.bakim }), t('DomainPrestaShopPage:maintenance_changed'))
   }
 

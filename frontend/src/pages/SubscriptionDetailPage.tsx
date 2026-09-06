@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams, useNavigate } from 'react-router-dom'
@@ -107,7 +108,7 @@ export default function SubscriptionDetailPage() {
   async function askiToggle() {
     if (!id || !domain) return
     const askiyaAl = !domain.askida
-    if (askiyaAl && !window.confirm(t('SubscriptionDetailPage:suspend_confirm', { domain: domain.alan_adi }))) return
+    if (askiyaAl && !(await modalOnay(t('SubscriptionDetailPage:suspend_confirm', { domain: domain.alan_adi })))) return
     setMenuAcik(false); setIsleniyor(true); setHata(null); setBildirim(null)
     try {
       await api.post(`/domains/${id}/${askiyaAl ? 'askiya-al' : 'askidan-al'}`)
@@ -121,11 +122,11 @@ export default function SubscriptionDetailPage() {
   async function paketDegistir() {
     if (!id || !domain || seciliPlanID === '' || seciliPlanID === domain.plan_id) return
     const yeniPlan = planlar.find(p => p.id === seciliPlanID)
-    if (!yeniPlan || !window.confirm(t('SubscriptionDetailPage:change_plan_confirm', {
+    if (!yeniPlan || !(await modalOnay(t('SubscriptionDetailPage:change_plan_confirm', {
       domain: domain.alan_adi,
       current: domain.plan_ad || t('SubscriptionDetailPage:no_plan'),
       next: yeniPlan.ad,
-    }))) return
+    })))) return
 
     setIsleniyor(true); setHata(null); setBildirim(null)
     try {

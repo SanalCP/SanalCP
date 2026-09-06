@@ -1,3 +1,5 @@
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalOnay, modalGirdi } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -98,7 +100,7 @@ export default function DomainMailPage() {
   // etkinleştirmek kutuları ve yönlendiricileri olduğu gibi geri getirir.
   // Onay metni bunu açıkça söylemeli: "sil" demek kullanıcıyı yanıltırdı.
   async function devredisiBirak() {
-    if (!confirm(t('DomainMailPage:disable.confirm', { domain: domain?.alan_adi }))) return
+    if (!(await modalOnay(t('DomainMailPage:disable.confirm', { domain: domain?.alan_adi })))) return
     setIsleniyor(true); setHata(null); setOk(null)
     try {
       await api.delete(`/domains/${id}/mail/etkinlestir`)
@@ -116,7 +118,7 @@ export default function DomainMailPage() {
   // kullanıcıya alan adını YAZDIRIYORUZ. Yanlışlıkla "Tamam"a basmak, yıllarca
   // birikmiş postayı silmeye yetmemeli.
   async function hizmetiSil() {
-    const yazilan = window.prompt(t('DomainMailPage:purge.confirm_prompt', { domain: domain?.alan_adi }))
+    const yazilan = await modalGirdi(t('DomainMailPage:purge.confirm_prompt', { domain: domain?.alan_adi }))
     if (yazilan === null) return // vazgeçildi
     if (yazilan.trim().toLowerCase() !== (domain?.alan_adi || '').toLowerCase()) {
       setHata(t('DomainMailPage:purge.confirm_mismatch'))
@@ -161,7 +163,7 @@ export default function DomainMailPage() {
   }
 
   async function sil(k: Mailbox) {
-    if (!confirm(t('DomainMailPage:mailbox.delete_confirm', { email: k.email }))) return
+    if (!(await modalOnay(t('DomainMailPage:mailbox.delete_confirm', { email: k.email })))) return
     setHata(null); setOk(null)
     try {
       await api.delete(`/domains/${id}/mail/${k.id}`)
@@ -208,7 +210,7 @@ export default function DomainMailPage() {
   }
 
   async function aliasSil(a: Alias) {
-    if (!confirm(t('DomainMailPage:forwarders.delete_confirm', { source: a.source }))) return
+    if (!(await modalOnay(t('DomainMailPage:forwarders.delete_confirm', { source: a.source })))) return
     setHata(null); setOk(null)
     try {
       await api.delete(`/domains/${id}/mail/aliases/${a.id}`)
@@ -285,7 +287,7 @@ export default function DomainMailPage() {
   }
 
   async function filtreSil(f: MailFilter) {
-    if (!confirm(t('DomainMailPage:filters.delete_confirm', { name: f.name }))) return
+    if (!(await modalOnay(t('DomainMailPage:filters.delete_confirm', { name: f.name })))) return
     try {
       await api.delete(`/domains/${id}/mail/filters/${f.id}`)
       yukle()
@@ -340,7 +342,7 @@ export default function DomainMailPage() {
             <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-2">{t('DomainMailPage:newPassword.hint')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-white dark:bg-slate-800 px-3 py-2 font-mono text-sm text-slate-900 dark:text-slate-100 rounded border border-emerald-200 dark:border-emerald-800 break-all">{yeniPw.parola}</code>
-              <button onClick={() => navigator.clipboard.writeText(yeniPw.parola)} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded">{t('common:copy')}</button>
+              <KopyalaButton metin={yeniPw.parola} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded" />
             </div>
           </div>
         )}
@@ -387,10 +389,7 @@ export default function DomainMailPage() {
                   className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium rounded-lg">
                   {t('DomainMailPage:webmail.open')}
                 </a>
-                <button onClick={() => { navigator.clipboard?.writeText(webmailURL); setOk(t('DomainMailPage:webmail.copied')) }}
-                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm rounded-lg">
-                  {t('common:copy')}
-                </button>
+                <KopyalaButton metin={webmailURL} className="px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm rounded-lg" />
               </div>
             </div>
 

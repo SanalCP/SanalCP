@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -72,7 +73,7 @@ export default function AltAlanGocPage() {
     if (!dryRun) {
       // Gerçek göç dosya taşır, nginx conf yazar ve DNS kaydı siler. Kuru
       // çalıştırmadan sonra bile açık bir onay isteniyor.
-      if (!confirm(t('AltAlanGocPage:confirm_run', { count: ids.length }))) return
+      if (!(await modalOnay(t('AltAlanGocPage:confirm_run', { count: ids.length })))) return
     }
     setCalisiyor(true); setHata(null); setYanit(null)
     try {

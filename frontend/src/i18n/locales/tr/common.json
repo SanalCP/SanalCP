@@ -62,5 +62,18 @@
     "reload": "Sayfayı yenile",
     "home": "Anasayfaya dön",
     "details": "Teknik ayrıntı"
-  }
+  },
+  "dialog": {
+    "uyari_title": "Uyarı",
+    "onay_title": "İşlemi onayla",
+    "girdi_title": "Bilgi girişi",
+    "kopyala_title": "Elle kopyala",
+    "value": "Değer",
+    "copy_value": "Kopyalanacak metin",
+    "copy_hint": "Metni seçip Ctrl+C veya ⌘C ile kopyalayın. Mobil cihazlarda metne basılı tutarak kopyalayabilirsiniz."
+  },
+  "copying": "Kopyalanıyor…",
+  "copy_manual": "Elle kopyalayın",
+  "copy_manual_hint": "Panoya otomatik kopyalama yapılamadı. Aşağıdaki metni elle kopyalayabilirsiniz.",
+  "copy_failed": "Kopyalanamadı, tekrar deneyin"
 }

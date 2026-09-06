@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay, modalUyari } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -33,7 +34,7 @@ export default function PHPSurumleriPage() {
   useEffect(yukle, [])
 
   async function kur(s: Surum) {
-    if (!confirm(t('PHPSurumleriPage:install_confirm', { version: s.surum, source: s.kaynak }))) return
+    if (!(await modalOnay(t('PHPSurumleriPage:install_confirm', { version: s.surum, source: s.kaynak })))) return
     const key = s.surum + ':' + s.kaynak
     setIsleniyor(key); setHata(null); setBasari(null)
     try {
@@ -48,10 +49,10 @@ export default function PHPSurumleriPage() {
 
   async function kaldir(s: Surum) {
     if (s.kaynak === 'appstream') {
-      alert(t('PHPSurumleriPage:appstream_remove_blocked'))
+      await modalUyari(t('PHPSurumleriPage:appstream_remove_blocked'))
       return
     }
-    if (!confirm(t('PHPSurumleriPage:remove_confirm', { version: s.surum }))) return
+    if (!(await modalOnay(t('PHPSurumleriPage:remove_confirm', { version: s.surum })))) return
     const key = s.surum + ':' + s.kaynak
     setIsleniyor(key); setHata(null); setBasari(null)
     try {

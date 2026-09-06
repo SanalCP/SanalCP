@@ -1,3 +1,5 @@
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -84,7 +86,6 @@ export default function SettingsPage() {
   const [tkAd, setTkAd] = useState(''); const [tkGun, setTkGun] = useState('0')
   const [tkYuk, setTkYuk] = useState(false); const [tkErr, setTkErr] = useState('')
   const [yeniUretilen, setYeniUretilen] = useState<{ ad: string; token: string } | null>(null)
-  const [kopyalandi, setKopyalandi] = useState(false)
 
   function tokenlariYukle() {
     api.get<{ tokenlar: ApiToken[] }>('/me/api-tokenlari')
@@ -94,7 +95,7 @@ export default function SettingsPage() {
 
   async function tokenOlustur(e: React.FormEvent) {
     e.preventDefault()
-    setTkErr(''); setTkYuk(true); setKopyalandi(false)
+    setTkErr(''); setTkYuk(true)
     try {
       const { data } = await api.post('/me/api-tokenlari', {
         ad: tkAd.trim(), gun_sonra: parseInt(tkGun, 10) || 0,
@@ -107,7 +108,7 @@ export default function SettingsPage() {
   }
 
   async function tokenSil(tk: ApiToken) {
-    if (!confirm(t('SettingsPage:apitoken.confirm_delete', { ad: tk.ad }))) return
+    if (!(await modalOnay(t('SettingsPage:apitoken.confirm_delete', { ad: tk.ad })))) return
     setTkErr('')
     try { await api.delete(`/me/api-tokenlari/${tk.id}`); tokenlariYukle() }
     catch (err) { setTkErr(apiHata(err, t('SettingsPage:apitoken.delete_failed'))) }
@@ -194,7 +195,6 @@ export default function SettingsPage() {
       setNSOk(data.uyari || t('SettingsPage:nameserver.saved'))
     } catch (e) { setNSErr(apiHata(e)) } finally { setNSYuk(false) }
   }
-
 
   const btn = 'ta-primary-button disabled:cursor-not-allowed disabled:opacity-50'
   const secretGruplu = f2Kur ? (f2Kur.secret.match(/.{1,4}/g) || []).join(' ') : ''
@@ -287,7 +287,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-slate-500 dark:text-slate-500">{t('SettingsPage:twofa.manual_hint')}</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <code className="font-mono text-sm px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 tracking-widest select-all">{secretGruplu}</code>
-                    <button type="button" onClick={() => { navigator.clipboard?.writeText(f2Kur.secret) }} className="text-xs px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">{t('common:copy')}</button>
+                    <KopyalaButton metin={f2Kur.secret} className="text-xs px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" />
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-500 break-all">{t('SettingsPage:twofa.or_link')} <span className="font-mono">{f2Kur.otpauth}</span></p>
                   <p className="text-sm text-slate-700 dark:text-slate-300">{t('SettingsPage:twofa.step2')}</p>
@@ -334,12 +334,8 @@ export default function SettingsPage() {
                     <code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-slate-900 px-3 py-2 font-mono text-[11px] text-slate-100">
                       {yeniUretilen.token}
                     </code>
-                    <button type="button"
-                      onClick={() => { navigator.clipboard?.writeText(yeniUretilen.token); setKopyalandi(true) }}
-                      className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium hover:bg-white dark:border-slate-600 dark:hover:bg-slate-700">
-                      {kopyalandi ? t('SettingsPage:apitoken.copied') : t('common:copy')}
-                    </button>
-                    <button type="button" onClick={() => { setYeniUretilen(null); setKopyalandi(false) }}
+                    <KopyalaButton metin={yeniUretilen.token} className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium hover:bg-white dark:border-slate-600 dark:hover:bg-slate-700" />
+                    <button type="button" onClick={() => { setYeniUretilen(null) }}
                       className="shrink-0 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700">
                       {t('SettingsPage:apitoken.saved_close')}
                     </button>

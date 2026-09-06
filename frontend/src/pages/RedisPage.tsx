@@ -1,3 +1,5 @@
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -23,7 +25,6 @@ export default function RedisPage() {
   const [mesgul, setMesgul] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
-  const [kopyalandi, setKopyalandi] = useState<string | null>(null)
 
   function yukle() {
     setYuk(true)
@@ -46,7 +47,7 @@ export default function RedisPage() {
     finally { setMesgul(false) }
   }
   async function kapat() {
-    if (!confirm(t('RedisPage:confirm_disable'))) return
+    if (!(await modalOnay(t('RedisPage:confirm_disable')))) return
     setHata(null); setBasari(null); setMesgul(true)
     try {
       await api.delete(`/domains/${id}/redis`)
@@ -56,11 +57,6 @@ export default function RedisPage() {
     finally { setMesgul(false) }
   }
 
-  function kopyala(metin: string, etiket: string) {
-    navigator.clipboard?.writeText(metin)
-    setKopyalandi(etiket)
-    setTimeout(() => setKopyalandi(null), 1500)
-  }
 
   return (
     <div className="px-6 py-5">
@@ -113,10 +109,10 @@ export default function RedisPage() {
               </button>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-700/60">
-              <SatirKopya etiket={t('RedisPage:row_server')} deger={`${d.host}:${d.port}`} onKopya={kopyala} kopyalandi={kopyalandi} t={t} />
-              <SatirKopya etiket={t('RedisPage:row_user')} deger={d.kullanici} onKopya={kopyala} kopyalandi={kopyalandi} t={t} />
-              <SatirKopya etiket={t('RedisPage:row_password')} deger={d.parola || ''} gizli onKopya={kopyala} kopyalandi={kopyalandi} t={t} />
-              <SatirKopya etiket={t('RedisPage:row_prefix')} deger={d.prefix} onKopya={kopyala} kopyalandi={kopyalandi} t={t} />
+              <SatirKopya etiket={t('RedisPage:row_server')} deger={`${d.host}:${d.port}`} t={t} />
+              <SatirKopya etiket={t('RedisPage:row_user')} deger={d.kullanici} t={t} />
+              <SatirKopya etiket={t('RedisPage:row_password')} deger={d.parola || ''} gizli t={t} />
+              <SatirKopya etiket={t('RedisPage:row_prefix')} deger={d.prefix} t={t} />
             </div>
           </div>
 
@@ -125,10 +121,7 @@ export default function RedisPage() {
             <div className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('RedisPage:wp_title')}</h3>
-                <button onClick={() => kopyala(d.wp_snippet!, 'wp')}
-                  className="text-xs px-2.5 py-1 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md">
-                  {kopyalandi === 'wp' ? t('RedisPage:wp_copied_btn') : t('RedisPage:wp_copy_btn')}
-                </button>
+                <KopyalaButton metin={d.wp_snippet!} className="text-xs px-2.5 py-1 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-md">{t('RedisPage:wp_copy_btn')}</KopyalaButton>
               </div>
               <div className="p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
@@ -144,9 +137,8 @@ export default function RedisPage() {
   )
 }
 
-function SatirKopya({ etiket, deger, gizli, onKopya, kopyalandi, t }: {
+function SatirKopya({ etiket, deger, gizli, t }: {
   etiket: string; deger: string; gizli?: boolean
-  onKopya: (m: string, e: string) => void; kopyalandi: string | null
   t: (k: string) => string
 }) {
   const [goster, setGoster] = useState(false)
@@ -160,10 +152,7 @@ function SatirKopya({ etiket, deger, gizli, onKopya, kopyalandi, t }: {
           {goster ? t('RedisPage:hide') : t('RedisPage:show')}
         </button>
       )}
-      <button onClick={() => onKopya(deger, etiket)}
-        className="text-xs px-2 py-0.5 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
-        {kopyalandi === etiket ? t('RedisPage:copied_btn') : t('RedisPage:copy_btn')}
-      </button>
+      <KopyalaButton metin={deger} className="text-xs px-2 py-0.5 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700" />
     </div>
   )
 }

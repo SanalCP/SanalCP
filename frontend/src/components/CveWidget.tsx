@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -102,7 +103,7 @@ export default function CveWidget() {
   }
 
   async function guncelle() {
-    if (!window.confirm(t('CveWidget:confirm_update'))) return
+    if (!(await modalOnay(t('CveWidget:confirm_update')))) return
     setHata('')
     setMesaj('')
     try {

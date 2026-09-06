@@ -1,3 +1,5 @@
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalUyari } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -41,7 +43,7 @@ export default function DomainDatabaseYonetPage() {
       setSilinecekKullanici(null)
       yukle()
     } catch (e) {
-      alert(apiHata(e, t('DomainDatabaseYonetPage:user_delete_failed')))
+      await modalUyari(apiHata(e, t('DomainDatabaseYonetPage:user_delete_failed')))
     }
   }
 
@@ -55,7 +57,7 @@ export default function DomainDatabaseYonetPage() {
       const { data } = await api.post<{ signon_url: string }>(`/databases/${detay.kullanicilar[0].id}/pma-token`)
       window.open(data.signon_url, '_blank', 'noopener')
     } catch (e) {
-      alert(apiHata(e, t('DomainDatabaseYonetPage:pma_token_failed')))
+      await modalUyari(apiHata(e, t('DomainDatabaseYonetPage:pma_token_failed')))
     }
   }
 
@@ -248,7 +250,6 @@ function KullaniciSatiri({ kullanici, sonKullanici, onSifreDegistir, onSil, t }:
   t: (k: string, opts?: Record<string, unknown>) => string
 }) {
   const [goster, setGoster] = useState(false)
-  const [kopya, setKopya] = useState(false)
   return (
     <div className="flex items-center justify-between py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
       <div className="flex items-center gap-2">
@@ -257,12 +258,7 @@ function KullaniciSatiri({ kullanici, sonKullanici, onSifreDegistir, onSil, t }:
           {goster ? kullanici.db_parola : '••••••••'}
         </button>
         {goster && (
-          <button
-            onClick={() => { navigator.clipboard.writeText(kullanici.db_parola).then(() => { setKopya(true); setTimeout(() => setKopya(false), 1500) }).catch(() => {}) }}
-            className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 rounded"
-          >
-            {kopya ? '✓' : '⧉'}
-          </button>
+          <KopyalaButton metin={kullanici.db_parola} className="text-xs px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:hover:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 rounded" />
         )}
       </div>
       <div className="flex items-center gap-1">

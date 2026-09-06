@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay, modalUyari, modalGirdi } from '@/lib/dialog'
 import { lazy, Suspense, useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -131,18 +132,18 @@ export default function DomainFilesPage() {
   }
 
   async function sil(e: Entry) {
-    if (!confirm(t('DomainFilesPage:confirmDelete', { name: e.adi }))) return
+    if (!(await modalOnay(t('DomainFilesPage:confirmDelete', { name: e.adi })))) return
     try {
       await api.delete(`/domains/${id}/files`, { params: { yol: e.yol } })
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.deleteFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.deleteFailed')))
     }
   }
 
   async function klasorOlustur() {
-    const ad = prompt(t('DomainFilesPage:newFolderPrompt'))
+    const ad = await modalGirdi(t('DomainFilesPage:newFolderPrompt'))
     if (!ad) return
     const hedef = (yol === '/' ? '' : yol) + '/' + ad
     try {
@@ -150,7 +151,7 @@ export default function DomainFilesPage() {
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.mkdirFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.mkdirFailed')))
     }
   }
 
@@ -160,7 +161,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get<{yol: string; icerik: string}>(`/domains/${id}/files/oku`, { params: { yol: e.yol } })
       setEditor({ yol: e.yol, icerik: data.icerik })
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.openFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.openFailed')))
     }
   }
 
@@ -170,7 +171,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/yaz`, { yol: editor.yol, icerik: editor.icerik })
       setEditor(null); tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.saveFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.saveFailed')))
     }
   }
 
@@ -183,7 +184,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/rename`, { eski: e.yol, yeni })
       setRenameFor(null); setAgacYenileme(x => x + 1); tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.renameFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.renameFailed')))
     }
   }
 
@@ -192,7 +193,7 @@ export default function DomainFilesPage() {
       await api.post(`/domains/${id}/files/chmod`, { yol: e.yol, mod })
       setChmodFor(null); tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.chmodFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.chmodFailed')))
     }
   }
 
@@ -264,7 +265,7 @@ export default function DomainFilesPage() {
     setAgacYenileme(x => x + 1)
     tara()
     if (basarili < files.length) {
-      alert(t('DomainFilesPage:errors.uploadPartial', { ok: basarili, total: files.length }))
+      await modalUyari(t('DomainFilesPage:errors.uploadPartial', { ok: basarili, total: files.length }))
     }
   }
 
@@ -296,7 +297,7 @@ export default function DomainFilesPage() {
     setSeciliSet(new Set())
     setAgacYenileme(x => x + 1)
     tara()
-    if (basarili < yollar.length) alert(t('DomainFilesPage:errors.deletePartial', { ok: basarili, total: yollar.length }))
+    if (basarili < yollar.length) await modalUyari(t('DomainFilesPage:errors.deletePartial', { ok: basarili, total: yollar.length }))
   }
 
   async function extractEt(e: Entry) {
@@ -306,7 +307,7 @@ export default function DomainFilesPage() {
       setAgacYenileme(x => x + 1)
       tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.extractFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.extractFailed')))
     } finally {
       setExtractAktif(false)
     }
@@ -318,7 +319,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get(`/domains/${id}/files/ara`, { params: { q: aramaQ, yol } })
       setAramaSonuc(data.icerik)
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.searchFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.searchFailed')))
     }
   }
 
@@ -331,9 +332,9 @@ export default function DomainFilesPage() {
       })
       setKopyalaModal(null); setSeciliSet(new Set())
       setAgacYenileme(x => x + 1); tara()
-      if (data.hatalar?.length) alert(t('DomainFilesPage:errors.someErrors', { list: data.hatalar.join('\n') }))
+      if (data.hatalar?.length) await modalUyari(t('DomainFilesPage:errors.someErrors', { list: data.hatalar.join('\n') }))
     } catch (err) {
-      alert(apiHata(err, kopyalaModal.tip === 'kopyala' ? t('DomainFilesPage:errors.copyFailed') : t('DomainFilesPage:errors.moveFailed')))
+      await modalUyari(apiHata(err, kopyalaModal.tip === 'kopyala' ? t('DomainFilesPage:errors.copyFailed') : t('DomainFilesPage:errors.moveFailed')))
     }
   }
 
@@ -346,7 +347,7 @@ export default function DomainFilesPage() {
       setArsivModal(null); setSeciliSet(new Set())
       setAgacYenileme(x => x + 1); tara()
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.archiveFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.archiveFailed')))
     }
   }
 
@@ -359,7 +360,7 @@ export default function DomainFilesPage() {
       const okuResp = await api.get(`/domains/${id}/files/oku`, { params: { yol: hedef } })
       setEditor({ yol: hedef, icerik: okuResp.data.icerik })
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.createFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.createFailed')))
     }
   }
 
@@ -368,7 +369,7 @@ export default function DomainFilesPage() {
       const { data } = await api.get(`/domains/${id}/files/boyut`, { params: { yol: yolu } })
       setBoyutSonuc({ yol: yolu, boyut: data.boyut_b })
     } catch (err) {
-      alert(apiHata(err, t('DomainFilesPage:errors.sizeFailed')))
+      await modalUyari(apiHata(err, t('DomainFilesPage:errors.sizeFailed')))
     }
   }
 
@@ -416,7 +417,7 @@ export default function DomainFilesPage() {
         a.click()
         setTimeout(() => URL.revokeObjectURL(a.href), 1000)
       })
-      .catch(err => alert(t('DomainFilesPage:errors.downloadFailed', { msg: err.message })))
+      .catch(async err => await modalUyari(t('DomainFilesPage:errors.downloadFailed', { msg: err.message })))
   }
 
   // ===== Bağlam (sağ-tık) menüsü =====

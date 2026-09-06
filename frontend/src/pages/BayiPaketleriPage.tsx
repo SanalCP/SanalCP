@@ -4,6 +4,7 @@
 // "Bayi Limitleri" ekranında bir paket seçtiğinde limitler buradan ANLIK
 // GÖRÜNTÜ olarak kopyalanır (bkz. internal/users LimitKaydet). Paketi sonradan
 // değiştirmek zaten atanmış bayileri etkilemez.
+import { modalUyari } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
@@ -53,7 +54,7 @@ export default function BayiPaketleriPage() {
       await api.delete(`/bayi-paketleri/${silinecek.id}`)
       setSilinecek(null); yukle()
     } catch (e) {
-      alert(apiHata(e, t('BayiPaketleriPage:errors.delete_failed')))
+      await modalUyari(apiHata(e, t('BayiPaketleriPage:errors.delete_failed')))
     }
   }
 

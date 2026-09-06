@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -143,7 +144,7 @@ export default function DomainWebSunucuPage() {
   }
 
   async function vhostOzelKapat() {
-    if (!confirm('Bu dosyayı panelin standart yönetimine geri döndürmek istiyor musun?\n\nYaptığın düzenleme SİLİNMEZ — tekrar özel moda geçersen kaldığın yerden devam edersin.')) return
+    if (!(await modalOnay('Bu dosyayı panelin standart yönetimine geri döndürmek istiyor musun?\n\nYaptığın düzenleme SİLİNMEZ — tekrar özel moda geçersen kaldığın yerden devam edersin.'))) return
     setVhostOzelIsleniyor(true)
     try {
       await api.put(`/domains/${id}/vhost-ozel`, { ozel: false, icerik: vhostOzel?.icerik || '' })

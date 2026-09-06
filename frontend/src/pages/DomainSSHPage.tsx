@@ -1,3 +1,4 @@
+import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
@@ -152,7 +153,7 @@ export default function DomainSSHPage() {
             <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainSSHPage:connection_command')}</label>
             <div className="mt-1 flex items-center gap-2">
               <code className="flex-1 px-3 py-2 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto">{sshKomut}</code>
-              <button onClick={() => navigator.clipboard?.writeText(sshKomut)} className="shrink-0 text-xs px-2.5 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">{t('common:copy')}</button>
+              <KopyalaButton metin={sshKomut} className="shrink-0 text-xs px-2.5 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700" />
             </div>
           </div>
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t('DomainSSHPage:password_hint')} <strong>{t('DomainSSHPage:password_hint_bold')}</strong> {t('DomainSSHPage:password_hint_rest')}</p>
@@ -205,10 +206,7 @@ export default function DomainSSHPage() {
                     className="text-xs px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-lg font-medium">
                     {t('DomainSSHPage:download_private')}
                   </button>
-                  <button onClick={() => navigator.clipboard?.writeText(uretilenAnahtar.ozel)}
-                    className="text-xs px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">
-                    {t('common:copy')}
-                  </button>
+                  <KopyalaButton metin={uretilenAnahtar.ozel} className="text-xs px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700" />
                 </div>
               </div>
               <div className="mt-3">

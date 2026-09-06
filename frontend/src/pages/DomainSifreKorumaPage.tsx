@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -44,7 +45,7 @@ export default function DomainSifreKorumaPage() {
   }
 
   async function sil(k: Kayit) {
-    if (!confirm(t('DomainSifreKorumaPage:confirm_remove', { kullanici: k.kullanici, yol: k.yol }))) return
+    if (!(await modalOnay(t('DomainSifreKorumaPage:confirm_remove', { kullanici: k.kullanici, yol: k.yol })))) return
     setHata(null); setOk(null)
     try {
       await api.delete(`/domains/${id}/koruma/${k.id}`)

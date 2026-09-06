@@ -19,6 +19,8 @@ export default tseslint.config(
       'react-refresh': reactRefresh,
     },
     rules: {
+      // Tarayıcı popup'ları yerine @/lib/dialog içindeki modal akışını kullan.
+      'no-alert': 'error',
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       // tsconfig noUnusedLocals/noUnusedParameters kasıtlı kapalı (geliştirme kolaylığı) —

@@ -1,3 +1,5 @@
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalOnay, modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -170,7 +172,7 @@ function Toolkit({ id, kurulum, onDegisti, t }: { id: string; kurulum: Kurulum; 
   const temaAktif = (p: Paket) => calistir(`tema:${p.name}`, async () => (await api.post(`/domains/${id}/wordpress/tema`, { dizin, islem: 'aktif', ad: p.name })).data, t('DomainWordPressPage:updated_theme', { name: p.name }), () => setTemalar(null))
 
   async function parolaSifirla(u: Kullanici) {
-    if (!confirm(t('DomainWordPressPage:confirm_reset_password', { user: u.user_login }))) return
+    if (!(await modalOnay(t('DomainWordPressPage:confirm_reset_password', { user: u.user_login })))) return
     setMesgul(`pw:${u.ID}`); setHata(null); setBasari(null)
     try {
       const { data } = await api.post<{ parola: string; kullanici: string }>(`/domains/${id}/wordpress/kullanici-parola`, { dizin, user_id: u.ID })
@@ -180,8 +182,8 @@ function Toolkit({ id, kurulum, onDegisti, t }: { id: string; kurulum: Kurulum; 
   }
 
   async function sil() {
-    if (kok) { alert(t('DomainWordPressPage:root_cant_delete')); return }
-    if (!confirm(t('DomainWordPressPage:confirm_delete', { dizin }))) return
+    if (kok) { await modalUyari(t('DomainWordPressPage:root_cant_delete')); return }
+    if (!(await modalOnay(t('DomainWordPressPage:confirm_delete', { dizin })))) return
     setMesgul('sil'); setHata(null)
     try { await api.delete(`/domains/${id}/wordpress`, { data: { dizin, db_sil: true } }); onDegisti() }
     catch (err) { setHata(apiHata(err, t('DomainWordPressPage:delete_failed'))) }
@@ -463,7 +465,7 @@ function ParolaModal({ s, kapat, t }: { s: { kullanici: string; parola: string }
         <div className="text-xs text-slate-400 mb-4">{t('DomainWordPressPage:password_modal_user_label')} <span className="font-mono text-slate-600 dark:text-slate-300">{s.kullanici}</span></div>
         <div className="flex items-center gap-2">
           <code className="flex-1 px-3.5 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-sm font-mono text-slate-800 dark:text-slate-100 break-all border border-slate-100 dark:border-slate-700">{s.parola}</code>
-          <button onClick={() => navigator.clipboard?.writeText(s.parola)} className="text-xs px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">{t('DomainWordPressPage:copy')}</button>
+          <KopyalaButton metin={s.parola} className="text-xs px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition" />
         </div>
         <p className="text-xs text-amber-600 dark:text-amber-400 mt-3">{t('DomainWordPressPage:password_modal_warning')}</p>
         <button onClick={kapat} className="ta-primary-button mt-5 w-full">{t('DomainWordPressPage:ok')}</button>

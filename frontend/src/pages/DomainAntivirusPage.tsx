@@ -1,3 +1,4 @@
+import { modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -59,14 +60,14 @@ export default function DomainAntivirusPage() {
   }
 
   async function karantina(b: Bulgu) {
-    if (!confirm(t('DomainAntivirusPage:quarantine_confirm', { file: b.dosya }))) return
+    if (!(await modalOnay(t('DomainAntivirusPage:quarantine_confirm', { file: b.dosya })))) return
     setHata(null)
     try { await api.post(`/domains/${id}/antivirus/karantina`, { bulgu_id: b.id }); yukle() }
     catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:quarantine_failed'))) }
   }
 
   async function geriAl(b: Bulgu) {
-    if (!confirm(t('DomainAntivirusPage:restore_confirm', { file: b.dosya }))) return
+    if (!(await modalOnay(t('DomainAntivirusPage:restore_confirm', { file: b.dosya })))) return
     setHata(null)
     try { await api.post(`/domains/${id}/antivirus/karantina-geri-al`, { bulgu_id: b.id }); yukle() }
     catch (e) { setHata(apiHata(e, t('DomainAntivirusPage:restore_failed'))) }
@@ -77,7 +78,7 @@ export default function DomainAntivirusPage() {
     try {
       if (b.istisna) await api.delete(`/domains/${id}/antivirus/istisna/${b.id}`)
       else {
-        if (!confirm(t('DomainAntivirusPage:exception_confirm', { file: b.dosya }))) return
+        if (!(await modalOnay(t('DomainAntivirusPage:exception_confirm', { file: b.dosya })))) return
         await api.post(`/domains/${id}/antivirus/istisna`, { bulgu_id: b.id })
       }
       yukle()

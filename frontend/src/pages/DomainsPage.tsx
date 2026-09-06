@@ -1,6 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 // sp-mobil-v1
+import KopyalaButton from '@/components/KopyalaButton'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -187,7 +188,6 @@ export default function DomainsPage() {
   const [olusturAcik, setOlusturAcik] = useState(false)
   const [olusturuluyor, setOlusturuluyor] = useState(false)
   const [olusturmaSonuc, setOlusturmaSonuc] = useState<OlusturmaSonuc | null>(null)
-  const [sonucKopyalandi, setSonucKopyalandi] = useState(false)
   const [wpYonlendir, setWpYonlendir] = useState<{ id: number; alanAdi: string } | null>(null)
   const [fAlanAdi, setFAlanAdi] = useState('')
   const [fPHPSurum, setFPHPSurum] = useState('8.3')
@@ -342,21 +342,6 @@ export default function DomainsPage() {
     }
   }
 
-  async function panoYaz(metin: string) {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(metin); return true
-      }
-    } catch {}
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = metin; ta.style.position = 'fixed'; ta.style.opacity = '0'
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy')
-      document.body.removeChild(ta); return true
-    } catch {}
-    try { window.prompt(t('DomainsPage:result_modal.clipboard_prompt'), metin); return true } catch {}
-    return false
-  }
 
   function sonucMetni(s: OlusturmaSonuc) {
     return [
@@ -888,24 +873,24 @@ export default function DomainsPage() {
             <div className="space-y-3">
               {olusturmaSonuc.db_adi && <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.ftp')}</div>
-                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.ftp_host || '—'} kopyala={panoYaz} />
-                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.ftp_user} kopyala={panoYaz} />
-                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.ftp} kopyala={panoYaz} parola />
+                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.ftp_host || '—'} />
+                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.ftp_user} />
+                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.ftp} parola />
               </div>}
 
               <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-500 font-semibold mb-2">{t('DomainsPage:result_modal.mysql')}</div>
-                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.db_host || 'localhost'} kopyala={panoYaz} />
-                <KopyaSatir e={t('DomainsPage:result_modal.database')} v={olusturmaSonuc.db_adi} kopyala={panoYaz} />
-                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.db_user} kopyala={panoYaz} />
-                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.db} kopyala={panoYaz} parola />
+                <KopyaSatir e={t('DomainsPage:result_modal.host')} v={olusturmaSonuc.db_host || 'localhost'} />
+                <KopyaSatir e={t('DomainsPage:result_modal.database')} v={olusturmaSonuc.db_adi} />
+                <KopyaSatir e={t('DomainsPage:result_modal.user')} v={olusturmaSonuc.db_user} />
+                <KopyaSatir e={t('DomainsPage:result_modal.password')} v={olusturmaSonuc.olusturulan_parolalar.db} parola />
               </div>
 
               {olusturmaSonuc.nameserver && (
                 <div className="border border-emerald-200 dark:border-emerald-800 rounded-md p-3 bg-emerald-50 dark:bg-emerald-900/20">
                   <div className="text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold mb-2">{t('DomainsPage:result_modal.nameservers')}</div>
-                  <KopyaSatir e="NS1" v={olusturmaSonuc.nameserver.ns1} kopyala={panoYaz} />
-                  <KopyaSatir e="NS2" v={olusturmaSonuc.nameserver.ns2} kopyala={panoYaz} />
+                  <KopyaSatir e="NS1" v={olusturmaSonuc.nameserver.ns1} />
+                  <KopyaSatir e="NS2" v={olusturmaSonuc.nameserver.ns2} />
                   <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-2">{t('DomainsPage:result_modal.ns_note')}</p>
                 </div>
               )}
@@ -916,13 +901,7 @@ export default function DomainsPage() {
             </div>
 
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={async () => {
-                  const ok = await panoYaz(sonucMetni(olusturmaSonuc))
-                  if (ok) { setSonucKopyalandi(true); setTimeout(() => setSonucKopyalandi(false), 1500) }
-                }}
-                className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
-                {sonucKopyalandi ? t('DomainsPage:result_modal.copied') : t('DomainsPage:result_modal.copy_all')}
-              </button>
+              <KopyalaButton metin={sonucMetni(olusturmaSonuc)} className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">{t('DomainsPage:result_modal.copy_all')}</KopyalaButton>
               <button onClick={() => sonucTxtIndir(olusturmaSonuc)}
                 className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 text-sm rounded">
                 {t('DomainsPage:result_modal.save_txt')}
@@ -1012,34 +991,21 @@ export default function DomainsPage() {
   )
 }
 
-function KopyaSatir({ e, v, kopyala, parola }: { e: string; v: string; kopyala: (m: string) => Promise<boolean>; parola?: boolean }) {
+function KopyaSatir({ e, v, parola }: { e: string; v: string; parola?: boolean }) {
   const { t } = useTranslation('DomainsPage')
-  const [kopyalandi, setKopyalandi] = useState(false)
   const [acik, setAcik] = useState(!parola)
-  async function tikla() {
-    const ok = await kopyala(v)
-    if (ok) { setKopyalandi(true); setTimeout(() => setKopyalandi(false), 1500) }
-  }
   return (
     <div className="flex items-center gap-2 text-xs py-1">
       <span className="w-24 text-slate-500 dark:text-slate-500 shrink-0">{e}</span>
-      <button
-        type="button"
-        onClick={tikla}
-        className={`flex-1 text-left font-mono px-2 py-1 rounded border cursor-pointer select-all transition ${
-          kopyalandi ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-400 text-slate-800 dark:text-slate-200'
-        }`}
-        title={t('DomainsPage:result_modal.copy_hint')}
-      >
+      <KopyalaButton metin={v} icerigiKoru className="flex-1 text-left font-mono px-2 py-1 rounded border cursor-pointer select-all border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand-400 text-slate-800 dark:text-slate-200" title={t('DomainsPage:result_modal.copy_hint')}>
         {parola && !acik ? '••••••••••' : v}
-      </button>
+      </KopyalaButton>
       {parola && (
         <button type="button" onClick={() => setAcik(s => !s)}
           className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800">
           {acik ? t('DomainsPage:result_modal.hide') : t('DomainsPage:result_modal.show')}
         </button>
       )}
-      {kopyalandi && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">{t('DomainsPage:result_modal.copied')}</span>}
     </div>
   )
 }

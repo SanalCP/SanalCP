@@ -1,5 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -48,7 +50,6 @@ export default function DomainDNSPage() {
   const [dnssec, setDnssec] = useState<DNSSEC | null>(null)
   const [dnssecIsliyor, setDnssecIsliyor] = useState(false)
   const [dnssecKapatOnay, setDnssecKapatOnay] = useState(false)
-  const [dsKopyalandi, setDsKopyalandi] = useState(false)
 
   const yukle = useCallback(() => {
     if (!id) return
@@ -144,7 +145,7 @@ export default function DomainDNSPage() {
       await api.delete(`/domains/${id}/dns/${silinecek.id}`)
       setSilinecek(null); yukle()
     } catch (e) {
-      alert(apiHata(e, t('DomainDNSPage:errors.delete_failed')))
+      await modalUyari(apiHata(e, t('DomainDNSPage:errors.delete_failed')))
     }
   }
 
@@ -301,8 +302,7 @@ export default function DomainDNSPage() {
                   {dnssec.ds.map((d, i) => (
                     <div key={i} className="flex items-center gap-2 mb-1">
                       <code className="flex-1 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 break-all text-slate-800 dark:text-slate-200">{d}</code>
-                      <button onClick={() => { navigator.clipboard?.writeText(d); setDsKopyalandi(true); setTimeout(() => setDsKopyalandi(false), 1500) }}
-                        className="px-2 py-1 text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded transition whitespace-nowrap">{dsKopyalandi ? `✓ ${t('common:copied')}` : t('common:copy')}</button>
+                      <KopyalaButton metin={d} className="px-2 py-1 text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded transition whitespace-nowrap" />
                     </div>
                   ))}
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{t('DomainDNSPage:dnssec.ds_copy_hint')}</p>

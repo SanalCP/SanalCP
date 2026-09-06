@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -68,7 +69,7 @@ export default function DomainSSLPage() {
   }
 
   async function issue(tip: 'self-signed' | 'letsencrypt') {
-    if (tip === 'letsencrypt' && !confirm(t('DomainSSLPage:confirm_letsencrypt'))) return
+    if (tip === 'letsencrypt' && !(await modalOnay(t('DomainSSLPage:confirm_letsencrypt')))) return
     setKurulanTip(tip)
     setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
@@ -91,7 +92,7 @@ export default function DomainSSLPage() {
   }
 
   async function disable() {
-    if (!confirm(t('DomainSSLPage:confirm_disable'))) return
+    if (!(await modalOnay(t('DomainSSLPage:confirm_disable')))) return
     setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
       await api.delete(`/domains/${id}/ssl`)

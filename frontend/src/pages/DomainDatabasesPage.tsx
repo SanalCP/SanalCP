@@ -1,5 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -64,7 +66,7 @@ export default function DomainDatabasesPage() {
   async function sil() {
     if (!silinecek) return
     try { await api.delete(`/databases/${silinecek.ilkId}`); setSilinecek(null); yukle() }
-    catch (e) { alert(apiHata(e, t('DomainDatabasesPage:delete_failed'))) }
+    catch (e) { await modalUyari(apiHata(e, t('DomainDatabasesPage:delete_failed'))) }
   }
 
   return (
@@ -298,12 +300,11 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
 }
 
 function SonucSatir({ e, v, t }: { e: string; v: string; t: (k: string, opts?: Record<string, unknown>) => string }) {
-  const [ok, setOk] = useState(false)
   return (
     <div className="flex items-center gap-2">
       <span className="w-24 shrink-0 text-xs text-emerald-700 dark:text-emerald-300">{e}</span>
       <code className="flex-1 bg-white dark:bg-slate-800 px-3 py-1.5 font-mono text-sm text-slate-900 dark:text-slate-100 rounded border border-emerald-200 dark:border-emerald-800 break-all">{v}</code>
-      <button onClick={() => { navigator.clipboard.writeText(v); setOk(true); setTimeout(() => setOk(false), 1500) }} className="px-2.5 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded">{ok ? '✓' : t('DomainDatabasesPage:copy')}</button>
+      <KopyalaButton metin={v} className="px-2.5 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded" />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -83,7 +84,7 @@ export default function PaketlerPage() {
     const onayMesaji = suankiKurulu
       ? t('PaketlerPage:confirm.remove_package', { package: paket })
       : t('PaketlerPage:confirm.install_package', { package: paket })
-    if (!confirm(onayMesaji)) return
+    if (!(await modalOnay(onayMesaji))) return
 
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
@@ -117,7 +118,7 @@ export default function PaketlerPage() {
   }
 
   async function kur(paket: string) {
-    if (!confirm(t('PaketlerPage:confirm.install_generic', { package: paket }))) return
+    if (!(await modalOnay(t('PaketlerPage:confirm.install_generic', { package: paket })))) return
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
       const r = await api.post('/paketler/kur', { paket })
@@ -129,7 +130,7 @@ export default function PaketlerPage() {
     finally { setIsleniyor(null) }
   }
   async function kaldir(paket: string) {
-    if (!confirm(t('PaketlerPage:confirm.remove_generic', { package: paket }))) return
+    if (!(await modalOnay(t('PaketlerPage:confirm.remove_generic', { package: paket })))) return
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
       const r = await api.post('/paketler/kaldir', { paket })

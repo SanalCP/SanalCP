@@ -1,5 +1,7 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import KopyalaButton from '@/components/KopyalaButton'
+import { modalOnay, modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -121,7 +123,7 @@ export default function DomainGitPage() {
   }
 
   async function ghDisconnect() {
-    if (!confirm('GitHub bağlantısı kaldırılacak. Webhook varsa silinir, mevcut repo dosyaları etkilenmez.')) return
+    if (!(await modalOnay('GitHub bağlantısı kaldırılacak. Webhook varsa silinir, mevcut repo dosyaları etkilenmez.'))) return
     try {
       await api.delete(`/domains/${id}/github`)
       setGhConn({ yok: true })
@@ -181,13 +183,10 @@ export default function DomainGitPage() {
       await api.delete(`/domains/${id}/git`)
       setRepo(null); setSilinecek(false); setBasari('Repo bağlantısı kaldırıldı')
     } catch (e) {
-      alert(apiHata(e))
+      await modalUyari(apiHata(e))
     }
   }
 
-  function kopyala(s: string) {
-    navigator.clipboard.writeText(s)
-  }
 
   return (
     <div className="w-full px-6 py-5">
@@ -356,7 +355,7 @@ export default function DomainGitPage() {
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mb-5">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Deploy Key (Public)</h3>
-                  <button onClick={() => kopyala(repo.deploy_key_pub)} className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 rounded">Kopyala</button>
+                  <KopyalaButton metin={repo.deploy_key_pub} className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:bg-brand-900/30 hover:text-brand-700 dark:text-brand-300 dark:hover:text-brand-300 rounded" />
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mb-2">GitHub → Repository → Settings → Deploy keys → Add deploy key — bu anahtarı yapıştırın (Allow write access GEREKMEZ).</p>
                 <textarea readOnly value={repo.deploy_key_pub} rows={3}
@@ -370,8 +369,8 @@ export default function DomainGitPage() {
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">GitHub → Repository → Settings → Webhooks → Add webhook. Content type: <code className="font-mono">application/json</code>. Push event yeterli.</p>
                 <div className="space-y-2">
-                  <Sat e="Payload URL" d={`http://${domain?.ipv4 || ''}:8443/api/v1/git-webhook/${repo.webhook_secret}`} onCopy={kopyala} />
-                  <Sat e="Secret" d={repo.webhook_secret} onCopy={kopyala} />
+                  <Sat e="Payload URL" d={`http://${domain?.ipv4 || ''}:8443/api/v1/git-webhook/${repo.webhook_secret}`} kopyalanabilir />
+                  <Sat e="Secret" d={repo.webhook_secret} kopyalanabilir />
                   <Sat e="Content type" d="application/json" />
                   <Sat e="Events" d="Just the push event" />
                 </div>
@@ -423,12 +422,12 @@ export default function DomainGitPage() {
   )
 }
 
-function Sat({ e, d, onCopy }: { e: string; d: string; onCopy?: (s: string) => void }) {
+function Sat({ e, d, kopyalanabilir }: { e: string; d: string; kopyalanabilir?: boolean }) {
   return (
     <div className="flex items-center gap-3">
       <span className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-500 w-28">{e}</span>
       <code className="flex-1 text-xs bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded font-mono break-all">{d}</code>
-      {onCopy && <button onClick={() => onCopy(d)} className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:bg-brand-900/30 rounded">⧉</button>}
+      {kopyalanabilir && <KopyalaButton metin={d} className="text-xs px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-brand-100 dark:bg-brand-900/30 rounded" />}
     </div>
   )
 }

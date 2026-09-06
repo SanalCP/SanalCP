@@ -1,3 +1,4 @@
+import { modalGirdi, modalOnay } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -22,9 +23,9 @@ export default function DomainLaravelPage() {
   useEffect(()=>{if(!jobs.some(j=>['queued','running'].includes(j.durum)))return;const timer=setInterval(()=>void yukle(),2500);return()=>clearInterval(timer)},[jobs,yukle])
   async function artisan(komut:string){setMesgul(komut);setHata('');try{const r=await api.post<{ok:boolean;cikti:string}>(`/domains/${id}/laravel/artisan`,{dizin,komut});setCikti(r.data.cikti||'—');if(!r.data.ok)setHata(t('command_failed'))}catch(e){setHata(apiHata(e))}finally{setMesgul('')}}
   async function bakim(){if(!durum)return;setMesgul('bakim');try{await api.post(`/domains/${id}/laravel/bakim`,{dizin,aktif:!durum.bakim});setOk(t('saved'));await yukle()}catch(e){setHata(apiHata(e))}finally{setMesgul('')}}
-  async function envDuzenle(k:string,item:EnvItem){const mevcut=item.gizli?'':(item.deger||'');const deger=prompt(t(item.gizli?'secret_prompt':'value_prompt',{key:k}),mevcut);if(deger===null)return;try{await api.put(`/domains/${id}/laravel/env`,{dizin,anahtar:k,deger});setOk(t('saved'));await yukle()}catch(e){setHata(apiHata(e))}}
-  async function envEkle(){const anahtar=prompt(t('key_prompt'));if(!anahtar)return;await envDuzenle(anahtar.toUpperCase(),{gizli:true,dolu:false})}
-  async function isBaslat(tur:'deploy'|'composer',komut=''){if(tur==='deploy'&&!confirm(t('deploy_confirm')))return;setMesgul(tur+komut);setHata('');try{await api.post(`/domains/${id}/laravel/${tur}`,tur==='deploy'?{dizin,migrate}:{dizin,komut});setOk(t('job_started'));await yukle()}catch(e){setHata(apiHata(e))}finally{setMesgul('')}}
+  async function envDuzenle(k:string,item:EnvItem){const mevcut=item.gizli?'':(item.deger||'');const deger=await modalGirdi(t(item.gizli?'secret_prompt':'value_prompt',{key:k}),mevcut,{gizli:item.gizli});if(deger===null)return;try{await api.put(`/domains/${id}/laravel/env`,{dizin,anahtar:k,deger});setOk(t('saved'));await yukle()}catch(e){setHata(apiHata(e))}}
+  async function envEkle(){const anahtar=await modalGirdi(t('key_prompt'));if(!anahtar)return;await envDuzenle(anahtar.toUpperCase(),{gizli:true,dolu:false})}
+  async function isBaslat(tur:'deploy'|'composer',komut=''){if(tur==='deploy'&&!(await modalOnay(t('deploy_confirm'))))return;setMesgul(tur+komut);setHata('');try{await api.post(`/domains/${id}/laravel/${tur}`,tur==='deploy'?{dizin,migrate}:{dizin,komut});setOk(t('job_started'));await yukle()}catch(e){setHata(apiHata(e))}finally{setMesgul('')}}
   async function runtime(tur:'scheduler'|'queue',aktif:boolean){setMesgul(tur);setHata('');try{await api.put(`/domains/${id}/laravel/${tur}`,{dizin,aktif,queue:'default',tries:3,timeout:90});setOk(t('saved'));await yukle()}catch(e){setHata(apiHata(e))}finally{setMesgul('')}}
   return <div className="w-full px-6 py-6"><Breadcrumb items={[{etiket:t('common:home'),href:'/'},{etiket:t('subscription'),href:`/abonelikler/${id}`},{etiket:t('title')}]} />
     <h1 className="text-2xl font-semibold dark:text-white">{t('title')}</h1><p className="mt-1 mb-5 text-sm text-slate-500">{t('subtitle')}</p>

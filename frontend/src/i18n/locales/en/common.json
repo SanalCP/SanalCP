@@ -62,5 +62,18 @@
     "reload": "Reload page",
     "home": "Back to home",
     "details": "Technical detail"
-  }
+  },
+  "dialog": {
+    "uyari_title": "Notice",
+    "onay_title": "Confirm action",
+    "girdi_title": "Enter information",
+    "kopyala_title": "Copy manually",
+    "value": "Value",
+    "copy_value": "Text to copy",
+    "copy_hint": "Select the text and press Ctrl+C or ⌘C to copy. On mobile devices, touch and hold the text to copy it."
+  },
+  "copying": "Copying…",
+  "copy_manual": "Copy manually",
+  "copy_manual_hint": "Automatic clipboard copying failed. You can copy the text below manually.",
+  "copy_failed": "Copy failed, try again"
 }

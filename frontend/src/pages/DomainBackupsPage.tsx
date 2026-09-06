@@ -1,5 +1,6 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
+import { modalOnay, modalUyari } from '@/lib/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -120,7 +121,7 @@ export default function DomainBackupsPage() {
   }
 
   async function destSil() {
-    if (!confirm(t('DomainBackupsPage:destination.delete_confirm'))) return
+    if (!(await modalOnay(t('DomainBackupsPage:destination.delete_confirm')))) return
     setDestKayit(true)
     try {
       await api.delete(`/domains/${id}/backup-destination`)
@@ -175,7 +176,7 @@ export default function DomainBackupsPage() {
       await api.delete(`/domains/${id}/backups/${silinecek.id}`)
       setSilinecek(null); yukle()
     } catch (e) {
-      alert(apiHata(e))
+      await modalUyari(apiHata(e))
     }
   }
 

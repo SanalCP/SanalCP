@@ -1,5 +1,6 @@
 // Veritabanı kullanıcı parolasını sıfırlama modalı — domain-özel ve sunucu
 // geneli veritabanı sayfaları arasında paylaşılır (ikisi de aynı /databases/:id/password ucunu çağırır).
+import KopyalaButton from '@/components/KopyalaButton'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -65,7 +66,7 @@ export default function DBParolaSifirlaModal({ db, onKapat, onTamam }: {
             <p className="text-xs mb-2 opacity-90">{t('DBParolaSifirlaModal:password_updated_save')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-white dark:bg-slate-900 px-3 py-2 font-mono text-sm text-slate-900 dark:text-slate-100 rounded border border-emerald-200 dark:border-emerald-800 break-all">{yeniPw}</code>
-              <button onClick={() => navigator.clipboard.writeText(yeniPw)} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded">{t('DBParolaSifirlaModal:copy')}</button>
+              <KopyalaButton metin={yeniPw} className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-200 text-xs rounded" />
             </div>
           </div>
           <div className="flex justify-end">

@@ -13,6 +13,25 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.61** (2026-09-06)
+
+Paneldeki 85 klasik tarayıcı uyarısı, onay ve metin girişi tasarımla uyumlu
+modal pencerelere dönüştürüldü. Modallar Türkçe/İngilizce, açık/koyu tema,
+klavye odağı ve Escape ile iptal desteği sunuyor. Eşzamanlı uyarılar sırayla
+sunuluyor; sayfa değişince bekleyen onaylar iptal ediliyor. Laravel gizli
+değer girişleri parola alanında gösteriliyor; posta hizmetini kaldırmada
+alan adını yazarak onaylama koşulu korunuyor.
+
+17 sayfa ve bileşendeki kopyalama butonları ortak yapıya geçirildi. İşlem
+sırasında bekleme göstergesi, gerçek başarıdan sonra iki saniyelik
+**✓ Kopyalandı** bildirimi ve yeşil vurgu gösteriliyor. Aynı değeri gösteren
+satırlar birbirini etkilemiyor; tekrar tıklama süreyi yeniliyor ve değer
+değişiminde eski bildirim temizleniyor. Panoya erişim başarısızsa alternatif
+kopyalama yöntemi, ardından elle kopyalama modalı kullanılıyor.
+
+27 frontend testi; onay/iptal, silme işlemlerinin API sıralaması, parola
+girdisi, kopyalama sonucunun beklenmesi ve geri bildirim süresini doğruluyor.
+
 **0.9.60** (2026-09-04)
 
 Domainler sayfasında domain adının üzerine gelindiğinde sitenin 250×250 canlı
