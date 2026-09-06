@@ -18,6 +18,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  installer:
+    name: Kurulum betiği — üretim ve atomik yayın testleri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/installer-bootstrap-test.py
+
   recovery:
     name: Kurtarma — izole rollback kabul testi
     runs-on: ubuntu-latest

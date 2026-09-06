@@ -1,77 +1,104 @@
 name: Yayınla (kur betiğini güncelle)
 
-# /kur SADECE etiket attığınızda ilerler (push:tags, main değil). main'e commit
-# akmaya devam eder, kurulan sürüm sizin bilerek attığınız etikettir.
-#   git tag v0.2 && git push origin v0.2
+# Yeni etiket otomatik yayımlanır. Sunucu/erişim düzeltmesinden sonra aynı
+# sürüm workflow_dispatch ile main'deki güncel yayın koduyla yeniden yüklenir.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Yeniden yayımlanacak mevcut sürüm etiketi (ör. v0.9.61)'
+        required: true
+        type: string
 
-concurrency: publish-installer   # aynı anda iki yayın çakışmasın
+permissions:
+  contents: read
+
+concurrency: publish-installer
 
 jobs:
   publish-installer:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Etiketlenen commit'in tarball hash'ini hesapla
+      - uses: actions/checkout@v4
+
+      - name: Yayın betiği testleri
+        run: python3 scripts/installer-bootstrap-test.py
+
+      - name: Sürümü ve arşiv bütünlüğünü doğrula
         id: pin
         env:
           REPO: ${{ github.repository }}
-          REF: ${{ github.sha }}
+          REQUESTED_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          SHA256=$(curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" | sha256sum | cut -d' ' -f1)
-          echo "ref=$REF"       >> "$GITHUB_OUTPUT"
+          [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Geçersiz sürüm etiketi"; exit 1;
+          }
+          git fetch --no-tags --depth=1 origin "refs/tags/$REQUESTED_TAG"
+          REF=$(git rev-parse 'FETCH_HEAD^{commit}')
+          VERSION=$(git show "$REF:surum.json" | jq -er '.son_surum')
+          [[ "$VERSION" = "${REQUESTED_TAG#v}" ]] || {
+            echo "::error::Etiket ve surum.json uyuşmuyor"; exit 1;
+          }
+          curl --fail --silent --show-error --location --retry 3 --max-time 180 \
+            "https://codeload.github.com/${REPO}/tar.gz/${REF}" -o source.tar.gz
+          SHA256=$(sha256sum source.tar.gz | cut -d' ' -f1)
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
-          echo "Sabitlenen: $REF  /  $SHA256"
+          echo "tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
+          echo "Doğrulanan: $REQUESTED_TAG / $REF / $SHA256"
 
       - name: kur betiğini üret
         env:
-          REPO: ${{ github.repository }}
-          TAG:  ${{ github.ref_name }}
-          REF:  ${{ steps.pin.outputs.ref }}
-          SHA:  ${{ steps.pin.outputs.sha256 }}
+          TAG: ${{ steps.pin.outputs.tag }}
+          REF: ${{ steps.pin.outputs.ref }}
+          SHA: ${{ steps.pin.outputs.sha256 }}
         run: |
           set -euo pipefail
-          TODAY=$(date -u +%Y-%m-%d)
-          cat > kur <<EOF
-          #!/usr/bin/env bash
-          # SanalCP — sanalcp.com/kur
-          # OTOMATİK ÜRETİLİR — elle düzenlemeyin. Kaynak: .github/workflows/release.yml
-          # Sürüm: ${TAG}  ·  Üretim: ${TODAY}
-          set -euo pipefail
+          python3 scripts/installer-bootstrap.py generate --tag "$TAG" --ref "$REF" --sha256 "$SHA" > kur
+          bash -n kur
 
-          SANALCP_REF=${REF}
-          SANALCP_SHA256=${SHA}
-          export SANALCP_REF SANALCP_SHA256
-
-          curl -fsSL "https://raw.githubusercontent.com/${REPO}/\${SANALCP_REF}/install.sh" | bash -s -- "\$@"
-          EOF
-          echo "----- üretilen kur -----"; cat kur
-
-      - name: Sunucuya yükle (scp/sftp kapalı — cat-pipe ile)
+      - name: Sınırlı SSH erişimiyle sunucuya yükle
         env:
-          DEPLOY_KEY:  ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+          for setting in DEPLOY_KEY DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_KNOWN_HOSTS; do
+            [[ -n "${!setting}" ]] || { echo "::error::$setting tanımlanmamış"; exit 1; }
+          done
           install -d -m 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          SSH="ssh -i ~/.ssh/id_ed25519 -p $DEPLOY_PORT -o BatchMode=yes ${DEPLOY_USER}@${DEPLOY_HOST}"
-          # atomik: geçici dosyaya yaz, sonra mv
-          $SSH "cat > ${DEPLOY_PATH}/kur.tmp && chmod 644 ${DEPLOY_PATH}/kur.tmp && mv -f ${DEPLOY_PATH}/kur.tmp ${DEPLOY_PATH}/kur" < kur
-          echo "yüklendi: ${DEPLOY_PATH}/kur"
+          # Güvenilen sunucudan alınmış anahtar; ağdaki ilk yanıta güvenilmez.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          trap 'rm -f ~/.ssh/id_ed25519' EXIT
+          if ! ssh -T -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" publish-kur < kur; then
+            echo "::error::Sunucuya kur yüklenemedi. Üstteki SSH hatasını, DEPLOY_HOST/PORT/USER ayarlarını ve sunucudaki sınırlı yayın anahtarını kontrol edin."
+            exit 1
+          fi
 
-      - name: Canlıda doğrula
+      - name: Canlı dosyanın tamamını doğrula
         run: |
           set -euo pipefail
-          sleep 2
-          LIVE=$(curl -fsSL https://sanalcp.com/kur)
-          echo "$LIVE" | grep -q "SANALCP_REF=${{ steps.pin.outputs.ref }}" \
-            && echo "✓ /kur canlıda doğru commit'e sabitli" \
-            || { echo "✗ /kur beklenen commit'i göstermiyor"; exit 1; }
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location --max-time 30 \
+              -H 'Cache-Control: no-cache' "https://sanalcp.com/kur?release=${{ steps.pin.outputs.ref }}" -o live-kur \
+              && cmp -s kur live-kur; then
+              echo "✓ /kur canlıda beklenen sürüm ve SHA-256 ile birebir eşleşiyor"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::Canlı /kur dosyası üretilen dosyayla eşleşmiyor"
+          exit 1
