@@ -1,8 +1,8 @@
 {
-  "page_title": "Tools and Settings",
+  "page_title": "Server Settings",
   "page_subtitle": "Server-wide administration — PHP, system packages, network, security and maintenance.",
   "breadcrumb_home": "Home",
-  "breadcrumb_current": "Tools and Settings",
+  "breadcrumb_current": "Server Settings",
   "search_placeholder": "Search tools…",
   "search_aria": "Search tools",
   "section_maintenance": "Server Maintenance",

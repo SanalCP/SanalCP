@@ -2,7 +2,7 @@
   "title": "Backup Manager",
   "subtitle": "View all domain backups from a single place; daily automatic backup runs, S3/SFTP targets are configured per domain.",
   "breadcrumb": {
-    "tools_settings": "Tools and Settings"
+    "tools_settings": "Server Settings"
   },
   "error_trigger_failed": "Could not trigger backup",
   "kpi": {

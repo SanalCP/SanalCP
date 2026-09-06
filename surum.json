@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.61",
-  "duyuru": "Klasik tarayıcı uyarıları, onay ve metin girişleri tasarıma uygun modallara dönüştürüldü. Tüm kopyalama butonlarına gerçek sonuca bağlı Kopyalandı bildirimi ve görsel geri bildirim eklendi.",
+  "son_surum": "0.9.62",
+  "duyuru": "Sol menü günlük iş akışlarına göre yeniden düzenlendi. Aktif bölüm otomatik açılıyor, gereksiz tekrarlar kaldırıldı ve sunucu, bayi ile domain menülerinde ortak ve daha anlaşılır bir terminoloji kullanılıyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-06"
 }

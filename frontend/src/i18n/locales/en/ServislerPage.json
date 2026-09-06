@@ -1,5 +1,5 @@
 {
-  "breadcrumb_settings": "Tools & Settings",
+  "breadcrumb_settings": "Server Settings",
   "breadcrumb_title": "Services",
   "title": "Service Management",
   "subtitle": "Restart web, database, DNS and PHP services from here. Useful after configuration changes.",

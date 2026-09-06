@@ -71,7 +71,7 @@ export default function DNSSablonuPage() {
 
   return (
     <div className="px-6 md:px-8 py-6">
-      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('DashboardLayout:items.tools_settings'), href: '/araclar-ayarlar' }, { etiket: t('DNSSablonuPage:breadcrumb_title') }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('DashboardLayout:items.server_settings'), href: '/araclar-ayarlar' }, { etiket: t('DNSSablonuPage:breadcrumb_title') }]} />
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DNSSablonuPage:title')}</h1>
       <p className="text-sm text-slate-500 dark:text-slate-500 mb-5">
         {t('DNSSablonuPage:subtitle')}

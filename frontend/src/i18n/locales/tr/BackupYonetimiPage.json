@@ -2,7 +2,7 @@
   "title": "Backup Yöneticisi",
   "subtitle": "Tüm domainlerin yedeklerini tek yerden görün; günlük otomatik yedekleme çalışır, S3/SFTP hedefleri domain bazında ayarlanır.",
   "breadcrumb": {
-    "tools_settings": "Araçlar ve Ayarlar"
+    "tools_settings": "Sunucu Ayarları"
   },
   "error_trigger_failed": "Yedekleme tetiklenemedi",
   "kpi": {

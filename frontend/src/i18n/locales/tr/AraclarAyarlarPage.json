@@ -1,8 +1,8 @@
 {
-  "page_title": "Araçlar ve Ayarlar",
+  "page_title": "Sunucu Ayarları",
   "page_subtitle": "Sunucu geneli yönetim — PHP, sistem paketleri, ağ, güvenlik ve bakım.",
   "breadcrumb_home": "Anasayfa",
-  "breadcrumb_current": "Araçlar ve Ayarlar",
+  "breadcrumb_current": "Sunucu Ayarları",
   "search_placeholder": "Araç ara…",
   "search_aria": "Araç ara",
   "section_maintenance": "Sunucu Bakımı",

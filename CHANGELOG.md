@@ -6,12 +6,28 @@ Sürümleme `BÜYÜK.KÜÇÜK.YAMA` biçimindedir. Panel **1.0 öncesi (beta)** 
 `0.x` serisinde küçük sürümler arasında davranış değişikliği olabilir; her sürüm
 `sanalcp-update` ile güvenli (yedekli + geri dönüşlü) şekilde uygulanır.
 
-Panelin kurulu sürümünü `Araçlar ve Ayarlar → Panel Güncellemesi` ekranından veya
+Panelin kurulu sürümünü `Sunucu Ayarları → Panel Güncellemesi` ekranından veya
 sayfa altbilgisinden görebilirsiniz.
 
 ---
 
 ## 0.9.x — Lisans numarası
+
+**0.9.62** (2026-09-06)
+
+Sol menü günlük kullanım akışlarına göre yeniden düzenlendi. Sunucu genelinde
+**Siteler**, **Müşteriler ve Planlar**, **Operasyon**, **Güvenlik** ve **Sistem**;
+seçili domain içinde ise **Web Sitesi**, **Domain ve E-posta**, **Veri ve Yedek**,
+**Geliştirici**, **Güvenlik** ve **Raporlar** bölümleri kullanılıyor. Bayi ve
+müşteri menüleri de aynı bilgi mimarisi ve terminolojiyle uyumlu hale getirildi.
+
+Menü artık akordeon gibi çalışıyor: aynı anda yalnız bir bölüm açık kalıyor ve
+aktif sayfanın bölümü kendiliğinden açılıyor. Tekrarlanan veya yer tutucu
+bağlantılar sol menüden kaldırıldı; sayfa rotaları korunurken işlevsel ekranlara
+üst menü aramasından erişim devam ediyor.
+"Kullanıcılar" ile "Müşteriler" arasındaki farkı belirginleştirmek için adlar
+**Panel Hesapları** ve **Müşteri Kayıtları** olarak değiştirildi. "Araçlar ve
+Ayarlar" merkezi de **Sunucu Ayarları** adıyla sadeleştirildi.
 
 **0.9.61** (2026-09-06)
 

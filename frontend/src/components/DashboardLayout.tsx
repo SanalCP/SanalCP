@@ -13,7 +13,6 @@ import DomainSecici from './DomainSecici'
 import HataSiniri from './HataSiniri'
 
 const SURUM_UYARI_KAPALI_KEY = 'sp-surum-duyuru-kapatildi'
-const MENU_KAPALI_GRUP_KEY = 'sp-menu-kapali-gruplar'
 type SurumKontrol = { guncelleme_var: boolean; kritik: boolean; duyuru: string; son: string; mevcut?: string; build_tarihi?: string }
 type SurumBilgi = { mevcut?: string; build_tarihi?: string }
 
@@ -64,48 +63,43 @@ const ICONS = {
   imunify:     'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622',
 }
 
-// Sunucu kipi menüsü. Buradaki her giriş App.tsx'te tanımlı bir rotaya bakar —
-// daha önce yalnız "Araçlar ve Ayarlar" hub sayfasından ulaşılabilen Servisler,
-// PHP, Paket Yöneticisi, Yedekleme ve DNS Şablonu artık doğrudan menüde.
+// Sunucu kipi menüsü. Günlük işler kullanıcının zihinsel modeline göre
+// gruplanır; seyrek kullanılan altyapı ayarları Sistem altında kalır.
 function nav(t: TFunction): NavGroup[] {
   return [
   { items: [{ to: '/', etiket: t('DashboardLayout:labels.home'), ikon: ICONS.home, end: true }] },
-  { baslik: t('DashboardLayout:groups.hosting'), baslikKey: 'hosting', items: [
+  { baslik: t('DashboardLayout:groups.sites'), baslikKey: 'sites', items: [
     { to: '/domainler',            etiket: t('DashboardLayout:items.domains'),       ikon: ICONS.domain },
-    { to: '/dns',                  etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+    { to: '/uygulamalar',          etiket: t('DashboardLayout:items.apps'),          ikon: ICONS.wp },
     { to: '/mail',                 etiket: t('DashboardLayout:items.mail_accounts'), ikon: ICONS.posta },
     { to: '/veritabanlari',        etiket: t('DashboardLayout:items.databases'),     ikon: ICONS.db },
-    { to: '/araclar/dns-sablonu',  etiket: t('DashboardLayout:items.dns_template'),  ikon: ICONS.ekdomain },
-    { to: '/hizmet-planlari',      etiket: t('DashboardLayout:items.service_plans'), ikon: ICONS.plan },
+    { to: '/dns',                  etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+    { to: '/ssl',                  etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
   ]},
-  { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
-    { to: '/uygulamalar',          etiket: t('DashboardLayout:items.apps'),          ikon: ICONS.wp },
-    { to: '/eklentiler',           etiket: t('DashboardLayout:items.plugins'),       ikon: ICONS.eklenti },
+  { baslik: t('DashboardLayout:groups.customers_plans'), baslikKey: 'customers_plans', items: [
+    { to: '/kullanicilar',         etiket: t('DashboardLayout:items.panel_accounts'), ikon: ICONS.bayi },
+    { to: '/musteriler',           etiket: t('DashboardLayout:items.customer_records'), ikon: ICONS.musteri },
+    { to: '/hizmet-planlari',      etiket: t('DashboardLayout:items.hosting_plans'), ikon: ICONS.plan },
+    { to: '/bayi-paketleri',       etiket: t('DashboardLayout:items.reseller_packages'), ikon: ICONS.plan },
+  ]},
+  { baslik: t('DashboardLayout:groups.operations'), baslikKey: 'operations', items: [
+    { to: '/izleme',               etiket: t('DashboardLayout:items.monitoring'), ikon: ICONS.izleme },
+    { to: '/backup-yonetimi',      etiket: t('DashboardLayout:items.backup_management'), ikon: ICONS.yedek },
+    { to: '/hesap-aktarimi',       etiket: t('DashboardLayout:items.account_transfer'), ikon: ICONS.kopya },
+    { to: '/araclar/altalan-goc',  etiket: t('DashboardLayout:items.subdomain_migration'), ikon: ICONS.ekdomain },
   ]},
   { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
-    { to: '/ssl',                  etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
+    { to: '/guvenlik-bildirimleri', etiket: t('DashboardLayout:items.security_notifications'), ikon: ICONS.kilit },
     { to: '/firewall',             etiket: t('DashboardLayout:items.firewall'),      ikon: ICONS.firewall },
+    { to: '/guvenlik-gunlugu',     etiket: t('DashboardLayout:items.audit_log'),  ikon: ICONS.log },
   ]},
-  { baslik: t('DashboardLayout:groups.server'), baslikKey: 'server', items: [
+  { baslik: t('DashboardLayout:groups.system'), baslikKey: 'system', items: [
+    { to: '/araclar-ayarlar',      etiket: t('DashboardLayout:items.server_settings'), ikon: ICONS.araclar },
     { to: '/araclar/servisler',    etiket: t('DashboardLayout:items.services'),      ikon: ICONS.servis },
     { to: '/araclar/php-surumler', etiket: t('DashboardLayout:items.php_versions'),  ikon: ICONS.php },
     { to: '/sistem/php-modulleri', etiket: t('DashboardLayout:items.php_modules'),   ikon: ICONS.puzzle },
     { to: '/araclar/paketler',     etiket: t('DashboardLayout:items.package_manager'), ikon: ICONS.paket },
-    { to: '/backup-yonetimi',      etiket: t('DashboardLayout:items.backup_management'), ikon: ICONS.yedek },
-    { to: '/araclar/altalan-goc',  etiket: t('DashboardLayout:items.subdomain_migration'), ikon: ICONS.ekdomain },
-  ]},
-  { baslik: t('DashboardLayout:groups.monitoring'), baslikKey: 'monitoring', items: [
-    { to: '/izleme',               etiket: t('DashboardLayout:items.server_monitoring'), ikon: ICONS.izleme },
-    { to: '/istatistikler',        etiket: t('DashboardLayout:items.statistics'),    ikon: ICONS.istatistik },
-  ]},
-  { baslik: t('DashboardLayout:groups.management'), baslikKey: 'management', items: [
-    { to: '/kullanicilar',         etiket: t('DashboardLayout:items.users'),         ikon: ICONS.bayi },
-    { to: '/bayi-paketleri',       etiket: t('DashboardLayout:items.reseller_packages'), ikon: ICONS.plan },
-    { to: '/musteriler',           etiket: t('DashboardLayout:items.customers'),     ikon: ICONS.musteri },
-    { to: '/hesap-aktarimi',       etiket: t('DashboardLayout:items.account_transfer'), ikon: ICONS.kopya },
-    { to: '/guvenlik-gunlugu',     etiket: t('DashboardLayout:items.security_log'),  ikon: ICONS.log },
-    { to: '/guvenlik-bildirimleri', etiket: t('DashboardLayout:items.security_notifications'), ikon: ICONS.kilit },
-    { to: '/araclar-ayarlar',      etiket: t('DashboardLayout:items.tools_settings'), ikon: ICONS.araclar },
+    { to: '/araclar/dns-sablonu',  etiket: t('DashboardLayout:items.dns_template'),  ikon: ICONS.ekdomain },
   ]},
   ]
 }
@@ -119,24 +113,22 @@ function nav(t: TFunction): NavGroup[] {
 function bayiNav(t: TFunction): NavGroup[] {
   return [
   { items: [{ to: '/', etiket: t('DashboardLayout:labels.home'), ikon: ICONS.home, end: true }] },
-  { baslik: t('DashboardLayout:groups.hosting'), baslikKey: 'hosting', items: [
+  { baslik: t('DashboardLayout:groups.sites'), baslikKey: 'sites', items: [
     { to: '/domainler',      etiket: t('DashboardLayout:items.domains'),   ikon: ICONS.domain },
-    { to: '/dns',            etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
+    { to: '/uygulamalar',    etiket: t('DashboardLayout:items.apps'), ikon: ICONS.wp },
     { to: '/mail',           etiket: t('DashboardLayout:items.mail'),      ikon: ICONS.posta },
     { to: '/veritabanlari',  etiket: t('DashboardLayout:items.databases'), ikon: ICONS.db },
+    { to: '/dns',            etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
     { to: '/ssl',            etiket: t('DashboardLayout:items.ssl_certificates'), ikon: ICONS.kilit },
   ]},
-  { baslik: t('DashboardLayout:groups.apps'), baslikKey: 'apps', items: [
-    { to: '/uygulamalar',    etiket: t('DashboardLayout:items.apps'), ikon: ICONS.wp },
-  ]},
-  { baslik: t('DashboardLayout:groups.my_accounts'), baslikKey: 'my_accounts', items: [
+  { baslik: t('DashboardLayout:groups.customers_plans'), baslikKey: 'customers_plans', items: [
     { to: '/bayi-ozet',      etiket: t('DashboardLayout:items.resource_summary'), ikon: ICONS.istatistik },
     { to: '/kullanicilar',   etiket: t('DashboardLayout:items.customer_accounts'), ikon: ICONS.bayi },
     { to: '/musteriler',     etiket: t('DashboardLayout:items.customer_records'), ikon: ICONS.musteri },
+    { to: '/hizmet-planlari', etiket: t('DashboardLayout:items.hosting_plans'), ikon: ICONS.plan },
   ]},
-  { baslik: t('DashboardLayout:groups.server'), baslikKey: 'server', items: [
-    { to: '/sunucu-durumu',   etiket: t('DashboardLayout:items.server_status'),  ikon: ICONS.izleme },
-    { to: '/hizmet-planlari', etiket: t('DashboardLayout:items.service_plans'), ikon: ICONS.plan },
+  { baslik: t('DashboardLayout:groups.operations'), baslikKey: 'operations', items: [
+    { to: '/sunucu-durumu',  etiket: t('DashboardLayout:items.server_status'),  ikon: ICONS.izleme },
   ]},
   ]
 }
@@ -150,31 +142,30 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
     { items: [{ to: y(), etiket: t('DashboardLayout:labels.overview'), ikon: ICONS.home, end: true }] },
     { baslik: t('DashboardLayout:groups.website'), baslikKey: 'website', items: [
       { to: y('/dosyalar'),      etiket: t('DashboardLayout:items.files'),        ikon: ICONS.dosyalar },
+      { to: y('/uygulamalar'),   etiket: t('DashboardLayout:items.apps'),         ikon: ICONS.wp },
       { to: y('/web-sunucu'),    etiket: t('DashboardLayout:items.apache_nginx'), ikon: ICONS.apache },
       { to: y('/php'),           etiket: t('DashboardLayout:items.php_settings'), ikon: ICONS.php },
-      { to: y('/composer'),      etiket: t('DashboardLayout:items.composer'),     ikon: ICONS.composer },
       { to: y('/performans'),    etiket: t('DashboardLayout:items.performance'),  ikon: ICONS.izleme },
       { to: y('/redis'),         etiket: t('DashboardLayout:items.redis_cache'),  ikon: ICONS.redis },
-      { to: y('/uygulamalar'),   etiket: t('DashboardLayout:items.apps'),         ikon: ICONS.wp },
     ]},
-    { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
+    { baslik: t('DashboardLayout:groups.domain_mail'), baslikKey: 'domain_mail', items: [
       { to: y('/dns'),           etiket: t('DashboardLayout:items.dns_management'), ikon: ICONS.dns },
-      { to: y('/ek-alanlar'),    etiket: t('DashboardLayout:items.addon_domains'), ikon: ICONS.ekdomain },
       { to: y('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
+      { to: y('/ek-alanlar'),    etiket: t('DashboardLayout:items.addon_domains'), ikon: ICONS.ekdomain },
+      { to: y('/mail'),          etiket: t('DashboardLayout:items.mail'),         ikon: ICONS.posta },
     ]},
-    { baslik: t('DashboardLayout:groups.data'), baslikKey: 'data', items: [
+    { baslik: t('DashboardLayout:groups.data_backup'), baslikKey: 'data_backup', items: [
       { to: y('/veritabanlari'), etiket: t('DashboardLayout:items.databases'),    ikon: ICONS.db },
       { to: y('/ftp'),           etiket: t('DashboardLayout:items.ftp_accounts'), ikon: ICONS.ftp },
-      { to: y('/mail'),          etiket: t('DashboardLayout:items.mail'),         ikon: ICONS.posta },
       { to: y('/yedekler'),      etiket: t('DashboardLayout:items.backups'),      ikon: ICONS.yedek },
       { to: y('/kopyala'),       etiket: t('DashboardLayout:items.clone_site'),   ikon: ICONS.kopya },
       { to: y('/ice-aktarim'),   etiket: t('DashboardLayout:items.import'),       ikon: ICONS.iceaktarim },
     ]},
     { baslik: t('DashboardLayout:groups.developer'), baslikKey: 'developer', items: [
       { to: y('/git'),           etiket: t('DashboardLayout:items.git'),          ikon: ICONS.git },
+      { to: y('/composer'),      etiket: t('DashboardLayout:items.composer'),     ikon: ICONS.composer },
       { to: y('/cron'),          etiket: t('DashboardLayout:items.cron_jobs'),    ikon: ICONS.cron },
       { to: y('/ssh-erisim'),    etiket: t('DashboardLayout:items.ssh_access'),   ikon: ICONS.ssh },
-      { to: y('/gunlukler'),     etiket: t('DashboardLayout:items.logs'),         ikon: ICONS.log },
     ]},
     { baslik: t('DashboardLayout:groups.security'), baslikKey: 'security', items: [
       { to: y('/waf'),           etiket: t('DashboardLayout:items.waf'),          ikon: ICONS.waf },
@@ -183,9 +174,9 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
       { to: y('/sifre-koruma'),  etiket: t('DashboardLayout:items.password_protected_dirs'), ikon: ICONS.kilit },
       { to: y('/imunify'),       etiket: t('DashboardLayout:items.imunify'),      ikon: ICONS.imunify },
     ]},
-    { baslik: t('DashboardLayout:groups.analytics'), baslikKey: 'analytics', items: [
+    { baslik: t('DashboardLayout:groups.reports'), baslikKey: 'reports', items: [
+      { to: y('/gunlukler'),     etiket: t('DashboardLayout:items.logs'),         ikon: ICONS.log },
       { to: y('/istatistik'),    etiket: t('DashboardLayout:items.statistics'),   ikon: ICONS.istatistik },
-      { to: y('/baglanti'),      etiket: t('DashboardLayout:items.connection_info'), ikon: ICONS.plan },
     ]},
   ]
 }
@@ -196,16 +187,9 @@ export default function DashboardLayout() {
   const musteriDomainID = typeof window !== 'undefined' ? localStorage.getItem('sanalcp.musteri.domain_id') || '' : ''
   const rol = useAuth((s) => s.kullanici?.rol)
 
-  // Gruplar varsayılan olarak açıktır; yalnız kullanıcının kapattıkları saklanır.
-  // Böylece menüye yeni grup eklendiğinde ayrıca kayıt gerekmez.
-  const [kapaliGruplar, setKapaliGruplar] = useState<string[]>(() => {
-    try {
-      const ham = localStorage.getItem(MENU_KAPALI_GRUP_KEY)
-      return ham ? (JSON.parse(ham) as string[]) : []
-    } catch {
-      return []
-    }
-  })
+  // Sol menü bir akordeondur: aynı anda yalnız bir bölüm açık tutulur.
+  // Aktif rotanın bölümü aşağıdaki effect ile kendiliğinden açılır.
+  const [acikGrup, setAcikGrup] = useState<string | null>(null)
 
   // Mobil kenar çubuğu (off-canvas). lg ve üstünde sidebar zaten sabit görünür,
   // bu durum yalnızca < lg genişliklerde anlam taşır.
@@ -267,11 +251,11 @@ export default function DashboardLayout() {
       { to: my('/web-sunucu'),    etiket: t('DashboardLayout:items.apache_nginx'), ikon: ICONS.apache },
       { to: my('/php'),           etiket: t('DashboardLayout:items.php_settings'), ikon: ICONS.php },
     ]},
-    { baslik: t('DashboardLayout:groups.domain_name'), baslikKey: 'domain_name', items: [
+    { baslik: t('DashboardLayout:groups.domain_mail'), baslikKey: 'domain_mail', items: [
       { to: my('/dns'),           etiket: t('DashboardLayout:items.dns_settings'), ikon: ICONS.dns },
       { to: my('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
     ]},
-    { baslik: t('DashboardLayout:groups.data'), baslikKey: 'data', items: [
+    { baslik: t('DashboardLayout:groups.data_backup'), baslikKey: 'data_backup', items: [
       { to: my('/veritabanlari'), etiket: t('DashboardLayout:items.databases'),    ikon: ICONS.db },
       { to: my('/ftp'),           etiket: t('DashboardLayout:items.ftp_accounts'), ikon: ICONS.ftp },
       { to: my('/yedekler'),      etiket: t('DashboardLayout:items.backups'),      ikon: ICONS.yedek },
@@ -279,6 +263,8 @@ export default function DashboardLayout() {
     { baslik: t('DashboardLayout:groups.developer'), baslikKey: 'developer', items: [
       { to: my('/cron'),          etiket: t('DashboardLayout:items.cron_jobs'),    ikon: ICONS.cron },
       { to: my('/git'),           etiket: t('DashboardLayout:items.git_deploy'),   ikon: ICONS.git },
+    ]},
+    { baslik: t('DashboardLayout:groups.reports'), baslikKey: 'reports', items: [
       { to: my('/gunlukler'),     etiket: t('DashboardLayout:items.logs'),         ikon: ICONS.log },
     ]},
   ]
@@ -303,14 +289,21 @@ export default function DashboardLayout() {
     ? bayiNav(t)
     : nav(t)
 
-  const grupAcik = (b: string) => !kapaliGruplar.includes(b)
+  const rotaGrubu = aktifNav.find((grup) =>
+    grup.baslikKey && grup.items.some((it) =>
+      it.end
+        ? konum.pathname === it.to
+        : konum.pathname === it.to || konum.pathname.startsWith(`${it.to}/`),
+    ),
+  )?.baslikKey
+
+  // Sayfa değişince yeni aktif bölüm açılır; anasayfada menü sakin ve kapalıdır.
+  useEffect(() => { setAcikGrup(rotaGrubu ?? null) }, [konum.pathname, rotaGrubu])
+
+  const grupAcik = (b: string) => acikGrup === b
 
   function toggle(b: string) {
-    setKapaliGruplar((s) => {
-      const yeni = s.includes(b) ? s.filter((x) => x !== b) : [...s, b]
-      try { localStorage.setItem(MENU_KAPALI_GRUP_KEY, JSON.stringify(yeni)) } catch { /* yok say */ }
-      return yeni
-    })
+    setAcikGrup((s) => s === b ? null : b)
   }
 
   return (

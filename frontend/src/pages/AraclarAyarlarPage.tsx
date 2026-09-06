@@ -22,7 +22,7 @@ import SunucuSaatiAyari from '@/components/SunucuSaatiAyari'
 import { DepolamaAyari, DNSCozumleyiciAyari, GuvenlikGuncellemeAyari, JournalAyari, RebootBilgisi, SunucuKimlikDNS, SwapAyari } from '@/components/GelismisSunucuAyarlari'
 
 /*
- * Araçlar ve Ayarlar — sunucu geneli yönetim merkezi.
+ * Sunucu Ayarları — sunucu geneli yönetim merkezi.
  * Tasarım: panelin monokrom "premium açık SaaS" dili. Nötr yüzey + tek brand-aksan,
  * çizgi (stroke) SVG ikon, tutarlı rounded-2xl, canlı arama. Emoji/gökkuşağı YOK.
  */
