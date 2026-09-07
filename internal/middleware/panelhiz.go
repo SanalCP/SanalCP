@@ -19,18 +19,16 @@ var panelHizSayac = map[string]panelHizKayit{}
 
 // PanelHizLimiti tüm panel API çağrılarına dakika pencereli bir üst sınır koyar.
 // Girişteki başarısız-deneme kilidi ayrıca ve daha sıkı biçimde çalışmaya devam eder.
+// Ayar satırı her istekte DB'den değil kısa TTL'li önbellekten okunur (panelayar_cache.go).
 func PanelHizLimiti(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if scopeDB == nil {
+		o, err := panelAyarlariOku(r.Context())
+		if err != nil {
 			httpx.WriteError(w, 503, "panel hız ayarı doğrulanamadı")
 			return
 		}
-		var profil, istisna string
-		var limit, burst int
-		if err := scopeDB.QueryRowContext(r.Context(), `SELECT hiz_profili,hiz_istek_dakika,hiz_burst,COALESCE(hiz_ip_istisnalari,'') FROM panel_ayarlari WHERE id=1`).Scan(&profil, &limit, &burst, &istisna); err != nil {
-			httpx.WriteError(w, 503, "panel hız ayarı doğrulanamadı")
-			return
-		}
+		profil, istisna := o.HizProfil, o.HizIstisna
+		limit, burst := o.HizIstek, o.HizBurst
 		if profil == "kapali" || panelIPIstisna(httpx.ClientIP(r), istisna) {
 			next.ServeHTTP(w, r)
 			return

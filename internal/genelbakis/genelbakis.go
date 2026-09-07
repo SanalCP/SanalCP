@@ -17,9 +17,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os/exec"
-	"strconv"
-	"strings"
 	"time"
 
 	"sanalcp/internal/hesaplar"
@@ -142,16 +139,25 @@ type MailSatir struct {
 }
 
 func (h *Handlers) Mail(w http.ResponseWriter, r *http.Request) {
-	// Alt sorgu kullanılıyor: mailboxes ve mail_aliases'ı aynı anda JOIN etmek
-	// kartezyen çarpım üretir ve sayımları şişirir.
 	q := `
 SELECT d.id, d.alan_adi,
        COALESCE(md.durum, ''),
-       (SELECT COUNT(*) FROM mailboxes mb WHERE mb.domain_id = d.id),
-       (SELECT COUNT(*) FROM mail_aliases a WHERE a.domain_id = d.id),
-       (SELECT COUNT(*) FROM mailboxes mb2 WHERE mb2.domain_id = d.id AND mb2.status = 'suspended')
+	   COALESCE(mb.kutu_sayisi, 0),
+	   COALESCE(ma.alias_sayisi, 0),
+	   COALESCE(mb.pasif_kutu, 0)
 FROM domains d
-LEFT JOIN mail_domains md ON md.domain_id = d.id`
+LEFT JOIN mail_domains md ON md.domain_id = d.id
+LEFT JOIN (
+	SELECT domain_id, COUNT(*) AS kutu_sayisi,
+	       COALESCE(SUM(status = 'suspended'), 0) AS pasif_kutu
+	FROM mailboxes
+	GROUP BY domain_id
+) mb ON mb.domain_id = d.id
+LEFT JOIN (
+	SELECT domain_id, COUNT(*) AS alias_sayisi
+	FROM mail_aliases
+	GROUP BY domain_id
+) ma ON ma.domain_id = d.id`
 
 	kosul, arg := middleware.KapsamSQL(r, "d")
 	q += kosul + `
@@ -191,42 +197,6 @@ type DBSatir struct {
 	Olusturma string `json:"olusturma"`
 }
 
-// dbBoyutlari: şema adı -> KB.
-//
-// Panelin kendi DSN'i (`panel` kullanıcısı) yalnız `panel` şemasına yetkilidir;
-// MySQL information_schema.TABLES'ı yetkiye göre filtrelediği için o bağlantı
-// üzerinden müşteri veritabanlarının boyutu HİÇ görünmez (sessizce 0 döner).
-// Bu yüzden panelin veritabanı oluştururken de kullandığı yol izleniyor:
-// root'un unix-socket kimliğiyle çalışan `mysql` istemcisi
-// (bkz. internal/hesaplar, internal/kaynaklimit).
-//
-// Hata durumunda boş harita döner — boyut sütunu "—" gösterir, liste yine gelir.
-func dbBoyutlari() map[string]int64 {
-	ctx, iptal := context.WithTimeout(context.Background(), 10*time.Second)
-	defer iptal()
-
-	out, err := exec.CommandContext(ctx, "mysql", "-N", "-B", "-e",
-		`SELECT table_schema, COALESCE(SUM(data_length + index_length), 0) DIV 1024
-		 FROM information_schema.TABLES GROUP BY table_schema`).Output()
-	if err != nil {
-		return map[string]int64{}
-	}
-
-	boyut := make(map[string]int64)
-	for _, satir := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		alan := strings.Split(satir, "\t")
-		if len(alan) != 2 {
-			continue
-		}
-		kb, err := strconv.ParseInt(strings.TrimSpace(alan[1]), 10, 64)
-		if err != nil {
-			continue
-		}
-		boyut[strings.TrimSpace(alan[0])] = kb
-	}
-	return boyut
-}
-
 func (h *Handlers) Veritabanlari(w http.ResponseWriter, r *http.Request) {
 	q := `
 SELECT a.id, a.domain_id, d.alan_adi, a.db_name, a.db_user, a.db_host, a.db_pass_plain,
@@ -257,7 +227,12 @@ ORDER BY d.alan_adi, a.db_name`
 		out = append(out, s)
 	}
 
-	boyutlar := dbBoyutlari()
+	ctx, iptal := context.WithTimeout(r.Context(), 10*time.Second)
+	defer iptal()
+	boyutlar, err := dbBoyutlariCache.get(ctx)
+	if err != nil {
+		boyutlar = map[string]int64{}
+	}
 
 	for i := range out {
 		out[i].BoyutKB = boyutlar[out[i].DBAdi]

@@ -13,6 +13,26 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.64** (2026-09-07)
+
+Domainler, Panel Hesapları ve Müşteri Kayıtları listelerine sunucu taraflı arama
+ve sayfalama eklendi. Listeler 50 kayıtlık sayfalar halinde, önceki alfabetik
+sıraları korunarak yükleniyor; arama bayi ve müşteri yetki kapsamlarının içinde
+çalışıyor. Eski API istemcileri query parametresi göndermediğinde dizi yanıtını
+almaya devam ediyor.
+
+Ana ekranın ilk açılışı hafifletildi: ağır WordPress, yedek ve domain istekleri
+yalnız ilgili widget görünüyorsa çalışıyor; bağımsız widget'lar gereksiz yeniden
+çizilmiyor. Posta özeti, satır başına alt sorgular yerine toplu SQL özetleriyle
+hesaplanıyor. Veritabanı boyutları kabukta `mysql` çalıştırmak yerine mevcut root
+bağlantısından okunuyor ve kısa süreli önbelleğe alınıyor.
+
+Her API isteğinde tekrarlanan panel erişim, hız limiti ve boşta oturum ayarı
+sorguları iki saniyelik ortak önbellekte birleştirildi. İlk dolum ve yenilemeler
+eşzamanlı istek yığını oluşturmuyor; geçici veritabanı hatalarında son başarılı
+ayar sınırlı süreyle kullanılabiliyor. Sayfalama, tenant kapsamı ve önbellek
+davranışları için yeni backend testleri eklendi.
+
 **0.9.63** (2026-09-07)
 
 Yayın düzeltmesi: backend sürüm sabiti (`SurumNo`) ve yayınlanan binary,

@@ -16,7 +16,8 @@
   "empty": {
     "title": "Henüz domain yok",
     "desc": "İlk domain'inizi ekleyerek başlayın. Linux kullanıcı, nginx vhost, PHP-FPM havuzu, FTP hesabı, MySQL veritabanı ve DNS zone otomatik oluşturulur.",
-    "button": "Domain Oluştur"
+    "button": "Domain Oluştur",
+    "search": "Aramanızla eşleşen domain bulunamadı."
   },
   "table": {
     "preview_title": "{{domain}} önizleme",

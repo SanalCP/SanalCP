@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor,
@@ -16,6 +16,12 @@ import { api } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import LoadHistoryChart from '@/components/LoadHistoryChart'
 import CveWidget from '@/components/CveWidget'
+
+// Kendi verisini kendisi çeken widget'lar: ana sayfa 5/20 sn'de bir yeniden
+// render edildiğinde props değişmezse memo tekrar çizimi atlar. memo() çağrısı
+// modül kapsamında yapılmalıdır (her render'da yeni bileşen üretilmemeli).
+const YukGrafikWidget = memo(LoadHistoryChart)
+const CveGuvenlikWidget = memo(CveWidget)
 
 type SistemInfo = {
   hostname: string; ip: string; os_adi: string; kernel: string
@@ -130,7 +136,6 @@ export default function HomePage() {
   // süre kesilir; poll hataları bu yüzden YUTULUR, log sunucuda kaldığı için
   // servis dönünce kaldığı yerden okunmaya devam eder.
   const [guncellemeLog, setGuncellemeLog] = useState('')
-  const logRef = useRef<HTMLPreElement>(null)
   const [optimize, setOptimize] = useState<Optimize | null>(null)
   const [yedek, setYedek] = useState<YedekOzet | null>(null)
   const [wp, setWp] = useState<WpKurulum[] | null>(null)
@@ -170,18 +175,23 @@ export default function HomePage() {
   }
 
   // Kayıtlı düzeni yükle (yoksa varsayılan) + eksik widget'ları birleştir
+  // duzenHazir: ağır tekil veri çekimleri ancak düzen belli olduktan sonra
+  // başlar (yalnız gerçekten görünen widget'ların uçları çağrılır, ilk boyama
+  // anındaki istek yığını parçalanır).
+  const [duzenHazir, setDuzenHazir] = useState(false)
   useEffect(() => {
     api.get<{ duzen: string }>('/dashboard-duzen')
       .then((r) => {
         const ham = r.data?.duzen
         if (ham && ham.trim()) {
           try { setDuzen(birlestirDuzen(JSON.parse(ham))) }
-          catch { setDuzen(VARSAYILAN_DUZEN) }
+          catch { setDuzen(birlestirDuzen(VARSAYILAN_DUZEN)) }
         } else {
           setDuzen(birlestirDuzen(VARSAYILAN_DUZEN))
         }
+        setDuzenHazir(true)
       })
-      .catch(() => setDuzen(VARSAYILAN_DUZEN))
+      .catch(() => { setDuzen(birlestirDuzen(VARSAYILAN_DUZEN)); setDuzenHazir(true) })
   }, [])
 
   useEffect(() => () => {
@@ -201,16 +211,56 @@ export default function HomePage() {
     }
     cekKullanim()
     cekBakim()
-    // Bir kez okunanlar (dosya sistemi / DB / wp-cli ağırlıklı — poll edilmez)
-    api.get<Domain[]>('/domains').then((r) => setDomainler(r.data || [])).catch(() => {})
-    api.get<YedekOzet>('/admin/backups/ozet').then((r) => setYedek(r.data)).catch(() => {})
-    api.get<WpKurulum[]>('/wordpress/tumu').then((r) => setWp(r.data || [])).catch(() => setWp([]))
 
     const idK = setInterval(cekKullanim, 5000)   // kaynak kullanımı — 5 sn
     const idB = setInterval(cekBakim, 20000)     // bakım durumu — 20 sn
     const onVis = () => { if (!document.hidden) { cekKullanim(); cekBakim() } } // geri gelince tazele
     document.addEventListener('visibilitychange', onVis)
     return () => { clearInterval(idK); clearInterval(idB); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
+
+  // Ağır tek seferlik istekleri düzen yüklendikten sonra, yalnız ilgili widget
+  // görünüyorsa ve ilk boyamadan kısa süre sonra başlat.
+  const agirCekilen = useRef<Set<string>>(new Set())
+  const agirPlanlanan = useRef<Set<string>>(new Set())
+  const agirZamanlayicilar = useRef<number[]>([])
+  const sayfaAktif = useRef(true)
+  useEffect(() => {
+    if (!duzenHazir) return
+    const gorunen = new Set(duzen.columns.flat())
+    const baslat = (anahtar: string, fn: () => void) => {
+      if (agirCekilen.current.has(anahtar) || agirPlanlanan.current.has(anahtar)) return
+      agirPlanlanan.current.add(anahtar)
+      agirZamanlayicilar.current.push(window.setTimeout(() => {
+        agirPlanlanan.current.delete(anahtar)
+        if (agirCekilen.current.has(anahtar)) return
+        agirCekilen.current.add(anahtar)
+        fn()
+      }, 150))
+    }
+    if (gorunen.has('domainler') || gorunen.has('abonelikler')) {
+      baslat('domainler', () => { api.get<Domain[]>('/domains').then((r) => { if (sayfaAktif.current) setDomainler(r.data || []) }).catch(() => {}) })
+    }
+    if (gorunen.has('son-yedek')) {
+      baslat('son-yedek', () => { api.get<YedekOzet>('/admin/backups/ozet').then((r) => { if (sayfaAktif.current) setYedek(r.data) }).catch(() => {}) })
+    }
+    if (gorunen.has('wordpress') || gorunen.has('abonelikler')) {
+      baslat('wp', () => {
+        api.get<WpKurulum[]>('/wordpress/tumu')
+          .then((r) => { if (sayfaAktif.current) setWp(r.data || []) })
+          .catch(() => { if (sayfaAktif.current) setWp([]) })
+      })
+    }
+  }, [duzenHazir, duzen])
+  useEffect(() => {
+    const zamanlayicilar = agirZamanlayicilar.current
+    const planlanan = agirPlanlanan.current
+    sayfaAktif.current = true
+    return () => {
+      sayfaAktif.current = false
+      for (const id of zamanlayicilar) clearTimeout(id)
+      planlanan.clear()
+    }
   }, [])
 
   // Güncelleme log'u — SADECE iş çalışırken poll edilir (aksi hâlde boşa istek).
@@ -230,11 +280,6 @@ export default function HomePage() {
     return () => { dur = true; window.clearInterval(id) }
   }, [guncellemeCalisiyor])
 
-  // Yeni satırlar geldikçe terminali en alta kaydır.
-  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }) }, [guncellemeLog])
-
-  const aktif = domainler.filter((d) => d.durum === 'aktif').length
-  const sslli = domainler.filter((d) => d.ssl).length
   const diskList = s ? (s.diskler?.length ? s.diskler : [s.disk]) : []
   const anaDisk = s ? (diskList[0] || s.disk) : null
   const servisAktif = s ? s.servisler.filter((x) => x.aktif).length : 0
@@ -243,16 +288,6 @@ export default function HomePage() {
 
   const ad = (kullanici?.ad_soyad || kullanici?.adi || '').trim()
   const saglik = hesaplaSaglik(s, servisDown, kotaUyariKapali, t)
-
-  // en yeni yedek zamanı (YYYY-MM-DD HH:MM leksikografik sıralanır)
-  const sonYedek = yedek?.domainler?.reduce((a, r) => (r.son_yedek > a ? r.son_yedek : a), '') || ''
-  const yedekliDomain = yedek?.domainler?.filter((r) => r.sayi > 0).length ?? 0
-
-  // WordPress türetimleri
-  const wpToplam = wp?.length ?? 0
-  const wpEski = wp?.filter((x) => x.durum === 'eski').length ?? 0
-  const wpGuncel = wp?.filter((x) => x.durum === 'guncel').length ?? 0
-  const wpBilinmiyor = wp?.filter((x) => x.durum === 'bilinmiyor').length ?? 0
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -325,155 +360,17 @@ export default function HomePage() {
 
   /* ---------- widget id → JSX eşlemesi ---------- */
   const widgets: Record<string, React.ReactNode> = {
-    'yuk-grafik': <LoadHistoryChart />,
+    'yuk-grafik': <YukGrafikWidget />,
 
-    'cve-guvenlik': <CveWidget />,
+    'cve-guvenlik': <CveGuvenlikWidget />,
 
-    'wordpress': (
-      <Kart baslik={t('HomePage:wordpress.baslik')} alt={t('HomePage:wordpress.alt')} ikon={I.wp}
-        sag={<Link to="/wordpress" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        {wp === null ? (
-          <Yukleniyor />
-        ) : (
-          <>
-            <div className="mb-3 grid grid-cols-3 gap-2.5">
-              <MiniIstatistik deger={wpToplam} etiket={t('HomePage:wordpress.install_count')} renk="slate" />
-              <MiniIstatistik deger={wpEski} etiket={t('HomePage:wordpress.update_count')} renk={wpEski > 0 ? 'amber' : 'emerald'} />
-              <MiniIstatistik deger={wpGuncel} etiket={t('HomePage:wordpress.current_count')} renk="emerald" />
-            </div>
-            {wpEski > 0 && (
-              <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/15 dark:text-amber-300">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="mt-0.5 h-3.5 w-3.5 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.36 3.6 2.26 17.66A1.5 1.5 0 0 0 3.56 19.9h16.88a1.5 1.5 0 0 0 1.3-2.25L13.64 3.6a1.5 1.5 0 0 0-2.6 0Z" /></svg>
-                <span>{t('HomePage:wordpress.outdated_warning', { count: wpEski })}</span>
-              </div>
-            )}
-            {wpToplam === 0 ? (
-              <div className="py-5 text-center text-xs text-slate-400">{t('HomePage:wordpress.empty')}</div>
-            ) : (
-              <div className="space-y-0.5">
-                {wp!.slice(0, 5).map((k) => (
-                  <Link key={`${k.domain_id}-${k.dizin}`} to="/wordpress"
-                    className="-mx-2 flex items-center justify-between rounded-xl px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}
-                        className={`h-4 w-4 shrink-0 ${k.durum === 'eski' ? 'text-amber-500' : k.durum === 'guncel' ? 'text-emerald-500' : 'text-slate-400'}`}><path d={I.wp} /></svg>
-                      <span className="min-w-0">
-                        <span className="block truncate font-mono text-[13px] text-slate-700 dark:text-slate-200">{k.alan_adi}</span>
-                        <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">{k.dizin === '/ (kök)' ? t('HomePage:wordpress.root_dir') : k.dizin}{k.surum ? t('HomePage:wordpress.version_prefix', { version: k.surum }) : ''}</span>
-                      </span>
-                    </span>
-                    <span className="shrink-0">
-                      {k.durum === 'eski'
-                        ? <Rozet renk="amber" metin={k.son_surum ? t('HomePage:wordpress.update_to_version', { version: k.son_surum }) : t('HomePage:wordpress.update_badge')} />
-                        : k.durum === 'guncel'
-                          ? <Rozet renk="emerald" metin={t('HomePage:wordpress.current_badge')} />
-                          : <Rozet renk="slate" metin={t('HomePage:wordpress.unknown_badge')} />}
-                    </span>
-                  </Link>
-                ))}
-                {wpToplam > 5 && (
-                  <Link to="/wordpress" className="block pt-1.5 text-center text-[11px] text-slate-400 transition-colors hover:text-brand-600 dark:hover:text-brand-400">
-                    {t('HomePage:wordpress.more_installs', { count: wpToplam - 5 })}
-                  </Link>
-                )}
-              </div>
-            )}
-            {wpBilinmiyor > 0 && (
-              <div className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t('HomePage:wordpress.unknown_status', { count: wpBilinmiyor })}</div>
-            )}
-          </>
-        )}
-      </Kart>
-    ),
+    'wordpress': <WordpressWidget wp={wp} />,
 
-    'panel-guncelleme': (
-      <Kart baslik={t('HomePage:panel_guncelleme.baslik')} alt={t('HomePage:panel_guncelleme.alt')} ikon={I.guncelle}
-        sag={<Link to="/araclar-ayarlar" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        <div className="flex items-center gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-            guncelleme?.calisiyor ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/25 dark:text-sky-300'
-              : guncelleme?.arac_var === false ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/25 dark:text-amber-300'
-                : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/25 dark:text-emerald-300'}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={I.guncelle} /></svg>
-          </span>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {guncelleme?.calisiyor ? t('HomePage:panel_guncelleme.running') : guncelleme?.arac_var === false ? t('HomePage:panel_guncelleme.no_tool') : t('HomePage:panel_guncelleme.up_to_date')}
-            </div>
-            <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" title={guncelleme?.durum}>
-              {guncelleme?.durum || (guncelleme ? t('HomePage:panel_guncelleme.no_status') : t('HomePage:loading_short'))}
-            </div>
-          </div>
-          <span className="ml-auto shrink-0">
-            <Rozet renk={guncelleme?.calisiyor ? 'sky' : guncelleme?.arac_var === false ? 'amber' : 'emerald'}
-              metin={guncelleme?.calisiyor ? t('HomePage:panel_guncelleme.running_badge') : guncelleme?.arac_var === false ? t('HomePage:panel_guncelleme.no_tool_badge') : t('HomePage:panel_guncelleme.up_to_date_badge')} />
-          </span>
-        </div>
-        {/* Canlı terminal — Araçlar & Ayarlar'daki panel güncelleme kartıyla aynı
-            görünüm. Yalnız iş çalışırken (veya bitip log elde kalmışken) görünür. */}
-        {(guncellemeCalisiyor || guncellemeLog) && (
-          <pre ref={logRef}
-            className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2.5 font-mono text-[11px] leading-relaxed text-slate-300">
-            {guncellemeLog || t('HomePage:panel_guncelleme.log_waiting')}
-          </pre>
-        )}
-        <Link to="/araclar/paketler" className="-mx-2 mt-3 flex items-center justify-between rounded-xl border-t border-slate-100 px-2 pt-3 text-xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-          <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-slate-400"><path d={I.paket} /></svg>
-            {t('HomePage:panel_guncelleme.system_packages')}
-          </span>
-          <span className="text-brand-600 dark:text-brand-400">{t('HomePage:panel_guncelleme.manage_link')}</span>
-        </Link>
-      </Kart>
-    ),
+    'panel-guncelleme': <PanelGuncellemeWidget guncelleme={guncelleme} guncellemeLog={guncellemeLog} />,
 
-    'son-yedek': (
-      <Kart baslik={t('HomePage:son_yedek.baslik')} alt={t('HomePage:son_yedek.alt')} ikon={I.yedek}
-        sag={<Link to="/backup-yonetimi" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        {!yedek ? (
-          <div className="py-6 text-center text-xs text-slate-400">{t('HomePage:son_yedek.load_failed')}</div>
-        ) : (
-          <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{yedek.toplam_yedek}</span>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{t('HomePage:son_yedek.summary', { count: yedek.toplam_yedek, size: fmtByteGB(yedek.toplam_boyut_b) })}</span>
-            </div>
-            <div className="mt-3 space-y-0">
-              <KV etiket={t('HomePage:son_yedek.last_backup')} deger={sonYedek || '—'} />
-              <KV etiket={t('HomePage:son_yedek.backed_up_sites')} deger={t('HomePage:son_yedek.backed_up_value', { backed: yedekliDomain, total: yedek.domainler.length })} />
-              <KV etiket={t('HomePage:son_yedek.remote_target')} deger={yedek.hedef_sayisi > 0 ? t('HomePage:son_yedek.target_active_count', { count: yedek.hedef_sayisi }) : t('HomePage:son_yedek.target_none')} />
-              <KV etiket={t('HomePage:son_yedek.schedule')} deger={
-                !yedek.otomatik_domain ? t('HomePage:son_yedek.schedule_off')
-                : yedek.zamanlama_saat < 0 ? t('HomePage:son_yedek.schedule_mixed')
-                : t('HomePage:son_yedek.schedule_daily', { hour: String(yedek.zamanlama_saat).padStart(2, '0') })
-              } />
-            </div>
-          </>
-        )}
-      </Kart>
-    ),
+    'son-yedek': <SonYedekWidget yedek={yedek} />,
 
-    'performans': (
-      <Kart baslik={t('HomePage:performans.baslik')} alt={t('HomePage:performans.alt')} ikon={I.optimize}
-        sag={<Link to="/araclar-ayarlar" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        <div className="flex items-center gap-3">
-          <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${optimize?.calisiyor ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/25 dark:text-sky-300' : 'bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-300'}`}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={I.optimize} /></svg>
-          </span>
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {optimize?.calisiyor ? t('HomePage:performans.running') : t('HomePage:performans.ready')}
-            </div>
-            <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" title={optimize?.durum}>
-              {optimize?.durum || (optimize ? t('HomePage:performans.description') : t('HomePage:loading_short'))}
-            </div>
-          </div>
-          <span className="ml-auto shrink-0">
-            <Rozet renk={optimize?.calisiyor ? 'sky' : 'slate'} metin={optimize?.calisiyor ? t('HomePage:performans.running_badge') : t('HomePage:performans.idle_badge')} />
-          </span>
-        </div>
-      </Kart>
-    ),
+    'performans': <PerformansWidget optimize={optimize} />,
 
     'servisler': (
       <Kart baslik={t('HomePage:servisler.baslik')} alt={s ? t('HomePage:servisler.alt_format', { active: servisAktif, total: servisToplam }) : t('HomePage:servisler.alt_fallback')} ikon={I.servis}
@@ -497,45 +394,7 @@ export default function HomePage() {
       </Kart>
     ),
 
-    'domainler': (
-      <Kart baslik={t('HomePage:domainler.baslik')} alt={t('HomePage:domainler.alt')} ikon={I.domain}
-        sag={<Link to="/domainler" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        <div className="mb-4 grid grid-cols-3 gap-2.5">
-          <MiniIstatistik deger={domainler.length} etiket={t('HomePage:domainler.total_count')} renk="slate" />
-          <MiniIstatistik deger={aktif} etiket={t('HomePage:domainler.active_count')} renk="emerald" />
-          <MiniIstatistik deger={sslli} etiket={t('HomePage:domainler.ssl_count')} renk="sky" />
-        </div>
-        {domainler.length === 0 ? (
-          <div className="py-6 text-center text-xs text-slate-400">{t('HomePage:domainler.empty')}</div>
-        ) : (
-          <div className="space-y-0.5">
-            {domainler.slice(0, 7).map((d) => (
-              <Link key={d.id} to={`/abonelikler/${d.id}`}
-                className="-mx-2 flex items-center justify-between rounded-xl px-2 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}
-                    className={`h-4 w-4 shrink-0 ${d.ssl ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                    {d.ssl
-                      ? <><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" d="M8 11V8a4 4 0 0 1 8 0v3" /></>
-                      : <><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" d="M8 11V6a4 4 0 0 1 7-2.6" /></>}
-                  </svg>
-                  <span className="truncate font-mono text-[13px] text-slate-700 dark:text-slate-200">{d.alan_adi}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {!d.ssl && <Rozet renk="amber" metin={t('HomePage:domainler.no_ssl_badge')} />}
-                  <Rozet renk={d.durum === 'aktif' ? 'emerald' : 'slate'} metin={d.durum === 'aktif' ? t('HomePage:domainler.active_badge') : d.durum} />
-                </span>
-              </Link>
-            ))}
-            {domainler.length > 7 && (
-              <Link to="/domainler" className="block pt-1.5 text-center text-[11px] text-slate-400 transition-colors hover:text-brand-600 dark:hover:text-brand-400">
-                {t('HomePage:domainler.more_domains', { count: domainler.length - 7 })}
-              </Link>
-            )}
-          </div>
-        )}
-      </Kart>
-    ),
+    'domainler': <DomainlerWidget domainler={domainler} />,
 
     'sunucu-bilgi': (
       <Kart baslik={t('HomePage:sunucu_bilgi.baslik')} alt={t('HomePage:sunucu_bilgi.alt')} ikon={I.sunucu}>
@@ -593,20 +452,7 @@ export default function HomePage() {
       </Kart>
     ),
 
-    'abonelikler': (
-      <Kart baslik={t('HomePage:abonelikler.baslik')} alt={t('HomePage:abonelikler.alt')} ikon={I.abonelik}
-        sag={<Link to="/domainler" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{domainler.length}</span>
-          <span className="text-sm text-slate-500 dark:text-slate-400">{t('HomePage:abonelikler.count_suffix')}</span>
-        </div>
-        <div className="mt-3 space-y-0">
-          <KV etiket={t('HomePage:abonelikler.active_sub')} deger={t('HomePage:abonelikler.active_sub_value', { active: aktif, total: domainler.length })} />
-          <KV etiket={t('HomePage:abonelikler.ssl_certified')} deger={t('HomePage:abonelikler.ssl_certified_value', { count: sslli, total: domainler.length })} />
-          <KV etiket={t('HomePage:abonelikler.wp_install')} deger={wp === null ? '…' : `${wpToplam}`} />
-        </div>
-      </Kart>
-    ),
+    'abonelikler': <AboneliklerWidget domainler={domainler} wp={wp} />,
 
     'ag': (
       <Kart baslik={t('HomePage:ag.baslik')} alt={s?.ag.arayuz ? s.ag.arayuz : t('HomePage:ag.alt_fallback')} ikon={I.ag}>
@@ -850,6 +696,252 @@ const I = {
   abonelik:'M4 7h16v12H4zM4 7l4-4h8l4 4M9 12h6',
   wp:      'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM4 8l4 11 3-8-2-3M20 8l-4 11-3-8',
 }
+
+const WordpressWidget = memo(function WordpressWidget({ wp }: { wp: WpKurulum[] | null }) {
+  const { t } = useTranslation(['HomePage'])
+  const wpToplam = wp?.length ?? 0
+  const wpEski = wp?.filter((x) => x.durum === 'eski').length ?? 0
+  const wpGuncel = wp?.filter((x) => x.durum === 'guncel').length ?? 0
+  const wpBilinmiyor = wp?.filter((x) => x.durum === 'bilinmiyor').length ?? 0
+
+  return (
+    <Kart baslik={t('HomePage:wordpress.baslik')} alt={t('HomePage:wordpress.alt')} ikon={I.wp}
+      sag={<Link to="/wordpress" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      {wp === null ? (
+        <Yukleniyor />
+      ) : (
+        <>
+          <div className="mb-3 grid grid-cols-3 gap-2.5">
+            <MiniIstatistik deger={wpToplam} etiket={t('HomePage:wordpress.install_count')} renk="slate" />
+            <MiniIstatistik deger={wpEski} etiket={t('HomePage:wordpress.update_count')} renk={wpEski > 0 ? 'amber' : 'emerald'} />
+            <MiniIstatistik deger={wpGuncel} etiket={t('HomePage:wordpress.current_count')} renk="emerald" />
+          </div>
+          {wpEski > 0 && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/15 dark:text-amber-300">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="mt-0.5 h-3.5 w-3.5 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.36 3.6 2.26 17.66A1.5 1.5 0 0 0 3.56 19.9h16.88a1.5 1.5 0 0 0 1.3-2.25L13.64 3.6a1.5 1.5 0 0 0-2.6 0Z" /></svg>
+              <span>{t('HomePage:wordpress.outdated_warning', { count: wpEski })}</span>
+            </div>
+          )}
+          {wpToplam === 0 ? (
+            <div className="py-5 text-center text-xs text-slate-400">{t('HomePage:wordpress.empty')}</div>
+          ) : (
+            <div className="space-y-0.5">
+              {wp.slice(0, 5).map((k) => (
+                <Link key={`${k.domain_id}-${k.dizin}`} to="/wordpress"
+                  className="-mx-2 flex items-center justify-between rounded-xl px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}
+                      className={`h-4 w-4 shrink-0 ${k.durum === 'eski' ? 'text-amber-500' : k.durum === 'guncel' ? 'text-emerald-500' : 'text-slate-400'}`}><path d={I.wp} /></svg>
+                    <span className="min-w-0">
+                      <span className="block truncate font-mono text-[13px] text-slate-700 dark:text-slate-200">{k.alan_adi}</span>
+                      <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">{k.dizin === '/ (kök)' ? t('HomePage:wordpress.root_dir') : k.dizin}{k.surum ? t('HomePage:wordpress.version_prefix', { version: k.surum }) : ''}</span>
+                    </span>
+                  </span>
+                  <span className="shrink-0">
+                    {k.durum === 'eski'
+                      ? <Rozet renk="amber" metin={k.son_surum ? t('HomePage:wordpress.update_to_version', { version: k.son_surum }) : t('HomePage:wordpress.update_badge')} />
+                      : k.durum === 'guncel'
+                        ? <Rozet renk="emerald" metin={t('HomePage:wordpress.current_badge')} />
+                        : <Rozet renk="slate" metin={t('HomePage:wordpress.unknown_badge')} />}
+                  </span>
+                </Link>
+              ))}
+              {wpToplam > 5 && (
+                <Link to="/wordpress" className="block pt-1.5 text-center text-[11px] text-slate-400 transition-colors hover:text-brand-600 dark:hover:text-brand-400">
+                  {t('HomePage:wordpress.more_installs', { count: wpToplam - 5 })}
+                </Link>
+              )}
+            </div>
+          )}
+          {wpBilinmiyor > 0 && (
+            <div className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">{t('HomePage:wordpress.unknown_status', { count: wpBilinmiyor })}</div>
+          )}
+        </>
+      )}
+    </Kart>
+  )
+})
+
+const PanelGuncellemeWidget = memo(function PanelGuncellemeWidget({ guncelleme, guncellemeLog }: {
+  guncelleme: Guncelleme | null
+  guncellemeLog: string
+}) {
+  const { t } = useTranslation(['HomePage'])
+  const logRef = useRef<HTMLPreElement>(null)
+  const guncellemeCalisiyor = guncelleme?.calisiyor === true
+
+  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }) }, [guncellemeLog])
+
+  return (
+    <Kart baslik={t('HomePage:panel_guncelleme.baslik')} alt={t('HomePage:panel_guncelleme.alt')} ikon={I.guncelle}
+      sag={<Link to="/araclar-ayarlar" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      <div className="flex items-center gap-3">
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+          guncelleme?.calisiyor ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/25 dark:text-sky-300'
+            : guncelleme?.arac_var === false ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/25 dark:text-amber-300'
+              : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/25 dark:text-emerald-300'}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={I.guncelle} /></svg>
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {guncelleme?.calisiyor ? t('HomePage:panel_guncelleme.running') : guncelleme?.arac_var === false ? t('HomePage:panel_guncelleme.no_tool') : t('HomePage:panel_guncelleme.up_to_date')}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" title={guncelleme?.durum}>
+            {guncelleme?.durum || (guncelleme ? t('HomePage:panel_guncelleme.no_status') : t('HomePage:loading_short'))}
+          </div>
+        </div>
+        <span className="ml-auto shrink-0">
+          <Rozet renk={guncelleme?.calisiyor ? 'sky' : guncelleme?.arac_var === false ? 'amber' : 'emerald'}
+            metin={guncelleme?.calisiyor ? t('HomePage:panel_guncelleme.running_badge') : guncelleme?.arac_var === false ? t('HomePage:panel_guncelleme.no_tool_badge') : t('HomePage:panel_guncelleme.up_to_date_badge')} />
+        </span>
+      </div>
+      {/* Canlı terminal — Araçlar & Ayarlar'daki panel güncelleme kartıyla aynı
+          görünüm. Yalnız iş çalışırken (veya bitip log elde kalmışken) görünür. */}
+      {(guncellemeCalisiyor || guncellemeLog) && (
+        <pre ref={logRef}
+          className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2.5 font-mono text-[11px] leading-relaxed text-slate-300">
+          {guncellemeLog || t('HomePage:panel_guncelleme.log_waiting')}
+        </pre>
+      )}
+      <Link to="/araclar/paketler" className="-mx-2 mt-3 flex items-center justify-between rounded-xl border-t border-slate-100 px-2 pt-3 text-xs transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+        <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-slate-400"><path d={I.paket} /></svg>
+          {t('HomePage:panel_guncelleme.system_packages')}
+        </span>
+        <span className="text-brand-600 dark:text-brand-400">{t('HomePage:panel_guncelleme.manage_link')}</span>
+      </Link>
+    </Kart>
+  )
+})
+
+const SonYedekWidget = memo(function SonYedekWidget({ yedek }: { yedek: YedekOzet | null }) {
+  const { t } = useTranslation(['HomePage'])
+  const sonYedek = yedek?.domainler?.reduce((a, r) => (r.son_yedek > a ? r.son_yedek : a), '') || ''
+  const yedekliDomain = yedek?.domainler?.filter((r) => r.sayi > 0).length ?? 0
+
+  return (
+    <Kart baslik={t('HomePage:son_yedek.baslik')} alt={t('HomePage:son_yedek.alt')} ikon={I.yedek}
+      sag={<Link to="/backup-yonetimi" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      {!yedek ? (
+        <div className="py-6 text-center text-xs text-slate-400">{t('HomePage:son_yedek.load_failed')}</div>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{yedek.toplam_yedek}</span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">{t('HomePage:son_yedek.summary', { count: yedek.toplam_yedek, size: fmtByteGB(yedek.toplam_boyut_b) })}</span>
+          </div>
+          <div className="mt-3 space-y-0">
+            <KV etiket={t('HomePage:son_yedek.last_backup')} deger={sonYedek || '—'} />
+            <KV etiket={t('HomePage:son_yedek.backed_up_sites')} deger={t('HomePage:son_yedek.backed_up_value', { backed: yedekliDomain, total: yedek.domainler.length })} />
+            <KV etiket={t('HomePage:son_yedek.remote_target')} deger={yedek.hedef_sayisi > 0 ? t('HomePage:son_yedek.target_active_count', { count: yedek.hedef_sayisi }) : t('HomePage:son_yedek.target_none')} />
+            <KV etiket={t('HomePage:son_yedek.schedule')} deger={
+              !yedek.otomatik_domain ? t('HomePage:son_yedek.schedule_off')
+              : yedek.zamanlama_saat < 0 ? t('HomePage:son_yedek.schedule_mixed')
+              : t('HomePage:son_yedek.schedule_daily', { hour: String(yedek.zamanlama_saat).padStart(2, '0') })
+            } />
+          </div>
+        </>
+      )}
+    </Kart>
+  )
+})
+
+const PerformansWidget = memo(function PerformansWidget({ optimize }: { optimize: Optimize | null }) {
+  const { t } = useTranslation(['HomePage'])
+
+  return (
+    <Kart baslik={t('HomePage:performans.baslik')} alt={t('HomePage:performans.alt')} ikon={I.optimize}
+      sag={<Link to="/araclar-ayarlar" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      <div className="flex items-center gap-3">
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${optimize?.calisiyor ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/25 dark:text-sky-300' : 'bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-300'}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d={I.optimize} /></svg>
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {optimize?.calisiyor ? t('HomePage:performans.running') : t('HomePage:performans.ready')}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" title={optimize?.durum}>
+            {optimize?.durum || (optimize ? t('HomePage:performans.description') : t('HomePage:loading_short'))}
+          </div>
+        </div>
+        <span className="ml-auto shrink-0">
+          <Rozet renk={optimize?.calisiyor ? 'sky' : 'slate'} metin={optimize?.calisiyor ? t('HomePage:performans.running_badge') : t('HomePage:performans.idle_badge')} />
+        </span>
+      </div>
+    </Kart>
+  )
+})
+
+const DomainlerWidget = memo(function DomainlerWidget({ domainler }: { domainler: Domain[] }) {
+  const { t } = useTranslation(['HomePage'])
+  const aktif = domainler.filter((d) => d.durum === 'aktif').length
+  const sslli = domainler.filter((d) => d.ssl).length
+
+  return (
+    <Kart baslik={t('HomePage:domainler.baslik')} alt={t('HomePage:domainler.alt')} ikon={I.domain}
+      sag={<Link to="/domainler" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      <div className="mb-4 grid grid-cols-3 gap-2.5">
+        <MiniIstatistik deger={domainler.length} etiket={t('HomePage:domainler.total_count')} renk="slate" />
+        <MiniIstatistik deger={aktif} etiket={t('HomePage:domainler.active_count')} renk="emerald" />
+        <MiniIstatistik deger={sslli} etiket={t('HomePage:domainler.ssl_count')} renk="sky" />
+      </div>
+      {domainler.length === 0 ? (
+        <div className="py-6 text-center text-xs text-slate-400">{t('HomePage:domainler.empty')}</div>
+      ) : (
+        <div className="space-y-0.5">
+          {domainler.slice(0, 7).map((d) => (
+            <Link key={d.id} to={`/abonelikler/${d.id}`}
+              className="-mx-2 flex items-center justify-between rounded-xl px-2 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+              <span className="flex min-w-0 items-center gap-2.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}
+                  className={`h-4 w-4 shrink-0 ${d.ssl ? 'text-emerald-500' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {d.ssl
+                    ? <><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" d="M8 11V8a4 4 0 0 1 8 0v3" /></>
+                    : <><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" d="M8 11V6a4 4 0 0 1 7-2.6" /></>}
+                </svg>
+                <span className="truncate font-mono text-[13px] text-slate-700 dark:text-slate-200">{d.alan_adi}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {!d.ssl && <Rozet renk="amber" metin={t('HomePage:domainler.no_ssl_badge')} />}
+                <Rozet renk={d.durum === 'aktif' ? 'emerald' : 'slate'} metin={d.durum === 'aktif' ? t('HomePage:domainler.active_badge') : d.durum} />
+              </span>
+            </Link>
+          ))}
+          {domainler.length > 7 && (
+            <Link to="/domainler" className="block pt-1.5 text-center text-[11px] text-slate-400 transition-colors hover:text-brand-600 dark:hover:text-brand-400">
+              {t('HomePage:domainler.more_domains', { count: domainler.length - 7 })}
+            </Link>
+          )}
+        </div>
+      )}
+    </Kart>
+  )
+})
+
+const AboneliklerWidget = memo(function AboneliklerWidget({ domainler, wp }: {
+  domainler: Domain[]
+  wp: WpKurulum[] | null
+}) {
+  const { t } = useTranslation(['HomePage'])
+  const aktif = domainler.filter((d) => d.durum === 'aktif').length
+  const sslli = domainler.filter((d) => d.ssl).length
+  const wpToplam = wp?.length ?? 0
+
+  return (
+    <Kart baslik={t('HomePage:abonelikler.baslik')} alt={t('HomePage:abonelikler.alt')} ikon={I.abonelik}
+      sag={<Link to="/domainler" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{t('HomePage:widget_more')}</Link>}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{domainler.length}</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">{t('HomePage:abonelikler.count_suffix')}</span>
+      </div>
+      <div className="mt-3 space-y-0">
+        <KV etiket={t('HomePage:abonelikler.active_sub')} deger={t('HomePage:abonelikler.active_sub_value', { active: aktif, total: domainler.length })} />
+        <KV etiket={t('HomePage:abonelikler.ssl_certified')} deger={t('HomePage:abonelikler.ssl_certified_value', { count: sslli, total: domainler.length })} />
+        <KV etiket={t('HomePage:abonelikler.wp_install')} deger={wp === null ? '…' : `${wpToplam}`} />
+      </div>
+    </Kart>
+  )
+})
 
 /* ---------- sağlık türetimi ---------- */
 type Saglik = { skor: number; baslik: string; aciklama: string; renk: string; nokta: string }

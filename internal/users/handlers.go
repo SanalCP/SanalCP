@@ -118,20 +118,52 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p, sayfali, err := httpx.SayfalamaAyristir(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	const from = ` FROM users`
 	q := `SELECT id, username, email, full_name, role, status, reseller_id, totp_enabled,
 	             COALESCE(DATE_FORMAT(last_login_at,'%Y-%m-%d %H:%i'),''), last_login_ip,
 	             COALESCE(DATE_FORMAT(created_at,'%Y-%m-%d'),''),
 	             CASE WHEN username = 'root' THEN 0
 	                  WHEN COALESCE(password_hash,'') = '' THEN 1 ELSE 0 END
-	      FROM users`
+	     ` + from
+	countQ := `SELECT COUNT(*)` + from
 	var arg []any
+	var kosullar []string
 	if c.Role == middleware.RolBayi {
-		q += ` WHERE reseller_id = ?`
+		kosullar = append(kosullar, `reseller_id = ?`)
 		arg = append(arg, c.UserID)
 	}
-	q += ` ORDER BY id`
+	if sayfali && p.Arama != "" {
+		kosullar = append(kosullar, `(username LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' OR full_name LIKE ? ESCAPE '!')`)
+		desen := httpx.LikeDeseni(p.Arama)
+		arg = append(arg, desen, desen, desen)
+	}
+	if len(kosullar) > 0 {
+		where := ` WHERE ` + strings.Join(kosullar, ` AND `)
+		q += where
+		countQ += where
+	}
+	var toplam int64
+	if sayfali {
+		if err := h.DB.QueryRowContext(r.Context(), countQ, arg...).Scan(&toplam); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	// İstemci tarafındaki eski kullanıcı adı sırasını sayfalı API'de koru.
+	q += ` ORDER BY username, id`
+	listeArg := append([]any(nil), arg...)
+	if sayfali {
+		q += ` LIMIT ? OFFSET ?`
+		listeArg = append(listeArg, p.Limit, p.Offset())
+	}
 
-	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
+	rows, err := h.DB.QueryContext(r.Context(), q, listeArg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -144,11 +176,20 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		var iki, parolasiz int
 		if err := rows.Scan(&s.ID, &s.KullaniciAdi, &s.Eposta, &s.AdSoyad, &s.Rol, &s.Durum,
 			&s.BayiID, &iki, &s.SonGiris, &s.SonGirisIP, &s.Olusturma, &parolasiz); err != nil {
-			continue
+			httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
+			return
 		}
 		s.IkiFA = iki == 1
 		s.Parolasiz = parolasiz == 1
 		out = append(out, s)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
+		return
+	}
+	if sayfali {
+		httpx.WriteJSON(w, http.StatusOK, httpx.YeniSayfaliYanit(out, p, toplam))
+		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }

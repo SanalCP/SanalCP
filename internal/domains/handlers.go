@@ -123,8 +123,44 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	// bayi yalnız kendi müşterilerininkini, müşteri yalnız kendi domainini.
 	// Satır satır sahiplik kontrolü burada işe yaramaz — filtrelenmemiş bir
 	// liste zaten tüm tenant adlarını sızdırırdı.
+	p, sayfali, err := httpx.SayfalamaAyristir(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	kosul, arg := middleware.KapsamSQL(r, "d")
-	rows, err := h.DB.QueryContext(r.Context(), selectAll+kosul+" ORDER BY d.id DESC", arg...)
+	if sayfali && p.Arama != "" {
+		aramaKosulu := `(d.alan_adi LIKE ? ESCAPE '!' OR d.sistem_kullanici LIKE ? ESCAPE '!' OR COALESCE(bu.username,'') LIKE ? ESCAPE '!' OR COALESCE(cu.ad,'') LIKE ? ESCAPE '!')`
+		if kosul == "" {
+			kosul = " WHERE " + aramaKosulu
+		} else {
+			kosul += " AND " + aramaKosulu
+		}
+		desen := httpx.LikeDeseni(p.Arama)
+		arg = append(arg, desen, desen, desen, desen)
+	}
+	var toplam int64
+	if sayfali {
+		countQ := `SELECT COUNT(*) FROM domains d
+  LEFT JOIN service_plans p ON p.id=d.plan_id
+  LEFT JOIN customers cu ON cu.id = d.customer_id
+  LEFT JOIN users bu ON bu.id = cu.owner_user_id
+  LEFT JOIN reseller_limits brl ON brl.user_id = bu.id
+  LEFT JOIN reseller_plans brp ON brp.id = brl.reseller_plan_id` + kosul
+		if err := h.DB.QueryRowContext(r.Context(), countQ, arg...).Scan(&toplam); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "veritabanı hatası: "+err.Error())
+			return
+		}
+	}
+	// Eski arayüz alan adına göre sıralıyordu; sayfalama sunucuya taşındığında
+	// sayfalar arasında da aynı kararlı alfabetik sırayı koru.
+	listeQ := selectAll + kosul + " ORDER BY d.alan_adi, d.id"
+	listeArg := append([]any(nil), arg...)
+	if sayfali {
+		listeQ += " LIMIT ? OFFSET ?"
+		listeArg = append(listeArg, p.Limit, p.Offset())
+	}
+	rows, err := h.DB.QueryContext(r.Context(), listeQ, listeArg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı hatası: "+err.Error())
 		return
@@ -138,6 +174,14 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out = append(out, d)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
+		return
+	}
+	if sayfali {
+		httpx.WriteJSON(w, http.StatusOK, httpx.YeniSayfaliYanit(out, p, toplam))
+		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }

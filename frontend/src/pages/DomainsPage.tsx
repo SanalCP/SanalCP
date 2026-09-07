@@ -2,7 +2,7 @@
 // sanal-dark-swept-v2
 // sp-mobil-v1
 import KopyalaButton from '@/components/KopyalaButton'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -12,7 +12,6 @@ import Modal from '@/components/Modal'
 import Breadcrumb from '@/components/Breadcrumb'
 import EmptyState from '@/components/EmptyState'
 import { T } from '@/lib/tablo'
-import { metneGoreSirala } from '@/lib/sirala'
 
 type Domain = {
   id: number; alan_adi: string; sistem_kullanici: string
@@ -26,6 +25,8 @@ type Domain = {
 }
 type Plan = { id: number; ad: string; disk_kota_mb?: number }
 type PHPVer = { surum: string; aciklama?: string }
+type SayfaliListe<T> = { icerik: T[]; sayfa: number; limit: number; toplam: number; toplam_sayfa: number }
+const SAYFA_BOYUTU = 50
 type OlusturmaSonuc = {
   id: number
   site_tipi?: string
@@ -169,6 +170,12 @@ export default function DomainsPage() {
   // panel başarı diyordu. DomainSSLPage ile aynı desen.
   const [uyari, setUyari] = useState<string | null>(null)
   const [q, setQ] = useState('')
+  const ertelenenArama = useDeferredValue(q)
+  const [sunucuAramasi, setSunucuAramasi] = useState('')
+  const [sayfa, setSayfa] = useState(1)
+  const [toplam, setToplam] = useState(0)
+  const [toplamSayfa, setToplamSayfa] = useState(1)
+  const istekSirasi = useRef(0)
   const [secili, setSecili] = useState<Set<number>>(new Set())
   const [isleniyor, setIsleniyor] = useState(false)
   const [yenileniyor, setYenileniyor] = useState(false)
@@ -211,14 +218,34 @@ export default function DomainsPage() {
   // sessiz=true: tabloyu "Yükleniyor" ile DEĞİŞTİRMEDEN tazeler. Arka plan
   // yenilemeleri (ör. SSL kurulduktan sonra rozeti güncellemek) için — aksi
   // hâlde dolu bir liste bir anlığına boşalıp geri gelir, göz tırmalar.
-  function yukle(sessiz = false) {
+  const yukle = useCallback(async (sessiz = false) => {
+    const sira = ++istekSirasi.current
     if (!sessiz) setYuk(true)
-    return api.get<Domain[]>('/domains')
-      .then(r => setItems(r.data))
-      .catch(e => setHata(apiHata(e)))
-      .finally(() => { if (!sessiz) setYuk(false) })
-  }
-  useEffect(() => { yukle() }, [])
+    try {
+      const r = await api.get<SayfaliListe<Domain>>('/domains', {
+        params: { sayfa, limit: SAYFA_BOYUTU, arama: sunucuAramasi },
+      })
+      if (sira !== istekSirasi.current) return
+      const sonSayfa = Math.max(1, r.data.toplam_sayfa)
+      if (sayfa > sonSayfa) {
+        setSayfa(sonSayfa)
+        return
+      }
+      setItems(r.data.icerik || [])
+      setToplam(r.data.toplam)
+      setToplamSayfa(sonSayfa)
+      setHata(null)
+    } catch (e) {
+      if (sira === istekSirasi.current) setHata(apiHata(e))
+    } finally {
+      if (sira === istekSirasi.current) setYuk(false)
+    }
+  }, [sayfa, sunucuAramasi])
+  useEffect(() => { void yukle() }, [yukle])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSunucuAramasi(ertelenenArama.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [ertelenenArama])
 
   // Mobil alt gezinme çubuğundaki "Yeni" eylemi buraya ?yeni=1 ile gelir.
   // Kipi açıp parametreyi TEMİZLİYORUZ: aksi halde geri/yenilemede kip
@@ -380,18 +407,6 @@ export default function DomainsPage() {
     URL.revokeObjectURL(a.href)
   }
 
-  const filtreli = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    // Liste ilk sütuna (alan adı) göre alfabetik; arama sonucu da aynı sırada.
-    if (!s) return metneGoreSirala(items, d => d.alan_adi)
-    // Alt alan adları da aranır: kullanıcı "blog.site.com" yazdığında listede
-    // ana domain (ve altındaki eşleşen alt alan) çıkmalı — aksi hâlde alt alan
-    // adı listede GÖRÜNÜR ama ARANAMAZ olurdu.
-    return metneGoreSirala(items.filter(d => d.alan_adi.toLowerCase().includes(s) || d.sistem_kullanici.toLowerCase().includes(s)
-      || (d.bayi_adi || '').toLowerCase().includes(s)
-      || (d.musteri_ad || '').toLowerCase().includes(s)), d => d.alan_adi)
-  }, [items, q])
-
   function togga(id: number) {
     setSecili(prev => {
       const yeni = new Set(prev)
@@ -400,7 +415,7 @@ export default function DomainsPage() {
     })
   }
   function tumunuSec(secVar: boolean) {
-    if (secVar) setSecili(new Set(filtreli.map(d => d.id)))
+    if (secVar) setSecili(new Set(items.map(d => d.id)))
     else setSecili(new Set())
   }
 
@@ -497,11 +512,11 @@ export default function DomainsPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex-1 max-w-md">
-          <input type="text" value={q} onChange={e => setQ(e.target.value)}
+          <input type="text" value={q} onChange={e => { setQ(e.target.value); setSayfa(1); setSecili(new Set()) }}
             placeholder={t('DomainsPage:search_placeholder')}
             className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded text-sm focus:border-brand-500 outline-none" />
         </div>
-        <span className="text-xs text-slate-500 dark:text-slate-500">{filtreli.length} / {items.length}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-500">{t('common:pagination_summary', { total: toplam })}</span>
         {/* Yenile — sağlama arka planda süren işler içerir (DNS, SSL, FPM
             geçişi); liste kendiliğinden tazelenmediğinde elle tetiklenebilsin.
             Sessiz tazeleme: tablo boşalmaz, yalnız simge döner. */}
@@ -553,10 +568,12 @@ export default function DomainsPage() {
 
       {yuk ? (
         <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !sunucuAramasi ? (
         <EmptyState baslik={t('DomainsPage:empty.title')}
           aciklama={t('DomainsPage:empty.desc')}
           buton={{ etiket: t('DomainsPage:empty.button'), onClick: olusturAc }} />
+      ) : items.length === 0 ? (
+        <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('DomainsPage:empty.search')}</div>
       ) : (
         <div className="lg:bg-white dark:lg:bg-slate-800 lg:border lg:border-slate-200 dark:lg:border-slate-700 lg:rounded-2xl lg:overflow-hidden">
           <div className="lg:overflow-x-auto">
@@ -565,8 +582,8 @@ export default function DomainsPage() {
                 <tr>
                   <th className={`${T.baslik} w-10 text-center`}>
                     <input type="checkbox"
-                      checked={filtreli.length > 0 && secili.size === filtreli.length}
-                      ref={ref => { if (ref) ref.indeterminate = secili.size > 0 && secili.size < filtreli.length }}
+                      checked={items.length > 0 && secili.size === items.length}
+                      ref={ref => { if (ref) ref.indeterminate = secili.size > 0 && secili.size < items.length }}
                       onChange={e => tumunuSec(e.target.checked)}
                       className="cursor-pointer" />
                   </th>
@@ -582,7 +599,7 @@ export default function DomainsPage() {
                 </tr>
               </thead>
               <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800`}>
-                {filtreli.map(d => {
+                {items.map(d => {
                   return (
                     <Fragment key={d.id}>
                     <tr className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800 transition ${secili.has(d.id) ? 'lg:bg-brand-50 dark:lg:bg-brand-900/20' : ''}`}>
@@ -663,6 +680,19 @@ export default function DomainsPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {!yuk && toplam > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span>{t('common:pagination_summary', { total: toplam })}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => { setSayfa((s) => Math.max(1, s - 1)); setSecili(new Set()) }} disabled={sayfa <= 1}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:back')}</button>
+            <span>{t('common:page_summary', { page: sayfa, totalPages: toplamSayfa })}</span>
+            <button type="button" onClick={() => { setSayfa((s) => Math.min(toplamSayfa, s + 1)); setSecili(new Set()) }} disabled={sayfa >= toplamSayfa}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:next')}</button>
           </div>
         </div>
       )}

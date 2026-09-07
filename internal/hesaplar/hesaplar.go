@@ -34,6 +34,33 @@ var box *secretcrypt.Box
 // bağlantı havuzu üzerinden native driver ile yapılıyor.
 var rootDB *sql.DB
 
+// VeritabaniBoyutlari, root bağlantısının görebildiği şemaların toplam boyutunu
+// KB cinsinden döndürür.
+func VeritabaniBoyutlari(ctx context.Context) (map[string]int64, error) {
+	if rootDB == nil {
+		return nil, fmt.Errorf("root mysql bağlantısı başlatılmadı")
+	}
+	rows, err := rootDB.QueryContext(ctx, `SELECT table_schema, COALESCE(SUM(data_length + index_length),0) DIV 1024 FROM information_schema.TABLES GROUP BY table_schema`)
+	if err != nil {
+		return nil, fmt.Errorf("veritabanı boyutları: %w", err)
+	}
+	defer rows.Close()
+
+	boyutlar := make(map[string]int64)
+	for rows.Next() {
+		var sema string
+		var boyut int64
+		if err := rows.Scan(&sema, &boyut); err != nil {
+			return nil, fmt.Errorf("veritabanı boyutu oku: %w", err)
+		}
+		boyutlar[sema] = boyut
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("veritabanı boyutları satırları: %w", err)
+	}
+	return boyutlar, nil
+}
+
 // rootSocket: MariaDB unix soketi — dağıtım paketlemesine göre çözülür
 // (RHEL /var/lib/mysql/mysql.sock · Debian /run/mysqld/mysqld.sock).
 // Sabit bırakıldığında panel Debian'da hiç açılmıyordu.

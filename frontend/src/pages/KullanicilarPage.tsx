@@ -3,7 +3,7 @@
 // Kapsam sunucu tarafında zorlanır (bkz. internal/users): bayi yalnız kendi
 // altındaki hesapları görür ve yalnız müşteri hesabı açabilir. Buradaki rol
 // kısıtları o kuralların arayüz yansımasıdır, güvenlik sınırı değildir.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -14,7 +14,6 @@ import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { T } from '@/lib/tablo'
-import { metneGoreSirala } from '@/lib/sirala'
 
 type Kullanici = {
   id: number
@@ -30,6 +29,16 @@ type Kullanici = {
   son_giris_ip: string
   olusturma: string
 }
+
+type SayfaliListe<T> = {
+  icerik: T[]
+  sayfa: number
+  limit: number
+  toplam: number
+  toplam_sayfa: number
+}
+
+const SAYFA_BOYUTU = 50
 
 const ROL_STIL: Record<string, string> = {
   admin: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
@@ -89,8 +98,21 @@ export default function KullanicilarPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
   const [aranan, setAranan] = useState(() => aramaParam.get('arama') || '')
+  const ertelenenArama = useDeferredValue(aranan)
+  const [sunucuAramasi, setSunucuAramasi] = useState(() => (aramaParam.get('arama') || '').trim())
+  const [sayfa, setSayfa] = useState(1)
+  const [toplam, setToplam] = useState(0)
+  const [toplamSayfa, setToplamSayfa] = useState(1)
+  const istekSirasi = useRef(0)
 
-  useEffect(() => { setAranan(aramaParam.get('arama') || '') }, [aramaParam])
+  useEffect(() => {
+    setAranan(aramaParam.get('arama') || '')
+    setSayfa(1)
+  }, [aramaParam])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSunucuAramasi(ertelenenArama.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [ertelenenArama])
 
   const [yeni, setYeni] = useState<YeniHesap | null>(null)
   const [kaydediliyor, setKaydediliyor] = useState(false)
@@ -103,28 +125,31 @@ export default function KullanicilarPage() {
   const [bayiPaketleri, setBayiPaketleri] = useState<BayiPaketOzet[]>([])
   const [hizmetPlanlari, setHizmetPlanlari] = useState<HizmetPlanOzet[]>([])
 
-  const getir = useCallback(async () => {
-    setYukleniyor(true)
+  const getir = useCallback(async (sessiz = false) => {
+    const sira = ++istekSirasi.current
+    if (!sessiz) setYukleniyor(true)
     try {
-      const r = await api.get<Kullanici[]>('/users')
-      setListe(Array.isArray(r.data) ? r.data : [])
+      const r = await api.get<SayfaliListe<Kullanici>>('/users', {
+        params: { sayfa, limit: SAYFA_BOYUTU, arama: sunucuAramasi },
+      })
+      if (sira !== istekSirasi.current) return
+      const sonSayfa = Math.max(1, r.data.toplam_sayfa)
+      if (sayfa > sonSayfa) {
+        setSayfa(sonSayfa)
+        return
+      }
+      setListe(r.data.icerik || [])
+      setToplam(r.data.toplam)
+      setToplamSayfa(sonSayfa)
       setHata(null)
     } catch (e) {
+      if (sira !== istekSirasi.current) return
       setHata(apiHata(e, t('KullanicilarPage:error.load')))
     } finally {
-      setYukleniyor(false)
+      if (sira === istekSirasi.current) setYukleniyor(false)
     }
-  }, [t])
+  }, [sayfa, sunucuAramasi, t])
   useEffect(() => { getir() }, [getir])
-
-  const suzulmus = useMemo(() => {
-    const t = aranan.trim().toLowerCase()
-    const temel = t
-      ? liste.filter((k) => `${k.kullanici_adi} ${k.eposta} ${k.ad_soyad}`.toLowerCase().includes(t))
-      : liste
-    // İlk sütun kullanıcı adı.
-    return metneGoreSirala(temel, (k) => k.kullanici_adi)
-  }, [liste, aranan])
 
   async function olustur() {
     if (!yeni) return
@@ -151,6 +176,7 @@ export default function KullanicilarPage() {
       setBasari(t('KullanicilarPage:success.password_updated', { name: parolaHedef.kullanici_adi }))
       setParolaHedef(null)
       setYeniParola('')
+      await getir(true)
     } catch (e) {
       setHata(apiHata(e, t('KullanicilarPage:error.password_reset')))
     } finally {
@@ -224,6 +250,7 @@ export default function KullanicilarPage() {
       setBasari(t('KullanicilarPage:success.limits_updated', { name: limitHedef.kullanici_adi }))
       setLimitHedef(null)
       setLimit(null)
+      await getir(true)
     } catch (e) {
       setHata(apiHata(e, t('KullanicilarPage:error.limits_save')))
     } finally {
@@ -314,7 +341,7 @@ export default function KullanicilarPage() {
       <ListToolbar
         birincil={{ etiket: adminMiyim ? t('KullanicilarPage:new_account') : t('KullanicilarPage:new_customer'), onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
         aranan={aranan}
-        arananSetter={setAranan}
+        arananSetter={(deger) => { setAranan(deger); setSayfa(1) }}
       />
 
       {hata && <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">{hata}</div>}
@@ -322,13 +349,13 @@ export default function KullanicilarPage() {
 
       {yukleniyor ? (
         <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
-      ) : liste.length === 0 ? (
+      ) : liste.length === 0 && !sunucuAramasi ? (
         <EmptyState
           baslik={adminMiyim ? t('KullanicilarPage:empty.title_admin') : t('KullanicilarPage:empty.title_reseller')}
           aciklama={t('KullanicilarPage:empty.desc')}
           buton={{ etiket: t('KullanicilarPage:new_account'), onClick: () => setYeni({ ...BOS, rol: adminMiyim ? 'reseller' : 'user' }) }}
         />
-      ) : suzulmus.length === 0 ? (
+      ) : liste.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-400">{t('KullanicilarPage:empty.no_search_results')}</div>
       ) : (
         <div className="lg:overflow-x-auto lg:rounded-xl lg:border lg:border-slate-200 dark:lg:border-slate-800">
@@ -341,7 +368,7 @@ export default function KullanicilarPage() {
               </tr>
             </thead>
             <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800 lg:bg-white dark:lg:bg-slate-950`}>
-              {suzulmus.map((k) => (
+              {liste.map((k) => (
                 <tr key={k.id} className={T.satir}>
                   <td className={T.hucreBaslik}>
                     <span className="font-mono text-slate-900 dark:text-slate-100">{k.kullanici_adi}</span>
@@ -402,6 +429,19 @@ export default function KullanicilarPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!yukleniyor && toplam > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span>{t('common:pagination_summary', { total: toplam })}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setSayfa((s) => Math.max(1, s - 1))} disabled={sayfa <= 1}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:back')}</button>
+            <span>{t('common:page_summary', { page: sayfa, totalPages: toplamSayfa })}</span>
+            <button type="button" onClick={() => setSayfa((s) => Math.min(toplamSayfa, s + 1))} disabled={sayfa >= toplamSayfa}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:next')}</button>
+          </div>
         </div>
       )}
 

@@ -103,21 +103,31 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 			var durum, rol string
 			var surum uint64
 			var bostaSaniye sql.NullInt64
-			var bostaLimitDakika int
+			// Oturum kararını veren alanlar users satırından TAZE okunur (hesap
+			// silinmiş/askıda/rolü değişmiş/sürümü artmış olabilir). Eskiden burada
+			// JOIN'lenen panel_ayarlari.oturum_bosta_dakika ise nadiren değişen tek
+			// satırlık bir ayar olduğu için kısa TTL'li önbellekten alınır
+			// (panelayar_cache.go) — böylece istek başına ayar sorgusu çalışmaz.
 			err = scopeDB.QueryRowContext(r.Context(), `
 				SELECT u.status, u.role, u.auth_version,
-				       TIMESTAMPDIFF(SECOND, u.last_activity_at, NOW()),
-				       p.oturum_bosta_dakika
-				  FROM users u JOIN panel_ayarlari p ON p.id = 1
+				       TIMESTAMPDIFF(SECOND, u.last_activity_at, NOW())
+				  FROM users u
 				 WHERE u.id = ?`, c.UserID).
-				Scan(&durum, &rol, &surum, &bostaSaniye, &bostaLimitDakika)
+				Scan(&durum, &rol, &surum, &bostaSaniye)
 			if err != nil || durum != "active" || rol != c.Role || surum != c.Version {
 				httpx.WriteError(w, http.StatusUnauthorized, "oturum geçersiz veya sona erdirilmiş")
 				return
 			}
 			// oturum_bosta_dakika=0 (varsayılan) => kapalı. last_activity_at NULL'sa
 			// (hiç istek atılmamış) zaman aşımı UYGULANMAZ — aşağıdaki UPDATE zaten
-			// hemen set eder.
+			// hemen set eder. Ayar da okunamazsa eski JOIN davranışındaki gibi
+			// fail-closed kalır; boşta zaman aşımı sessizce devre dışı bırakılamaz.
+			o, err := panelAyarlariOku(r.Context())
+			if err != nil {
+				httpx.WriteError(w, http.StatusServiceUnavailable, "oturum doğrulanamadı")
+				return
+			}
+			bostaLimitDakika := o.OturumBosta
 			if bostaLimitDakika > 0 && bostaSaniye.Valid && bostaSaniye.Int64 > int64(bostaLimitDakika)*60 {
 				httpx.WriteError(w, http.StatusUnauthorized, "oturum boşta kaldığı için sona erdi")
 				return

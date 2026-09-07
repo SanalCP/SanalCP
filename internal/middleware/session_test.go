@@ -11,9 +11,10 @@ import (
 	"sanalcp/internal/auth"
 )
 
-// requireAuthSorgu: RequireAuth'un tek doğrulama sorgusu. Testler bunu regexp
-// olarak eşleştirir; boşluk/satır sonu farkları için (?s) + \s+ kullanılır.
-var requireAuthSorgu = regexp.MustCompile(`(?s)SELECT\s+u\.status,\s*u\.role,\s*u\.auth_version,\s*TIMESTAMPDIFF\(SECOND,\s*u\.last_activity_at,\s*NOW\(\)\),\s*p\.oturum_bosta_dakika\s*FROM\s+users u JOIN panel_ayarlari p ON p\.id = 1\s*WHERE u\.id = \?`)
+// requireAuthSorgu: RequireAuth'un tek doğrulama sorgusu (users satırı taze okunur;
+// panel_ayarlari.oturum_bosta_dakika artık önbellekten gelir, bkz. auth.go).
+// Testler bunu regexp olarak eşleştirir; boşluk/satır sonu farkları için (?s) + \s+ kullanılır.
+var requireAuthSorgu = regexp.MustCompile(`(?s)SELECT\s+u\.status,\s*u\.role,\s*u\.auth_version,\s*TIMESTAMPDIFF\(SECOND,\s*u\.last_activity_at,\s*NOW\(\)\)\s*FROM\s+users u\s*WHERE u\.id = \?`)
 
 func TestRequireAuthOturumSurumu(t *testing.T) {
 	secret := []byte("test-secret-0123456789-0123456789")
@@ -41,13 +42,16 @@ func TestRequireAuthOturumSurumu(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mock := mockDB(t)
+			t.Cleanup(panelAyarCacheTemizle)
+			// Oturum-bosta limiti artık önbellekten okunuyor; senaryodaki değeri kur.
+			panelAyarCacheDoldur(&panelAyarOzet{OturumBosta: tc.bostaLimit})
 			q := mock.ExpectQuery(requireAuthSorgu.String()).WithArgs(int64(42))
 			if tc.dbError {
 				q.WillReturnError(sqlmock.ErrCancelled)
 			} else {
 				q.WillReturnRows(sqlmock.NewRows(
-					[]string{"status", "role", "auth_version", "bosta_saniye", "oturum_bosta_dakika"}).
-					AddRow(tc.status, tc.dbRole, tc.dbVer, tc.bostaSn, tc.bostaLimit))
+					[]string{"status", "role", "auth_version", "bosta_saniye"}).
+					AddRow(tc.status, tc.dbRole, tc.dbVer, tc.bostaSn))
 				if tc.expected == http.StatusOK {
 					mock.ExpectExec(regexp.QuoteMeta(
 						"UPDATE users SET last_activity_at = NOW()")).

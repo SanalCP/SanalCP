@@ -75,5 +75,7 @@
   "copying": "Copying…",
   "copy_manual": "Copy manually",
   "copy_manual_hint": "Automatic clipboard copying failed. You can copy the text below manually.",
-  "copy_failed": "Copy failed, try again"
+  "copy_failed": "Copy failed, try again",
+  "pagination_summary": "{{total}} records total",
+  "page_summary": "{{page}} / {{totalPages}}"
 }

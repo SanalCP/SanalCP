@@ -16,7 +16,8 @@
   "empty": {
     "title": "No domains yet",
     "desc": "Get started by adding your first domain. A Linux user, nginx vhost, PHP-FPM pool, FTP account, MySQL database and DNS zone will be created automatically.",
-    "button": "Create Domain"
+    "button": "Create Domain",
+    "search": "No domains match your search."
   },
   "table": {
     "preview_title": "{{domain}} preview",

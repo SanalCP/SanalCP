@@ -5,7 +5,7 @@
 // NOT: Bunlar panel giriş hesabı DEĞİLDİR — fatura/iletişim kaydıdır. Giriş
 // hesabı users tablosundadır (rol='user') ve customers.user_id ile buraya
 // bağlanır; müşteri o hesapla /cp adresinden girer.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
@@ -15,7 +15,6 @@ import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { T } from '@/lib/tablo'
-import { metneGoreSirala } from '@/lib/sirala'
 
 type Musteri = {
   id: number
@@ -28,8 +27,10 @@ type Musteri = {
 }
 
 type Plan = { id: number; ad: string }
+type SayfaliListe<T> = { icerik: T[]; sayfa: number; limit: number; toplam: number; toplam_sayfa: number }
 
 const BOS: Musteri = { id: 0, ad: '', eposta: '', plan_id: null, durum: 'aktif', notlar: '', olusturma: '' }
+const SAYFA_BOYUTU = 50
 
 export default function MusterilerPage() {
   const { t } = useTranslation(['MusterilerPage', 'common'])
@@ -40,41 +41,57 @@ export default function MusterilerPage() {
   const [hata, setHata] = useState<string | null>(null)
   const [basari, setBasari] = useState<string | null>(null)
   const [aranan, setAranan] = useState(() => aramaParam.get('arama') || '')
+  const ertelenenArama = useDeferredValue(aranan)
+  const [sunucuAramasi, setSunucuAramasi] = useState(() => (aramaParam.get('arama') || '').trim())
+  const [sayfa, setSayfa] = useState(1)
+  const [toplam, setToplam] = useState(0)
+  const [toplamSayfa, setToplamSayfa] = useState(1)
+  const istekSirasi = useRef(0)
 
-  useEffect(() => { setAranan(aramaParam.get('arama') || '') }, [aramaParam])
+  useEffect(() => {
+    setAranan(aramaParam.get('arama') || '')
+    setSayfa(1)
+  }, [aramaParam])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSunucuAramasi(ertelenenArama.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [ertelenenArama])
 
   const [duzenlenen, setDuzenlenen] = useState<Musteri | null>(null)
   const [kaydediliyor, setKaydediliyor] = useState(false)
   const [silinecek, setSilinecek] = useState<Musteri | null>(null)
 
-  const getir = useCallback(async () => {
-    setYukleniyor(true)
+  const getir = useCallback(async (sessiz = false) => {
+    const sira = ++istekSirasi.current
+    if (!sessiz) setYukleniyor(true)
     try {
-      const r = await api.get<Musteri[]>('/customers')
-      setListe(Array.isArray(r.data) ? r.data : [])
+      const r = await api.get<SayfaliListe<Musteri>>('/customers', {
+        params: { sayfa, limit: SAYFA_BOYUTU, arama: sunucuAramasi },
+      })
+      if (sira !== istekSirasi.current) return
+      const sonSayfa = Math.max(1, r.data.toplam_sayfa)
+      if (sayfa > sonSayfa) {
+        setSayfa(sonSayfa)
+        return
+      }
+      setListe(r.data.icerik || [])
+      setToplam(r.data.toplam)
+      setToplamSayfa(sonSayfa)
       setHata(null)
     } catch (e) {
+      if (sira !== istekSirasi.current) return
       setHata(apiHata(e, t('MusterilerPage:error.load_failed')))
     } finally {
-      setYukleniyor(false)
+      if (sira === istekSirasi.current) setYukleniyor(false)
     }
-  }, [t])
+  }, [sayfa, sunucuAramasi, t])
 
+  useEffect(() => { getir() }, [getir])
   useEffect(() => {
-    getir()
     api.get<Plan[]>('/plans')
       .then((r) => setPlanlar(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
-  }, [getir])
-
-  const suzulmus = useMemo(() => {
-    const t = aranan.trim().toLowerCase()
-    const temel = t
-      ? liste.filter((m) => `${m.ad} ${m.eposta} ${m.notlar}`.toLowerCase().includes(t))
-      : liste
-    // İlk sütun müşteri adı.
-    return metneGoreSirala(temel, (m) => m.ad)
-  }, [liste, aranan])
+  }, [])
 
   async function kaydet() {
     if (!duzenlenen) return
@@ -140,7 +157,7 @@ export default function MusterilerPage() {
       <ListToolbar
         birincil={{ etiket: t('MusterilerPage:toolbar_new'), onClick: () => setDuzenlenen({ ...BOS }) }}
         aranan={aranan}
-        arananSetter={setAranan}
+        arananSetter={(deger) => { setAranan(deger); setSayfa(1) }}
       />
 
       {hata && (
@@ -152,13 +169,13 @@ export default function MusterilerPage() {
 
       {yukleniyor ? (
         <div className="py-16 text-center text-sm text-slate-400">{t('common:loading')}</div>
-      ) : liste.length === 0 ? (
+      ) : liste.length === 0 && !sunucuAramasi ? (
         <EmptyState
           baslik={t('MusterilerPage:empty.title')}
           aciklama={t('MusterilerPage:empty.description')}
           buton={{ etiket: t('MusterilerPage:toolbar_new'), onClick: () => setDuzenlenen({ ...BOS }) }}
         />
-      ) : suzulmus.length === 0 ? (
+      ) : liste.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-400">{t('MusterilerPage:search_empty')}</div>
       ) : (
         <div className="lg:overflow-x-auto lg:rounded-xl lg:border lg:border-slate-200 dark:lg:border-slate-800">
@@ -173,7 +190,7 @@ export default function MusterilerPage() {
               </tr>
             </thead>
             <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-800 lg:bg-white dark:lg:bg-slate-950`}>
-              {suzulmus.map((m) => (
+              {liste.map((m) => (
                 <tr key={m.id} className={T.satir}>
                   <td className={T.hucreBaslik}>{m.ad}</td>
                   <td className={T.hucre} data-etiket={t('MusterilerPage:table.email')}><span className="break-all text-slate-600 dark:text-slate-400">{m.eposta}</span></td>
@@ -196,6 +213,19 @@ export default function MusterilerPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!yukleniyor && toplam > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <span>{t('common:pagination_summary', { total: toplam })}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setSayfa((s) => Math.max(1, s - 1))} disabled={sayfa <= 1}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:back')}</button>
+            <span>{t('common:page_summary', { page: sayfa, totalPages: toplamSayfa })}</span>
+            <button type="button" onClick={() => setSayfa((s) => Math.min(toplamSayfa, s + 1))} disabled={sayfa >= toplamSayfa}
+              className="rounded-md border border-slate-200 px-2.5 py-1.5 disabled:opacity-40 dark:border-slate-700">{t('common:next')}</button>
+          </div>
         </div>
       )}
 

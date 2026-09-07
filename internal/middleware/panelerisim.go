@@ -8,30 +8,25 @@ import (
 	"sanalcp/internal/httpx"
 )
 
-// PanelErisimKisiti, panel_ayarlari listesini her istekte okur; ayar değişikliği
-// yeniden başlatma gerektirmez. DB okunamazsa güvenli tarafta kalıp erişimi keser.
+// PanelErisimKisiti, panel_ayarlari'ndaki erişim listesini kısa TTL'li önbellekten
+// okur (bkz. panelayar_cache.go) — ayar değişikliği yeniden başlatma gerektirmez,
+// en geç TTL kadar sonra yansır. DB'ye ilk dolumda erişilemezse güvenli tarafta
+// kalıp erişimi keser.
 func PanelErisimKisiti(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if scopeDB == nil {
+		o, err := panelAyarlariOku(r.Context())
+		if err != nil {
 			httpx.WriteError(w, http.StatusServiceUnavailable, "panel erişim ayarı doğrulanamadı")
 			return
 		}
-		var ham, gecici string
-		var geciciAktif int
-		if err := scopeDB.QueryRowContext(r.Context(),
-			`SELECT COALESCE(erisim_cidrleri,''), COALESCE(gecici_erisim_cidr,''),
-			        COALESCE(gecici_erisim_bitis > NOW(),0)
-			   FROM panel_ayarlari WHERE id=1`).Scan(&ham, &gecici, &geciciAktif); err != nil {
-			httpx.WriteError(w, http.StatusServiceUnavailable, "panel erişim ayarı doğrulanamadı")
-			return
-		}
+		ham := o.ErisimHam
 		if strings.TrimSpace(ham) == "" {
 			next.ServeHTTP(w, r)
 			return
 		}
 		ip := net.ParseIP(strings.Trim(httpx.ClientIP(r), "[]"))
-		if geciciAktif == 1 {
-			_, ag, err := net.ParseCIDR(gecici)
+		if o.GeciciAktif {
+			_, ag, err := net.ParseCIDR(o.GeciciCIDR)
 			if err == nil && ip != nil && ag.Contains(ip) {
 				next.ServeHTTP(w, r)
 				return

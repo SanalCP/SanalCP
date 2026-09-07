@@ -75,5 +75,7 @@
   "copying": "Kopyalanıyor…",
   "copy_manual": "Elle kopyalayın",
   "copy_manual_hint": "Panoya otomatik kopyalama yapılamadı. Aşağıdaki metni elle kopyalayabilirsiniz.",
-  "copy_failed": "Kopyalanamadı, tekrar deneyin"
+  "copy_failed": "Kopyalanamadı, tekrar deneyin",
+  "pagination_summary": "Toplam {{total}} kayıt",
+  "page_summary": "{{page}} / {{totalPages}}"
 }

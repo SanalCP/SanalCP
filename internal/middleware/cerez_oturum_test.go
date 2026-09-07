@@ -12,14 +12,17 @@ import (
 )
 
 // gecerliOturumBekle: RequireAuth'un tek doğrulama sorgusunu ve ardından gelen
-// aktivite güncellemesini başarıyla yanıtlayacak şekilde mock kurar.
+// aktivite güncellemesini başarıyla yanıtlayacak şekilde mock kurar. Oturum-bosta
+// limiti önbellekten okunduğu için (auth.go) kapalı (0) olarak önceden doldurulur.
 func gecerliOturumBekle(t *testing.T, uid int64, rol string, surum uint64) sqlmock.Sqlmock {
 	t.Helper()
 	mock := mockDB(t)
+	t.Cleanup(panelAyarCacheTemizle)
+	panelAyarCacheDoldur(&panelAyarOzet{OturumBosta: 0})
 	mock.ExpectQuery(requireAuthSorgu.String()).WithArgs(uid).
 		WillReturnRows(sqlmock.NewRows(
-			[]string{"status", "role", "auth_version", "bosta_saniye", "oturum_bosta_dakika"}).
-			AddRow("active", rol, surum, nil, 0))
+			[]string{"status", "role", "auth_version", "bosta_saniye"}).
+			AddRow("active", rol, surum, nil))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET last_activity_at = NOW()")).
 		WithArgs(uid).WillReturnResult(sqlmock.NewResult(0, 1))
 	return mock

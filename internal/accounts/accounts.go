@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/kota"
@@ -31,17 +32,49 @@ type Handlers struct {
 // ------------ Customers ------------
 
 func (h *Handlers) ListCustomers(w http.ResponseWriter, r *http.Request) {
+	p, sayfali, err := httpx.SayfalamaAyristir(r)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	// Bayi yalnız kendi müşterilerini görür (customers.owner_user_id).
 	q := `SELECT id, ad, eposta, plan_id, durum, notlar, DATE_FORMAT(created_at,'%Y-%m-%d')
 	      FROM customers`
+	countQ := `SELECT COUNT(*) FROM customers`
 	var arg []any
+	var kosullar []string
 	if c := middleware.ClaimsFrom(r); c != nil && c.Role == middleware.RolBayi {
-		q += ` WHERE owner_user_id = ?`
+		kosullar = append(kosullar, `owner_user_id = ?`)
 		arg = append(arg, c.UserID)
 	}
-	q += ` ORDER BY id`
+	if sayfali && p.Arama != "" {
+		kosullar = append(kosullar, `(ad LIKE ? ESCAPE '!' OR eposta LIKE ? ESCAPE '!' OR notlar LIKE ? ESCAPE '!')`)
+		desen := httpx.LikeDeseni(p.Arama)
+		arg = append(arg, desen, desen, desen)
+	}
+	if len(kosullar) > 0 {
+		where := ` WHERE ` + strings.Join(kosullar, ` AND `)
+		q += where
+		countQ += where
+	}
+	var toplam int64
+	if sayfali {
+		if err := h.DB.QueryRowContext(r.Context(), countQ, arg...).Scan(&toplam); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	// Eski arayüz listeyi ilk sütuna göre sıralıyordu. Sayfalama sunucuya
+	// taşınınca aynı görünür sıralamayı koru; id eşitlik bozucu olarak kararlı
+	// sayfa sınırları sağlar.
+	q += ` ORDER BY ad, id`
+	listeArg := append([]any(nil), arg...)
+	if sayfali {
+		q += ` LIMIT ? OFFSET ?`
+		listeArg = append(listeArg, p.Limit, p.Offset())
+	}
 
-	rows, err := h.DB.QueryContext(r.Context(), q, arg...)
+	rows, err := h.DB.QueryContext(r.Context(), q, listeArg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -50,9 +83,19 @@ func (h *Handlers) ListCustomers(w http.ResponseWriter, r *http.Request) {
 	out := make([]Customer, 0)
 	for rows.Next() {
 		var cs Customer
-		if err := rows.Scan(&cs.ID, &cs.Ad, &cs.Eposta, &cs.PlanID, &cs.Durum, &cs.Notlar, &cs.Created); err == nil {
-			out = append(out, cs)
+		if err := rows.Scan(&cs.ID, &cs.Ad, &cs.Eposta, &cs.PlanID, &cs.Durum, &cs.Notlar, &cs.Created); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
+			return
 		}
+		out = append(out, cs)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
+		return
+	}
+	if sayfali {
+		httpx.WriteJSON(w, http.StatusOK, httpx.YeniSayfaliYanit(out, p, toplam))
+		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }

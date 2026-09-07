@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.63",
-  "duyuru": "Yayın sürümü artık kurulu binary ile tam uyumlu. Sol menü bilgi mimarisi güncellemesinin sunucu sürümü doğru görüntüleniyor; güncelleme kontrolü ve sanalcp-update bu sürümde tutarlı çalışır.",
+  "son_surum": "0.9.64",
+  "duyuru": "Büyük domain, panel hesabı ve müşteri listeleri artık sunucu tarafında aranıp sayfalanıyor. Ana ekran ve veritabanı özetleri daha az sorguyla daha hızlı yükleniyor; panel ayarları güvenli, kısa süreli önbellekle sunuluyor.",
   "kritik": false,
   "yayin_tarihi": "2026-09-07"
 }
