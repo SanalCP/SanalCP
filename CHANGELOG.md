@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.63** (2026-09-07)
+
+Yayın düzeltmesi: backend sürüm sabiti (`SurumNo`) ve yayınlanan binary,
+`surum.json` ile eşitlendi. v0.9.62 sol menü bilgi mimarisi güncellemesinin
+frontend/migration kısmı yayınlanmış ancak binary sürümü artırılmadığı için
+kurulu paneller kendilerini hâlâ 0.9.61 olarak gösteriyor, panel "güncelleme
+var" derken `sanalcp-update` "zaten en güncel" diyordu. Bu sürümle sunucular
+0.9.63'e güncellenir ve sürüm görünümü/güncelleme kontrolü tutarlı hale gelir.
+
 **0.9.62** (2026-09-06)
 
 Sol menü günlük kullanım akışlarına göre yeniden düzenlendi. Sunucu genelinde

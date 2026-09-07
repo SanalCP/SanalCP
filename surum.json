@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.62",
-  "duyuru": "Sol menü günlük iş akışlarına göre yeniden düzenlendi. Aktif bölüm otomatik açılıyor, gereksiz tekrarlar kaldırıldı ve sunucu, bayi ile domain menülerinde ortak ve daha anlaşılır bir terminoloji kullanılıyor.",
+  "son_surum": "0.9.63",
+  "duyuru": "Yayın sürümü artık kurulu binary ile tam uyumlu. Sol menü bilgi mimarisi güncellemesinin sunucu sürümü doğru görüntüleniyor; güncelleme kontrolü ve sanalcp-update bu sürümde tutarlı çalışır.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-06"
+  "yayin_tarihi": "2026-09-07"
 }
