@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.64",
-  "duyuru": "Büyük domain, panel hesabı ve müşteri listeleri artık sunucu tarafında aranıp sayfalanıyor. Ana ekran ve veritabanı özetleri daha az sorguyla daha hızlı yükleniyor; panel ayarları güvenli, kısa süreli önbellekle sunuluyor.",
+  "son_surum": "0.9.65",
+  "duyuru": "Bayiler müşteri seçmeden domain ekleyebilir; müşteri kaydı otomatik oluşturulup ilgili bayiye bağlanır. Müşteri kotası ve bayi yetki kapsamı korunur.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-07"
+  "yayin_tarihi": "2026-09-16"
 }

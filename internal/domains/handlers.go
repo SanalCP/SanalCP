@@ -387,12 +387,14 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusForbidden, err.Error())
 			return
 		}
-		// Bayi yalnız kendi müşterisine domain açabilir.
+		// Müşteri seçilmediyse Hazirla yeni müşteri oluşturup bu bayiye bağlar.
+		// Otomatik oluşturulan müşteri de bayinin müşteri kotasına tabidir.
 		if req.CustomerID == nil {
-			httpx.WriteError(w, http.StatusBadRequest, "domain bir müşteriye bağlanmalı")
-			return
-		}
-		if !middleware.BayiMusterisiMi(r, c.UserID, *req.CustomerID) {
+			if err := kota.CheckBayiMusteriEklenebilir(r.Context(), h.DB, c.UserID); err != nil {
+				httpx.WriteError(w, http.StatusForbidden, err.Error())
+				return
+			}
+		} else if !middleware.BayiMusterisiMi(r, c.UserID, *req.CustomerID) {
 			httpx.WriteError(w, http.StatusForbidden, "bu müşteriye erişim yok")
 			return
 		}

@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.65** (2026-09-16)
+
+Bayi hesabıyla müşteri seçmeden domain eklenirken verilen “domain bir
+müşteriye bağlanmalı” hatası düzeltildi. Müşteri kaydı otomatik oluşturulup
+domaini açan bayiye bağlanır. Otomatik müşteri oluşturulurken bayi müşteri
+kotası denetlenir; başka bayinin müşterisine domain açılması reddedilir.
+Bu akış için dört regresyon testi eklendi.
+
+Frontend'in dolaylı geliştirme bağımlılığı js-yaml 4.3.2'ye güncellendi;
+CPU tüketimi açığı giderildi.
+
 **0.9.64** (2026-09-07)
 
 Domainler, Panel Hesapları ve Müşteri Kayıtları listelerine sunucu taraflı arama
