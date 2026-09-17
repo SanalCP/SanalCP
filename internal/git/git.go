@@ -82,49 +82,6 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func deployKeyDir(sk string) string {
-	return "/home/" + sk + "/.ssh"
-}
-
-// generateDeployKey: ssh-keygen -t ed25519 ile no-passphrase key uretir, /home/<sk>/.ssh/'a yazar
-func generateDeployKey(sk string) (pubKey string, err error) {
-	dir := deployKeyDir(sk)
-	_ = os.MkdirAll(dir, 0700)
-	priv := filepath.Join(dir, "sanalcp_deploy")
-	pub := priv + ".pub"
-
-	if _, err := os.Stat(pub); err == nil {
-		// Mevcut key kullan
-		b, _ := os.ReadFile(pub)
-		return strings.TrimSpace(string(b)), nil
-	}
-	_, _ = exec.Command("rm", "-f", priv, pub).CombinedOutput()
-	out, err := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-C", "deploy@sanalcp/"+sk, "-f", priv).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("ssh-keygen: %s: %w", strings.TrimSpace(string(out)), err)
-	}
-	// chown + perms
-	_, _ = exec.Command("chown", "-R", sk+":"+sk, dir).CombinedOutput()
-	_ = os.Chmod(priv, 0600)
-	_ = os.Chmod(pub, 0644)
-
-	// ssh config'e github.com için bu key'i bağla (per-user, ~/.ssh/config)
-	cfg := filepath.Join(dir, "config")
-	cfgBody := `Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/sanalcp_deploy
-    StrictHostKeyChecking no
-    UserKnownHostsFile=/dev/null
-`
-	_ = os.WriteFile(cfg, []byte(cfgBody), 0600)
-	_, _ = exec.Command("chown", sk+":"+sk, cfg).CombinedOutput()
-	_, _ = exec.Command("restorecon", "-R", dir).CombinedOutput()
-
-	b, _ := os.ReadFile(pub)
-	return strings.TrimSpace(string(b)), nil
-}
-
 var (
 	reTargetDir = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	reBranch    = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
@@ -185,24 +142,30 @@ func temizleDizinIcerigi(home, rel string) error {
 
 // runAsUserArgs: komutu sk kullanicisi olarak SHELL OLMADAN (argv) calistir; panel env verilmez
 func runAsUserArgs(ctx context.Context, sk, cwd string, argv ...string) (string, error) {
-	sudoArgs := append([]string{"-u", sk, "-H", "--"}, argv...)
-	cmd := exec.CommandContext(ctx, "sudo", sudoArgs...)
-	if cwd != "" {
-		cmd.Dir = cwd
-	}
-	out, err := cmd.CombinedOutput()
+	home, err := jailpath.TenantHome(sk)
 	if err != nil {
-		ruArgs := append([]string{"-u", sk, "--"}, argv...)
-		cmd2 := exec.CommandContext(ctx, "runuser", ruArgs...)
-		if cwd != "" {
-			cmd2.Dir = cwd
-		}
-		cmd2.Env = []string{
-			"HOME=/home/" + sk,
-			"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		}
-		out, err = cmd2.CombinedOutput()
+		return "", err
 	}
+	uid, gid, ok := jailpath.TenantIDs(sk)
+	if !ok || uid == 0 {
+		return "", errors.New("tenant kullanıcısı bulunamadı")
+	}
+	// Eski kurulumdaki StrictHostKeyChecking=no ayarını da komut satırında
+	// geçersiz kıl. Git clone/fetch/reset bir hata sonrası ikinci kez çalıştırılmaz.
+	if err := prepareKnownHosts(home, uid, gid); err != nil {
+		return "", err
+	}
+	if len(argv) > 0 && argv[0] == "git" {
+		// Yeni SSH dosyalarının SELinux etiketlerini de tenant yetkisiyle
+		// düzelt; path-tabanlı root restorecon geri getirilmez.
+		relabel := exec.CommandContext(ctx, "runuser", "-u", sk, "--", "restorecon", "-R", filepath.Join(home, ".ssh"))
+		relabel.Env = gitEnvironment(home)
+		_ = relabel.Run() // SELinux/restorecon olmayan dağıtımlarda gerekli değil
+	}
+	cmd := exec.CommandContext(ctx, "runuser", append([]string{"-u", sk, "--"}, argv...)...)
+	cmd.Dir = cwd
+	cmd.Env = gitEnvironment(home)
+	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
@@ -231,7 +194,6 @@ func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha s
 	if err := temizleDizinIcerigi(home, targetDir); err != nil {
 		return "", "", fmt.Errorf("hedef dizin temizlenemedi: %w", err)
 	}
-	_, _ = exec.Command("chown", sk+":"+sk, dst).CombinedOutput()
 
 	out, err := runAsUserArgs(ctx, sk, home, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
 	log = out
@@ -240,7 +202,7 @@ func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha s
 	}
 	shaOut, _ := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
 	sha = strings.TrimSpace(shaOut)
-	_, _ = exec.Command("restorecon", "-R", dst).CombinedOutput()
+	_, _ = runAsUserArgs(ctx, sk, home, "restorecon", "-R", dst)
 	return sha, log, nil
 }
 
@@ -277,7 +239,7 @@ func gitPull(ctx context.Context, sk, targetDir, branch string) (sha string, log
 	}
 	shaOut, _ := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "rev-parse", "HEAD")
 	sha = strings.TrimSpace(shaOut)
-	_, _ = exec.Command("restorecon", "-R", dst).CombinedOutput()
+	_, _ = runAsUserArgs(ctx, sk, home, "restorecon", "-R", dst)
 	return sha, log, nil
 }
 

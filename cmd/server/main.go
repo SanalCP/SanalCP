@@ -158,7 +158,10 @@ func main() {
 	}
 
 	provisioner.Init(d) // askıya-alma tutarlılığı için provisioner'a DB handle'ı ver
-	middleware.Init(d)  // musteri-scope askiya-alma kontrolu icin DB handle
+	if err := sifrekoruma.HealLegacyFiles(context.Background(), d); err != nil {
+		log.Fatalf("şifreli dizin güvenlik göçü: %v", err)
+	}
+	middleware.Init(d) // musteri-scope askiya-alma kontrolu icin DB handle
 	// Domain bot/rate-limit zone ve istisna haritalarını DB'den yeniden üret.
 	// Restore/reboot sonrasında diskteki türetilmiş nginx dosyasına güvenilmez.
 	if err := provisioner.RateLimitGlobalYaz(d); err != nil {

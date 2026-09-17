@@ -115,7 +115,7 @@ func (h *Handlers) Goster(w http.ResponseWriter, r *http.Request) {
 
 	// Disk kullanım
 	home := "/home/" + o.SK
-	o.DiskMB.Kullanim = duMB(home)
+	o.DiskMB.Kullanim = duMB(ctx, home)
 	_, _ = h.DB.ExecContext(ctx, `UPDATE domains SET boyut_kb=? WHERE id=?`, o.DiskMB.Kullanim*1024, id)
 	o.DiskMB.Limit = diskKota
 	// XFS user quota AKTİF ise gerçek disk kullanım/limit + inode kullanım/limit oradan (du'dan

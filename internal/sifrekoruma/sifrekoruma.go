@@ -4,6 +4,7 @@
 package sifrekoruma
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
@@ -26,6 +28,9 @@ type Handlers struct {
 }
 
 const htpasswdDir = "/etc/nginx/htpasswd"
+
+// Aynı dizindeki kullanıcı güncellemeleri ve nginx render'ı birbirini ezmesin.
+var mutationMu sync.Mutex
 
 var (
 	reYol  = regexp.MustCompile(`^/[A-Za-z0-9._/-]{0,200}$`)
@@ -80,6 +85,8 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 
 // POST /domains/{id}/koruma  {yol, kullanici, parola}
 func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
+	mutationMu.Lock()
+	defer mutationMu.Unlock()
 	id, sk, surum, demo, ok := h.domain(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
@@ -119,13 +126,20 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd dizini oluşturulamadı")
 		return
 	}
-	dosya := htpasswdDir + "/d" + strconv.FormatInt(id, 10) + "_" + sanitize(yol)
-	flag := "-bB"
+	dosya := passwordFile(htpasswdDir, id, yol)
+	flag := "-iB"
 	if _, e := os.Stat(dosya); e != nil {
-		flag = "-cbB" // yeni dosya oluştur
+		flag = "-ciB" // yeni dosya oluştur
 	}
-	// argv EXPLICIT — parola/kullanıcı shell'e uğramaz
-	if out, err := exec.Command("htpasswd", flag, dosya, req.Kullanici, req.Parola).CombinedOutput(); err != nil {
+	// Parola argv/ps içinde görünmez. -i ilk satırı okur; çok satırlı
+	// parolayı sessizce değiştirmek yerine reddet.
+	if strings.ContainsAny(req.Parola, "\r\n\x00") {
+		httpx.WriteError(w, http.StatusBadRequest, "parola satır sonu veya NUL içeremez")
+		return
+	}
+	cmd := exec.CommandContext(r.Context(), "htpasswd", flag, dosya, req.Kullanici)
+	cmd.Stdin = strings.NewReader(req.Parola + "\n")
+	if out, err := cmd.CombinedOutput(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd: "+strings.TrimSpace(string(out)))
 		return
 	}
@@ -156,6 +170,8 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /domains/{id}/koruma/{kid}
 func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
+	mutationMu.Lock()
+	defer mutationMu.Unlock()
 	id, sk, surum, _, ok := h.domain(r)
 	if !ok {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
@@ -225,13 +241,6 @@ func normalizeYol(y string) string {
 	return y
 }
 
-var reNonAlnum = regexp.MustCompile(`[^A-Za-z0-9]+`)
-
-func sanitize(s string) string {
-	s = reNonAlnum.ReplaceAllString(s, "_")
-	s = strings.Trim(s, "_")
-	if s == "" {
-		s = "root"
-	}
-	return s
+func passwordFile(dir string, domainID int64, yol string) string {
+	return fmt.Sprintf("%s/v2_d%d_%x", dir, domainID, sha256.Sum256([]byte(yol)))
 }

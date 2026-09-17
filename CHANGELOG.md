@@ -13,6 +13,22 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.66** (2026-09-17) — güvenlik ve disk ölçümü düzeltmeleri
+
+- Git deploy anahtarları tenant dizininde root komutları çalıştırılmadan,
+  sembolik bağ takip etmeyen dosya işlemleriyle oluşturulur. Mevcut özel
+  anahtar korunur; Git SSH bağlantılarında sunucu anahtarı doğrulaması zorunludur.
+- İzin sıfırlama işlemindeki sembolik bağ yarışı kapatıldı; ACL güncellemesi
+  tenant kimliğiyle çalışır.
+- Korunan dizinlerin parola dosyaları yolun SHA-256 değeriyle ayrılır. Mevcut
+  ortak dosyalar başlangıçta ayrıştırılır; özgün parolası belirlenemeyen
+  çakışan kullanıcı kayıtları yeniden parola atanana kadar kilitlenir.
+  Parolalar artık htpasswd komutunun argümanlarında görünmez.
+- Disk ölçümleri ortak önbellek, aynı ölçüm için tek iş ve en fazla iki
+  eşzamanlı tarama kullanır. Bekleyen işler ve önbellek boyutu da sınırlıdır.
+
+Geçiş ayrıntıları: [güvenlik düzeltmeleri](docs/SECURITY-FIXES-2026-09.md).
+
 **0.9.65** (2026-09-16)
 
 Bayi hesabıyla müşteri seçmeden domain eklenirken verilen “domain bir

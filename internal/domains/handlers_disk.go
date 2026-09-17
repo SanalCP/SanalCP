@@ -1,16 +1,13 @@
 package domains
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"net/http"
-	"os/exec"
 	"strconv"
-	"strings"
-	"time"
 
 	"sanalcp/internal/adlar"
+	"sanalcp/internal/diskusage"
 	"sanalcp/internal/httpx"
 
 	"github.com/go-chi/chi/v5"
@@ -41,20 +38,11 @@ func (h *Handlers) DiskHesapla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := "/home/" + sk
-	// du tüm ev dizinini gezer; ÜST SINIRLI çalıştırılır (bkz. internal/kaynak/dusize.go).
-	duCtx, duCancel := context.WithTimeout(r.Context(), 60*time.Second)
-	defer duCancel()
-	out, err := exec.CommandContext(duCtx, "du", "-sb", path).CombinedOutput()
+	byteB, err := diskusage.Measure(r.Context(), path, true)
 	if err != nil {
-		httpx.WriteExecError(w, http.StatusInternalServerError, "du", out)
+		httpx.WriteError(w, http.StatusServiceUnavailable, "disk ölçümü tamamlanamadı; lütfen yeniden deneyin")
 		return
 	}
-	fields := strings.Fields(string(out))
-	if len(fields) < 1 {
-		httpx.WriteError(w, http.StatusInternalServerError, "du çıktısı okunamadı")
-		return
-	}
-	byteB, _ := strconv.ParseInt(fields[0], 10, 64)
 	kb := byteB / 1024
 	if _, err := h.DB.ExecContext(r.Context(),
 		`UPDATE domains SET boyut_kb=? WHERE id=?`, kb, id); err != nil {

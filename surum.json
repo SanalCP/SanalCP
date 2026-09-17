@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.65",
-  "duyuru": "Bayiler müşteri seçmeden domain ekleyebilir; müşteri kaydı otomatik oluşturulup ilgili bayiye bağlanır. Müşteri kotası ve bayi yetki kapsamı korunur.",
-  "kritik": false,
-  "yayin_tarihi": "2026-09-16"
+  "son_surum": "0.9.66",
+  "duyuru": "Güvenlik güncellemesi: Git deploy ve izin sıfırlama sembolik bağ açıkları kapatıldı; SSH sunucu doğrulaması zorunlu, korunan dizinlerin parola dosyaları ayrıldı. Disk ölçümleri önbellek ve eşzamanlılık sınırı kullanır. Çakışan eski dizin kullanıcılarında parola yeniden atanmalıdır.",
+  "kritik": true,
+  "yayin_tarihi": "2026-09-17"
 }

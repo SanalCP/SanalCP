@@ -18,7 +18,6 @@ import (
 
 	"sanalcp/internal/archivex"
 	"sanalcp/internal/httpx"
-	"sanalcp/internal/provisioner"
 
 	"golang.org/x/sys/unix"
 
@@ -174,7 +173,25 @@ func (h *Handlers) IzinSifirla(w http.ResponseWriter, r *http.Request) {
 	}
 	// nginx erişim ACL'i (u:nginx:rX + default-ACL) chmod'un ardından yeniden uygulanır —
 	// olası bir yedek geri-yükleme/rsync --acls'siz işlem ACL'leri silmiş olabilir.
-	provisioner.HardenHomePermsRecursive(filepath.Join(home, "public_html"))
+	// Yol alan dış araç da tenant kimliğiyle çalışır; chmod sonrası bir
+	// symlink takası root yetkili setfacl üzerinden korumayı aşamaz.
+	if _, err := exec.LookPath("setfacl"); err == nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+		for _, args := range [][]string{
+			{"setfacl", "-R", "-P", "-m", "u:" + osfam.WebKullanici() + ":rX", "--", filepath.Join(home, "public_html")},
+			{"setfacl", "-R", "-P", "-d", "-m", "u:" + osfam.WebKullanici() + ":rX", "--", filepath.Join(home, "public_html")},
+		} {
+			cmd, err := tenantKomut(ctx, sk, args...)
+			if err == nil {
+				err = cmd.Run()
+			}
+			if err != nil {
+				httpx.WriteError(w, http.StatusInternalServerError, "nginx erişim izinleri ayarlanamadı")
+				return
+			}
+		}
+	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

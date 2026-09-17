@@ -561,43 +561,40 @@ func chmodTreeBeneath(home, rel string, dirMode, fileMode uint32) error {
 }
 
 func chmodAt(dirfd int, name string, dirMode, fileMode uint32) error {
+	// Açma ve doğrulama aynı inode üzerinde yapılır. Fstatat + Fchmodat
+	// arasındaki isim takası artık chmod'u bir symlink hedefine yöneltemez.
+	fd, err := unix.Openat(dirfd, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	if err == unix.ELOOP || err == unix.ENOENT {
+		return nil // sembolik bağ veya eşzamanlı silinen girdi
+	}
+	if err != nil {
+		return err
+	}
+	defer unix.Close(fd)
 	var st unix.Stat_t
-	if err := unix.Fstatat(dirfd, name, &st, unix.AT_SYMLINK_NOFOLLOW); err != nil {
-		if err == unix.ENOENT {
-			return nil
-		}
+	if err := unix.Fstat(fd, &st); err != nil {
 		return err
 	}
 	switch st.Mode & unix.S_IFMT {
-	case unix.S_IFLNK:
-		return nil
+	case unix.S_IFREG:
+		return unix.Fchmod(fd, fileMode)
 	case unix.S_IFDIR:
-		if err := unix.Fchmodat(dirfd, name, dirMode, 0); err != nil {
+		if err := unix.Fchmod(fd, dirMode); err != nil {
 			return err
 		}
-		cfd, err := unix.Openat(dirfd, name, dirOpenFlags, 0)
+		names, err := readdirnamesFd(fd)
 		if err != nil {
-			return nil
-		}
-		names, rerr := readdirnamesFd(cfd)
-		if rerr != nil {
-			unix.Close(cfd)
-			return rerr
+			return err
 		}
 		for _, n := range names {
-			if n == "." || n == ".." {
-				continue
-			}
-			if e := chmodAt(cfd, n, dirMode, fileMode); e != nil {
-				unix.Close(cfd)
-				return e
+			if n != "." && n != ".." {
+				if err := chmodAt(fd, n, dirMode, fileMode); err != nil {
+					return err
+				}
 			}
 		}
-		unix.Close(cfd)
-		return nil
-	default:
-		return unix.Fchmodat(dirfd, name, fileMode, 0)
 	}
+	return nil // FIFO/soket/aygıt izinlerine dokunma
 }
 
 // copyTreeBeneath: symlink-güvenli özyinelemeli kopya. Kaynak ve hedef PARENT'ları pinler;
