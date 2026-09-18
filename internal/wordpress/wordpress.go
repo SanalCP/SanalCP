@@ -23,6 +23,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
@@ -405,12 +406,16 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, msg)
 		return
 	}
-	if err := os.MkdirAll(hedef, 0o755); err != nil {
+	home, homeErr := jailpath.TenantHome(sk)
+	if homeErr != nil {
+		httpx.WriteError(w, 400, "geçersiz tenant")
+		return
+	}
+	rel := filepath.Join("public_html", req.AltDizin)
+	if err := jailpath.DizinOlustur(home, rel, sk); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "hedef dizin oluşturulamadı")
 		return
 	}
-	_ = exec.Command("chown", "-R", sk+":"+sk, hedef).Run()
-	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	// DB oluştur
 	slug := randSlug()
@@ -425,7 +430,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		_, _ = h.DB.Exec("DROP DATABASE IF EXISTS `" + dbName + "`")
 		_, _ = h.DB.Exec("DROP USER IF EXISTS '" + dbUser + "'@'localhost'")
 		if req.AltDizin != "" { // sadece kendi oluşturduğumuz alt dizini temizle
-			_ = os.RemoveAll(hedef)
+			_ = jailpath.Sil(home, rel)
 		}
 		msg := strings.TrimSpace(string(out))
 		if len(msg) > 600 {
@@ -475,8 +480,6 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		basarisiz("admin parolası doğrulama", out)
 		return
 	}
-	_ = exec.Command("chown", "-R", sk+":"+sk, hedef).Run()
-	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	surum := ""
 	if b, err := wpKomut(ctx, sk, "core", "version", "--path="+hedef); err == nil {

@@ -14,6 +14,7 @@ import (
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() { apps.Kaydet(Surucu{}) }
@@ -53,24 +54,34 @@ func (Surucu) DBAdiOku(dizin string) (string, bool) {
 }
 
 func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (sonuc apps.KurulumSonuc, err error) {
-	surum, err := indirVeDogrula(ctx, i.Hedef)
+	var surum string
+	err = jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error {
+		var e error
+		surum, e = indirVeDogrula(ctx, stage)
+		return e
+	})
 	if err != nil {
 		return sonuc, err
 	}
 	veriDizini := veriDiziniYolu(i.SK, i.Hedef)
-	if err := os.Mkdir(veriDizini, 0o750); err != nil {
+	home, err := jailpath.TenantHome(i.SK)
+	if err != nil {
+		return sonuc, err
+	}
+	veriRel, err := filepath.Rel(home, veriDizini)
+	if err != nil {
+		return sonuc, err
+	}
+	if err := jailpath.YeniDizin(home, veriRel, i.SK, 0o750); err != nil {
 		return sonuc, fmt.Errorf("Nextcloud veri dizini oluşturulamadı: %w", err)
 	}
 	basarili := false
 	defer func() {
 		if !basarili {
-			_ = os.RemoveAll(veriDizini)
+			_ = jailpath.Sil(home, veriRel)
 			_ = os.Remove(cronDosyasiYolu(i.SK, i.Hedef))
 		}
 	}()
-	if out, chownErr := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef, veriDizini).CombinedOutput(); chownErr != nil {
-		return sonuc, komutHatasi("Nextcloud dosya izinleri", out, chownErr)
-	}
 	adminParola := hesaplar.RandomParola(20)
 	out, err := occ(ctx, i.SK, i.Hedef, "maintenance:install", "--no-interaction",
 		"--database=mysql", "--database-host=localhost", "--database-name="+i.DBAdi,

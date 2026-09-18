@@ -8,9 +8,11 @@
 package wordpress
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"sanalcp/internal/jailpath"
+	"strings"
 )
 
 // muPluginPHP: süresi dolmayan bakım modu mu-plugin'i.
@@ -55,26 +57,40 @@ func bakimAktif(dir string) bool {
 
 // bakimAc: mu-plugin'i (yoksa) yazar ve bayrak dosyasını oluşturur. Kalıcıdır — süre dolmaz.
 func bakimAc(sk, dir string) error {
-	muDir, muFile, flag := bakimYollari(dir)
-	if err := os.MkdirAll(muDir, 0o755); err != nil {
+	home, rel, err := bakimRel(sk, dir)
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(muFile, []byte(muPluginPHP), 0o644); err != nil {
+	muDir, muFile, flag := bakimYollari(rel)
+	if err := jailpath.DizinOlustur(home, muDir, sk); err != nil {
 		return err
 	}
-	if err := os.WriteFile(flag, []byte("Sitemiz kısa süreli bakımdadır. Lütfen daha sonra tekrar deneyin."), 0o644); err != nil {
+	if err := jailpath.DosyaYaz(home, muFile, sk, []byte(muPluginPHP), 0o644); err != nil {
 		return err
 	}
-	// domain kullanıcısına devret + SELinux bağlamı düzelt (php-fpm okuyabilsin)
-	_ = exec.Command("chown", "-R", sk+":"+sk, muDir, flag).Run()
-	_ = exec.Command("restorecon", "-R", muDir, flag).Run()
-	return nil
+	return jailpath.DosyaYaz(home, flag, sk, []byte("Sitemiz kısa süreli bakımdadır. Lütfen daha sonra tekrar deneyin."), 0o644)
 }
 
-// bakimKapat: bayrak dosyasını kaldırır (mu-plugin kalır ama bayrak olmadan atıl).
-func bakimKapat(dir string) error {
-	_, _, flag := bakimYollari(dir)
-	if err := os.Remove(flag); err != nil && !os.IsNotExist(err) {
+func bakimRel(sk, dir string) (string, string, error) {
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		return "", "", err
+	}
+	rel, err := filepath.Rel(home, dir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", "", fmt.Errorf("bakım dizini tenant dışında")
+	}
+	return home, rel, nil
+}
+
+// bakimKapat removes only the pinned tenant entry, never a symlink target.
+func bakimKapat(sk, dir string) error {
+	home, rel, err := bakimRel(sk, dir)
+	if err != nil {
+		return err
+	}
+	_, _, flag := bakimYollari(rel)
+	if err := jailpath.Sil(home, flag); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil

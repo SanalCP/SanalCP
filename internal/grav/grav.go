@@ -12,6 +12,7 @@ import (
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() { apps.Kaydet(Surucu{}) }
@@ -36,12 +37,14 @@ func (Surucu) FormAlanlari() []apps.FormAlan {
 }
 
 func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, error) {
-	surum, err := indirVeDogrula(ctx, i.Hedef)
+	var surum string
+	err := jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error {
+		var e error
+		surum, e = indirVeDogrula(ctx, stage)
+		return e
+	})
 	if err != nil {
 		return apps.KurulumSonuc{}, err
-	}
-	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
-		return apps.KurulumSonuc{}, komutHatasi("Grav dosya izinleri", out, err)
 	}
 	adminParola := hesaplar.RandomParola(18)
 	out, err := phpKomut(ctx, i.SK, i.Hedef, "bin/plugin", "login", "new-user",

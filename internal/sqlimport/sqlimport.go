@@ -81,7 +81,7 @@ type Hedef struct {
 }
 
 func (h Hedef) dogrula() error {
-	if !identRE.MatchString(h.DBAdi) || !identRE.MatchString(h.Kullanici) {
+	if !identRE.MatchString(h.DBAdi) || !identRE.MatchString(h.Kullanici) || strings.EqualFold(h.Kullanici, "root") {
 		return ErrGecersizHedef
 	}
 	if h.Parola == "" {
@@ -135,8 +135,10 @@ func defaultsDosya(h Hedef) (string, func(), error) {
 }
 
 // Uygula: src'deki SQL'i hedef veritabanına, hedefin KENDİ düşük yetkili
-// kullanıcısıyla uygular. Dump'ın içeriği güvenilmezdir; sınırı MariaDB'nin
-// yetki denetimi koyar (bkz. paket açıklaması).
+// kullanıcısıyla uygular. SQL yetkilerini DB kullanıcısı sınırlar.
+// --binary-mode yerel system/source komutlarını, --local-infile=0 ise
+// root istemcinin yerel dosyaları SQL üzerinden okumasını engeller.
+// --defaults-file ilk argümandır; sunucu/kullanıcı option dosyaları yüklenmez.
 func Uygula(ctx context.Context, h Hedef, src io.Reader) error {
 	if err := h.dogrula(); err != nil {
 		return err
@@ -148,11 +150,11 @@ func Uygula(ctx context.Context, h Hedef, src io.Reader) error {
 	defer temizle()
 
 	cmd := exec.CommandContext(ctx, "mysql",
-		"--defaults-extra-file="+cnf,
+		"--defaults-file="+cnf, "--binary-mode", "--local-infile=0",
 		"--database="+h.DBAdi,
 	)
 	// Temiz env: panelin sırları (PANEL_SECRET_KEY vb.) alt sürece sızmasın.
-	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	cmd.Env = []string{"HOME=/nonexistent", "MYSQL_TEST_LOGIN_FILE=/nonexistent", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -236,8 +238,8 @@ func TablolariSil(ctx context.Context, h Hedef) error {
 	}
 	b.WriteString("SET FOREIGN_KEY_CHECKS=1;\n")
 
-	cmd := exec.CommandContext(ctx, "mysql", "--defaults-extra-file="+cnf, "--database="+h.DBAdi)
-	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	cmd := exec.CommandContext(ctx, "mysql", "--defaults-file="+cnf, "--binary-mode", "--local-infile=0", "--database="+h.DBAdi)
+	cmd.Env = []string{"HOME=/nonexistent", "MYSQL_TEST_LOGIN_FILE=/nonexistent", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 	cmd.Stdin = strings.NewReader(b.String())
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -254,9 +256,9 @@ func TablolariSil(ctx context.Context, h Hedef) error {
 // yalnız bu şemayı görür.
 func nesneleriListele(ctx context.Context, cnf, dbAdi string) (tablolar, viewler []string, err error) {
 	const sorgu = `SELECT TABLE_TYPE, TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()`
-	cmd := exec.CommandContext(ctx, "mysql", "--defaults-extra-file="+cnf,
+	cmd := exec.CommandContext(ctx, "mysql", "--defaults-file="+cnf, "--binary-mode", "--local-infile=0",
 		"--database="+dbAdi, "-N", "-B", "-e", sorgu)
-	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	cmd.Env = []string{"HOME=/nonexistent", "MYSQL_TEST_LOGIN_FILE=/nonexistent", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

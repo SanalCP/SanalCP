@@ -21,6 +21,7 @@ import (
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/iceaktarim"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/provisioner"
 	"sanalcp/internal/sqlimport"
 )
@@ -129,12 +130,11 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 	defer cancel()
-	if out, x := exec.CommandContext(ctx, "rsync", "-a", "--delete", filepath.Join("/home", src.SK, "public_html")+"/", pr.WebRoot+"/").CombinedOutput(); x != nil {
+	if x := jailpath.AgacKopyala(ctx, src.SK, "public_html", pr.SistemKullanici, "public_html"); x != nil {
 		cleanup()
-		httpx.WriteExecError(w, 500, "dosyalar kopyalanamadı", out)
+		httpx.WriteError(w, 500, "dosyalar kopyalanamadı: "+x.Error())
 		return
 	}
-	_ = exec.Command("chown", "-R", pr.SistemKullanici+":"+pr.SistemKullanici, pr.WebRoot).Run()
 	if src.DBAdi != "" {
 		if e = copyDB(ctx, src.DBAdi, sqlimport.Hedef{DBAdi: dbn, Kullanici: dbu, Parola: dbp}); e != nil {
 			cleanup()
@@ -185,11 +185,10 @@ func (h *Handlers) CanliyaGonder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Dosyalar {
-		if out, x := exec.CommandContext(ctx, "rsync", "-a", "--delete", filepath.Join("/home", ssk, "public_html")+"/", filepath.Join("/home", src.SK, "public_html")+"/").CombinedOutput(); x != nil {
-			httpx.WriteExecError(w, 500, "dosyalar gönderilemedi", out)
+		if x := jailpath.AgacKopyala(ctx, ssk, "public_html", src.SK, "public_html"); x != nil {
+			httpx.WriteError(w, 500, "dosyalar gönderilemedi: "+x.Error())
 			return
 		}
-		_ = exec.Command("chown", "-R", src.SK+":"+src.SK, filepath.Join("/home", src.SK, "public_html")).Run()
 	}
 	if req.Veritabani && src.DBAdi != "" {
 		live, e := h.dbHedef(ctx, src.ID, src.DBAdi, src.DBUser)
@@ -262,6 +261,7 @@ func copyDB(ctx context.Context, source string, target sqlimport.Hedef) error {
 		return e
 	}
 	imp := sqlimport.Uygula(ctx, target, pipe)
+	_ = pipe.Close()
 	dumpErr := cmd.Wait()
 	if dumpErr != nil {
 		return fmt.Errorf("mysqldump: %s: %w", strings.TrimSpace(stderr.String()), dumpErr)

@@ -14,6 +14,7 @@ import (
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() { apps.Kaydet(Surucu{}) }
@@ -54,7 +55,7 @@ func (Surucu) DBAdiOku(dizin string) (string, bool) {
 func yamlDeger(s string) string { b, _ := json.Marshal(s); return string(b) }
 
 func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, error) {
-	if err := indirVeDogrula(ctx, i.Hedef); err != nil {
+	if err := jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error { return indirVeDogrula(ctx, stage) }); err != nil {
 		return apps.KurulumSonuc{}, err
 	}
 	u, err := url.Parse(i.URL)
@@ -106,13 +107,18 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 		yamlDeger(i.Alanlar["forum_adi"]), yamlDeger(i.DBKullanici), yamlDeger(i.DBParola), yamlDeger(i.DBAdi),
 		i.SSL, yamlDeger(protokol), yamlDeger(u.Hostname()), yamlDeger(port), yamlDeger(scriptPath))
 	konfig := filepath.Join(i.Hedef, "install", "sanalcp-install.yml")
-	if err := os.WriteFile(konfig, []byte(yaml), 0o600); err != nil {
+	home, err := jailpath.TenantHome(i.SK)
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	konfigRel, err := filepath.Rel(home, konfig)
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	if err := jailpath.DosyaYaz(home, konfigRel, i.SK, []byte(yaml), 0o600); err != nil {
 		return apps.KurulumSonuc{}, fmt.Errorf("phpBB kurulum yapılandırması yazılamadı: %w", err)
 	}
-	defer os.Remove(konfig)
-	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
-		return apps.KurulumSonuc{}, komutHatasi("phpBB dosya izinleri", out, err)
-	}
+	defer jailpath.Sil(home, konfigRel)
 	out, err := phpKomut(ctx, i.SK, i.Hedef, "install/phpbbcli.php", "install", "install/sanalcp-install.yml", "--no-interaction")
 	if err != nil {
 		return apps.KurulumSonuc{}, komutHatasi("phpBB kurulumu", out, err)
@@ -120,7 +126,7 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	if _, err := os.Stat(filepath.Join(i.Hedef, "config.php")); err != nil {
 		return apps.KurulumSonuc{}, fmt.Errorf("phpBB kurulumu config.php oluşturmadı")
 	}
-	if err := os.RemoveAll(filepath.Join(i.Hedef, "install")); err != nil {
+	if err := jailpath.Sil(home, filepath.Dir(konfigRel)); err != nil {
 		return apps.KurulumSonuc{}, fmt.Errorf("phpBB install dizini kaldırılamadı: %w", err)
 	}
 	return apps.KurulumSonuc{SiteURL: i.URL, AdminURL: i.URL + "/adm/index.php",

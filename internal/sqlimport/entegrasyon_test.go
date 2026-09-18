@@ -5,10 +5,48 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestEntegrasyonCLICommandsCannotExecute(t *testing.T) {
+	hedef := itHazirla(t)
+	for _, command := range []string{`\!`, "system"} {
+		t.Run(command, func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), "executed")
+			payload := command + " touch " + marker + "\n"
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := Uygula(ctx, hedef, strings.NewReader(payload)); err == nil {
+				t.Fatal("client shell command accepted")
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("client command executed: %v", err)
+			}
+		})
+	}
+	// Source must not read a local SQL file, even when it contains valid SQL.
+	source := filepath.Join(t.TempDir(), "local.sql")
+	if err := os.WriteFile(source, []byte("CREATE TABLE escaped_source(id INT);\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"source", `\.`} {
+		if err := Uygula(context.Background(), hedef, strings.NewReader(command+" "+source+"\n")); err == nil {
+			t.Fatal("source command accepted")
+		}
+	}
+	if got := rootSorgu(t, "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='"+itHedefDB+"' AND table_name='escaped_source'"); got != "0" {
+		t.Fatal("source file executed")
+	}
+	if err := Uygula(context.Background(), hedef, strings.NewReader("CREATE TABLE local_file_probe(value TEXT);\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Uygula(context.Background(), hedef, strings.NewReader("LOAD DATA LOCAL INFILE '"+source+"' INTO TABLE local_file_probe;\n")); err == nil {
+		t.Fatal("LOCAL INFILE was accepted")
+	}
+}
 
 // Entegrasyon testi: GERÇEK bir MariaDB sunucusuna karşı çalışır.
 //

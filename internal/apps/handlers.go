@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
@@ -154,12 +154,16 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusConflict, msg)
 		return
 	}
-	if err := os.MkdirAll(hedef, 0o755); err != nil {
+	home, homeErr := jailpath.TenantHome(sk)
+	if homeErr != nil {
+		httpx.WriteError(w, 400, "geçersiz tenant")
+		return
+	}
+	rel := filepath.Join("public_html", req.AltDizin)
+	if err := jailpath.DizinOlustur(home, rel, sk); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "hedef dizin oluşturulamadı")
 		return
 	}
-	_ = exec.Command("chown", "-R", sk+":"+sk, hedef).Run()
-	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	slug := randSlug()
 	dbName, dbUser, dbPass := "", "", ""
@@ -182,7 +186,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 			_ = hesaplar.MySQLDropDB(h.DB, dbName, dbUser)
 		}
 		if req.AltDizin != "" {
-			_ = os.RemoveAll(hedef)
+			_ = jailpath.Sil(home, rel)
 		}
 		msg := err.Error()
 		if len(msg) > 600 {
@@ -212,8 +216,6 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		temizle(u.Ad()+" kurulumu", err)
 		return
 	}
-	_ = exec.Command("chown", "-R", sk+":"+sk, hedef).Run()
-	_ = exec.Command("restorecon", "-R", hedef).Run()
 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "tur": u.Slug(),

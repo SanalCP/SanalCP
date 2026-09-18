@@ -353,7 +353,7 @@ func (h *Handlers) AracIslem(w http.ResponseWriter, r *http.Request) {
 			out = []byte("Bakım modu açıldı (kalıcı).")
 		}
 	case "bakim-kapat":
-		if err = bakimKapat(dir); err == nil {
+		if err = bakimKapat(sk, dir); err == nil {
 			h.bakimKaydet(r, dir, false)
 			out = []byte("Bakım modu kapatıldı.")
 		}

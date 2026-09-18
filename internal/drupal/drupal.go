@@ -12,6 +12,7 @@ import (
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() { apps.Kaydet(Surucu{}) }
@@ -51,19 +52,29 @@ func (Surucu) DBAdiOku(dizin string) (string, bool) {
 }
 
 func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, error) {
-	surum, err := indirVeDogrula(ctx, i.Hedef)
+	var surum string
+	err := jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error {
+		var e error
+		surum, e = indirVeDogrula(ctx, stage)
+		return e
+	})
 	if err != nil {
 		return apps.KurulumSonuc{}, err
 	}
 	adminParola := hesaplar.RandomParola(18)
 	kurucu := filepath.Join(i.Hedef, ".sanalcp-drupal-install.php")
-	if err := os.WriteFile(kurucu, []byte(kurucuPHP), 0o600); err != nil {
+	home, err := jailpath.TenantHome(i.SK)
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	kurucuRel, err := filepath.Rel(home, kurucu)
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	if err := jailpath.DosyaYaz(home, kurucuRel, i.SK, []byte(kurucuPHP), 0o600); err != nil {
 		return apps.KurulumSonuc{}, fmt.Errorf("Drupal kurucusu yazılamadı: %w", err)
 	}
-	defer os.Remove(kurucu)
-	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
-		return apps.KurulumSonuc{}, komutHatasi("Drupal dosya izinleri", out, err)
-	}
+	defer jailpath.Sil(home, kurucuRel)
 	cmd := exec.CommandContext(ctx, "runuser", "-u", i.SK, "--", "env",
 		"HOME=/home/"+i.SK, "TMPDIR=/home/"+i.SK,
 		"DRUPAL_DB_NAME="+i.DBAdi, "DRUPAL_DB_USER="+i.DBKullanici, "DRUPAL_DB_PASS="+i.DBParola,

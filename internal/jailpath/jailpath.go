@@ -83,7 +83,7 @@ func temizRel(rel string) string {
 // symlink'e takas edemez, bu yüzden home'u doğrudan açmak güvenlidir; alt
 // bileşenlerin tamamı openat2 ile korunur.
 func homeFd(home string) (int, error) {
-	return unix.Open(home, unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	return unix.Open(home, unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NONBLOCK|unix.O_NOFOLLOW, 0)
 }
 
 // Ac: home altında rel'i, hiçbir symlink takip etmeden ve home dışına
@@ -168,6 +168,36 @@ func DizinOlustur(home, rel, sk string) error {
 	return nil
 }
 
+// YeniDizin creates exactly one new directory, refusing an existing entry.
+// Ownership and permissions are applied through a pinned fd, never chown -R.
+func YeniDizin(home, rel, sk string, mode uint32) error {
+	p := temizRel(rel)
+	if p == "." {
+		return fmt.Errorf("yeni dizin yolu gerekli")
+	}
+	uid, gid, ok := TenantIDs(sk)
+	if !ok || uid == 0 || gid == 0 {
+		return fmt.Errorf("tenant kimliği bulunamadı")
+	}
+	parent, err := AcDizin(home, filepath.Dir(p))
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	if err := unix.Mkdirat(int(parent.Fd()), filepath.Base(p), mode); err != nil {
+		return err
+	}
+	fd, err := unix.Openat(int(parent.Fd()), filepath.Base(p), dizinBayrak|unix.O_NOFOLLOW, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(fd)
+	if err := unix.Fchmod(fd, mode); err != nil {
+		return err
+	}
+	return unix.Fchown(fd, uid, gid)
+}
+
 // DosyaYaz: home altına symlink-güvenli dosya yazar (oluştur/truncate) ve
 // tenant'a devreder. Hedef zaten bir symlink ise RESOLVE_NO_SYMLINKS reddeder.
 func DosyaYaz(home, rel, sk string, veri []byte, mode uint32) error {
@@ -219,6 +249,10 @@ func IceriginiSil(home, rel string) error {
 		return err
 	}
 	defer f.Close()
+	return clearDirectory(f)
+}
+
+func clearDirectory(f *os.File) error {
 	adlar, err := adlariOku(int(f.Fd()))
 	if err != nil {
 		return err

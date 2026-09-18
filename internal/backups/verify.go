@@ -18,6 +18,7 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
+	"sanalcp/internal/sqlimport"
 )
 
 type verificationResult struct {
@@ -131,13 +132,10 @@ func restoreDrillSQL(ctx context.Context, dump string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "mysql", "--user="+tmpUser, tmpDB)
-	cmd.Env = append(os.Environ(), "MYSQL_PWD="+tmpPass)
-	cmd.Stdin = f
-	out, runErr := cmd.CombinedOutput()
+	runErr := sqlimport.Uygula(ctx, sqlimport.Hedef{DBAdi: tmpDB, Kullanici: tmpUser, Parola: tmpPass}, f)
 	f.Close()
 	if runErr != nil {
-		return fmt.Errorf("SQL açılamadı: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("SQL açılamadı: %w", runErr)
 	}
 	check := exec.CommandContext(ctx, "mysql", "-N", "-B", "-e", "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='"+tmpDB+"'")
 	raw, err := check.Output()

@@ -13,6 +13,23 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.67** (2026-09-18) — acil SQL import ve tenant izolasyonu düzeltmeleri
+
+- SQL import, yedek doğrulama ve geri yüklemede istemcinin yerel komut
+  çalıştırması ve yerel dosya okuması kapatıldı. Yüklenen SQL artık tenant DB
+  kimliğiyle işlenir; eksik kimlik durumunda root bağlantısına geri düşülmez.
+- Staging/canlı site kopyalama kaynak ve hedef tenant kimlikleriyle çalışır.
+  Dizinler dosya tanıtıcısıyla sabitlenerek sembolik bağ ve yol değiştirme
+  saldırılarına karşı korunur.
+- Uygulama paketleri özel geçici dizinde hazırlanıp tenant yetkisiyle yayınlanır.
+  Kurulum, bakım ve geri yüklemedeki root recursive dosya işlemleri kaldırıldı
+  veya tenant yetkisine indirildi.
+- Gerçek MariaDB ve iki farklı sistem kullanıcısıyla izolasyon regresyon
+  testleri eklendi. Staging kopyalama için geçici arşiv alanı gerekir; DB
+  kimliği eksik eski yedeklerde metadata onarılmadan restore yapılmaz.
+
+Ayrıntılar: [acil güvenlik düzeltmeleri](docs/SECURITY-P0-FIXES-2026-09-18.md).
+
 **0.9.66** (2026-09-17) — güvenlik ve disk ölçümü düzeltmeleri
 
 - Git deploy anahtarları tenant dizininde root komutları çalıştırılmadan,

@@ -432,7 +432,7 @@ func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeni
 	}
 
 	dump := exec.CommandContext(ctx, "mysqldump", "--single-transaction", "--routines", "--triggers", "--events", eskiAd)
-	restore := exec.CommandContext(ctx, "mysql", yeniAd)
+	restore := exec.CommandContext(ctx, "mysql", "--binary-mode", "--local-infile=0", yeniAd)
 	pipe, err := dump.StdoutPipe()
 	if err != nil {
 		temizle()

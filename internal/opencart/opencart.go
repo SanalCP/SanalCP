@@ -12,6 +12,7 @@ import (
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() { apps.Kaydet(Surucu{}) }
@@ -51,17 +52,27 @@ func (Surucu) DBAdiOku(dizin string) (string, bool) {
 }
 
 func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, error) {
-	surum, err := indirVeDogrula(ctx, i.Hedef)
+	var surum string
+	err := jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error {
+		var e error
+		surum, e = indirVeDogrula(ctx, stage)
+		return e
+	})
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	home, err := jailpath.TenantHome(i.SK)
+	if err != nil {
+		return apps.KurulumSonuc{}, err
+	}
+	hedefRel, err := filepath.Rel(home, i.Hedef)
 	if err != nil {
 		return apps.KurulumSonuc{}, err
 	}
 	for _, cift := range [][2]string{{"config-dist.php", "config.php"}, {"admin/config-dist.php", "admin/config.php"}} {
-		if err := os.Rename(filepath.Join(i.Hedef, cift[0]), filepath.Join(i.Hedef, cift[1])); err != nil {
+		if err := jailpath.Tasi(home, filepath.Join(hedefRel, cift[0]), filepath.Join(hedefRel, cift[1])); err != nil {
 			return apps.KurulumSonuc{}, fmt.Errorf("OpenCart yapılandırma şablonu hazırlanamadı: %w", err)
 		}
-	}
-	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
-		return apps.KurulumSonuc{}, komutHatasi("OpenCart dosya izinleri", out, err)
 	}
 	adminParola := hesaplar.RandomParola(18)
 	args := []string{
@@ -79,7 +90,7 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 		}
 		return apps.KurulumSonuc{}, komutHatasi("OpenCart kurulumu", out, err)
 	}
-	if err := os.RemoveAll(filepath.Join(i.Hedef, "install")); err != nil {
+	if err := jailpath.Sil(home, filepath.Join(hedefRel, "install")); err != nil {
 		return apps.KurulumSonuc{}, fmt.Errorf("OpenCart install dizini kaldırılamadı: %w", err)
 	}
 	return apps.KurulumSonuc{SiteURL: i.URL, AdminURL: i.URL + "/admin",

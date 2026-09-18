@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"sanalcp/internal/apps"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/jailpath"
 )
 
 func init() {
@@ -97,15 +97,8 @@ func (Surucu) Kur(ctx context.Context, i apps.KurulumIstek) (apps.KurulumSonuc, 
 	if err != nil {
 		return apps.KurulumSonuc{}, err
 	}
-	if err := psIndirVeAc(ctx, surum, i.Hedef); err != nil {
+	if err := jailpath.PaketYukle(ctx, i.SK, i.Hedef, func(stage string) error { return psIndirVeAc(ctx, surum, stage) }); err != nil {
 		return apps.KurulumSonuc{}, err
-	}
-	if out, err := exec.CommandContext(ctx, "chown", "-R", i.SK+":"+i.SK, i.Hedef).CombinedOutput(); err != nil {
-		msg := strings.TrimSpace(string(out))
-		if msg == "" {
-			msg = err.Error()
-		}
-		return apps.KurulumSonuc{}, fmt.Errorf("PrestaShop dosya izinleri: %s", msg)
 	}
 
 	adminParola := hesaplar.RandomParola(18)

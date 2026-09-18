@@ -17,8 +17,10 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/archivex"
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
+	"sanalcp/internal/sqlimport"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -58,7 +60,7 @@ func RestoreRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, sk,
 		if e != nil {
 			return e
 		}
-		return importDatabase(dump, database)
+		return importDatabase(ctx, db, domainID, dump, database)
 	default:
 		return fmt.Errorf("geçersiz kurtarma kapsamı")
 	}
@@ -201,7 +203,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		if err := importDatabase(dump, req.Database); err != nil {
+		if err := importDatabase(r.Context(), h.DB, id, dump, req.Database); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -258,8 +260,7 @@ func restoreTree(source, rel, sk string, deleteMissing bool) error {
 	if out, err := tenantKomut(sk, "rsync", args...); err != nil {
 		return fmt.Errorf("rsync: %s: %w", strings.TrimSpace(out), err)
 	}
-	_, _ = exec.Command("chown", "-R", sk+":"+sk, target).CombinedOutput()
-	_, _ = exec.Command("restorecon", "-R", target).CombinedOutput()
+	_, _ = tenantKomut(sk, "restorecon", "-R", target)
 	return nil
 }
 
@@ -313,7 +314,7 @@ func restoreSingle(source, rel, sk string) error {
 		return fmt.Errorf("hedef dosya güvenli değil (symlink?): %w", err)
 	}
 	target := filepath.Join(home, rel)
-	_, _ = exec.Command("restorecon", target).CombinedOutput()
+	_, _ = tenantKomut(sk, "restorecon", target)
 	return nil
 }
 
@@ -333,7 +334,7 @@ func restoreAllDatabases(r *http.Request, db *sql.DB, domainID int64, tmpDir, sk
 		if len(matches) == 0 {
 			return 0, nil
 		}
-		if err := importDatabase(matches[0], sk+"_main"); err != nil {
+		if err := importDatabase(r.Context(), db, domainID, matches[0], sk+"_main"); err != nil {
 			return 0, err
 		}
 		return 1, nil
@@ -352,7 +353,7 @@ func restoreAllDatabases(r *http.Request, db *sql.DB, domainID int64, tmpDir, sk
 			atlanan = append(atlanan, name)
 			continue
 		}
-		if err := importDatabase(filepath.Join(dbDir, entry.Name()), name); err != nil {
+		if err := importDatabase(r.Context(), db, domainID, filepath.Join(dbDir, entry.Name()), name); err != nil {
 			return count, err
 		}
 		count++
@@ -378,20 +379,21 @@ func findDatabaseDump(tmpDir, name string) (string, error) {
 	return "", fmt.Errorf("%s veritabanı bu yedekte bulunamadı", name)
 }
 
-func importDatabase(dumpPath, database string) error {
+func importDatabase(ctx context.Context, db *sql.DB, domainID int64, dumpPath, database string) error {
+	var user, encrypted string
+	if err := db.QueryRowContext(ctx, `SELECT db_user,db_pass_plain FROM db_accounts WHERE domain_id=? AND db_name=? ORDER BY id LIMIT 1`, domainID, database).Scan(&user, &encrypted); err != nil {
+		return fmt.Errorf("geri yükleme veritabanı kimliği bulunamadı: %w", err)
+	}
+	password, err := hesaplar.DecryptDBPassword(encrypted)
+	if err != nil {
+		return fmt.Errorf("veritabanı parolası çözülemedi: %w", err)
+	}
 	in, err := os.Open(dumpPath)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	cmd := exec.Command("mysql", database)
-	cmd.Stdin = in
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("mysql %s: %s: %w", database, strings.TrimSpace(stderr.String()), err)
-	}
-	return nil
+	return sqlimport.Uygula(ctx, sqlimport.Hedef{DBAdi: database, Kullanici: user, Parola: password}, in)
 }
 
 func authorizeDatabase(r *http.Request, db *sql.DB, domainID int64, sk, database string) error {

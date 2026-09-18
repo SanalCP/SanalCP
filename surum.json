@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.66",
-  "duyuru": "Güvenlik güncellemesi: Git deploy ve izin sıfırlama sembolik bağ açıkları kapatıldı; SSH sunucu doğrulaması zorunlu, korunan dizinlerin parola dosyaları ayrıldı. Disk ölçümleri önbellek ve eşzamanlılık sınırı kullanır. Çakışan eski dizin kullanıcılarında parola yeniden atanmalıdır.",
+  "son_surum": "0.9.67",
+  "duyuru": "Acil güvenlik güncellemesi: SQL içe aktarma ve yedek geri yüklemede yerel komut çalıştırma engellendi. Site kopyalama ve uygulama kurulumlarında tenant dışına dosya erişimi kapatıldı. Güncelleme önerilir.",
   "kritik": true,
-  "yayin_tarihi": "2026-09-17"
+  "yayin_tarihi": "2026-09-18"
 }

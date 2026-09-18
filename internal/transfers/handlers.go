@@ -33,6 +33,7 @@ import (
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/mail"
 	"sanalcp/internal/provisioner"
+	"sanalcp/internal/sqlimport"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -278,7 +279,7 @@ func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if err := restoreDatabases(tmpPath, inv.ArchiveRoot, dbMaps); err != nil {
+	if err := restoreDatabases(r.Context(), tmpPath, inv.ArchiveRoot, dbMaps, created.DBUser, created.Parolalar.DB); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "veritabanı aktarılamadı: "+err.Error())
 		return
 	}
@@ -917,12 +918,12 @@ func restoreMailboxes(archivePath, root, sourceDomain string, locals []string, s
 		// Metadata'da görünen boş bir kutunun arşivde Maildir'i olmayabilir; tar
 		// bunu ölümcül saymaz ama çıkış kodunu bozar. Diğer kutular yine açılmıştır.
 		if strings.Contains(string(out), "Not found in archive") || strings.Contains(string(out), "Not found") {
-			_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
+			_, _ = exec.Command("runuser", "-u", sk, "--", "restorecon", "-RF", target).CombinedOutput()
 			return nil
 		}
 		return fmt.Errorf("tar: %s", strings.TrimSpace(string(out)))
 	}
-	_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
+	_, _ = exec.Command("runuser", "-u", sk, "--", "restorecon", "-RF", target).CombinedOutput()
 	return nil
 }
 
@@ -1181,7 +1182,7 @@ func restoreWeb(archivePath, root, sk string) error {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("tar: %s", tarHataOzeti(out, err))
 	}
-	_, _ = exec.Command("restorecon", "-RF", target).CombinedOutput()
+	_, _ = exec.Command("runuser", "-u", sk, "--", "restorecon", "-RF", target).CombinedOutput()
 	return nil
 }
 
@@ -1304,7 +1305,7 @@ func nativeHomeFileDenied(base string) bool {
 //
 // Dump başına ayrı geçiş, veritabanı sayısı kadar tam gzip decompress demekti.
 // Arşiv sıralı okunur; hangi üyeye denk gelinirse ilgili hedefe aktarılır.
-func restoreDatabases(archivePath, root string, maps []DBMap) error {
+func restoreDatabases(ctx context.Context, archivePath, root string, maps []DBMap, user, password string) error {
 	hedef := make(map[string]string, len(maps)) // arşiv üyesi -> hedef DB
 	for _, m := range maps {
 		hedef[path.Clean(root+"/mysql/"+m.Source+".sql")] = m.Target
@@ -1335,7 +1336,7 @@ func restoreDatabases(archivePath, root string, maps []DBMap) error {
 		}
 		delete(hedef, path.Clean(h.Name))
 		kalan--
-		if err := dumpAktar(tr, targetDB); err != nil {
+		if err := dumpAktar(ctx, tr, sqlimport.Hedef{DBAdi: targetDB, Kullanici: user, Parola: password}); err != nil {
 			return err
 		}
 	}
@@ -1353,46 +1354,38 @@ func restoreDatabases(archivePath, root string, maps []DBMap) error {
 // dumpAktar — tek bir dump'ı hedef veritabanına akıtır. Kaynak dump'taki
 // CREATE DATABASE / USE satırları atılır; aksi halde içe aktarma hedef yerine
 // cPanel'deki özgün veritabanı adına yazardı.
-func dumpAktar(src io.Reader, targetDB string) error {
-	cmd := exec.Command("mysql", targetDB)
-	stdin, err := cmd.StdinPipe()
+func dumpAktar(ctx context.Context, src io.Reader, target sqlimport.Hedef) error {
+	// Eski şema seçimlerini yalnız uyumluluk için çıkar. Güven sınırı hedef
+	// DB kullanıcısının yetkileri ve sqlimport'un kapalı CLI komutlarıdır.
+	pr, pw := io.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		br := bufio.NewReader(src)
+		for {
+			line, readErr := br.ReadString('\n')
+			upper := strings.ToUpper(strings.TrimSpace(line))
+			if !strings.HasPrefix(upper, "CREATE DATABASE ") && !strings.HasPrefix(upper, "USE ") {
+				if _, err := io.WriteString(pw, line); err != nil {
+					pw.CloseWithError(err)
+					done <- err
+					return
+				}
+			}
+			if readErr != nil {
+				if readErr == io.EOF {
+					readErr = nil
+				}
+				pw.CloseWithError(readErr)
+				done <- readErr
+				return
+			}
+		}
+	}()
+	err := sqlimport.Uygula(ctx, target, pr)
+	pr.CloseWithError(err)
+	filterErr := <-done
 	if err != nil {
 		return err
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	bw := bufio.NewWriter(stdin)
-	br := bufio.NewReader(src)
-	for {
-		line, readErr := br.ReadString('\n')
-		upper := strings.ToUpper(strings.TrimSpace(line))
-		if !strings.HasPrefix(upper, "CREATE DATABASE ") && !strings.HasPrefix(upper, "USE ") {
-			if _, err := bw.WriteString(line); err != nil {
-				_ = stdin.Close()
-				_ = cmd.Wait()
-				return err
-			}
-		}
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			_ = stdin.Close()
-			_ = cmd.Wait()
-			return readErr
-		}
-	}
-	if err := bw.Flush(); err != nil {
-		_ = stdin.Close()
-		_ = cmd.Wait()
-		return err
-	}
-	_ = stdin.Close()
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("mysql %s: %s", targetDB, strings.TrimSpace(stderr.String()))
-	}
-	return nil
+	return filterErr
 }

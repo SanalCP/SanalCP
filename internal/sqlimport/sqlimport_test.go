@@ -99,6 +99,7 @@ func TestHedefDogrula(t *testing.T) {
 		t.Errorf("geçerli hedef reddedildi: %v", err)
 	}
 	kotu := []Hedef{
+		{DBAdi: "a", Kullanici: "root", Parola: "x"},
 		{DBAdi: "a b", Kullanici: "u", Parola: "x"},
 		{DBAdi: "a`b", Kullanici: "u", Parola: "x"},
 		{DBAdi: "mysql; DROP", Kullanici: "u", Parola: "x"},
