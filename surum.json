@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.67",
-  "duyuru": "Acil güvenlik güncellemesi: SQL içe aktarma ve yedek geri yüklemede yerel komut çalıştırma engellendi. Site kopyalama ve uygulama kurulumlarında tenant dışına dosya erişimi kapatıldı. Güncelleme önerilir.",
+  "son_surum": "0.9.68",
+  "duyuru": "Güvenlik ve kararlılık güncellemesi: GitHub token bilgilerinin repo adreslerine yazılması engellendi, eski kayıtlar için otomatik temizlik eklendi. WordPress durum sorgusundaki eşzamanlılık hatası düzeltildi. Daha önce kullanılan GitHub token bilgilerinin yenilenmesi önerilir.",
   "kritik": true,
   "yayin_tarihi": "2026-09-18"
 }

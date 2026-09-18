@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"net/url"
+	githubpkg "sanalcp/internal/github"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
 
@@ -64,6 +66,7 @@ func scan(rs interface{ Scan(...any) error }) (Repo, error) {
 	var r Repo
 	err := rs.Scan(&r.ID, &r.DomainID, &r.RepoURL, &r.Branch, &r.TargetDir,
 		&r.DeployKeyPub, &r.WebhookSecret, &r.SonSync, &r.SonCommit, &r.SonDurum, &r.Olusturulma)
+	r.RepoURL = cleanRepoURL(r.RepoURL)
 	return r, err
 }
 
@@ -119,7 +122,11 @@ func gecerliRepoURL(u string) bool {
 			return false
 		}
 	}
-	return strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "git@") || strings.HasPrefix(u, "ssh://")
+	if strings.HasPrefix(u, "https://") {
+		parsed, err := url.Parse(u)
+		return err == nil && parsed.Hostname() != "" && parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == ""
+	}
+	return strings.HasPrefix(u, "git@") || strings.HasPrefix(u, "ssh://")
 }
 
 // temizleDizinIcerigi: hedef dizinin icerigini SHELL OLMADAN sil (dotfile dahil).
@@ -142,6 +149,10 @@ func temizleDizinIcerigi(home, rel string) error {
 
 // runAsUserArgs: komutu sk kullanicisi olarak SHELL OLMADAN (argv) calistir; panel env verilmez
 func runAsUserArgs(ctx context.Context, sk, cwd string, argv ...string) (string, error) {
+	return runAsUserCredentials(ctx, sk, cwd, "", "", argv...)
+}
+
+func runAsUserCredentials(ctx context.Context, sk, cwd, repoURL, token string, argv ...string) (string, error) {
 	home, err := jailpath.TenantHome(sk)
 	if err != nil {
 		return "", err
@@ -164,13 +175,13 @@ func runAsUserArgs(ctx context.Context, sk, cwd string, argv ...string) (string,
 	}
 	cmd := exec.CommandContext(ctx, "runuser", append([]string{"-u", sk, "--"}, argv...)...)
 	cmd.Dir = cwd
-	cmd.Env = gitEnvironment(home)
+	cmd.Env = append(gitEnvironment(home), gitCredentialEnvironment(repoURL, token)...)
 	out, err := cmd.CombinedOutput()
-	return string(out), err
+	return redactGitOutput(string(out), token), err
 }
 
 // gitClone: ilk kez klonla (target_dir varsa silinir)
-func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha string, log string, err error) {
+func gitClone(ctx context.Context, sk, repoURL, branch, targetDir, token string) (sha string, log string, err error) {
 	if !gecerliTargetDir(targetDir) {
 		return "", "", errors.New("geçersiz hedef dizin")
 	}
@@ -195,7 +206,7 @@ func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha s
 		return "", "", fmt.Errorf("hedef dizin temizlenemedi: %w", err)
 	}
 
-	out, err := runAsUserArgs(ctx, sk, home, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
+	out, err := runAsUserCredentials(ctx, sk, home, repoURL, token, "git", "clone", "--depth", "1", "--branch", branch, "--", repoURL, dst)
 	log = out
 	if err != nil {
 		return "", out, err
@@ -207,7 +218,10 @@ func gitClone(ctx context.Context, sk, repoURL, branch, targetDir string) (sha s
 }
 
 // gitPull: mevcut repo'da pull yap
-func gitPull(ctx context.Context, sk, targetDir, branch string) (sha string, log string, err error) {
+func gitPull(ctx context.Context, sk, targetDir, branch, repoURL, token string) (sha string, log string, err error) {
+	if !gecerliRepoURL(repoURL) {
+		return "", "", errors.New("geçersiz repo URL")
+	}
 	if !gecerliTargetDir(targetDir) {
 		return "", "", errors.New("geçersiz hedef dizin")
 	}
@@ -228,9 +242,15 @@ func gitPull(ctx context.Context, sk, targetDir, branch string) (sha string, log
 	if _, err := os.Stat(filepath.Join(dst, ".git")); err != nil {
 		return "", "", errors.New("hedef dizin git deposu değil; önce 'klonla' kullanın")
 	}
-	out, err := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "fetch", "origin", branch)
+	if err := scrubRepoConfig(home, targetDir); err != nil {
+		return "", "", err
+	}
+	if out, err := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "remote", "set-url", "origin", repoURL); err != nil {
+		return "", out, err
+	}
+	out, err := runAsUserCredentials(ctx, sk, dst, repoURL, token, "git", "-C", dst, "fetch", "--", repoURL, branch)
 	if err == nil {
-		o2, e2 := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "reset", "--hard", "origin/"+branch)
+		o2, e2 := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "reset", "--hard", "FETCH_HEAD")
 		out, err = out+o2, e2
 	}
 	log = out
@@ -347,9 +367,19 @@ func (h *Handlers) Klonla(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "önce repo bağlayın")
 		return
 	}
+	if err != nil {
+		httpx.WriteError(w, 500, "repo okunamadı")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
 	defer cancel()
-	sha, log, err := gitClone(ctx, sk, repoURL, branch, targetDir)
+	repoURL = cleanRepoURL(repoURL)
+	token, err := githubpkg.DeployToken(ctx, h.DB, id, repoURL)
+	if err != nil {
+		httpx.WriteError(w, 500, err.Error())
+		return
+	}
+	sha, log, err := gitClone(ctx, sk, repoURL, branch, targetDir, token)
 	durum := "basarili"
 	if err != nil {
 		durum = "hata"
@@ -373,18 +403,28 @@ func (h *Handlers) Pull(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, "izin yok")
 		return
 	}
-	var branch, targetDir string
+	var branch, targetDir, repoURL string
 	var gid int64
 	err = h.DB.QueryRowContext(r.Context(),
-		`SELECT id, branch, target_dir FROM git_repos WHERE domain_id=? LIMIT 1`, id).
-		Scan(&gid, &branch, &targetDir)
+		`SELECT id, branch, target_dir, repo_url FROM git_repos WHERE domain_id=? LIMIT 1`, id).
+		Scan(&gid, &branch, &targetDir, &repoURL)
 	if errors.Is(err, sql.ErrNoRows) {
 		httpx.WriteError(w, http.StatusBadRequest, "repo yok")
 		return
 	}
+	if err != nil {
+		httpx.WriteError(w, 500, "repo okunamadı")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
 	defer cancel()
-	sha, log, err := gitPull(ctx, sk, targetDir, branch)
+	repoURL = cleanRepoURL(repoURL)
+	token, err := githubpkg.DeployToken(ctx, h.DB, id, repoURL)
+	if err != nil {
+		httpx.WriteError(w, 500, err.Error())
+		return
+	}
+	sha, log, err := gitPull(ctx, sk, targetDir, branch, repoURL, token)
 	durum := "basarili"
 	if err != nil {
 		durum = "hata"
@@ -419,11 +459,11 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var gid, domainID int64
-	var sk, branch, targetDir string
+	var sk, branch, targetDir, repoURL string
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT g.id, g.domain_id, d.sistem_kullanici, g.branch, g.target_dir
+		`SELECT g.id, g.domain_id, d.sistem_kullanici, g.branch, g.target_dir, g.repo_url
 		 FROM git_repos g JOIN domains d ON d.id=g.domain_id
-		 WHERE g.webhook_secret=? LIMIT 1`, secret).Scan(&gid, &domainID, &sk, &branch, &targetDir)
+		 WHERE g.webhook_secret=? LIMIT 1`, secret).Scan(&gid, &domainID, &sk, &branch, &targetDir, &repoURL)
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "secret eşleşmedi", http.StatusNotFound)
 		return
@@ -476,9 +516,19 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err != nil {
+		httpx.WriteError(w, 500, "repo okunamadı")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
 	defer cancel()
-	sha, log, perr := gitPull(ctx, sk, targetDir, branch)
+	repoURL = cleanRepoURL(repoURL)
+	token, tokenErr := githubpkg.DeployToken(ctx, h.DB, domainID, repoURL)
+	var sha, log string
+	perr := tokenErr
+	if perr == nil {
+		sha, log, perr = gitPull(ctx, sk, targetDir, branch, repoURL, token)
+	}
 	durum := "basarili"
 	if perr != nil {
 		durum = "hata-webhook"

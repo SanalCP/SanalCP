@@ -58,52 +58,59 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	// 5 wp-cli çağrısını PARALEL çalıştır → gecikme = en yavaş tek çağrı (~check-update),
-	// toplam ~3s yerine ~1.5s. Her sonuç kendi alanına yazılır (yarış yok).
-	out := map[string]any{"surum": "", "guncelleme_var": false, "hedef_surum": "",
-		"php": "", "db_mb": "", "bakim": false}
+	httpx.WriteJSON(w, http.StatusOK, durumTopla(ctx, sk, dir, wpStdout))
+}
+
+func durumTopla(ctx context.Context, sk, dir string, stdout func(context.Context, string, ...string) ([]byte, error)) map[string]any {
+	// Dört wp-cli çağrısı ve bakım kontrolü paralel kalır. Her goroutine
+	// yalnız kendi değişkenlerine yazar; map, Wait sonrasında oluşturulur.
+	var surum, hedefSurum, php, dbMB string
+	var guncellemeVar, bakim bool
 	var wg sync.WaitGroup
 	wg.Add(5)
 	go func() {
 		defer wg.Done()
-		if b, e := wpStdout(ctx, sk, "core", "version", "--path="+dir); e == nil {
-			out["surum"] = strings.TrimSpace(string(b))
+		if b, e := stdout(ctx, sk, "core", "version", "--path="+dir); e == nil {
+			surum = strings.TrimSpace(string(b))
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		if b, e := wpStdout(ctx, sk, "core", "check-update", "--path="+dir, "--format=json"); e == nil {
+		if b, e := stdout(ctx, sk, "core", "check-update", "--path="+dir, "--format=json"); e == nil {
 			bt := strings.TrimSpace(string(b))
 			if bt != "" && bt != "[]" {
 				var ups []struct {
 					Version string `json:"version"`
 				}
 				if json.Unmarshal([]byte(bt), &ups) == nil && len(ups) > 0 {
-					out["guncelleme_var"] = true
-					out["hedef_surum"] = ups[0].Version
+					guncellemeVar = true
+					hedefSurum = ups[0].Version
 				}
 			}
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		if b, e := wpStdout(ctx, sk, "eval", "echo PHP_VERSION;", "--path="+dir); e == nil {
-			out["php"] = strings.TrimSpace(string(b))
+		if b, e := stdout(ctx, sk, "eval", "echo PHP_VERSION;", "--path="+dir); e == nil {
+			php = strings.TrimSpace(string(b))
 		}
 	}()
 	go func() {
 		defer wg.Done()
-		if b, e := wpStdout(ctx, sk, "db", "size", "--size_format=mb", "--path="+dir); e == nil {
-			out["db_mb"] = strings.TrimSpace(string(b))
+		if b, e := stdout(ctx, sk, "db", "size", "--size_format=mb", "--path="+dir); e == nil {
+			dbMB = strings.TrimSpace(string(b))
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		// KALICI bakım modu: WP-native 10dk auto-expiry yerine mu-plugin bayrağını oku.
-		out["bakim"] = bakimAktif(dir)
+		bakim = bakimAktif(dir)
 	}()
 	wg.Wait()
-	httpx.WriteJSON(w, http.StatusOK, out)
+	return map[string]any{
+		"surum": surum, "guncelleme_var": guncellemeVar, "hedef_surum": hedefSurum,
+		"php": php, "db_mb": dbMB, "bakim": bakim,
+	}
 }
 
 // GET /domains/{id}/wordpress/eklentiler?dizin=

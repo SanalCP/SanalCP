@@ -184,6 +184,9 @@ func main() {
 
 	githubpkg.Init(secretBox) // github_connections.pat şifreleme kutusu
 	githubpkg.HealLegacyPlaintextPATs(context.Background(), d)
+	if err := git.HealLegacyRepoCredentials(context.Background(), d); err != nil {
+		log.Printf("Git kimlik temizliği: %v", err)
+	}
 	cloudflare.Init(secretBox) // Cloudflare API token şifreleme kutusu
 
 	ipv4 := detectIPv4()

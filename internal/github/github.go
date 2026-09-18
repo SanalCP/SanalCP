@@ -352,7 +352,11 @@ func (h *Handlers) Use(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cloneURL := fmt.Sprintf("https://%s@github.com/%s.git", pat, req.Repo)
+	cloneURL, err := CloneURL(req.Repo)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	// git_repos kaydını yaz/güncelle
 	var existingSecret string
@@ -452,8 +456,11 @@ func Init(b *secretcrypt.Box) { box = b }
 // çalınması, yanlış izinli mysqldump) düz metin olarak ifşa olmamalı —
 // db_accounts.db_pass_plain ve backup_destinations.parola ile aynı desen.
 func patSifrele(ham string) (string, error) {
-	if ham == "" || box == nil {
-		return ham, nil
+	if ham == "" {
+		return "", nil
+	}
+	if box == nil {
+		return "", errors.New("şifreleme kutusu ayarlanmamış")
 	}
 	return box.Encrypt(ham)
 }

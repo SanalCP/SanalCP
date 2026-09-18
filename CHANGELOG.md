@@ -13,6 +13,21 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.68** (2026-09-18) — GitHub token güvenliği ve WordPress kararlılığı
+
+- GitHub token'ı repo URL'sine, Git komut argümanlarına ve kalıcı Git ayarlarına
+  yazılmaz. Şifreli bağlantı kaydı kullanılır; kimlik bilgisi yalnız seçilen
+  HTTPS deposuna gönderilir ve yönlendirmeler takip edilmez.
+- Eski repo URL'leri, Git ayarları ve işlem geçmişindeki kimlik bilgileri
+  başlangıçta temizlenir. Git hata çıktılarında token maskelenir.
+- WordPress durum sorgusunda eşzamanlı map yazımı kaldırıldı; paralel sorguların
+  sonuçları tamamlandıktan sonra birleştirilir.
+- Güncelleme sonrası önceden kullanılan GitHub PAT'lerini yenileyin. Temizlik,
+  eski yedeklerdeki kopyaları iptal etmez. Şifreli bağlantısı bulunmayan özel
+  depolar için GitHub bağlantısının yeniden kurulması gerekir.
+- Gerçek HTTPS Git clone/fetch, kimlik kapsamı, yönlendirme engeli, dosya temizliği
+  ve sembolik/sabit bağ koruması testleri eklendi; ilgili yarış testleri geçti.
+
 **0.9.67** (2026-09-18) — acil SQL import ve tenant izolasyonu düzeltmeleri
 
 - SQL import, yedek doğrulama ve geri yüklemede istemcinin yerel komut
