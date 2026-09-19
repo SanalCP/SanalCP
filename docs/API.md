@@ -155,7 +155,10 @@ curl -sS -X POST "$SANALCP/domains" \
 | `GET` | `/domains/{id}/backups` | Yedek listesi |
 | `POST` | `/domains/{id}/backups` | Yeni yedek al |
 | `GET` | `/domains/{id}/backups/{bid}/indir` | Yedeği indir |
-| `POST` | `/domains/{id}/backups/{bid}/geriyukle` | Geri yükle |
+| `POST` | `/domains/{id}/backups/{bid}/geriyukle` | Arka planda geri yükleme işi başlat (`202`, `job_id`) |
+| `GET` | `/domains/{id}/backup-restore-jobs/active` | Aktif geri yükleme işini bul |
+| `GET` | `/domains/{id}/backup-restore-jobs/{jid}` | Geri yükleme işinin durumunu oku |
+| `DELETE` | `/domains/{id}/backup-restore-jobs/{jid}` | Geri yükleme işini iptal et |
 | `DELETE` | `/domains/{id}/backups/{bid}` | Yedeği sil |
 
 ### DNS

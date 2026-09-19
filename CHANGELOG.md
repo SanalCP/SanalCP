@@ -13,6 +13,22 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.69** (2026-09-19) — güvenilir ve geri alınabilir yedek geri yükleme
+
+- Yedek geri yüklemeleri HTTP isteğinden bağımsız, ilerlemesi izlenebilen ve
+  kullanıcı tarafından iptal edilebilen arka plan işlerine dönüştürüldü.
+- Her işlemden önce otomatik kurtarma noktası oluşturulur. Hata, iptal veya
+  panel yeniden başlatması durumunda dosya ve veritabanı değişiklikleri güvenli
+  kurtarma noktasından otomatik olarak geri alınır.
+- Yedekler ve domainler çalışan bir geri yükleme sırasında silinemez; işler
+  İşlem Merkezi'nde görünür. Uzun aktarım rotalarına ayrı zaman aşımı uygulanır.
+- Arayüz geçici ağ kesintisi, sayfa yenileme veya başka sekmede başlatılan işlem
+  sonrasında aktif geri yükleme işine yeniden bağlanır.
+- Aynı anda iki geri yükleme çalışır ve toplam kabul edilen iş sayısı 16 ile
+  sınırlıdır. Kurtarma arşivleri rastgele kimlikli benzersiz adlar kullanır.
+- Gerçek MariaDB ve geçici tenant hesabıyla başarı, iptal ve yeniden başlatma
+  rollback senaryolarını kapsayan canlı entegrasyon testi eklendi.
+
 **0.9.68** (2026-09-18) — GitHub token güvenliği ve WordPress kararlılığı
 
 - GitHub token'ı repo URL'sine, Git komut argümanlarına ve kalıcı Git ayarlarına

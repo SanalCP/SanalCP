@@ -59,6 +59,15 @@ SELECT anahtar,tur,baslik,aciklama,durum,ilerleme,mesaj,yol,baslangic,bitis FROM
   FROM laravel_deploy_jobs j LEFT JOIN domains d ON d.id=j.domain_id
   WHERE j.created_at>=NOW()-INTERVAL 7 DAY
   UNION ALL
+  SELECT CONCAT('restore:',j.id) COLLATE utf8mb4_unicode_ci,'yedek_geri_yukleme' COLLATE utf8mb4_unicode_ci,CONCAT(COALESCE(d.alan_adi,'Domain'),' geri yüklemesi') COLLATE utf8mb4_unicode_ci,
+    CONCAT('Kapsam: ',j.scope) COLLATE utf8mb4_unicode_ci,
+    CASE j.status WHEN 'queued' THEN 'bekliyor' WHEN 'running' THEN 'calisiyor'
+      WHEN 'success' THEN 'basarili' WHEN 'rolled_back' THEN 'geri_alindi' ELSE 'basarisiz' END COLLATE utf8mb4_unicode_ci,
+    j.progress,j.message COLLATE utf8mb4_unicode_ci,CONCAT('/abonelikler/',j.domain_id,'/yedekler') COLLATE utf8mb4_unicode_ci,
+    DATE_FORMAT(j.created_at,'%Y-%m-%d %H:%i:%s') COLLATE utf8mb4_unicode_ci,COALESCE(DATE_FORMAT(j.finished_at,'%Y-%m-%d %H:%i:%s'),'') COLLATE utf8mb4_unicode_ci,j.created_at
+  FROM backup_restore_jobs j LEFT JOIN domains d ON d.id=j.domain_id
+  WHERE j.created_at>=NOW()-INTERVAL 7 DAY
+  UNION ALL
   SELECT CONCAT('antivirus:',j.id) COLLATE utf8mb4_unicode_ci,'antivirus' COLLATE utf8mb4_unicode_ci,CONCAT(COALESCE(d.alan_adi,'Domain'),' zararlı taraması') COLLATE utf8mb4_unicode_ci,
     CONCAT(j.motor,' · ',j.taranan,' dosya') COLLATE utf8mb4_unicode_ci,
     CASE WHEN j.durum='calisiyor' THEN 'calisiyor' WHEN j.durum='bitti' THEN 'basarili' ELSE 'basarisiz' END COLLATE utf8mb4_unicode_ci,
@@ -79,6 +88,8 @@ SELECT anahtar FROM (
   SELECT CONCAT('remote:',id) FROM remote_transfer_jobs WHERE status NOT IN ('queued','packaging','downloading','importing') AND created_at>=NOW()-INTERVAL 7 DAY
   UNION ALL
   SELECT CONCAT('laravel:',id) FROM laravel_deploy_jobs WHERE status NOT IN ('queued','running') AND created_at>=NOW()-INTERVAL 7 DAY
+  UNION ALL
+  SELECT CONCAT('restore:',id) FROM backup_restore_jobs WHERE status NOT IN ('queued','running') AND created_at>=NOW()-INTERVAL 7 DAY
   UNION ALL
   SELECT CONCAT('antivirus:',id) FROM av_taramalar WHERE durum<>'calisiyor' AND baslangic>=NOW()-INTERVAL 7 DAY
 ) x`
@@ -129,10 +140,12 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
     (SELECT COUNT(*) FROM import_jobs WHERE durum IN ('queued','running'))+
     (SELECT COUNT(*) FROM remote_transfer_jobs WHERE status IN ('queued','packaging','downloading','importing'))+
     (SELECT COUNT(*) FROM laravel_deploy_jobs WHERE status IN ('queued','running'))+
+    (SELECT COUNT(*) FROM backup_restore_jobs WHERE status IN ('queued','running'))+
     (SELECT COUNT(*) FROM av_taramalar WHERE durum='calisiyor') aktif,
     (SELECT COUNT(*) FROM import_jobs j WHERE durum='failed' AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('import:',j.id)))+
     (SELECT COUNT(*) FROM remote_transfer_jobs j WHERE status='failed' AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('remote:',j.id)))+
-    (SELECT COUNT(*) FROM laravel_deploy_jobs j WHERE status IN ('failed','rolled_back') AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('laravel:',j.id))) basarisiz,
+    (SELECT COUNT(*) FROM laravel_deploy_jobs j WHERE status IN ('failed','rolled_back') AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('laravel:',j.id)))+
+    (SELECT COUNT(*) FROM backup_restore_jobs j WHERE status IN ('failed','cancelled','rolled_back') AND created_at>=NOW()-INTERVAL 1 DAY AND NOT EXISTS (SELECT 1 FROM islem_merkezi_gizlenenler g WHERE g.anahtar=CONCAT('restore:',j.id))) basarisiz,
     (SELECT COUNT(*) FROM guvenlik_bildirimleri WHERE durum='acik') bildirim,
     (SELECT COUNT(*) FROM guvenlik_bildirimleri WHERE durum='acik' AND seviye='kritik') kritik`).Scan(&aktif, &basarisiz, &bildirim, &kritik)
 	if err != nil {

@@ -138,6 +138,9 @@
     "database_not_found": "No database found",
     "warning": "Existing data in the selected section will be replaced with the backed-up version. This action cannot be undone.",
     "restoring": "Restoring…",
+    "cancel_job": "Cancel job",
+    "cancelling": "Cancelling…",
+    "reconnecting": "Connection lost; reconnecting to the restore job…",
     "restore": "Restore",
     "restored": "Restored: {{domain}} — {{result}}",
     "restore_failed": "Restore failed"

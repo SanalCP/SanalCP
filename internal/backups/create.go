@@ -2,7 +2,9 @@ package backups
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -97,12 +99,19 @@ func createArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, 
 // CreateRecoveryArchive creates a full local recovery point for destructive
 // internal workflows such as staging -> production deployment.
 func CreateRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, note string) (string, int64, error) {
-	stamp := time.Now().UTC().Format("20060102-150405")
+	// Saniye hassasiyetindeki eski ad, aynı tenant için peş peşe başlayan iki
+	// işlemde önceki kurtarma noktasını sessizce ezebiliyordu. Zaman damgasını
+	// okunabilir bırakıp 96 bit rastgele ekle çakışmayı pratikte imkânsız kıl.
+	random := make([]byte, 12)
+	if _, err := rand.Read(random); err != nil {
+		return "", 0, fmt.Errorf("kurtarma noktası kimliği üretilemedi: %w", err)
+	}
+	stamp := time.Now().UTC().Format("20060102-150405.000000000")
 	dir := filepath.Join(BackupRoot, sk)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", 0, err
 	}
-	name := fmt.Sprintf("%s-staging-recovery-%s.tar.gz", sk, stamp)
+	name := fmt.Sprintf("%s-recovery-%s-%s.tar.gz", sk, stamp, hex.EncodeToString(random))
 	abs := filepath.Join(dir, name)
 	size, err := createArchive(ctx, db, domainID, domain, sk, abs)
 	if err != nil {

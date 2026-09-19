@@ -138,6 +138,9 @@
     "database_not_found": "Veritabanı bulunamadı",
     "warning": "Seçilen bölümdeki mevcut veriler yedekteki sürümle değiştirilir. Bu işlem geri alınamaz.",
     "restoring": "Geri yükleniyor…",
+    "cancel_job": "İşi iptal et",
+    "cancelling": "İptal ediliyor…",
+    "reconnecting": "Bağlantı kesildi; geri yükleme işine yeniden bağlanılıyor…",
     "restore": "Geri yükle",
     "restored": "Geri yüklendi: {{domain}} — {{result}}",
     "restore_failed": "Geri yükleme başarısız"

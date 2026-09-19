@@ -45,9 +45,17 @@ func RestoreRecoveryArchive(ctx context.Context, db *sql.DB, domainID int64, sk,
 	extracted := filepath.Join(tmpDir, sk)
 	switch scope {
 	case "files":
-		return restoreTree(filepath.Join(extracted, "public_html"), "public_html", sk, true)
+		return restoreTree(ctx, filepath.Join(extracted, "public_html"), "public_html", sk, true)
+	case "email":
+		return restoreTree(ctx, filepath.Join(extracted, "mail"), "mail", sk, true)
+	case "file":
+		rel, err := safeRestoreRelativePath(database)
+		if err != nil {
+			return err
+		}
+		return restoreSingle(ctx, filepath.Join(extracted, rel), rel, sk)
 	case "home":
-		return restoreTree(extracted, "", sk, true)
+		return restoreTree(ctx, extracted, "", sk, true)
 	case "database":
 		if !mysqlNameRE.MatchString(database) {
 			return fmt.Errorf("geçersiz veritabanı")
@@ -72,10 +80,9 @@ type restoreRequest struct {
 	Database string `json:"database"` // database: hedef DB adı
 }
 
-// Restore supports a complete account restore as well as web files, one file,
-// one database, or Maildir-only recovery. An empty body remains "full" for API
-// backwards compatibility.
-func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
+// restoreNow executes the queued restore. The public Restore handler validates
+// and records the request before handing it to the background worker.
+func (h *Handlers) restoreNow(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
 
@@ -154,7 +161,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 	result := ""
 	switch req.Scope {
 	case "full":
-		if err := restoreTree(extractedHome, "", sk, true); err != nil {
+		if err := restoreTree(r.Context(), extractedHome, "", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -165,14 +172,14 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 		}
 		result = fmt.Sprintf("tüm hesap geri yüklendi; %d veritabanı içe aktarıldı", imported)
 	case "files":
-		if err := restoreTree(filepath.Join(extractedHome, "public_html"),
+		if err := restoreTree(r.Context(), filepath.Join(extractedHome, "public_html"),
 			"public_html", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		result = "web dosyaları geri yüklendi"
 	case "email":
-		if err := restoreTree(filepath.Join(extractedHome, "mail"),
+		if err := restoreTree(r.Context(), filepath.Join(extractedHome, "mail"),
 			"mail", sk, true); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -184,7 +191,7 @@ func (h *Handlers) Restore(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if err := restoreSingle(filepath.Join(extractedHome, rel), rel, sk); err != nil {
+		if err := restoreSingle(r.Context(), filepath.Join(extractedHome, rel), rel, sk); err != nil {
 			httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -239,7 +246,7 @@ func safeRestoreRelativePath(value string) (string, error) {
 //  2. rsync TENANT KİMLİĞİNDE çalışır: doğrulama ile rsync arasındaki TOCTOU
 //     penceresinde hedef yine takas edilse bile DAC jail dışına yazmayı
 //     engeller (bkz. internal/transfers'daki aynı desen).
-func restoreTree(source, rel, sk string, deleteMissing bool) error {
+func restoreTree(ctx context.Context, source, rel, sk string, deleteMissing bool) error {
 	if info, err := os.Stat(source); err != nil || !info.IsDir() {
 		return fmt.Errorf("seçilen bölüm bu yedekte bulunamadı")
 	}
@@ -257,18 +264,18 @@ func restoreTree(source, rel, sk string, deleteMissing bool) error {
 		args = append(args, "--delete")
 	}
 	args = append(args, source+"/", target+"/")
-	if out, err := tenantKomut(sk, "rsync", args...); err != nil {
+	if out, err := tenantKomut(ctx, sk, "rsync", args...); err != nil {
 		return fmt.Errorf("rsync: %s: %w", strings.TrimSpace(out), err)
 	}
-	_, _ = tenantKomut(sk, "restorecon", "-R", target)
+	_, _ = tenantKomut(ctx, sk, "restorecon", "-R", target)
 	return nil
 }
 
 // tenantKomut: komutu tenant kullanıcısı kimliğinde, SHELL OLMADAN (argv)
 // çalıştırır. Panel ortam değişkenleri verilmez.
-func tenantKomut(sk, ad string, args ...string) (string, error) {
+func tenantKomut(ctx context.Context, sk, ad string, args ...string) (string, error) {
 	full := append([]string{"-u", sk, "--", ad}, args...)
-	cmd := exec.Command("runuser", full...)
+	cmd := exec.CommandContext(ctx, "runuser", full...)
 	cmd.Env = []string{
 		"HOME=" + filepath.Join(jailpath.HomeKok, sk),
 		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -284,7 +291,7 @@ func tenantKomut(sk, ad string, args ...string) (string, error) {
 // os.MkdirAll symlink'i izleyip jail dışına dizin açıyor, dosya da oraya
 // yazılıyordu. Artık tüm bileşenler openat2(RESOLVE_BENEATH|NO_SYMLINKS) ile
 // çözülüyor — hiçbir bileşen symlink olamaz.
-func restoreSingle(source, rel, sk string) error {
+func restoreSingle(ctx context.Context, source, rel, sk string) error {
 	info, err := os.Lstat(source)
 	if err != nil {
 		return fmt.Errorf("seçilen dosya yedekte bulunamadı")
@@ -314,7 +321,7 @@ func restoreSingle(source, rel, sk string) error {
 		return fmt.Errorf("hedef dosya güvenli değil (symlink?): %w", err)
 	}
 	target := filepath.Join(home, rel)
-	_, _ = tenantKomut(sk, "restorecon", target)
+	_, _ = tenantKomut(ctx, sk, "restorecon", target)
 	return nil
 }
 

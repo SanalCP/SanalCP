@@ -14,6 +14,8 @@ type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string; dogrulama_durum: string; dogrulama_hata?: string; dogrulama_sha256?: string; dogrulama_zamani?: string }
 type DB = { db_name: string }
 type RestoreScope = 'full' | 'files' | 'file' | 'database' | 'email'
+type RestoreJob = { id: number; status: 'queued' | 'running' | 'success' | 'failed' | 'cancelled' | 'rolled_back'; progress: number; message: string; result: string }
+type ActiveRestoreJob = { active: boolean; job?: RestoreJob }
 type Schedule = {
   freq: 'none' | 'daily' | 'weekly' | 'monthly'; hour: number
   retention: number          // kaç OTOMATİK yedek tutulacak
@@ -49,6 +51,7 @@ export default function DomainBackupsPage() {
   const [restoreScope, setRestoreScope] = useState<RestoreScope>('full')
   const [restorePath, setRestorePath] = useState('public_html/index.php')
   const [restoreDatabase, setRestoreDatabase] = useState('')
+  const [restoreJob, setRestoreJob] = useState<RestoreJob | null>(null)
   const [databases, setDatabases] = useState<DB[]>([])
 
   const [sched, setSched] = useState<Schedule>(bosSchedule)
@@ -140,6 +143,62 @@ export default function DomainBackupsPage() {
     yukle()
   }, [id, yukle])
 
+  // Sayfa yenilense veya önceki polling isteği ağ yüzünden kopsa bile backend'de
+  // süren işe yeniden bağlan. İş kimliği yalnız component belleğine bağlı değildir.
+  useEffect(() => {
+    if (!id) return
+    let stopped = false
+    api.get<ActiveRestoreJob>(`/domains/${id}/backup-restore-jobs/active`)
+      .then(({ data }) => {
+        if (!stopped && data.active && data.job) {
+          setRestoreJob(data.job)
+          setIsleniyor(true)
+        }
+      })
+      .catch(() => {})
+    return () => { stopped = true }
+  }, [id])
+
+  // Geçici ağ hatasında işi kaybetme: aynı job_id için polling devam eder.
+  // Terminal durum ancak backend'den okunduktan sonra yerel iş durumu temizlenir.
+  useEffect(() => {
+    if (!id || !restoreJob || !['queued', 'running'].includes(restoreJob.status)) return
+    const jobID = restoreJob.id
+    let stopped = false
+    let timer: number | undefined
+    const poll = async () => {
+      try {
+        const { data: job } = await api.get<RestoreJob>(`/domains/${id}/backup-restore-jobs/${jobID}`)
+        if (stopped) return
+        setRestoreJob(job)
+        if (['queued', 'running'].includes(job.status)) {
+          timer = window.setTimeout(poll, 1500)
+          return
+        }
+        setIsleniyor(false)
+        setGeriYukle(null)
+        setRestoreJob(null)
+        if (job.status === 'success') {
+          setBasari(t('DomainBackupsPage:restore_modal.restored', { domain: domain?.alan_adi || '', result: job.result || '' }))
+          yukle()
+        } else {
+          setHata(job.message || t('DomainBackupsPage:restore_modal.restore_failed'))
+        }
+      } catch {
+        if (stopped) return
+        setRestoreJob(current => current?.id === jobID
+          ? { ...current, message: t('DomainBackupsPage:restore_modal.reconnecting') }
+          : current)
+        timer = window.setTimeout(poll, 3000)
+      }
+    }
+    void poll()
+    return () => {
+      stopped = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [id, restoreJob?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function scheduleKaydet(yeni: Schedule) {
     setSchedKayit(true); setHata(null); setBasari(null)
     try {
@@ -184,17 +243,36 @@ export default function DomainBackupsPage() {
     if (!geriYukle) return
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
-      const { data } = await api.post(`/domains/${id}/backups/${geriYukle.id}/geriyukle`, {
+      const { data } = await api.post<{ job_id: number }>(`/domains/${id}/backups/${geriYukle.id}/geriyukle`, {
         scope: restoreScope,
         path: restoreScope === 'file' ? restorePath : '',
         database: restoreScope === 'database' ? restoreDatabase : '',
       })
-      setBasari(t('DomainBackupsPage:restore_modal.restored', { domain: data.alan_adi, result: data.sonuc || '' }))
+      setRestoreJob({ id: data.job_id, status: 'queued', progress: 0, message: t('DomainBackupsPage:restore_modal.restoring'), result: '' })
       setGeriYukle(null)
     } catch (e) {
+      // Başka bir sekme tam bu sırada iş başlattıysa 409 sonrasında da o işe
+      // bağlan; kullanıcı çalışan işi kayıp sanıp tekrar denemesin.
+      try {
+        const { data } = await api.get<ActiveRestoreJob>(`/domains/${id}/backup-restore-jobs/active`)
+        if (data.active && data.job) {
+          setRestoreJob(data.job)
+          setGeriYukle(null)
+          return
+        }
+      } catch { /* asıl POST hatasını aşağıda göster */ }
       setHata(apiHata(e, t('DomainBackupsPage:restore_modal.restore_failed')))
-    } finally {
       setIsleniyor(false)
+    }
+  }
+
+  async function restoreIptal() {
+    if (!restoreJob || !id) return
+    try {
+      await api.delete(`/domains/${id}/backup-restore-jobs/${restoreJob.id}`)
+      setRestoreJob({ ...restoreJob, message: t('DomainBackupsPage:restore_modal.cancelling') })
+    } catch (e) {
+      setHata(apiHata(e))
     }
   }
 
@@ -472,6 +550,12 @@ export default function DomainBackupsPage() {
 
       {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">{hata}</div>}
       {basari && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+      {restoreJob && <div className="mb-3 px-3 py-2 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-md text-sm text-sky-700 dark:text-sky-300 flex items-center gap-3">
+        <span className="flex-1">{restoreJob.message} ({restoreJob.progress}%)</span>
+        <button type="button" onClick={restoreIptal} className="ta-secondary-button">
+          {t('DomainBackupsPage:restore_modal.cancel_job')}
+        </button>
+      </div>}
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
         {yuk ? <div className="py-12 text-center text-sm text-slate-400 dark:text-slate-500">{t('common:loading')}</div> :

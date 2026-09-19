@@ -595,6 +595,15 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "okuma hatası: "+err.Error())
 		return
 	}
+	var restoreActive int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM backup_restore_jobs WHERE domain_id=? AND status IN ('queued','running')`, id).Scan(&restoreActive); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "geri yükleme durumu okunamadı")
+		return
+	}
+	if restoreActive != 0 {
+		httpx.WriteError(w, http.StatusConflict, "çalışan geri yükleme tamamlanmadan veya iptal edilmeden domain silinemez")
+		return
+	}
 
 	// Bu domain bir ek alan adıysa (addon/parked, sk'yi ana hesapla PAYLAŞIYOR),
 	// aşağıdaki sk-genelindeki yıkıcı adımlara (Deprovision/SystemdSliceSil/

@@ -276,6 +276,7 @@ func main() {
 	genelH := &genelbakis.Handlers{DB: d}
 	accountsH := &accounts.Handlers{DB: d}
 	backupsH := &backups.Handlers{DB: d}
+	backupsH.RecoverRestoreJobs()
 	backups.StartScheduler(d)
 	gitH := &git.Handlers{DB: d}
 	githubH := &githubpkg.Handlers{DB: d, WebhookBase: "https://" + ipv4 + ":8443"}
@@ -327,7 +328,7 @@ func main() {
 	// (varsayılan) başlıklar tamamen yok sayılır — nginx reload hatası veya yanlış
 	// dağıtımda uygulama katmanı kendi başına ayakta kalır.
 	r.Use(chimw.Recoverer)
-	r.Use(chimw.Timeout(300 * time.Second))
+	r.Use(middleware.IslemZamanAsimi(300*time.Second, 30*time.Minute))
 	// 🔴 GÜVENLİK: Panelin ~95 JSON ucu gövdeyi sınırsız okuyordu (json.NewDecoder
 	// tüm gövdeyi belleğe alır) — kimliği doğrulanmış bir bayi/müşteri tek bir dev
 	// alanla süreci OOM'a sürükleyebilirdi. Artık varsayılan 2 MiB; gerçekten büyük
@@ -741,6 +742,9 @@ func main() {
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backups/{bid}/indir", backupsH.Download)
 				r.With(middleware.MusteriScope).Delete("/domains/{id}/backups/{bid}", backupsH.Delete)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/backups/{bid}/geriyukle", backupsH.Restore)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-restore-jobs/active", backupsH.ActiveRestoreJob)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-restore-jobs/{jid}", backupsH.RestoreJob)
+				r.With(middleware.MusteriScope).Delete("/domains/{id}/backup-restore-jobs/{jid}", backupsH.CancelRestoreJob)
 				r.With(middleware.MusteriScope).Post("/domains/{id}/backups/{bid}/dogrula", backupsH.Verify)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/backup-schedule", backupsH.GetSchedule)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/backup-schedule", backupsH.SetSchedule)
@@ -826,7 +830,7 @@ func main() {
 		// 🔴 GÜVENLİK: Bu değerler eskiden 30dk idi — TÜM uçlara (login dahil)
 		// uygulandığından, kimliği doğrulanmış bir istemci 1 byte/sn ile gövde
 		// göndererek bağlantıyı 30 dakika açık tutabilir, dosya tanıtıcılarını
-		// tüketebilirdi (slow-DoS). 6dk, chi.Timeout(300s) üst sınırının hemen
+		// tüketebilirdi (slow-DoS). 6dk, varsayılan 300sn işlem sınırının hemen
 		// üzerinde bir güvenlik payı bırakır (normal exec-bağımlı admin işlemleri
 		// zaten o sınıra göre tasarlandı). Gerçekten uzun sürmesi beklenen büyük
 		// dosya/arşiv/DB yükleme-indirme uçları httpx.ExtendDeadline ile kendi
@@ -901,6 +905,11 @@ func main() {
 	}
 	if err := cliSrv.Shutdown(ctx); err != nil {
 		log.Printf("cli shutdown: %v", err)
+	}
+	jobCtx, jobCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer jobCancel()
+	if err := backupsH.CancelRestoreJobs(jobCtx); err != nil {
+		log.Printf("geri yükleme işleri kapatılamadı: %v", err)
 	}
 }
 

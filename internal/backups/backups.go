@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"sanalcp/internal/adlar"
@@ -67,7 +68,10 @@ type Yedek struct {
 }
 
 type Handlers struct {
-	DB *sql.DB
+	DB             *sql.DB
+	restoreMu      sync.Mutex
+	restoreCancels map[int64]context.CancelFunc
+	restoreWG      sync.WaitGroup
 }
 
 func (h *Handlers) lookupDomain(r *http.Request) (id int64, alanAdi, sk string, demo bool, err error) {
@@ -308,6 +312,15 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	bid, _ := strconv.ParseInt(chi.URLParam(r, "bid"), 10, 64)
+	var restoreActive int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM backup_restore_jobs WHERE backup_id=? AND domain_id=? AND status IN ('queued','running')`, bid, id).Scan(&restoreActive); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "geri yükleme durumu okunamadı")
+		return
+	}
+	if restoreActive != 0 {
+		httpx.WriteError(w, http.StatusConflict, "bu yedek çalışan bir geri yükleme işi tarafından kullanılıyor")
+		return
+	}
 	var sk, dosya, uzakDurum string
 	err := h.DB.QueryRowContext(r.Context(),
 		`SELECT d.sistem_kullanici, b.dosya, b.uzak_durum FROM backups b
