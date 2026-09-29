@@ -167,7 +167,7 @@ export default function DomainGitPage() {
   async function pull() {
     setIsleniyor(true); setHata(null); setBasari(null); setLogSon(null)
     try {
-      const { data } = await api.post(`/domains/${id}/git/pull`)
+      const { data } = await api.post(`/domains/${id}/git/pull`, {}, { timeout: 480000 })
       setBasari(`Pull tamam. Commit: ${data.commit.slice(0, 7)}`)
       setLogSon(data.log)
       yukle()
@@ -383,7 +383,7 @@ export default function DomainGitPage() {
                   <Stat e="Son sync" d={repo.son_sync || '— (henüz yok)'} />
                   <Stat e="Son commit" d={repo.son_commit ? repo.son_commit.slice(0, 8) : '—'} mono />
                   <Stat e="Durum"
-                    d={repo.son_durum === 'basarili' ? '✓ başarılı' : (repo.son_durum === 'hata' || repo.son_durum.startsWith('hata') ? '⚠ hata' : repo.son_durum)}
+                    d={repo.son_durum === 'basarili' ? '✓ başarılı' : repo.son_durum.includes('geri-alindi') ? '↩ önceki commit geri yüklendi' : (repo.son_durum === 'hata' || repo.son_durum.startsWith('hata') ? '⚠ hata' : repo.son_durum)}
                     renk={repo.son_durum === 'basarili' ? 'emerald' : (repo.son_durum.startsWith('hata') ? 'red' : 'slate')}
                   />
                 </div>

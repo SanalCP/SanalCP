@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"net/url"
+	"sanalcp/internal/appruntime"
 	githubpkg "sanalcp/internal/github"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
@@ -263,6 +264,28 @@ func gitPull(ctx context.Context, sk, targetDir, branch, repoURL, token string) 
 	return sha, log, nil
 }
 
+func (h *Handlers) deployPull(ctx context.Context, id int64, sk, targetDir, branch, repoURL, token string) (appruntime.DeployResult, error) {
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		return appruntime.DeployResult{}, err
+	}
+	dst := filepath.Join(home, targetDir)
+	discard := func(ctx context.Context, rel string) error {
+		if !validReleaseRel(id, rel) {
+			return errors.New("geçersiz sürüm dizini")
+		}
+		_, err := runAsUserArgs(ctx, sk, dst, "git", "-C", dst, "worktree", "remove", "--force", filepath.Join(home, rel))
+		return err
+	}
+	return appruntime.DeployGitAtomic(ctx, h.DB, id, sk, targetDir,
+		func(ctx context.Context) (string, string, error) {
+			return gitPull(ctx, sk, targetDir, branch, repoURL, token)
+		},
+		func(ctx context.Context) (appruntime.StagedRelease, error) {
+			return stageGitRelease(ctx, id, sk, targetDir, branch, repoURL, token)
+		}, discard)
+}
+
 // ----- HTTP handlers -----
 
 type baglaReq struct {
@@ -371,6 +394,15 @@ func (h *Handlers) Klonla(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 500, "repo okunamadı")
 		return
 	}
+	var protectedApp int
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM app_runtimes WHERE domain_id=? AND (enabled=1 OR release_dir<>'')`, id).Scan(&protectedApp); err != nil {
+		httpx.WriteError(w, 500, "uygulama durumu okunamadı")
+		return
+	}
+	if protectedApp != 0 {
+		httpx.WriteError(w, 409, "çalışan veya Git sürümü etkin uygulamada yeniden klonlama yapılamaz; pull kullanın")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
 	defer cancel()
 	repoURL = cleanRepoURL(repoURL)
@@ -398,6 +430,7 @@ func (h *Handlers) Klonla(w http.ResponseWriter, r *http.Request) {
 
 // Pull: var olan repo'da pull
 func (h *Handlers) Pull(w http.ResponseWriter, r *http.Request) {
+	httpx.ExtendDeadline(w, 8*time.Minute)
 	id, sk, demo, err := h.lookupDomain(r)
 	if err != nil || demo {
 		httpx.WriteError(w, http.StatusForbidden, "izin yok")
@@ -416,7 +449,7 @@ func (h *Handlers) Pull(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 500, "repo okunamadı")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	repoURL = cleanRepoURL(repoURL)
 	token, err := githubpkg.DeployToken(ctx, h.DB, id, repoURL)
@@ -424,20 +457,23 @@ func (h *Handlers) Pull(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 500, err.Error())
 		return
 	}
-	sha, log, err := gitPull(ctx, sk, targetDir, branch, repoURL, token)
+	result, err := h.deployPull(ctx, id, sk, targetDir, branch, repoURL, token)
 	durum := "basarili"
 	if err != nil {
 		durum = "hata"
+		if result.RolledBack {
+			durum = "hata-geri-alindi"
+		}
 	}
 	_, _ = h.DB.ExecContext(r.Context(),
-		`UPDATE git_repos SET son_sync=NOW(), son_commit=?, son_durum=? WHERE id=?`,
-		sha, durum, gid)
+		`UPDATE git_repos SET son_sync=NOW(), son_commit=COALESCE(NULLIF(?,''),son_commit), son_durum=? WHERE id=?`,
+		result.Commit, durum, gid)
 	if err != nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "pull: "+err.Error()+"\n"+log)
+		httpx.WriteError(w, http.StatusInternalServerError, "pull: "+err.Error()+"\n"+result.Log)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "commit": sha, "log": log,
+		"ok": true, "commit": result.Commit, "log": result.Log,
 	})
 }
 
@@ -453,6 +489,7 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 // URL secret'ı repo kaydını bulur; yetkilendirme kararı tek başına URL'ye
 // dayanmaz. Gövde ayrıca GitHub X-Hub-Signature-256 HMAC'iyle doğrulanır.
 func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
+	httpx.ExtendDeadline(w, 8*time.Minute)
 	secret := chi.URLParam(r, "secret")
 	if len(secret) < 16 {
 		http.Error(w, "geçersiz secret", http.StatusBadRequest)
@@ -520,32 +557,35 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, 500, "repo okunamadı")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), gitAgSuresi)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	repoURL = cleanRepoURL(repoURL)
 	token, tokenErr := githubpkg.DeployToken(ctx, h.DB, domainID, repoURL)
-	var sha, log string
+	var result appruntime.DeployResult
 	perr := tokenErr
 	if perr == nil {
-		sha, log, perr = gitPull(ctx, sk, targetDir, branch, repoURL, token)
+		result, perr = h.deployPull(ctx, domainID, sk, targetDir, branch, repoURL, token)
 	}
 	durum := "basarili"
 	if perr != nil {
 		durum = "hata-webhook"
+		if result.RolledBack {
+			durum = "hata-webhook-geri-alindi"
+		}
 	}
 	_, _ = h.DB.ExecContext(r.Context(),
-		`UPDATE git_repos SET son_sync=NOW(), son_commit=?, son_durum=? WHERE id=?`,
-		sha, durum, gid)
+		`UPDATE git_repos SET son_sync=NOW(), son_commit=COALESCE(NULLIF(?,''),son_commit), son_durum=? WHERE id=?`,
+		result.Commit, durum, gid)
 	if perr != nil {
 		// GitHub geçici hatalarda aynı delivery kimliğiyle yeniden deneyebilir.
 		// Başarısız pull'u replay tablosunda kalıcı tutarsak meşru retry 409 alır.
 		_, _ = h.DB.ExecContext(r.Context(),
 			`DELETE FROM git_webhook_deliveries WHERE delivery_id=?`, delivery)
-		http.Error(w, "pull başarısız: "+perr.Error()+"\n"+log, http.StatusInternalServerError)
+		http.Error(w, "pull başarısız: "+perr.Error()+"\n"+result.Log, http.StatusInternalServerError)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "commit": sha,
+		"ok": true, "commit": result.Commit,
 	})
 }
 

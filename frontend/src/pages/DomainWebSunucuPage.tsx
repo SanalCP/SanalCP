@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import AppRuntimeCard from '@/components/AppRuntimeCard'
 import CodeMirror from '@uiw/react-codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
 
@@ -295,6 +296,8 @@ export default function DomainWebSunucuPage() {
           </button>
         </div>
       )}
+
+      {backend === 'reverse-proxy' && proxy?.aktif && id && <AppRuntimeCard domainId={id} proxyPort={proxy.port} />}
 
       <div className="mb-5 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-200">
         {t('DomainWebSunucuPage:hsts_notice')}

@@ -67,7 +67,7 @@ yol haritasındadırlar:
 
 | Eksik | Durum |
 |---|---|
-| **Node.js / Python uygulama desteği** | Yalnızca PHP (7.4 – 8.5) ve statik site. |
+| **Node.js / Python yorumlayıcısını sunucuya kurma ve sıfır kesintili dağıtım** | Kurulu yorumlayıcı seçimi, tenant kimliğiyle npm/pip kurulumu, süreç yönetimi ve ayrı Git worktree üzerinde sağlık kapılı dağıtım var. Yeni yorumlayıcı kurulumu ve sıfır kesintili trafik geçişi henüz yok. |
 | **Slave / cluster DNS** | Tek sunucu üzerinde birincil DNS. `allow-transfer` kapalıdır (zone enumerasyonuna karşı). |
 | **Geniş uygulama kataloğu** | Tek tık kurulum WordPress, Joomla, PrestaShop, Drupal, OpenCart, Matomo, Grav, Nextcloud, MediaWiki ve phpBB için; diğer PHP uygulamaları sırada. |
 
@@ -215,6 +215,7 @@ Roller:
 - **Yönetim API'si** — otomasyon için kişisel erişim token'ları ([docs/API.md](docs/API.md))
 - Backup yöneticisi, izleme/loglar, istatistikler
 - Hizmet planları ve kaynak limitleri (domain oluştururken varsayılan **Başlangıç**)
+- Reverse proxy sitelerinde tenant kullanıcısıyla Node.js/Python giriş dosyasını systemd servisi olarak başlatma, durdurma, yeniden başlatma ve günlük görüntüleme. Kurulu yorumlayıcı seçimi, npm/pip kurulumu ve HTTP sağlık kontrolü desteklenir. Git Pull/webhook dağıtımı ayrı sürüm dizininde derler, sağlık kontrolünden sonra servisi yönlendirir ve hatada önceki sürüme döner. Uygulama `HOST=127.0.0.1` ve `PORT` değerleriyle dinlemelidir.
 
 ## Otomatik Saldırı Engelleme
 

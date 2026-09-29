@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/appruntime"
 	"sanalcp/internal/cliapi"
 	"sanalcp/internal/dns"
 	"sanalcp/internal/domainek"
@@ -642,6 +643,12 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isDemo == 0 {
+		// Uygulama servisi tenant hesabı silinmeden durmalı; çalışan süreç ve
+		// systemd unit'i kalırsa kullanıcı silinse bile eski uygulama çalışır.
+		if err := appruntime.Remove(r.Context(), id); err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "uygulama servisi kaldırılamadı: "+err.Error())
+			return
+		}
 		// MariaDB'deki gerçek DB'leri kaldır (CASCADE FK sadece panel DB metadata'sını siler)
 		_ = hesaplar.MySQLDropAllForDomain(h.DB, id)
 		// nginx vhost + PHP pool + Linux user + per-tenant FPM servisi (Deprovision içinde)

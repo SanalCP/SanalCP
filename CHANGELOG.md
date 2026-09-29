@@ -13,6 +13,20 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.70** (2026-09-29) — ACME ön denemesi ve Node.js/Python uygulamaları
+
+- Let's Encrypt sertifika işlemlerinde üretim CA isteğinden önce staging
+  doğrulaması eklendi. Staging hatasında mevcut sertifika korunur ve üretim
+  isteği durdurulur.
+- Reverse proxy siteleri için tenant kimliğinde çalışan Node.js ve Python
+  servisleri eklendi. Kurulu yorumlayıcı seçimi, bağımlılık kurulumu, servis
+  günlükleri ve sağlık kontrolü panelden yönetilebilir.
+- Git Pull ve webhook dağıtımları ayrı worktree içinde hazırlanır. Sağlık
+  kontrolü başarısızsa önceki çalışan sürüme geri dönülür; panel açılışında
+  yarım kalmış geçişler uzlaştırılır.
+- Canlı tenant kabul testi bu sürüm hazırlığı sırasında yapılmadı. Üretim
+  uygulamasına geçmeden önce test sitesinde doğrulama önerilir.
+
 **0.9.69** (2026-09-19) — güvenilir ve geri alınabilir yedek geri yükleme
 
 - Yedek geri yüklemeleri HTTP isteğinden bağımsız, ilerlemesi izlenebilen ve

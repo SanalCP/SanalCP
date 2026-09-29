@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.69",
-  "duyuru": "Yedek geri yüklemeleri artık izlenebilir ve iptal edilebilir arka plan işleri olarak çalışır. Kesinti veya panel yeniden başlatması durumunda otomatik geri alma uygulanır; arayüz sayfa yenilense bile çalışan işe yeniden bağlanır.",
+  "son_surum": "0.9.70",
+  "duyuru": "Let's Encrypt staging ön denemesi ve Node.js/Python uygulama yönetimi eklendi. Git dağıtımları ayrı sürüm dizininde hazırlanır; sağlık kontrolü başarısız olursa önceki sürüme dönülür.",
   "kritik": false,
-  "yayin_tarihi": "2026-09-19"
+  "yayin_tarihi": "2026-09-29"
 }

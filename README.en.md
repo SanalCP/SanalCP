@@ -66,7 +66,7 @@ Being honest beats disappointing you later. These do **not** exist today; they a
 
 | Missing | Status |
 |---|---|
-| **Node.js / Python application support** | PHP (7.4 – 8.5) and static sites only. |
+| **Installing new Node.js / Python interpreters and zero-downtime deployment** | Reverse proxy sites can select an installed interpreter, install npm/pip dependencies as the tenant, manage the app process, and deploy from a separate Git worktree with a health gate. Installing new interpreters and zero-downtime traffic switching are not yet available. |
 | **Slave / cluster DNS** | Primary DNS on a single server. `allow-transfer` is disabled (to prevent zone enumeration). |
 | **Broad application catalog** | One-click installation supports WordPress, Joomla, PrestaShop, Drupal, OpenCart, Matomo, Grav, Nextcloud, MediaWiki, and phpBB; more PHP applications are planned. |
 
@@ -214,6 +214,7 @@ Roles:
 - **Management API** — personal access tokens for automation ([docs/API.md](docs/API.md))
 - Backup manager, monitoring/logs, statistics
 - Service plans and resource limits (new domains default to the **Starter** plan)
+- On reverse proxy sites, start, stop, restart, and view logs for a Node.js/Python entry file running as the tenant user. Select an installed interpreter, install npm/pip dependencies, and configure an HTTP health path. Git Pull/webhook deployment builds in a separate worktree, switches the service after preparation, and restores the previous release on health failure. The app must listen using the provided `HOST=127.0.0.1` and `PORT` values.
 
 ## Automatic Intrusion Blocking
 

@@ -19,6 +19,7 @@ import (
 	"sanalcp/internal/accounts"
 	"sanalcp/internal/altalangoc"
 	"sanalcp/internal/antivirus"
+	"sanalcp/internal/appruntime"
 	"sanalcp/internal/apps"
 	"sanalcp/internal/auth"
 	"sanalcp/internal/backups"
@@ -188,6 +189,14 @@ func main() {
 		log.Printf("Git kimlik temizliği: %v", err)
 	}
 	cloudflare.Init(secretBox) // Cloudflare API token şifreleme kutusu
+	appRuntimeH := &appruntime.Handlers{DB: d}
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		if err := appruntime.Reconcile(ctx, d); err != nil {
+			log.Printf("uygulama sürümü açılış onarımı: %v", err)
+		}
+		cancel()
+	}
 
 	ipv4 := detectIPv4()
 	log.Printf("server ipv4: %s", ipv4)
@@ -792,6 +801,11 @@ func main() {
 				r.With(middleware.MusteriScope).Post("/domains/{id}/nginx-settings/olc", nginxsetH.Olc)
 				r.With(middleware.MusteriScope).Get("/domains/{id}/reverse-proxy", nginxsetH.ProxyGoster)
 				r.With(middleware.MusteriScope).Put("/domains/{id}/reverse-proxy", nginxsetH.ProxyKaydet)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/app-runtime", appRuntimeH.Get)
+				r.With(middleware.MusteriScope).Put("/domains/{id}/app-runtime", appRuntimeH.Put)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/app-runtime/dependencies", appRuntimeH.InstallDependencies)
+				r.With(middleware.MusteriScope).Post("/domains/{id}/app-runtime/{action}", appRuntimeH.Action)
+				r.With(middleware.MusteriScope).Get("/domains/{id}/app-runtime/logs", appRuntimeH.Logs)
 				// Özel vhost modu: paylaşımlı nginx'te server_name/listen gibi tenant-izolasyonunu
 				// etkileyebilecek tam kontrol veriyor — MusteriScope DEĞİL, yalnızca admin.
 				r.With(middleware.AdminOnly).Get("/domains/{id}/vhost-ozel", nginxsetH.GetVhostOzel)

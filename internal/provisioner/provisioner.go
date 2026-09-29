@@ -1445,14 +1445,21 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 		args = append(args, "-d", h)
 	}
 	args = append(args, "--keylength", "2048")
-	args = append(args, AcmeServerArgs()...)
-	// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
-	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
-	issueCtx, issueCancel := context.WithTimeout(ctx, 3*time.Minute)
+	// Staging ve üretim iki ayrı ACME isteğidir; toplamda altı dakika üst sınır.
+	// Geçici staging deposu canlı cert/yenileme kayıtlarına dokunmaz.
+	issueCtx, issueCancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer issueCancel()
-	if out, e := exec.CommandContext(issueCtx, "/root/.acme.sh/acme.sh", args...).CombinedOutput(); e != nil {
+	if out, e := issueWithPreflight(issueCtx, "/root/.acme.sh/acme.sh", args); e != nil {
 		// FAIL-SAFE (teardown YOK): mevcut/self-signed cert ile 443'ü KORU.
-		cp, kp, gercek, e := sslFailSafe(alanAdi, sk, phpSurum, backend, "acme issue: "+strings.TrimSpace(string(out)))
+		sebep := strings.TrimSpace(string(out))
+		if sebep == "" {
+			sebep = e.Error()
+		}
+		if not != "" {
+			not += " "
+		}
+		not += sebep
+		cp, kp, gercek, e := sslFailSafe(alanAdi, sk, phpSurum, backend, "acme issue: "+sebep)
 		return cp, kp, gercek, not, e
 	}
 

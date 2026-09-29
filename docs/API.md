@@ -194,6 +194,29 @@ Sağlık kontrolü `/api/v1` **altında değildir** ve kimlik gerektirmez:
 
 ## 5. Bu listede olmayan uçlar
 
+Reverse proxy sitesinin Node.js/Python uygulama süreci için:
+
+| Uç | Açıklama |
+|---|---|
+| `GET /domains/{id}/app-runtime` | Kayıt, çalışma durumu ve sunucudaki yorumlayıcılar |
+| `PUT /domains/{id}/app-runtime` | `{"runtime":"node","interpreter":"/usr/bin/node","entrypoint":"public_html/server.js","health_path":"/health","port":3000,"enabled":false}` ile servis kur/güncelle; `interpreter` boşsa sunucu varsayılanı seçilir, sağlık yolu HTTP 2xx dönmeli, port sitenin reverse proxy portuyla aynı olmalı |
+| `POST /domains/{id}/app-runtime/dependencies` | Node.js için lockfile üzerinden `npm ci --omit=dev`, Python için sanal ortamda `pip install -r requirements.txt` |
+| `POST /domains/{id}/app-runtime/start` | Servisi başlat |
+| `POST /domains/{id}/app-runtime/stop` | Servisi durdur |
+| `POST /domains/{id}/app-runtime/restart` | Servisi yeniden başlat |
+| `GET /domains/{id}/app-runtime/logs` | Son 100 servis günlük satırı |
+
+Bu uçlar domain sahipliği kapsamını uygular. Giriş dosyası tenant'ın
+`public_html` dizininde olmalıdır. Uygulama `127.0.0.1` üzerinde kendisine
+verilen `PORT` değerini dinlemelidir.
+
+Yönetilen uygulamada `POST /domains/{id}/git/pull` ve imzalı Git webhook'u,
+Git hedefi `public_html` ise ayrı bir Git worktree içinde bağımlılıkları kurar,
+Node.js için varsa build betiğini çalıştırır, servisi bu sürüme yönlendirir
+ve `health_path` üzerinden HTTP 2xx bekler. Hata halinde önceki servis sürümü
+geri yüklenir. `GET /domains/{id}/app-runtime` yanıtındaki `active_release`
+etkin worktree yoludur. İlk klonlama uygulama başlatılmadan yapılmalıdır.
+
 Yukarıdakiler en sık kullanılanlardır; panelin tamamı çok daha geniştir (e-posta
 kutuları, SSL, cron, FTP, veritabanları, dosya yöneticisi, güvenlik duvarı, WordPress
 araçları…). Hepsi aynı kimlik doğrulama ve yetki kurallarıyla çalışır.

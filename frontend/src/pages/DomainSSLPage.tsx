@@ -32,7 +32,7 @@ export default function DomainSSLPage() {
   // kullaniciyi yaniltiyordu — tarayici uyari verirken panel basarili diyordu.
   const [uyari, setUyari] = useState<string | null>(null)
   // Kurulum sırasında geçen saniye. Backend ilerleme AKIŞI vermiyor (issue tek
-  // bloklayan POST, 120sn timeout) — bu yüzden sahte bir yüzde göstermek yerine
+  // bloklayan POST) — bu yüzden sahte bir yüzde göstermek yerine
   // belirsiz (indeterminate) çubuk + gerçek süre sayacı gösteriyoruz. Let's
   // Encrypt'te DNS doğrulaması uzun sürebildiği için kullanıcının "dondu mu?"
   // diye düşünmemesi bu geri bildirime bağlı.
@@ -73,7 +73,7 @@ export default function DomainSSLPage() {
     setKurulanTip(tip)
     setIsleniyor(true); setHata(null); setBasari(null); setUyari(null)
     try {
-      const { data } = await api.post(`/domains/${id}/ssl/issue`, { tip }, { timeout: 120_000 })
+      const { data } = await api.post(`/domains/${id}/ssl/issue`, { tip }, { timeout: 480_000 })
       // Backend istenen tip ile FIILEN kurulan tipi ayri raporlar; uyari varsa
       // basari degil uyari gosterilir.
       if (data.uyari) {

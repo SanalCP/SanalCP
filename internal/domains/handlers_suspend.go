@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"sanalcp/internal/appruntime"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/provisioner"
 
@@ -78,6 +79,16 @@ func AskiUygula(ctx context.Context, db *sql.DB, id int64, askida bool) (alanAdi
 		// DB güncellendi ama vhost render başarısız → geri al ki tutarlı kalsın
 		geriDurum := map[bool]string{true: "aktif", false: "pasif"}[askida]
 		_, _ = db.ExecContext(ctx, `UPDATE domains SET askida=?, durum=? WHERE id=?`, 1-ak, geriDurum, id)
+		return alanAdi, err
+	}
+	// systemd'nin Restart=on-failure kuralı tenant süreçleri öldürülünce
+	// uygulamayı yeniden açabilir. Askıdan önce servisi disable --now ile
+	// durdur; başarısızsa DB/vhost'u eski duruma döndür.
+	if err := appruntime.Suspend(ctx, db, id, askida); err != nil {
+		geriDurum := map[bool]string{true: "aktif", false: "pasif"}[askida]
+		_, _ = db.ExecContext(ctx, `UPDATE domains SET askida=?, durum=? WHERE id=?`, 1-ak, geriDurum, id)
+		_ = provisioner.RerenderVhost(db, id)
+		_ = appruntime.Suspend(context.Background(), db, id, !askida)
 		return alanAdi, err
 	}
 

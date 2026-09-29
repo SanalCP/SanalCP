@@ -327,7 +327,7 @@ export default function DomainsPage() {
       if (fSSL) {
         setAdim(t('DomainsPage:create_modal.step_ssl'))
         try {
-          const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' }, { timeout: 120_000 })
+          const sslR = await api.post<{ tip: string; uyari?: string }>(`/domains/${r.data.id}/ssl/issue`, { tip: 'letsencrypt' }, { timeout: 480_000 })
           // Sunucu self-signed'a düştüyse bunu AYRI bir uyarı kutusunda göster;
           // başarı mesajına iliştirmek yeşil kutuda kaybolmasına yol açıyordu.
           if (sslR.data.uyari) setUyari(sslR.data.uyari)
