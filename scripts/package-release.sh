@@ -78,11 +78,36 @@ tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner \
 tar --sort=name --mtime="@$EPOCH" --owner=0 --group=0 --numeric-owner \
   -czf assets/migrations.tar.gz -C migrations .
 
+echo "== Sürüm damgası =="
+# assets/SURUM manifestin (dolayısıyla imzanın) kapsamındadır: sanalcp-update
+# bununla imzalı ama ESKİ bir release'e geri döndürme (downgrade) saldırısını
+# reddeder.
+SURUM="$(sed -n 's/^const SurumNo = "\(.*\)"$/\1/p' internal/system/usage.go)"
+[ -n "$SURUM" ] || { echo "SurumNo okunamadı (internal/system/usage.go)" >&2; exit 1; }
+printf '%s\n' "$SURUM" > assets/SURUM
+
 echo "== Asset bütünlük manifesti =="
-find assets -type f ! -name SHA256SUMS -print0 |
+find assets -type f ! -name SHA256SUMS ! -name SHA256SUMS.sig -print0 |
   LC_ALL=C sort -z |
   xargs -0 sha256sum > assets/SHA256SUMS
 sha256sum -c assets/SHA256SUMS
+
+echo "== Release imzası =="
+# 🔴 TEDARİK ZİNCİRİ: SHA256SUMS aynı arşivin içinden geldiği için tek başına
+# dışarıya karşı güvence vermez. sanalcp-update manifestin imzasını, sunucuya
+# kurulumda yerleştirilen /etc/sanalcp/release-signers açık anahtarıyla doğrular;
+# GitHub hesabı/deposu ele geçirilse bile imzasız bir release kurulmaz.
+# Özel anahtar depoda DEĞİL, yayımcının makinesinde durur.
+IMZA_ANAHTARI="${SANALCP_IMZA_ANAHTARI:-$HOME/.config/sanalcp/release-imza}"
+[ -f "$IMZA_ANAHTARI" ] || {
+  echo "release imza anahtarı yok: $IMZA_ANAHTARI (SANALCP_IMZA_ANAHTARI ile verin)" >&2
+  exit 1
+}
+rm -f assets/SHA256SUMS.sig
+ssh-keygen -Y sign -q -f "$IMZA_ANAHTARI" -n sanalcp-release assets/SHA256SUMS
+ssh-keygen -Y verify -f assets/release-signers -I sanalcp-release -n sanalcp-release \
+  -s assets/SHA256SUMS.sig < assets/SHA256SUMS >/dev/null ||
+  { echo "imza assets/release-signers ile doğrulanamadı (yanlış anahtar?)" >&2; exit 1; }
 
 # Paket eski migration/frontend taşıyorsa burada yayın kesilir.
 src_migrations="$(find migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | LC_ALL=C sort)"

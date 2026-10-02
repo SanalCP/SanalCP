@@ -3,6 +3,7 @@ package pma
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -111,7 +112,9 @@ func (h *Handlers) TokenIste(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("X-Internal-Auth")
 	expected := internalAuthToken()
-	if expected == "" || auth == "" || auth != expected {
+	// Sabit zamanlı karşılaştırma: düz != yanıt süresinden token'ı bayt bayt
+	// tahmin etmeye izin verir.
+	if expected == "" || auth == "" || subtle.ConstantTimeCompare([]byte(auth), []byte(expected)) != 1 {
 		http.Error(w, "yetki yok", http.StatusUnauthorized)
 		return
 	}
@@ -150,8 +153,11 @@ func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 	// Tek-kullanim işaretini atomik olarak kazan. SELECT ile UPDATE arasına
 	// aynı tokenı kullanan ikinci bir istek girse bile yalnız bir UPDATE satır
 	// etkiler; kaybeden istek kimlik bilgilerini alamaz.
+	// Parola kolonu tüketimle birlikte boşaltılır: kullanılmış satır bir
+	// sonraki token üretimine kadar tabloda kalıyordu ve DB parolasını düz
+	// metin taşıyordu. Kimlik bilgisi yukarıda zaten okundu.
 	res, err := h.DB.ExecContext(r.Context(),
-		`UPDATE pma_tokens SET kullanildi=1
+		`UPDATE pma_tokens SET kullanildi=1, db_parola=''
 		 WHERE token=? AND kullanildi=0 AND son_kullanma >= NOW()`, req.Token)
 	if err != nil {
 		http.Error(w, "token tüketilemedi", http.StatusInternalServerError)
@@ -162,6 +168,10 @@ func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "token zaten kullanılmış veya süresi dolmuş", http.StatusGone)
 		return
 	}
+
+	// Süresi dolmuş (hiç kullanılmamış) satırlar da parola taşır; temizliği
+	// yalnız yeni token üretimine bırakmamak için burada da yapılır.
+	_, _ = h.DB.ExecContext(r.Context(), `DELETE FROM pma_tokens WHERE son_kullanma < NOW() OR kullanildi=1`)
 
 	// 🔴 host DAİMA localhost (socket). Cloud/GCP'de dış IP NIC'te yok → TCP hairpin/denied;
 	// ayrıca DB-user'lar @localhost (socket) kayıtlı → 127.0.0.1 (TCP) eşleşmez. pma-signon.php

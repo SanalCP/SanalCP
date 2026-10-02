@@ -592,6 +592,10 @@ ok "/etc/sanalcp/env (JWT + secret key + DB DSN + Redis admin — kept if presen
 # ============ 6) ARTIFACT DEPLOY ============
 step "6) Panel binary + frontend + migrations"
 install -m 0755 "$A/sanalcp-server" /opt/sanalcp/bin/sanalcp-server
+# Release imza güven çapası: sanalcp-update bundan sonraki her güncellemenin
+# assets/SHA256SUMS imzasını BU dosyaya karşı doğrular (arşivdeki kopyaya değil).
+[ -f "$A/release-signers" ] && install -m 0644 -o root -g root "$A/release-signers" /etc/sanalcp/release-signers \
+  && ok "release imza anahtarı (/etc/sanalcp/release-signers)"
 [ -f "$A/sanalcp-seed-admin" ] && install -m 0755 "$A/sanalcp-seed-admin" /opt/sanalcp/bin/sanalcp-seed-admin
 tar xzf "$A/frontend-dist.tar.gz" -C /opt/sanalcp/frontend-dist && ok "frontend-dist"
 tar xzf "$A/migrations.tar.gz" -C /opt/sanalcp/src/migrations && ok "migrations ($(ls /opt/sanalcp/src/migrations/*.sql 2>/dev/null | wc -l) sql)"
@@ -649,6 +653,28 @@ if [ ! -f /var/www/_default80/index.html ]; then
 SANALCP_DEFAULT_HTML
   chmod 644 /var/www/_default80/index.html
 fi
+# 🔴 Panel nginx → backend proxy anahtarı. _panel.conf'taki $sanalcp_* değişkenleri
+# bu 0600 map dosyasından gelir; dosya yoksa nginx -t "unknown variable" ile düşer.
+# Backend, loopback'ten gelen X-Forwarded-For'a YALNIZ bu anahtarla güvenir — tenant
+# süreçleri 127.0.0.1:8080'e doğrudan bağlanıp IP izin listesini atlatamasın diye.
+# Biçim internal/nginxconf/proxyanahtar.go ile birebir aynıdır (panel açılışta yeniden üretir).
+umask_eski=$(umask); umask 077
+[ -s /etc/sanalcp/proxy-anahtar ] || openssl rand -hex 16 > /etc/sanalcp/proxy-anahtar  # 128 bit — daha uzunu nginx map_hash_bucket_size sınırını aşar
+PROXY_ANAHTAR=$(tr -d '[:space:]' < /etc/sanalcp/proxy-anahtar)
+cat > /etc/nginx/conf.d/_sanalcp_proxy_anahtar.conf <<PROXYMAP
+# SanalCP — panel proxy anahtarı (panel tarafından üretilir; elle düzenlemeyin).
+# 0600 root:root olmalı: tenant'lar bu değeri okuyamamalı.
+map "" \$sanalcp_proxy_anahtari {
+    default "${PROXY_ANAHTAR}";
+}
+map \$http_x_sanalcp_proxy \$sanalcp_istemci_ip {
+    "${PROXY_ANAHTAR}" \$http_x_sanalcp_istemci;
+    default \$remote_addr;
+}
+PROXYMAP
+umask "$umask_eski"
+chmod 600 /etc/sanalcp/proxy-anahtar /etc/nginx/conf.d/_sanalcp_proxy_anahtar.conf
+ok "panel proxy anahtarı (/etc/sanalcp/proxy-anahtar, 0600)"
 cp "$A/nginx/_panel.conf"     /etc/nginx/conf.d/_panel.conf
 cp "$A/nginx/_default80.conf" /etc/nginx/conf.d/_default80.conf
 cp "$A/nginx/_default443.conf" /etc/nginx/conf.d/_default443.conf

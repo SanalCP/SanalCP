@@ -14,6 +14,7 @@ func TestProxyAyarDogrula(t *testing.T) {
 		{Scheme: "file", Host: "127.0.0.1", Port: 3000},
 		{Scheme: "http", Host: "192.168.1.1", Port: 3000},
 		{Scheme: "http", Host: "127.0.0.1", Port: 8080},
+		{Scheme: "http", Host: "127.0.0.1", Port: 8090},
 	} {
 		if err := proxyAyarDogrula(&x); err == nil {
 			t.Fatalf("geçersiz hedef kabul edildi: %+v", x)

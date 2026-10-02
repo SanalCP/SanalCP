@@ -22,6 +22,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/nginxconf"
 	"sanalcp/internal/osfam"
+	"sanalcp/internal/proxyport"
 )
 
 var (
@@ -46,6 +47,9 @@ func Init(d *sql.DB) {
 	// paketten gelmese bile İLK update'te per-user ACL izolasyonu + RAR extract hazır olur.
 	ensureArchiveTools()
 	HealCacheZoneOnStartup()
+	// SIRA ONEMLI: kanonik panel vhost'u proxy anahtari map'ine ($sanalcp_*)
+	// basvurur; map dosyasi heal'in nginx -t'sinden ONCE hazir olmali.
+	healProxyAnahtarOnStartup()
 	// Batch2 sertlestirme: panel vhost'unu kanonik surume esitle + mevcut tenant
 	// vhost/pool'larinin (retroaktif) guvenli yeniden-render'i. Her ikisi de
 	// hash/sentinel + nginx -t rollback korumali → tekrar-guvenli ve kirilmaz.
@@ -53,6 +57,7 @@ func Init(d *sql.DB) {
 	// SIRA ONEMLI: ustteki butunsel yenileme basarili olduysa kanonik conf zaten
 	// NOCACHE v1'i icerir ve asagidaki no-op'tur. Vhost elle duzenlenmis olup
 	// yenileme atlandiysa bu hedefli yama yine de devreye girer.
+	proxyAnahtarGuveniniBelirle()
 	HealPanelIndexNoCacheOnStartup() // Cloud-fix: panel SPA (index.html) no-cache → bayat UI önlenir
 	ensurePMAStartup()               // Cloud-fix: phpMyAdmin GCP/socket (pma-signon.php + token + pool socket + config host=localhost)
 	HealVhostsOnStartup()
@@ -1002,7 +1007,7 @@ func renderAndReload(opts VhostOpts, sk string) error {
 		}
 		opts.ProxyWebSocket = ws == 1
 		if opts.ProxyHost != "127.0.0.1" || (opts.ProxyScheme != "http" && opts.ProxyScheme != "https") ||
-			opts.ProxyPort < 1024 || opts.ProxyPort > 65535 {
+			opts.ProxyPort < 1024 || opts.ProxyPort > 65535 || proxyport.AyrilmisMi(opts.ProxyPort) {
 			return fmt.Errorf("geçersiz reverse proxy hedefi")
 		}
 	}

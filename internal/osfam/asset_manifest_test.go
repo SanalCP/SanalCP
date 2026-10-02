@@ -48,7 +48,8 @@ func TestAssetManifestiTumDosyalariKapsar(t *testing.T) {
 		if rerr != nil {
 			return rerr
 		}
-		if gorece == filepath.Join("assets", "SHA256SUMS") {
+		// Manifest kendini ve kendi imzasını listeleyemez (bkz. scripts/package-release.sh).
+		if gorece == filepath.Join("assets", "SHA256SUMS") || gorece == filepath.Join("assets", "SHA256SUMS.sig") {
 			return nil
 		}
 		if !listelenen[gorece] {

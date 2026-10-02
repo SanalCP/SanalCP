@@ -26,6 +26,7 @@ import (
 	"sanalcp/internal/middleware"
 	"sanalcp/internal/osfam"
 	"sanalcp/internal/provisioner"
+	"sanalcp/internal/proxyport"
 	"sanalcp/internal/redis"
 	"sanalcp/internal/tenanthesap"
 
@@ -260,7 +261,7 @@ func proxyHedefDogrula(req *createReq) error {
 	if req.ProxyPort < 1024 || req.ProxyPort > 65535 {
 		return fmt.Errorf("proxy portu 1024–65535 arasında olmalı")
 	}
-	if req.ProxyPort == 8080 || req.ProxyPort == 8443 || req.ProxyPort == 10080 {
+	if proxyport.AyrilmisMi(req.ProxyPort) {
 		return fmt.Errorf("bu port SanalCP tarafından ayrılmıştır")
 	}
 	return nil
@@ -420,6 +421,16 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 	if err := proxyHedefDogrula(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	// Admin dışındaki roller yeni sitesini başka bir hesabın ya da bir sistem
+	// servisinin yerel portuna yönlendiremez (bkz. internal/proxyport).
+	if siteTipi == "reverse_proxy" {
+		if c := middleware.ClaimsFrom(r); c == nil || c.Role != middleware.RolAdmin {
+			if err := proxyport.TenantIcinDogrula(r.Context(), h.DB, req.ProxyPort, "", -1, 0); err != nil {
+				httpx.WriteError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
 	}
 
 	// Sahip bayiyi SAĞLAMADAN ÖNCE çöz ve doğrula: aşağıdaki Provision Linux

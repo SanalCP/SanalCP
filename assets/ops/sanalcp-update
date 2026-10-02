@@ -5,6 +5,11 @@
 #   sanalcp-update --dry-run  # show what would happen, touch nothing
 #   sanalcp-update --force    # re-apply even if the binary is unchanged
 #   sanalcp-update --branch X # use a different branch (default: main)
+#   sanalcp-update --allow-downgrade  # install an OLDER signed release on purpose
+#
+# INTEGRITY: assets/SHA256SUMS must carry a valid OpenSSH signature
+# (assets/SHA256SUMS.sig) from a key in /etc/sanalcp/release-signers. The trust
+# anchor is the INSTALLED file, never the one inside the download.
 #
 # PRESERVES (never touched): /etc/sanalcp/env (JWT/DB/Redis secrets),
 # the MariaDB `panel` DB + all customer data, /home/c_* sites.
@@ -18,7 +23,8 @@
 set -euo pipefail
 
 REPO="${SANAL_REPO:-sanalcp/sanalcp}"
-BRANCH="main"; DRY=0; FORCE=0
+BRANCH="main"; DRY=0; FORCE=0; DOWNGRADE=0
+SIGNERS=/etc/sanalcp/release-signers   # trust anchor: release signing public key(s)
 PREFIX=/opt/sanalcp
 BIN="$PREFIX/bin/sanalcp-server"
 SEED="$PREFIX/bin/sanalcp-seed-admin"
@@ -33,6 +39,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --force) FORCE=1 ;;
+    --allow-downgrade) DOWNGRADE=1 ;;
     --branch) BRANCH="$2"; shift ;;
     --branch=*) BRANCH="${1#*=}" ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -82,6 +89,32 @@ A="$SRC/assets"
 NEWBIN="$A/sanalcp-server"
 [ -f "$NEWBIN" ] || die "$(t "$A/sanalcp-server yok (repo yapısı beklenenden farklı)" "$A/sanalcp-server missing (repo layout is not what was expected)")"
 [ -f "$A/SHA256SUMS" ] || die "$(t "release bütünlük manifesti yok" "release integrity manifest missing")"
+# 🔴 TEDARİK ZİNCİRİ: SHA256SUMS indirilen arşivin İÇİNDEN geldiği için tek başına
+# yalnız bozulmaya karşı korur; GitHub hesabı/deposu ele geçirilirse saldırgan
+# manifesti de yeniden üretir. Asıl güvence, manifestin yayımcı anahtarıyla
+# imzalanmış olmasıdır. Güven çapası SUNUCUDAKİ $SIGNERS'tır, arşivdeki kopya değil.
+command -v ssh-keygen >/dev/null || die "$(t "ssh-keygen gerekli (openssh) — release imzası doğrulanamaz" "ssh-keygen required (openssh) — cannot verify the release signature")"
+imza_dogrula() {
+  [ -f "$A/SHA256SUMS.sig" ] || return 1
+  ssh-keygen -Y verify -f "$1" -I sanalcp-release -n sanalcp-release \
+    -s "$A/SHA256SUMS.sig" < "$A/SHA256SUMS" >/dev/null 2>&1
+}
+if [ -s "$SIGNERS" ]; then
+  imza_dogrula "$SIGNERS" ||
+    die "$(t "release İMZASI GEÇERSİZ veya eksik ($SIGNERS ile doğrulanamadı) — güncelleme GÜVENLİK NEDENİYLE durduruldu" "release SIGNATURE INVALID or missing (could not verify with $SIGNERS) — update stopped FOR SECURITY")"
+  ok "$(t "release imzası doğrulandı ($SIGNERS)" "release signature verified ($SIGNERS)")"
+  IMZA_TOFU=0
+else
+  # Geçiş: imzalı güncellemeden önce kurulmuş sunucularda güven çapası henüz yok.
+  # Arşivdeki anahtar bu İLK seferde kabul edilir (önceki davranıştan zayıf
+  # değildir); başarılı güncellemeden sonra $SIGNERS'a yazılır ve sonraki her
+  # güncelleme ona karşı doğrulanır.
+  [ -f "$A/release-signers" ] && imza_dogrula "$A/release-signers" ||
+    die "$(t "release imzası yok/geçersiz — güncelleme durduruldu" "release signature missing/invalid — update stopped")"
+  warn "$(t "$SIGNERS yok — release anahtarı bu güncellemeyle İLK KEZ kabul ediliyor (güven-ilk-kullanımda). Parmak izini yayımcıyla doğrulayın:" "$SIGNERS missing — the release key is accepted for the FIRST TIME with this update (trust on first use). Verify its fingerprint with the publisher:")"
+  ssh-keygen -l -f <(awk '{print $3" "$4}' "$A/release-signers") 2>/dev/null | sed 's/^/    /' || true
+  IMZA_TOFU=1
+fi
 (cd "$SRC" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
   die "$(t "release asset SHA-256 doğrulaması başarısız" "release asset SHA-256 verification failed")"
 ok "$(t "release asset bütünlüğü doğrulandı" "release asset integrity verified")"
@@ -107,6 +140,15 @@ fi
 head -c4 "$NEWBIN" | grep -q $'\x7fELF' || die "$(t "indirilen binary geçerli ELF değil — iptal" "downloaded binary is not a valid ELF — aborting")"  # sigpipe-ok
 CURVER=$(surum); [ -n "$CURVER" ] || CURVER="?"
 echo "  $(t "mevcut sürüm: $CURVER" "current version: $CURVER")"
+# Geri döndürme koruması: imzalı ama ESKİ (bilinen açık taşıyan) bir release'i
+# yeniden sunmak da bir saldırıdır. assets/SURUM imzalı manifestin kapsamındadır.
+YENIVER=$(tr -d '[:space:]' < "$A/SURUM" 2>/dev/null || true)
+if [ -n "$YENIVER" ] && [ "$CURVER" != "?" ] && [ "$YENIVER" != "$CURVER" ] &&
+   [ "$(printf '%s\n%s\n' "$YENIVER" "$CURVER" | sort -V | tail -1)" = "$CURVER" ]; then
+  [ "$DOWNGRADE" = 1 ] ||
+    die "$(t "indirilen sürüm ($YENIVER) kurulu sürümden ($CURVER) ESKİ — geri döndürme reddedildi (bilerek yapıyorsanız --allow-downgrade)" "downloaded version ($YENIVER) is OLDER than installed ($CURVER) — downgrade refused (use --allow-downgrade if intended)")"
+  warn "$(t "--allow-downgrade: $CURVER → $YENIVER" "--allow-downgrade: $CURVER → $YENIVER")"
+fi
 # NOTE: reduce every sha256sum to ONLY the hash with cut — otherwise the (random tmp)
 # file path in the output would change RELHASH on every run, and the no-op path would
 # never trigger.
@@ -455,6 +497,13 @@ done
 if [ "$HEALTHY" = 1 ]; then
   systemctl reload nginx >/dev/null 2>&1 || true
   echo "$RELHASH" > "$MARKER" 2>/dev/null || true   # mark this release as applied
+  # Güven çapası: imzası doğrulanmış release'in anahtar dosyası kurulur (ilk
+  # kez veya anahtar rotasyonu — yeni dosya ESKİ anahtarla imzalı manifestin
+  # kapsamında geldiği için güvenlidir).
+  if [ -f "$A/release-signers" ]; then
+    install -m 0644 -o root -g root "$A/release-signers" "$SIGNERS" 2>/dev/null \
+      && { [ "${IMZA_TOFU:-0}" = 1 ] && ok "$(t "release imza anahtarı kuruldu ($SIGNERS)" "release signing key installed ($SIGNERS)")" || true; }
+  fi
   NEWVER=$(surum); [ -n "$NEWVER" ] || NEWVER="?"
   ok "$(t "panel ACTIVE + /healthz OK" "panel ACTIVE + /healthz OK")"
   ok "$(t "kaynak limitleri planlardan uygulanıyor + mevcut siteler per-tenant PHP-FPM izolasyonuna GÜVENLE (self-check + auto-rollback) geçiriliyor (arka planda)" "resource limits are being applied from plans + existing sites are being SAFELY migrated to per-tenant PHP-FPM isolation (self-check + auto-rollback) in the background")"

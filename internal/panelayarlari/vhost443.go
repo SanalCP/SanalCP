@@ -19,8 +19,10 @@ package panelayarlari
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -51,6 +53,11 @@ server {
         proxy_ssl_verify off;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        # _panel.conf istemci IP'sini YALNIZ nginx anahtarı doğruysa bu bloktan
+        # kabul eder (bkz. internal/nginxconf/proxyanahtar.go); aksi hâlde tüm
+        # istekler 127.0.0.1 görünürdü.
+        proxy_set_header X-SanalCP-Proxy $sanalcp_proxy_anahtari;
+        proxy_set_header X-SanalCP-Istemci $remote_addr;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -59,6 +66,26 @@ server {
     }
 }
 `
+
+var panelDomainServerNameRE = regexp.MustCompile(`(?m)^\s*server_name\s+([A-Za-z0-9.-]+);`)
+
+// HealPort443VhostOnStartup: anahtar başlığından önce yazılmış bir panel alan
+// adı vhost'unu güncel şablonla yeniden yazar. Dosya yoksa ya da zaten
+// günceldse no-op; nginx -t başarısız olursa port443VhostYaz eskisini geri koyar.
+func HealPort443VhostOnStartup() {
+	mevcut, err := os.ReadFile(panelDomainVhostYol)
+	if err != nil || strings.Contains(string(mevcut), "X-SanalCP-Istemci") {
+		return
+	}
+	m := panelDomainServerNameRE.FindStringSubmatch(string(mevcut))
+	if m == nil {
+		log.Printf("panel alan adı vhost'u: server_name okunamadı, güncellenmedi (%s)", panelDomainVhostYol)
+		return
+	}
+	if err := port443VhostYaz(m[1]); err != nil {
+		log.Printf("panel alan adı vhost'u güncellenemedi: %v", err)
+	}
+}
 
 // port443VhostYaz: panel domaini için 443'te (port'suz) bir SNI bloğu yazar ve nginx'i
 // güvenle yeniden yükler. nginx -t başarısız olursa ESKİ içerik geri yüklenir (veya
