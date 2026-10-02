@@ -13,6 +13,26 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.71** (2026-10-02) — güvenlik güncellemesi ve imzalı güncellemeler
+
+- Panel, istemci IP adresini yalnız kendi nginx vekilinden gelen ve sunucuya
+  özel bir anahtar taşıyan isteklerde başlıklardan okur. Panel IP izin listesi
+  ve giriş deneme sınırı sunucudaki diğer süreçlerce atlatılamaz. Özel panel
+  alan adı (443) üzerinden gelen isteklerde gerçek istemci IP'si korunur.
+- `sanalcp-update`, release manifestinin imzasını sunucudaki
+  `/etc/sanalcp/release-signers` anahtarıyla doğrular; imzasız veya geçersiz
+  imzalı paket kurulmaz, eski sürüme dönüş `--allow-downgrade` gerektirir.
+  Bu sürüme geçiş eski güncelleme aracıyla yapıldığından doğrulama bir sonraki
+  güncellemeden itibaren zorunludur.
+- Reverse proxy siteleri panelin kendi portlarına yönlendirilemez; yönetici
+  dışındaki roller yalnız boş bir porta veya kendi uygulamalarının portuna
+  yönlendirebilir.
+- phpMyAdmin oturum açma iç ucu dışarıya kapatıldı; tek kullanımlık
+  kimlik bilgileri kullanıldıktan hemen sonra silinir.
+- Ek alan adı silinirken docroot sembolik bağ izlenmeden kaldırılır.
+- Frontend bağımlılıklarındaki yüksek önemli açıklar (axios, undici,
+  brace-expansion) güncellendi.
+
 **0.9.70** (2026-09-29) — ACME ön denemesi ve Node.js/Python uygulamaları
 
 - Let's Encrypt sertifika işlemlerinde üretim CA isteğinden önce staging

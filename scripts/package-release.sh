@@ -104,7 +104,17 @@ IMZA_ANAHTARI="${SANALCP_IMZA_ANAHTARI:-$HOME/.config/sanalcp/release-imza}"
   exit 1
 }
 rm -f assets/SHA256SUMS.sig
-ssh-keygen -Y sign -q -f "$IMZA_ANAHTARI" -n sanalcp-release assets/SHA256SUMS
+# Parola korumalı anahtar: ssh-agent'a yüklüyse (SSH_AUTH_SOCK) imza agent
+# üzerinden atılır ve parola sorulmaz — ssh-keygen -Y sign, -f açık anahtar
+# dosyasını gösterdiğinde özel yarıyı agent'tan kullanır. Değilse ssh-keygen
+# parolayı terminalden sorar.
+IMZA_KAYNAGI="$IMZA_ANAHTARI"
+if [ -f "$IMZA_ANAHTARI.pub" ] && [ -n "${SSH_AUTH_SOCK:-}" ] &&
+   ssh-add -L 2>/dev/null | grep -qF "$(cut -d' ' -f2 "$IMZA_ANAHTARI.pub")"; then
+  IMZA_KAYNAGI="$IMZA_ANAHTARI.pub"
+  echo "  imza ssh-agent üzerinden atılıyor"
+fi
+ssh-keygen -Y sign -q -f "$IMZA_KAYNAGI" -n sanalcp-release assets/SHA256SUMS
 ssh-keygen -Y verify -f assets/release-signers -I sanalcp-release -n sanalcp-release \
   -s assets/SHA256SUMS.sig < assets/SHA256SUMS >/dev/null ||
   { echo "imza assets/release-signers ile doğrulanamadı (yanlış anahtar?)" >&2; exit 1; }
