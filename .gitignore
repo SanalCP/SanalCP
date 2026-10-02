@@ -42,3 +42,6 @@ frontend/tsconfig.tsbuildinfo
 
 # Geçici git worktree'leri (subagent-driven-development vb.)
 .worktrees/
+
+# Claude Code kişisel ayarları (izin kuralları vb.) — depoya girmez
+.claude/settings.local.json

@@ -81,8 +81,11 @@ func TestUseStoresCleanURL(t *testing.T) {
 	defer db.Close()
 	mock.ExpectQuery("SELECT sistem_kullanici, is_demo").WithArgs(int64(42)).WillReturnRows(sqlmock.NewRows([]string{"sk", "demo"}).AddRow("c_test", 0))
 	mock.ExpectQuery("SELECT pat FROM github_connections").WithArgs(int64(42)).WillReturnRows(sqlmock.NewRows([]string{"pat"}).AddRow(encrypted))
-	mock.ExpectQuery("SELECT COALESCE").WithArgs(int64(42)).WillReturnRows(sqlmock.NewRows([]string{"secret"}).AddRow("existing-webhook-secret"))
-	mock.ExpectExec("INSERT INTO git_repos").WithArgs(int64(42), "https://github.com/owner/repo.git", "main", "public_html", "existing-webhook-secret").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT COALESCE").WithArgs(int64(42)).WillReturnRows(sqlmock.NewRows([]string{"secret", "imza"}).AddRow("existing-webhook-secret", ""))
+	// Eski kayıt + otomatik dağıtım yok: GitHub'daki webhook yeniden kurulmadığı
+	// için ayrı imza anahtarı ÜRETİLMEMELİ (boş kalır) — aksi hâlde mevcut
+	// webhook'un imzası kırılırdı.
+	mock.ExpectExec("INSERT INTO git_repos").WithArgs(int64(42), "https://github.com/owner/repo.git", "main", "public_html", "existing-webhook-secret", "").WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec("UPDATE github_connections SET secili_repo").WithArgs("owner/repo", "main", int64(42)).WillReturnResult(sqlmock.NewResult(1, 1))
 	r := chi.NewRouter()
 	r.Post("/{id}", (&Handlers{DB: db}).Use)

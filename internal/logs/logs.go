@@ -147,11 +147,14 @@ func (h *Handlers) Tail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		httpx.WriteError(w, http.StatusInternalServerError, "stream desteklenmiyor")
-		return
-	}
+	// w.(http.Flusher) KULLANILMAZ: üstteki middleware sarmalayıcıları
+	// (metrics vb.) Flush'ı doğrudan dışarı vermez, yalnız Unwrap sağlar; tip
+	// iddiası her istekte başarısız olup canlı günlüğü tamamen kapatıyordu.
+	// ResponseController sarmalayıcı zincirini Unwrap ile çözer.
+	// Flush desteği burada önceden sınanmaz: Flush başlıkları hemen gönderir
+	// ve Content-Type yazılmadan 200 dönerdi.
+	rc := http.NewResponseController(w)
+	flusher := flushFunc(func() { _ = rc.Flush() })
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -262,3 +265,8 @@ func countLines(b []byte) int {
 
 // helper for filepath import order
 var _ = filepath.Base
+
+// flushFunc: http.ResponseController.Flush'ı eski flusher.Flush() çağrılarına uyarlar.
+type flushFunc func()
+
+func (f flushFunc) Flush() { f() }

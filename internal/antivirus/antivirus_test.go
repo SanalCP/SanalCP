@@ -115,7 +115,8 @@ func TestInitSinir(t *testing.T) {
 	if got := MaxConcurrent(); got != 2 {
 		t.Fatalf("MaxConcurrent = %d, beklenen 2", got)
 	}
-	if !acquire() || !acquire() {
+	birinci, ikinci := acquire(), acquire() // her çağrı bir slot alır (yan etkili)
+	if !birinci || !ikinci {
 		t.Fatal("ilk iki acquire başarısız — kuyruk mantığı bozuk")
 	}
 	if acquire() {

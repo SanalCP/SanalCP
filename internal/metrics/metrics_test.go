@@ -37,3 +37,19 @@ func TestMiddlewareVeHandler(t *testing.T) {
 		t.Fatalf("beklenen histogram bulunamadı; çıktı:\n%s", gövde)
 	}
 }
+
+// Canlı günlük (SSE) http.ResponseController ile flush eder; sarmalayıcı
+// Unwrap sağlamazsa flush sessizce başarısız olur ve akış kesilir.
+func TestMiddlewareFlushGecirir(t *testing.T) {
+	var hata error
+	h := Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: x\n\n"))
+		hata = http.NewResponseController(w).Flush()
+	}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if hata != nil || !rec.Flushed {
+		t.Fatalf("flush metrics sarmalayıcısından geçmedi: err=%v flushed=%v", hata, rec.Flushed)
+	}
+}

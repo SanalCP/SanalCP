@@ -2187,7 +2187,7 @@ const panelIndexNoCacheSentinel = "# SANAL-PANEL-NOCACHE v1"
 // kaldırdığı 'unsafe-inline'/'unsafe-eval'i script-src'ye GERİ SOKAR (tam bu
 // bug canlı koddaydı: heal string'i v2'de kalmıştı). TestPanelHealCSPMatchesPanelConf
 // bunu artık otomatik doğruluyor — biri güncellenip diğeri unutulursa test kırılır.
-const panelHealCSP = `add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https: http:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'" always;`
+const panelHealCSP = `add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-src https:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'" always;`
 
 // panelIndexLocRe: panel vhost'unun SPA fallback location'ini (index.html) yakalar.
 // Installer'in yazdigi kanonik bicim: `location / { try_files $uri $uri/ /index.html; }`.

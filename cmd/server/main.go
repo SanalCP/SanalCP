@@ -385,6 +385,9 @@ func main() {
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(cfg.JWTSecret))
+			// Bayi/müşteri 5xx yanıtlarında iç hata ayrıntısı (SQL/exec çıktısı,
+			// yollar) görmez; admin görür. Bkz. middleware.HataAyrintisiGizle.
+			r.Use(middleware.HataAyrintisiGizle)
 			r.Get("/me", usersH.Me)
 			// Footer sürüm bilgisi: her rol (müşteri dahil) erişebilsin —
 			// dış güncelleme/duyuru verisi taşımaz, bkz. system.SurumBilgi.

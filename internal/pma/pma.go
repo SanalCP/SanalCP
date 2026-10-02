@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -139,7 +140,8 @@ func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("pma-redeem: token okunamadı: %v", err)
+		http.Error(w, "token okunamadı", http.StatusInternalServerError)
 		return
 	}
 	if kul == 1 {
