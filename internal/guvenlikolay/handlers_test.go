@@ -10,7 +10,9 @@ import (
 
 func TestAnahtarKararlıVeKapsamlı(t *testing.T) {
 	a := aday{Tur: "yogun_giris_deneme", IP: "192.0.2.10", Ilk: "2026-08-29 10:01:00", Son: "2026-08-29 10:09:00", DomainID: sql.NullInt64{Int64: 7, Valid: true}}
-	if anahtar(a) != anahtar(a) {
+	// İki ayrı çağrı: anahtarın deterministik olduğu (rastgele/harita sırası
+	// içermediği) sınanır.
+	if k1, k2 := anahtar(a), anahtar(a); k1 != k2 {
 		t.Fatal("aynı olay farklı dedup anahtarı üretti")
 	}
 	b := a

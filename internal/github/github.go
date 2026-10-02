@@ -359,19 +359,27 @@ func (h *Handlers) Use(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// git_repos kaydını yaz/güncelle
-	var existingSecret string
+	var existingSecret, existingImza string
 	_ = h.DB.QueryRowContext(r.Context(),
-		`SELECT COALESCE(webhook_secret,'') FROM git_repos WHERE domain_id=?`, id).Scan(&existingSecret)
+		`SELECT COALESCE(webhook_secret,''), COALESCE(webhook_imza,'') FROM git_repos WHERE domain_id=?`, id).
+		Scan(&existingSecret, &existingImza)
 	secret := existingSecret
 	if secret == "" {
 		secret = randomHex(20)
 	}
+	// HMAC anahtarı URL'deki yönlendirme anahtarından ayrıdır (bkz. git.Webhook).
+	// Eski kayıtta yalnız webhook GitHub'da bu istekte yeniden kurulacaksa
+	// üretilir; aksi hâlde GitHub'daki mevcut webhook'un imzası kırılırdı.
+	imza := existingImza
+	if imza == "" && (existingSecret == "" || (req.AutoDeploy && h.WebhookBase != "")) {
+		imza = randomHex(32)
+	}
 	if _, err := h.DB.ExecContext(r.Context(),
-		`INSERT INTO git_repos(domain_id, repo_url, branch, target_dir, deploy_key_pub, webhook_secret, son_durum)
-		 VALUES(?,?,?,?, '', ?, 'beklemede')
+		`INSERT INTO git_repos(domain_id, repo_url, branch, target_dir, deploy_key_pub, webhook_secret, webhook_imza, son_durum)
+		 VALUES(?,?,?,?, '', ?, ?, 'beklemede')
 		 ON DUPLICATE KEY UPDATE repo_url=VALUES(repo_url), branch=VALUES(branch),
-		   target_dir=VALUES(target_dir), webhook_secret=VALUES(webhook_secret)`,
-		id, cloneURL, req.Branch, req.TargetDir, secret); err != nil {
+		   target_dir=VALUES(target_dir), webhook_secret=VALUES(webhook_secret), webhook_imza=VALUES(webhook_imza)`,
+		id, cloneURL, req.Branch, req.TargetDir, secret, imza); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB: "+err.Error())
 		return
 	}
@@ -399,7 +407,7 @@ func (h *Handlers) Use(w http.ResponseWriter, r *http.Request) {
 		hook := ghHook{Name: "web", Active: true, Events: []string{"push"}}
 		hook.Config.URL = hookURL
 		hook.Config.ContentType = "json"
-		hook.Config.Secret = secret
+		hook.Config.Secret = imza
 		// GitHub ile panel arasındaki TLS sertifikası doğrulansın. Self-signed
 		// kurulumlarda otomatik deploy, panel için geçerli sertifika alınana
 		// kadar bilinçli olarak başarısız olur.

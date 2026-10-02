@@ -12,7 +12,7 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string; ipv4: string }
 type Repo = {
   id: number; domain_id: number; repo_url: string; branch: string; target_dir: string;
-  deploy_key_pub: string; webhook_secret: string; son_sync?: string; son_commit?: string; son_durum: string; olusturulma: string
+  deploy_key_pub: string; webhook_secret: string; webhook_imza?: string; son_sync?: string; son_commit?: string; son_durum: string; olusturulma: string
 }
 type GHConn = {
   yok?: boolean
@@ -369,8 +369,10 @@ export default function DomainGitPage() {
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mb-3">GitHub → Repository → Settings → Webhooks → Add webhook. Content type: <code className="font-mono">application/json</code>. Push event yeterli.</p>
                 <div className="space-y-2">
-                  <Sat e="Payload URL" d={`http://${domain?.ipv4 || ''}:8443/api/v1/git-webhook/${repo.webhook_secret}`} kopyalanabilir />
-                  <Sat e="Secret" d={repo.webhook_secret} kopyalanabilir />
+                  {/* 8443 yalnız TLS kabul eder; http:// adresine giden webhook 497→301 yönlendirmesinde düşer. */}
+                  <Sat e="Payload URL" d={`https://${domain?.ipv4 || ''}:8443/api/v1/git-webhook/${repo.webhook_secret}`} kopyalanabilir />
+                  {/* İmza anahtarı URL'den ayrıdır; eski kayıtlarda (webhook_imza boş) URL anahtarı geçerlidir. */}
+                  <Sat e="Secret" d={repo.webhook_imza || repo.webhook_secret} kopyalanabilir />
                   <Sat e="Content type" d="application/json" />
                   <Sat e="Events" d="Just the push event" />
                 </div>

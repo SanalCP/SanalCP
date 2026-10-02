@@ -13,6 +13,22 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.72** (2026-10-02) — güvenlik sertleştirmeleri, canlı günlük ve pano performansı
+
+- Bayi ve müşteri hesapları sunucu hatalarında iç ayrıntı (SQL hata metni,
+  dosya yolları, komut çıktısı) yerine genel bir mesaj ve hata kimliği görür;
+  ayrıntı sunucu günlüğüne aynı kimlikle yazılır. Yönetici ayrıntıyı görmeye
+  devam eder.
+- Git webhook imzası artık adresteki anahtardan ayrı bir anahtarla doğrulanır.
+  Mevcut webhook'lar değişiklik gerektirmeden çalışmaya devam eder; yeni
+  kurulumlarda GitHub'daki "Secret" alanına paneldeki imza anahtarı girilir.
+  Webhook istekleri panel erişim günlüğüne yazılmaz.
+- Eklentilere panel oturum çerezi ve API token'ı iletilmez.
+- Canlı site günlüğü (Günlükler → Canlı) yeniden çalışıyor.
+- Manuel webhook kurulumunda gösterilen adres `https://` olarak düzeltildi.
+- Pano kaynak kullanımı ölçümü hızlandı (~155 ms → ~45 ms) ve aynı anda açık
+  sekmeler tek ölçümü paylaşır.
+
 **0.9.71** (2026-10-02) — güvenlik güncellemesi ve imzalı güncellemeler
 
 - Panel, istemci IP adresini yalnız kendi nginx vekilinden gelen ve sunucuya

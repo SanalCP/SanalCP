@@ -25,7 +25,7 @@ import (
 // "güncelleme var" bildirimi çıkar (bkz. internal/system/surumkontrol.go).
 // 🔴 Kullanıcıya görünür her yeni özellik/düzeltme release'inde bu sabiti
 // (VE surum.json'ı) birlikte bump'lamayı unutma.
-const SurumNo = "0.9.71"
+const SurumNo = "0.9.72"
 
 const PanelSurum = "SanalCP " + SurumNo
 
@@ -134,16 +134,41 @@ func readCPUStat() (cpuStat, error) {
 	return cpuStat{}, fmt.Errorf("cpu satiri bulunamadi")
 }
 
+// cpuOnceki: bir önceki /proc/stat örneği. Yeterince yakınsa CPU yüzdesi onunla
+// fark alınarak hesaplanır ve istek 150 ms uyumaz.
+var (
+	cpuOncekiMu    sync.Mutex
+	cpuOnceki      cpuStat
+	cpuOncekiZaman time.Time
+)
+
+const (
+	cpuEnAzAralik   = 100 * time.Millisecond // daha kısa fark gürültülüdür
+	cpuEnFazlaYas   = 30 * time.Second       // daha eski örnek "şimdi"yi temsil etmez
+	cpuOrnekBekleme = 150 * time.Millisecond
+)
+
 func ReadCPU() (CPUUsage, error) {
-	s1, err := readCPUStat()
-	if err != nil {
-		return CPUUsage{}, err
-	}
-	time.Sleep(150 * time.Millisecond)
 	s2, err := readCPUStat()
 	if err != nil {
 		return CPUUsage{}, err
 	}
+	simdi := time.Now()
+	cpuOncekiMu.Lock()
+	s1, yas, ilk := cpuOnceki, simdi.Sub(cpuOncekiZaman), cpuOncekiZaman.IsZero()
+	cpuOncekiMu.Unlock()
+	if ilk || yas < cpuEnAzAralik || yas > cpuEnFazlaYas || s2.total <= s1.total {
+		// Kullanılabilir önceki örnek yok: eski davranış (kısa bekleme ile fark).
+		s1 = s2
+		time.Sleep(cpuOrnekBekleme)
+		if s2, err = readCPUStat(); err != nil {
+			return CPUUsage{}, err
+		}
+		simdi = time.Now()
+	}
+	cpuOncekiMu.Lock()
+	cpuOnceki, cpuOncekiZaman = s2, simdi
+	cpuOncekiMu.Unlock()
 	totalDelta := float64(s2.total - s1.total)
 	idleDelta := float64(s2.idle - s1.idle)
 	pct := 0.0
@@ -548,41 +573,73 @@ var servisListesi = []struct{ ad, etiket string }{
 // kontrol edilir; is-active tek başına bunu ayırt edemez (kurulu değilse de
 // "inactive" döner).
 func ReadServisler() []ServiceStat {
-	out := make([]ServiceStat, 0, len(servisListesi))
-	type res struct {
-		i      int
-		aktif  bool
-		kurulu bool
+	// 🔴 PERF: eskiden servis başına iki ayrı systemctl süreci (13 servis → 26
+	// fork) çalıştırılıyordu ve pano bunu 4 sn'de bir istiyordu. Artık iki
+	// toplu çağrı yeterli: kurulu unit'ler tek list-unit-files ile, durumlar
+	// tek is-active ile (çıktı, verilen sırayla satır satır döner).
+	adlar := make([]string, 0, len(servisListesi))
+	for _, s := range servisListesi {
+		adlar = append(adlar, s.ad+".service")
 	}
-	ch := make(chan res, len(servisListesi))
-	for i, s := range servisListesi {
-		go func(i int, ad string) {
-			ub, _ := exec.Command("systemctl", "list-unit-files", ad+".service", "--no-legend").Output()
-			kurulu := len(strings.TrimSpace(string(ub))) > 0
-			var aktif bool
-			if kurulu {
-				ab, _ := exec.Command("systemctl", "is-active", ad).Output()
-				aktif = strings.TrimSpace(string(ab)) == "active"
-			}
-			ch <- res{i: i, aktif: aktif, kurulu: kurulu}
-		}(i, s.ad)
-	}
-	mat := make(map[int]res)
-	for i := 0; i < len(servisListesi); i++ {
-		r := <-ch
-		mat[r.i] = r
-	}
-	for i, s := range servisListesi {
-		r := mat[i]
-		if !r.kurulu {
-			continue
+	kurulu := map[string]bool{}
+	ub, _ := exec.Command("systemctl", append([]string{"list-unit-files", "--no-legend", "--no-pager"}, adlar...)...).Output()
+	for _, satir := range strings.Split(string(ub), "\n") {
+		if f := strings.Fields(satir); len(f) > 0 {
+			kurulu[strings.TrimSuffix(f[0], ".service")] = true
 		}
-		out = append(out, ServiceStat{Ad: s.ad, Etiket: s.etiket, Aktif: r.aktif})
+	}
+	var kuruluAdlar []string
+	for _, s := range servisListesi {
+		if kurulu[s.ad] {
+			kuruluAdlar = append(kuruluAdlar, s.ad)
+		}
+	}
+	out := make([]ServiceStat, 0, len(kuruluAdlar))
+	if len(kuruluAdlar) == 0 {
+		return out
+	}
+	// is-active, servislerden biri bile aktif değilse sıfırdan farklı çıkar;
+	// stdout yine de tam döner, bu yüzden hata yok sayılır.
+	ab, _ := exec.Command("systemctl", append([]string{"is-active"}, kuruluAdlar...)...).Output()
+	durumlar := strings.Split(strings.TrimRight(string(ab), "\n"), "\n")
+	aktif := map[string]bool{}
+	for i, ad := range kuruluAdlar {
+		if i < len(durumlar) && strings.TrimSpace(durumlar[i]) == "active" {
+			aktif[ad] = true
+		}
+	}
+	for _, s := range servisListesi {
+		if kurulu[s.ad] {
+			out = append(out, ServiceStat{Ad: s.ad, Etiket: s.etiket, Aktif: aktif[s.ad]})
+		}
 	}
 	return out
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
+// usageOnbellekSuresi: /system/usage sonucunun paylaşıldığı süre. Pano 4 sn'de
+// bir sorar; birden çok açık sekme/kullanıcı aynı ölçümü paylaşır.
+const usageOnbellekSuresi = 2 * time.Second
+
+var (
+	usageMu    sync.Mutex
+	usageSon   Usage
+	usageZaman time.Time
+)
+
+// usageOku: önbellekteki ölçüm tazeyse onu döner; değilse YALNIZ BİR istek
+// ölçer, aynı anda gelen diğerleri kilitte bekleyip aynı sonucu alır.
+func usageOku() Usage {
+	usageMu.Lock()
+	defer usageMu.Unlock()
+	if !usageZaman.IsZero() && time.Since(usageZaman) < usageOnbellekSuresi {
+		return usageSon
+	}
+	usageSon = usageOlc()
+	usageZaman = time.Now()
+	return usageSon
+}
+
+func usageOlc() Usage {
 	cpu, _ := ReadCPU()
 	mem, _ := ReadMem()
 	disk, _ := ReadDisk("/")
@@ -606,11 +663,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	go func() { defer wg.Done(); kotaFSUyumsuz = !kaynaklimit.KotaFSUyumlu() }()
 	wg.Wait()
 
-	httpx.WriteJSON(w, http.StatusOK, Usage{
+	return Usage{
 		Sistem: info, CPU: cpu, Bellek: mem, Swap: swap,
 		Disk: disk, Diskler: diskler, Ag: ag,
 		Servisler: servisler, UptimeSn: ReadUptime(),
 		KotaRebootGerekli: kotaReboot,
 		KotaFSUyumsuz:     kotaFSUyumsuz,
-	})
+	}
+}
+
+func Handler(w http.ResponseWriter, r *http.Request) {
+	httpx.WriteJSON(w, http.StatusOK, usageOku())
 }

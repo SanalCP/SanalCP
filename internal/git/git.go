@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -46,10 +47,13 @@ type Repo struct {
 	TargetDir     string `json:"target_dir"`
 	DeployKeyPub  string `json:"deploy_key_pub"`
 	WebhookSecret string `json:"webhook_secret"`
-	SonSync       string `json:"son_sync,omitempty"`
-	SonCommit     string `json:"son_commit,omitempty"`
-	SonDurum      string `json:"son_durum"`
-	Olusturulma   string `json:"olusturulma"`
+	// WebhookImza: GitHub'ın "Secret" alanına girilecek HMAC anahtarı. Boşsa
+	// eski kayıttır ve imza URL'deki webhook_secret ile doğrulanır.
+	WebhookImza string `json:"webhook_imza"`
+	SonSync     string `json:"son_sync,omitempty"`
+	SonCommit   string `json:"son_commit,omitempty"`
+	SonDurum    string `json:"son_durum"`
+	Olusturulma string `json:"olusturulma"`
 }
 
 type Handlers struct {
@@ -57,7 +61,7 @@ type Handlers struct {
 }
 
 const selectAll = `SELECT id, domain_id, repo_url, branch, target_dir,
-  deploy_key_pub, webhook_secret,
+  deploy_key_pub, webhook_secret, webhook_imza,
   COALESCE(DATE_FORMAT(son_sync,'%Y-%m-%d %H:%i'),''),
   son_commit, son_durum,
   DATE_FORMAT(created_at,'%Y-%m-%d %H:%i')
@@ -66,7 +70,7 @@ const selectAll = `SELECT id, domain_id, repo_url, branch, target_dir,
 func scan(rs interface{ Scan(...any) error }) (Repo, error) {
 	var r Repo
 	err := rs.Scan(&r.ID, &r.DomainID, &r.RepoURL, &r.Branch, &r.TargetDir,
-		&r.DeployKeyPub, &r.WebhookSecret, &r.SonSync, &r.SonCommit, &r.SonDurum, &r.Olusturulma)
+		&r.DeployKeyPub, &r.WebhookSecret, &r.WebhookImza, &r.SonSync, &r.SonCommit, &r.SonDurum, &r.Olusturulma)
 	r.RepoURL = cleanRepoURL(r.RepoURL)
 	return r, err
 }
@@ -358,12 +362,15 @@ func (h *Handlers) Bagla(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	secret := randomHex(20)
+	// Mevcut kayıtta imza anahtarı DEĞİŞTİRİLMEZ: GitHub'a girilmiş eski
+	// webhook'u sessizce kırardı. Yalnız yeni kayıt ayrı anahtar alır.
+	imza := randomHex(32)
 	res, err := h.DB.ExecContext(r.Context(),
-		`INSERT INTO git_repos(domain_id, repo_url, branch, target_dir, deploy_key_pub, webhook_secret, son_durum)
-		 VALUES(?,?,?,?,?,?, 'beklemede')
+		`INSERT INTO git_repos(domain_id, repo_url, branch, target_dir, deploy_key_pub, webhook_secret, webhook_imza, son_durum)
+		 VALUES(?,?,?,?,?,?,?, 'beklemede')
 		 ON DUPLICATE KEY UPDATE repo_url=VALUES(repo_url), branch=VALUES(branch),
 		   target_dir=VALUES(target_dir), deploy_key_pub=VALUES(deploy_key_pub)`,
-		id, req.RepoURL, req.Branch, req.TargetDir, pub, secret)
+		id, req.RepoURL, req.Branch, req.TargetDir, pub, secret, imza)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -496,18 +503,28 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var gid, domainID int64
-	var sk, branch, targetDir, repoURL string
+	var sk, branch, targetDir, repoURL, imza string
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT g.id, g.domain_id, d.sistem_kullanici, g.branch, g.target_dir, g.repo_url
+		`SELECT g.id, g.domain_id, d.sistem_kullanici, g.branch, g.target_dir, g.repo_url, g.webhook_imza
 		 FROM git_repos g JOIN domains d ON d.id=g.domain_id
-		 WHERE g.webhook_secret=? LIMIT 1`, secret).Scan(&gid, &domainID, &sk, &branch, &targetDir, &repoURL)
+		 WHERE g.webhook_secret=? LIMIT 1`, secret).Scan(&gid, &domainID, &sk, &branch, &targetDir, &repoURL, &imza)
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "secret eşleşmedi", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Kimlik doğrulamasız uç: iç hata metni (SQL) dışarı verilmez.
+		log.Printf("git webhook: repo okunamadı: %v", err)
+		http.Error(w, "webhook işlenemedi", http.StatusInternalServerError)
 		return
+	}
+	// 🔴 HMAC anahtarı URL'deki yönlendirme anahtarından ayrıdır: URL nginx/
+	// vekil erişim günlüklerine düşebilir ve günlüğü okuyabilen imza
+	// üretebilirdi. Eski kayıtlarda (webhook_imza boş) geriye uyum için URL
+	// anahtarı kullanılır.
+	hmacAnahtari := secret
+	if imza != "" {
+		hmacAnahtari = imza
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -516,7 +533,7 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "webhook gövdesi çok büyük veya okunamadı", http.StatusRequestEntityTooLarge)
 		return
 	}
-	if !gecerliWebhookImzasi([]byte(secret), body, r.Header.Get("X-Hub-Signature-256")) {
+	if !gecerliWebhookImzasi([]byte(hmacAnahtari), body, r.Header.Get("X-Hub-Signature-256")) {
 		http.Error(w, "webhook imzası geçersiz", http.StatusUnauthorized)
 		return
 	}

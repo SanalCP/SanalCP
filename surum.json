@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.71",
-  "duyuru": "Güvenlik güncellemesi: panel istemci IP doğrulaması, reverse proxy port politikası ve phpMyAdmin iç ucu sertleştirildi; panel güncellemeleri artık imzalı olarak doğrulanır.",
-  "kritik": true,
+  "son_surum": "0.9.72",
+  "duyuru": "Canlı site günlüğü yeniden çalışıyor, pano kaynak kullanımı daha hızlı yükleniyor. Webhook imzaları ayrı anahtarla doğrulanır; bayi ve müşteri hata mesajlarında sunucu iç ayrıntısı gösterilmez.",
+  "kritik": false,
   "yayin_tarihi": "2026-10-02"
 }

@@ -48,6 +48,8 @@ var BilinenHashler = map[string]string{
 	// 0.5.25 – 0.9.70 arası değişmeden kalan sürüm — backend'e proxy anahtarı
 	// göndermiyordu ve /api/v1/internal/ uçlarını dışarı açıyordu.
 	"326c9f550e461cf7b3bf83e9c8c29d4d68c6a4530e84ad0ac43bef8c0a47de1a": "0.5.25-0.9.70",
+	// 0.9.71 — git webhook yolunu erişim günlüğüne yazıyordu, frame-src http: içeriyordu.
+	"52011409e14c19ac0b2583334924e8dde4ab027a155e31789f0bc5ca55404a00": "0.9.71",
 }
 
 // Hash, verilen içeriğin sha256'sını onaltılık olarak döner.

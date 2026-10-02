@@ -15,6 +15,7 @@ package eklenti
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -22,8 +23,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"sanalcp/internal/auth"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/middleware"
 
@@ -137,42 +140,7 @@ func (h *Handlers) Proxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rp := &httputil.ReverseProxy{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", e.soket)
-			},
-			ResponseHeaderTimeout: 0, // SSE: yanıt başlığı uzun sürebilir, sınırlama
-		},
-		Director: func(req *http.Request) {
-			req.URL.Scheme = "http"
-			req.URL.Host = "eklenti" // unix soket — host anlamsız, sabit
-			// /api/v1/eklenti/ai/sohbetler → /sohbetler
-			on := "/api/v1/eklenti/" + ad
-			req.URL.Path = strings.TrimPrefix(req.URL.Path, on)
-			if req.URL.Path == "" {
-				req.URL.Path = "/"
-			}
-			// Kimliği güvenilir header ile geçir — eklenti JWT doğrulamaz,
-			// yalnız core'a (sokete) güvenir.
-			// 🔴 Dışarıdan gelen taklit header'ları ÖNCE TEMİZLE (spoof koruması).
-			req.Header.Del("X-Sanal-Kullanici")
-			req.Header.Del("X-Sanal-Uid")
-			req.Header.Del("X-Sanal-Rol")
-			if c := middleware.ClaimsFrom(req); c != nil {
-				req.Header.Set("X-Sanal-Uid", strconv.FormatInt(c.UserID, 10))
-				req.Header.Set("X-Sanal-Kullanici", c.Username)
-				req.Header.Set("X-Sanal-Rol", c.Role)
-			}
-		},
-		FlushInterval: -1, // SSE: her yazımda anında flush
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			// eklenti ölü olabilir — panel ayakta kalır, kullanıcıya net hata
-			httpx.WriteError(w, http.StatusBadGateway, "eklentiye ulaşılamadı ("+ad+"): "+err.Error())
-		},
-	}
-	rp.ServeHTTP(w, r)
+	eklentiProxy(ad, e.soket).ServeHTTP(w, r)
 }
 
 // SaglikTara — tüm eklentilerin soketini yoklar, cp_eklentiler.saglik günceller.
@@ -223,4 +191,91 @@ func (h *Handlers) SaglikDongusu(ctx context.Context) {
 func (h *Handlers) Routes(r chi.Router) {
 	r.With(middleware.AdminOnly).Get("/eklentiler", h.Liste)
 	r.With(middleware.AdminOnly).HandleFunc("/eklenti/{ad}/*", h.Proxy)
+}
+
+// eklentiProxy: /api/v1/eklenti/{ad}/* isteklerini eklentinin UNIX soketine
+// ileten vekil.
+func eklentiProxy(ad, soket string) *httputil.ReverseProxy {
+	return &httputil.ReverseProxy{
+		Transport: soketTransport(soket),
+		// Rewrite (Director değil): Director'da istemcinin Connection başlığında
+		// listelediği adlar, Director çalıştıktan SONRA hop-by-hop diye silinir;
+		// eklentiye giden kimlik başlıkları istemci tarafından düşürülebilirdi.
+		// Rewrite, hop-by-hop temizliğinden sonra çalışır.
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.Out.URL.Scheme = "http"
+			pr.Out.URL.Host = "eklenti" // unix soket — host anlamsız, sabit
+			// /api/v1/eklenti/ai/sohbetler → /sohbetler
+			on := "/api/v1/eklenti/" + ad
+			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, on)
+			if pr.Out.URL.Path == "" {
+				pr.Out.URL.Path = "/"
+			}
+			if pr.In.URL.RawPath != "" {
+				pr.Out.URL.RawPath = strings.TrimPrefix(pr.In.URL.RawPath, on)
+			}
+			// Panel kimlik bilgisi eklentiye GİTMEZ: eklenti kimliği yalnız
+			// aşağıdaki güvenilir başlıklardan öğrenir. Oturum çerezi (JWT) ve
+			// API token'ı eklentiye geçseydi, ele geçirilmiş ya da hatalı bir
+			// eklenti kullanıcının panel oturumunu yeniden kullanabilirdi.
+			pr.Out.Header.Del("Authorization")
+			cerezsizYaz(pr.Out)
+			// 🔴 Dışarıdan gelen taklit header'ları ÖNCE TEMİZLE (spoof koruması).
+			pr.Out.Header.Del("X-Sanal-Kullanici")
+			pr.Out.Header.Del("X-Sanal-Uid")
+			pr.Out.Header.Del("X-Sanal-Rol")
+			if c := middleware.ClaimsFrom(pr.In); c != nil {
+				pr.Out.Header.Set("X-Sanal-Uid", strconv.FormatInt(c.UserID, 10))
+				pr.Out.Header.Set("X-Sanal-Kullanici", c.Username)
+				pr.Out.Header.Set("X-Sanal-Rol", c.Role)
+			}
+		},
+		FlushInterval: -1, // SSE: her yazımda anında flush
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			// eklenti ölü olabilir — panel ayakta kalır. Soket yolu/ağ hatası
+			// ayrıntısı yalnız günlüğe yazılır.
+			log.Printf("eklenti %s: proxy hatası: %v", ad, err)
+			httpx.WriteError(w, http.StatusBadGateway, "eklentiye ulaşılamadı ("+ad+")")
+		},
+	}
+}
+
+// soketTransportlari: eklenti soketi başına TEK Transport. Eskiden her istekte
+// yeni bir http.Transport kuruluyordu: bağlantılar hiç yeniden kullanılmıyor,
+// IdleConnTimeout tanımsız olduğu için her istek boşta açık kalan bir soket
+// bağlantısı (ve okuyucu goroutine'i) bırakıyordu.
+var (
+	soketTransportMu   sync.Mutex
+	soketTransportlari = map[string]*http.Transport{}
+)
+
+func soketTransport(soket string) *http.Transport {
+	soketTransportMu.Lock()
+	defer soketTransportMu.Unlock()
+	if t, ok := soketTransportlari[soket]; ok {
+		return t
+	}
+	t := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "unix", soket)
+		},
+		ResponseHeaderTimeout: 0, // SSE: yanıt başlığı uzun sürebilir, sınırlama
+		MaxIdleConnsPerHost:   8,
+		IdleConnTimeout:       90 * time.Second,
+	}
+	soketTransportlari[soket] = t
+	return t
+}
+
+// cerezsizYaz: giden istekten panel oturum çerezini çıkarır; eklentinin kendi
+// çerezleri (varsa) korunur.
+func cerezsizYaz(r *http.Request) {
+	cerezler := r.Cookies()
+	r.Header.Del("Cookie")
+	for _, c := range cerezler {
+		if c.Name != auth.OturumCerezAdi {
+			r.AddCookie(c)
+		}
+	}
 }
