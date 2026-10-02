@@ -29,6 +29,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -36,6 +37,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sanalcp/internal/adlar"
 	"sanalcp/internal/dns"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
@@ -92,6 +94,27 @@ func (h *Handlers) hedef(r *http.Request) (id int64, hb hedefBilgi, ok bool) {
 // iki yerde ayrı türetmek dosyaların ayrışmasına yol açardı.
 func confPath(sk, alanAdi string) string  { return provisioner.EkConfPath(sk, alanAdi) }
 func docrootOf(sk, alanAdi string) string { return "/home/" + sk + "/domains/" + alanAdi }
+
+// docrootSil: ek alan adının docroot'unu (~/domains/<alan>) tenant ev dizini
+// içinde, hiçbir symlink izlemeden siler.
+//
+// 🔴 GÜVENLİK: eskiden os.RemoveAll("/home/<sk>/domains/<alan>") root olarak
+// çağrılıyordu. /home/<sk> ve ~/domains tenant'a aittir; tenant "domains"
+// bileşenini başka bir dizine işaret eden bir symlink'le değiştirirse root,
+// jail DIŞINDAKİ <hedef>/<alan> dizinini silerdi. jailpath.Sil yolu
+// openat2(RESOLVE_BENEATH|RESOLVE_NO_SYMLINKS) ile çözer.
+func docrootSil(sk, alanAdi string) {
+	if !adlar.SKGecerli(sk) || alanAdi == "" || strings.ContainsAny(alanAdi, "/\\") || alanAdi == "." || alanAdi == ".." {
+		return
+	}
+	home, err := jailpath.TenantHome(sk)
+	if err != nil {
+		return
+	}
+	if err := jailpath.Sil(home, "domains/"+alanAdi); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("ek alan adı docroot'u silinemedi (%s/domains/%s): %v", home, alanAdi, err)
+	}
+}
 
 // GET /domains/{id}/ek
 func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +252,7 @@ func (h *Handlers) Olustur(w http.ResponseWriter, r *http.Request) {
 		_ = os.Remove(conf)
 		_ = exec.Command("systemctl", "reload", "nginx").Run()
 		if !req.Parked {
-			_ = os.RemoveAll(docroot)
+			docrootSil(hb.sk, alanAdi)
 		}
 		httpx.WriteError(w, http.StatusInternalServerError, "kayıt eklenemedi: "+err.Error())
 		return
@@ -292,11 +315,7 @@ func DeleteEkDomain(ctx context.Context, db *sql.DB, ekID, parentID int64) error
 	_ = exec.Command("systemctl", "reload", "nginx").Run()
 
 	if parked == 0 {
-		docroot := docrootOf(sk, alanAdi)
-		base := "/home/" + sk + "/domains/"
-		if strings.HasPrefix(docroot, base) && filepath.Clean(docroot) != filepath.Clean(base) {
-			_ = os.RemoveAll(docroot)
-		}
+		docrootSil(sk, alanAdi)
 	}
 
 	_ = hesaplar.MySQLDropAllForDomain(db, ekID)

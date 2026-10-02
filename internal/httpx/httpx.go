@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -71,19 +72,44 @@ func SetTrustedProxies(cidrs []*net.IPNet) {
 	trustedProxies.Store(cidrs)
 }
 
+// proxyAnahtari: nginx'in backend'e X-SanalCP-Proxy başlığıyla gönderdiği
+// anahtar (bkz. internal/nginxconf/proxyanahtar.go). Loopback vekilden gelen
+// istemci-IP başlıkları YALNIZ bu anahtar doğruysa kabul edilir.
+var proxyAnahtari atomic.Value // string
+
+// loopbackAnahtarsizGuven: yalnız GEÇİŞ modu — kurulu panel vhost'u anahtar
+// göndermiyorsa (elle düzenlenmiş, otomatik güncellenemedi) eski davranışı
+// korur; bkz. provisioner.proxyAnahtarGuveniniBelirle.
+var loopbackAnahtarsizGuven atomic.Bool
+
+// SetLoopbackAnahtarsizGuven: geçiş modunu açar/kapatır.
+func SetLoopbackAnahtarsizGuven(acik bool) {
+	loopbackAnahtarsizGuven.Store(acik)
+}
+
+// SetProxyAnahtari: nginx proxy anahtarını ayarlar. Boşsa loopback'ten gelen
+// X-Forwarded-For/X-Real-IP hiç kabul edilmez (fail-closed).
+func SetProxyAnahtari(anahtar string) {
+	proxyAnahtari.Store(anahtar)
+}
+
 // ClientIP gerçek istemci adresini döner. r.RemoteAddr (TCP bağlantısının
 // gerçek kaynağı, spoof edilemez) tek güvenilir kaynaktır — X-Forwarded-For
 // ve X-Real-IP yalnızca doğrudan bağlanan taraf SetTrustedProxies ile
 // tanımlanmış güvenilir bir vekil listesindeyse dikkate alınır. Aksi halde
 // bu başlıklar saldırgan tarafından serbestçe ayarlanabilir ve IP-bazlı hız
 // sınırlarını (bkz. middleware.GirisLimiti) atlatmak için kullanılabilir.
+//
+// 🔴 Loopback özel durumdur: 127.0.0.1'e yalnız nginx değil, sunucudaki her
+// tenant süreci de bağlanabilir. Bu yüzden vekil loopback ise başlıklar ancak
+// istek nginx'in anahtarını (X-SanalCP-Proxy) taşıyorsa kabul edilir.
 func ClientIP(r *http.Request) string {
 	host := r.RemoteAddr
 	if i := lastColon(r.RemoteAddr); i > 0 {
 		host = r.RemoteAddr[:i]
 	}
 
-	if isTrustedProxy(r.RemoteAddr) {
+	if isTrustedProxy(r.RemoteAddr) && loopbackVekilDogrulandi(r) {
 		if v := r.Header.Get("X-Forwarded-For"); v != "" {
 			for i := 0; i < len(v); i++ {
 				if v[i] == ',' {
@@ -98,6 +124,29 @@ func ClientIP(r *http.Request) string {
 	}
 
 	return host
+}
+
+// loopbackVekilDogrulandi: doğrudan bağlanan taraf loopback DEĞİLSE true
+// (ayrı bir makinedeki yük dengeleyici TRUSTED_PROXY_CIDRS ile açıkça
+// tanımlanmıştır). Loopback ise isteğin nginx anahtarını taşıması gerekir.
+func loopbackVekilDogrulandi(r *http.Request) bool {
+	h, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		h = r.RemoteAddr
+	}
+	ip := net.ParseIP(strings.Trim(h, "[]"))
+	if ip == nil || !ip.IsLoopback() {
+		return true
+	}
+	if loopbackAnahtarsizGuven.Load() {
+		return true
+	}
+	beklenen, _ := proxyAnahtari.Load().(string)
+	gelen := r.Header.Get("X-SanalCP-Proxy")
+	if beklenen == "" || gelen == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(beklenen), []byte(gelen)) == 1
 }
 
 func isTrustedProxy(remoteAddr string) bool {

@@ -14,8 +14,11 @@ import (
 	"strings"
 	"time"
 
+	"sanalcp/internal/auth"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/jailpath"
 	"sanalcp/internal/provisioner"
+	"sanalcp/internal/proxyport"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -65,7 +68,7 @@ func proxyAyarDogrula(p *ProxyAyar) error {
 	if p.Port < 1024 || p.Port > 65535 {
 		return errors.New("port 1024–65535 arasında olmalı")
 	}
-	if p.Port == 8080 || p.Port == 8443 || p.Port == 10080 {
+	if proxyport.AyrilmisMi(p.Port) {
 		return errors.New("bu port SanalCP tarafından ayrılmıştır")
 	}
 	return nil
@@ -100,16 +103,30 @@ func (h *Handlers) ProxyKaydet(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	var backend, oldScheme, oldHost string
+	var backend, oldScheme, oldHost, sk string
 	var oldPort, oldWS int
-	if err := h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(web_backend,'php-fpm'), proxy_scheme, proxy_host, proxy_port, proxy_websocket
-		FROM domains WHERE id=?`, id).Scan(&backend, &oldScheme, &oldHost, &oldPort, &oldWS); err != nil {
+	if err := h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(web_backend,'php-fpm'), proxy_scheme, proxy_host, proxy_port, proxy_websocket, sistem_kullanici
+		FROM domains WHERE id=?`, id).Scan(&backend, &oldScheme, &oldHost, &oldPort, &oldWS, &sk); err != nil {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
 	if backend != "reverse-proxy" {
 		httpx.WriteError(w, http.StatusConflict, "domain reverse proxy türünde değil")
 		return
+	}
+	// 🔴 Admin dışındaki roller (bayi/müşteri) siteyi başka bir hesabın ya da
+	// bir sistem servisinin yerel portuna yönlendiremez (bkz. internal/proxyport).
+	// Port değişmiyorsa (ör. admin'in ayarladığı hedefte yalnız WebSocket
+	// değiştiriliyor) yeniden denetlenmez.
+	if c := auth.ClaimsFrom(r); (c == nil || c.Role != "admin") && req.Port != oldPort {
+		uid := -1
+		if u, _, ok := jailpath.TenantIDs(sk); ok {
+			uid = u
+		}
+		if err := proxyport.TenantIcinDogrula(r.Context(), h.DB, req.Port, sk, uid, id); err != nil {
+			httpx.WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 	if _, err := h.DB.ExecContext(r.Context(), `UPDATE domains SET proxy_scheme=?, proxy_host=?, proxy_port=?, proxy_websocket=? WHERE id=?`,
 		req.Scheme, req.Host, req.Port, b2i(req.WebSocket), id); err != nil {

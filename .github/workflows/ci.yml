@@ -24,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/installer-bootstrap-test.py
+      - name: Güncelleme — release imza doğrulaması
+        run: bash scripts/release-imza-test.sh
 
   recovery:
     name: Kurtarma — izole rollback kabul testi

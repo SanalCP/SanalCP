@@ -159,6 +159,8 @@ func main() {
 	}
 
 	provisioner.Init(d) // askıya-alma tutarlılığı için provisioner'a DB handle'ı ver
+	// Panel alan adı (443) vhost'u eski şablondaysa proxy anahtarını taşıyacak şekilde yenile.
+	panelayarlari.HealPort443VhostOnStartup()
 	if err := sifrekoruma.HealLegacyFiles(context.Background(), d); err != nil {
 		log.Fatalf("şifreli dizin güvenlik göçü: %v", err)
 	}

@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.70",
-  "duyuru": "Let's Encrypt staging ön denemesi ve Node.js/Python uygulama yönetimi eklendi. Git dağıtımları ayrı sürüm dizininde hazırlanır; sağlık kontrolü başarısız olursa önceki sürüme dönülür.",
-  "kritik": false,
-  "yayin_tarihi": "2026-09-29"
+  "son_surum": "0.9.71",
+  "duyuru": "Güvenlik güncellemesi: panel istemci IP doğrulaması, reverse proxy port politikası ve phpMyAdmin iç ucu sertleştirildi; panel güncellemeleri artık imzalı olarak doğrulanır.",
+  "kritik": true,
+  "yayin_tarihi": "2026-10-02"
 }

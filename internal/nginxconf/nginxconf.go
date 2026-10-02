@@ -45,6 +45,9 @@ var BilinenHashler = map[string]string{
 	// 1.20 (AlmaLinux 9 AppStream) tarafından tanınmıyordu ("unknown directive"),
 	// yerine listen satırlarına http2 parametresi eklendi (bkz. 0.5.25 duyurusu).
 	"5c92ea24317f08fdd48014ca46d09a3c05a20db12aec4785262d8363cc12056c": "0.5.9-0.5.24",
+	// 0.5.25 – 0.9.70 arası değişmeden kalan sürüm — backend'e proxy anahtarı
+	// göndermiyordu ve /api/v1/internal/ uçlarını dışarı açıyordu.
+	"326c9f550e461cf7b3bf83e9c8c29d4d68c6a4530e84ad0ac43bef8c0a47de1a": "0.5.25-0.9.70",
 }
 
 // Hash, verilen içeriğin sha256'sını onaltılık olarak döner.
