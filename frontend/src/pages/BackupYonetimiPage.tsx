@@ -9,6 +9,7 @@ import { T } from '@/lib/tablo'
 type OzetSatir = {
   domain_id: number; alan_adi: string; sayi: number; toplam_b: number; son_yedek: string
   oto_sayi: number; manuel_sayi: number; freq: string; retention: number; manuel_retention: number
+  saklama_gun: number // 0 = gün sınırı yok
 }
 type Ozet = {
   domainler: OzetSatir[]; toplam_boyut_b: number; toplam_yedek: number
@@ -16,6 +17,7 @@ type Ozet = {
   otomatik_domain: number; zamanlama_saat: number
   retention_min: number; retention_max: number
   manuel_ret_min: number; manuel_ret_max: number
+  saklama_gun_min: number; saklama_gun_max: number
 }
 type TopluDurum = {
   calisiyor: boolean; toplam: number; tamamlanan: number; basarisiz: number
@@ -138,7 +140,7 @@ export default function BackupYonetimiPage() {
       <div className="mb-5 flex flex-wrap items-center gap-3 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/60">
         <span className="text-sm text-slate-600 dark:text-slate-300">
           {t('BackupYonetimiPage:schedule.label')} <strong>{o ? zamanlamaMetni(o, t) : '—'}</strong>
-          {o && <> · {otoSaklamaMetni(o, t)} · {manuelSaklamaMetni(o, t)}</>}
+          {o && <> · {otoSaklamaMetni(o, t)}{gunSaklamaMetni(o, t) && <> · {gunSaklamaMetni(o, t)}</>} · {manuelSaklamaMetni(o, t)}</>}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={simdiYedekle} disabled={yedekliyor || !!toplu?.calisiyor}
@@ -193,15 +195,16 @@ export default function BackupYonetimiPage() {
                 <th className={T.baslik}>{t('common:domain')}</th>
                 <th className={`${T.baslik} text-right`}>{t('BackupYonetimiPage:table.backup_count')}</th>
                 <th className={`${T.baslik} text-right`}>{t('BackupYonetimiPage:table.total_size')}</th>
+                <th className={T.baslik}>{t('BackupYonetimiPage:table.retention')}</th>
                 <th className={T.baslik}>{t('BackupYonetimiPage:table.last_backup')}</th>
                 <th className={`${T.baslik} text-right`}>{t('common:actions')}</th>
               </tr>
             </thead>
             <tbody className={`${T.govde} lg:divide-y lg:divide-slate-100 dark:lg:divide-slate-700/60`}>
               {yuk ? (
-                <tr><td colSpan={5} className={T.hucreDurum}>{t('common:loading')}</td></tr>
+                <tr><td colSpan={6} className={T.hucreDurum}>{t('common:loading')}</td></tr>
               ) : !o || o.domainler.length === 0 ? (
-                <tr><td colSpan={5} className={T.hucreDurum}>{t('BackupYonetimiPage:table.no_domain')}</td></tr>
+                <tr><td colSpan={6} className={T.hucreDurum}>{t('BackupYonetimiPage:table.no_domain')}</td></tr>
               ) : (
                 o.domainler.map(d => (
                   <tr key={d.domain_id} className={`${T.satir} lg:hover:bg-slate-50 dark:lg:hover:bg-slate-800/40`}>
@@ -215,6 +218,7 @@ export default function BackupYonetimiPage() {
                       )}
                     </td>
                     <td className={T.hucre} data-etiket={t('BackupYonetimiPage:table.total_size')}><span className="font-mono text-xs text-slate-600 dark:text-slate-300">{d.sayi ? fmtByte(d.toplam_b) : '—'}</span></td>
+                    <td className={T.hucre} data-etiket={t('BackupYonetimiPage:table.retention')}><span className="text-xs text-slate-600 dark:text-slate-300">{domainSaklamaMetni(d, t)}</span></td>
                     <td className={T.hucre} data-etiket={t('BackupYonetimiPage:table.last_backup')}><span className="font-mono text-xs text-slate-500 dark:text-slate-400">{d.son_yedek || <span className="text-slate-400">{t('BackupYonetimiPage:table.never')}</span>}</span></td>
                     <td className={T.hucreAksiyon}>
                       <Link to={`/abonelikler/${d.domain_id}/yedekler`} className="text-xs px-2.5 py-1 border border-slate-200 dark:border-slate-700 rounded-md text-brand-600 dark:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-700">{t('BackupYonetimiPage:table.manage')}</Link>
@@ -330,6 +334,23 @@ function otoSaklamaMetni(o: Ozet, t: Ceviri): string {
   if (!o.otomatik_domain) return t('BackupYonetimiPage:schedule.auto_none')
   if (o.retention_min === o.retention_max) return t('BackupYonetimiPage:schedule.auto_retention', { n: o.retention_max })
   return t('BackupYonetimiPage:schedule.auto_retention_range', { min: o.retention_min, max: o.retention_max })
+}
+
+// Gün sınırı: yalnız otomatik yedeği açık domainlerden hesaplanır. Hiçbirinde
+// sınır yoksa boş döner ve banner'da hiç görünmez (adet metni yeterli).
+function gunSaklamaMetni(o: Ozet, t: Ceviri): string {
+  if (!o.otomatik_domain || o.saklama_gun_max === 0) return ''
+  if (o.saklama_gun_min === 0) return t('BackupYonetimiPage:schedule.days_mixed')
+  if (o.saklama_gun_min === o.saklama_gun_max) return t('BackupYonetimiPage:schedule.days', { n: o.saklama_gun_max })
+  return t('BackupYonetimiPage:schedule.days_range', { min: o.saklama_gun_min, max: o.saklama_gun_max })
+}
+
+// Tablo hücresi: domainin kendi saklama ayarı. Otomatik yedek kapalıysa
+// adet/gün sınırı işlemez, o yüzden yalnız manuel sınır anlamlıdır.
+function domainSaklamaMetni(d: OzetSatir, t: Ceviri): string {
+  if (d.freq === 'none') return t('BackupYonetimiPage:table.retention_auto_off')
+  const adet = t('BackupYonetimiPage:table.retention_count', { n: d.retention })
+  return d.saklama_gun > 0 ? `${adet} · ${t('BackupYonetimiPage:table.retention_days', { n: d.saklama_gun })}` : adet
 }
 
 function manuelSaklamaMetni(o: Ozet, t: Ceviri): string {
