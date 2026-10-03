@@ -13,6 +13,19 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.73** (2026-10-03) — yedekler için gün bazlı saklama süresi
+
+- Yedekleme ekranına "Yedek saklama süresi" ayarı eklendi: gün sınırı yok,
+  3 gün, 5 gün, 1 hafta veya 1 ay. Seçilen süreden eski otomatik yedekler
+  diskten, uzak hedeften ve listeden silinir. Mevcut adet sınırıyla birlikte
+  uygulanır; hangisi önce dolarsa o budar.
+- En yeni otomatik yedek, yaşı ne olursa olsun korunur: yedekleme günlerce
+  hata verse bile elde son sağlam yedek kalır. Manuel yedeklere dokunulmaz.
+- Varsayılan "gün sınırı yok"tur; güncellemeyle hiçbir yedek kendiliğinden
+  silinmez. Ayar kaydedildiği anda uygulanır.
+- Yedek Yöneticisi üst bandında gün sınırı, domain tablosunda her domainin
+  adet ve gün sınırını gösteren "Saklama" sütunu yer alır.
+
 **0.9.72** (2026-10-02) — güvenlik sertleştirmeleri, canlı günlük ve pano performansı
 
 - Bayi ve müşteri hesapları sunucu hatalarında iç ayrıntı (SQL hata metni,
