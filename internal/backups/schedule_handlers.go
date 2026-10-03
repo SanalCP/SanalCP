@@ -25,10 +25,10 @@ func (h *Handlers) GetSchedule(w http.ResponseWriter, r *http.Request) {
 	var last sql.NullString
 	if err := h.DB.QueryRowContext(r.Context(),
 		`SELECT COALESCE(backup_freq,'none'), COALESCE(backup_hour,3), COALESCE(backup_retention,7),
-		        COALESCE(backup_manuel_retention,0),
+		        COALESCE(backup_manuel_retention,0), COALESCE(backup_saklama_gun,0),
 		        DATE_FORMAT(last_backup_at,'%Y-%m-%dT%H:%i:%sZ')
 		 FROM domains WHERE id=?`, id).
-		Scan(&s.Freq, &s.Hour, &s.Retention, &s.ManuelRetention, &last); err != nil {
+		Scan(&s.Freq, &s.Hour, &s.Retention, &s.ManuelRetention, &s.SaklamaGun, &last); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -81,9 +81,15 @@ func (h *Handlers) SetSchedule(w http.ResponseWriter, r *http.Request) {
 	if s.ManuelRetention > 90 {
 		s.ManuelRetention = 90
 	}
+	if s.SaklamaGun < 0 {
+		s.SaklamaGun = 0
+	}
+	if s.SaklamaGun > MaxSaklamaGun {
+		s.SaklamaGun = MaxSaklamaGun
+	}
 	if _, err := h.DB.ExecContext(r.Context(),
-		`UPDATE domains SET backup_freq=?, backup_hour=?, backup_retention=?, backup_manuel_retention=? WHERE id=?`,
-		s.Freq, s.Hour, s.Retention, s.ManuelRetention, id); err != nil {
+		`UPDATE domains SET backup_freq=?, backup_hour=?, backup_retention=?, backup_manuel_retention=?, backup_saklama_gun=? WHERE id=?`,
+		s.Freq, s.Hour, s.Retention, s.ManuelRetention, s.SaklamaGun, id); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "DB güncelleme: "+err.Error())
 		return
 	}
@@ -91,6 +97,11 @@ func (h *Handlers) SetSchedule(w http.ResponseWriter, r *http.Request) {
 	// bunun bir sonraki manuel yedeğe kadar beklemesi ayarı işlevsiz gösterir.
 	if err := pruneManuel(h.DB, id, sk, s.ManuelRetention); err != nil {
 		log.Printf("manuel retention domain=%d: %v", id, err)
+	}
+	// Gün sınırı da aynı gerekçeyle anında uygulanır: "3 gün" seçildiğinde
+	// 3 günden eski otomatik yedekler gece tick'ini beklemeden silinir.
+	if err := pruneEski(h.DB, id, sk, s.SaklamaGun); err != nil {
+		log.Printf("saklama süresi domain=%d: %v", id, err)
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "schedule": s})
 }

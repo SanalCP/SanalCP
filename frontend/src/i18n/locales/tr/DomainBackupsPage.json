@@ -40,6 +40,16 @@
     "hour_label": "Çalışma saati (yerel)",
     "retention_label": "Tutulacak otomatik yedek sayısı",
     "retention_hint": "Bu sayıyı aşan eski OTOMATİK yedekler silinir. Sayı adettir, gün değil.",
+    "keep_days_label": "Yedek saklama süresi",
+    "keep_days_options": {
+      "0": "Gün sınırı yok",
+      "3": "3 gün",
+      "5": "5 gün",
+      "7": "1 hafta",
+      "30": "1 ay"
+    },
+    "keep_days_hint": "{{n}} günden eski OTOMATİK yedekler silinir. En yeni yedek her zaman korunur.",
+    "keep_days_hint_off": "Yalnızca yukarıdaki adet sınırı uygulanır.",
     "manual_retention_label": "Tutulacak manuel yedek sayısı",
     "manual_retention_hint": "En yeni {{n}} manuel yedek tutulur, eskileri silinir. 0 yazarsanız sınır kalkar.",
     "manual_retention_hint_unlimited": "0 = sınırsız. Elle aldığınız yedekler kendiliğinden silinmez; sınır koymak için 1-90 arası bir sayı girin.",

@@ -22,9 +22,17 @@ type Schedule struct {
 	Retention int `json:"retention"`
 	// ManuelRetention: kaç MANUEL yedek tutulacağı. 0 = sınırsız (varsayılan),
 	// yani elle alınan yedek kendiliğinden silinmez. Bkz. migrations/0065.
-	ManuelRetention int    `json:"manuel_retention"`
-	LastBackupAt    string `json:"last_backup_at"` // RFC3339 or empty
+	ManuelRetention int `json:"manuel_retention"`
+	// SaklamaGun: otomatik yedeklerin en fazla kaç gün tutulacağı. 0 = gün
+	// sınırı yok. Retention (adet) ile birlikte uygulanır; hangisi önce
+	// dolarsa o budar. Bkz. migrations/0091.
+	SaklamaGun   int    `json:"saklama_gun"`
+	LastBackupAt string `json:"last_backup_at"` // RFC3339 or empty
 }
+
+// MaxSaklamaGun: API'nin kabul ettiği en uzun saklama süresi. Arayüz yalnızca
+// 3/5/7/30 sunar; üst sınır elle API çağıranlar için bir emniyet kemeridir.
+const MaxSaklamaGun = 365
 
 // Yedek tipleri: DB'deki backups.tip sütununun aldığı iki değer.
 // TipOto scheduler tarafından, TipManuel ise kullanıcı "Yedek Al" dediğinde
@@ -70,6 +78,7 @@ type dueDomain struct {
 	Hour            int
 	Retention       int
 	ManuelRetention int
+	SaklamaGun      int
 	IsDemo          int
 }
 
@@ -86,7 +95,7 @@ func tickOnce(db *sql.DB) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT id, alan_adi, sistem_kullanici,
 		       COALESCE(backup_freq,'none'), COALESCE(backup_hour,3),
-		       COALESCE(backup_retention,7), COALESCE(backup_manuel_retention,0), is_demo,
+		       COALESCE(backup_retention,7), COALESCE(backup_manuel_retention,0), COALESCE(backup_saklama_gun,0), is_demo,
 		       UNIX_TIMESTAMP(last_backup_at)
 		FROM domains
 		WHERE COALESCE(backup_freq,'none') != 'none'
@@ -104,7 +113,7 @@ func tickOnce(db *sql.DB) {
 		var d dueDomain
 		var lastTs sql.NullInt64
 		if err := rows.Scan(&d.ID, &d.AlanAdi, &d.SK, &d.Freq, &d.Hour, &d.Retention,
-			&d.ManuelRetention, &d.IsDemo, &lastTs); err != nil {
+			&d.ManuelRetention, &d.SaklamaGun, &d.IsDemo, &lastTs); err != nil {
 			log.Printf("backup scheduler scan: %v", err)
 			continue
 		}
@@ -137,6 +146,9 @@ func tickOnce(db *sql.DB) {
 		}
 		if err := pruneOld(db, d.ID, d.SK, d.Retention); err != nil {
 			log.Printf("backup retention %s: %v", d.AlanAdi, err)
+		}
+		if err := pruneEski(db, d.ID, d.SK, d.SaklamaGun); err != nil {
+			log.Printf("backup saklama süresi %s: %v", d.AlanAdi, err)
 		}
 		if err := pruneManuel(db, d.ID, d.SK, d.ManuelRetention); err != nil {
 			log.Printf("backup manuel retention %s: %v", d.AlanAdi, err)
@@ -205,6 +217,65 @@ func pruneManuel(db *sql.DB, domainID int64, sk string, keep int) error {
 	return pruneTip(db, domainID, sk, TipManuel, keep)
 }
 
+// pruneEski: `gun` günden eski OTOMATİK yedekleri siler. gun < 1 ise hiçbir
+// şey silinmez (gün sınırı yok).
+//
+// En yeni otomatik yedek, yaşı ne olursa olsun KORUNUR. Yedeklemesi günlerdir
+// hata veren bir domainde (dolu disk, bozuk veritabanı) aksi halde süre
+// dolunca elde kalan son sağlam yedek de silinirdi — yani tam da yedeğe en
+// çok ihtiyaç duyulan anda hiç yedek kalmazdı.
+func pruneEski(db *sql.DB, domainID int64, sk string, gun int) error {
+	if gun < 1 {
+		return nil
+	}
+	if gun > MaxSaklamaGun {
+		gun = MaxSaklamaGun
+	}
+	rows, err := db.Query(
+		`SELECT id, dosya, uzak_durum FROM backups
+		 WHERE domain_id=? AND tip=?
+		   AND created_at < NOW() - INTERVAL ? DAY
+		   AND id < (SELECT MAX(id) FROM backups WHERE domain_id=? AND tip=?)
+		 ORDER BY id`, domainID, TipOto, gun, domainID, TipOto)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var eski []pruneItem
+	for rows.Next() {
+		var it pruneItem
+		if err := rows.Scan(&it.ID, &it.Dosya, &it.UzakDurum); err != nil {
+			continue
+		}
+		eski = append(eski, it)
+	}
+	rows.Close()
+	if len(eski) == 0 {
+		return nil
+	}
+	silYedekler(db, domainID, sk, eski)
+	log.Printf("backup saklama süresi domain=%d: %d yedek silindi (%d günden eski)",
+		domainID, len(eski), gun)
+	return nil
+}
+
+type pruneItem struct {
+	ID        int64
+	Dosya     string
+	UzakDurum string
+}
+
+// silYedekler: verilen kayıtları diskten + uzak hedeften + DB'den siler.
+func silYedekler(db *sql.DB, domainID int64, sk string, items []pruneItem) {
+	for _, it := range items {
+		yol := filepath.Join(BackupRoot, sk, it.Dosya)
+		_ = os.Remove(yol)
+		deleteRemoteBestEffort(db, domainID, it.Dosya, it.UzakDurum)
+		_, _ = db.Exec(`DELETE FROM backups WHERE id=?`, it.ID)
+	}
+}
+
 // pruneTip: tek bir yedek tipi içinde en yeni `keep` kaydı bırakır, gerisini
 // diskten + uzak hedeften + DB'den siler.
 func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
@@ -217,14 +288,9 @@ func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
 	}
 	defer rows.Close()
 
-	type item struct {
-		ID        int64
-		Dosya     string
-		UzakDurum string
-	}
-	var all []item
+	var all []pruneItem
 	for rows.Next() {
-		var it item
+		var it pruneItem
 		if err := rows.Scan(&it.ID, &it.Dosya, &it.UzakDurum); err != nil {
 			continue
 		}
@@ -237,12 +303,7 @@ func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
 	// En yeni N tut, geri kalan sil
 	old := all[keep:]
 	sort.Slice(old, func(i, j int) bool { return old[i].ID < old[j].ID })
-	for _, it := range old {
-		yol := filepath.Join(BackupRoot, sk, it.Dosya)
-		_ = os.Remove(yol)
-		deleteRemoteBestEffort(db, domainID, it.Dosya, it.UzakDurum)
-		_, _ = db.Exec(`DELETE FROM backups WHERE id=?`, it.ID)
-	}
+	silYedekler(db, domainID, sk, old)
 	log.Printf("backup retention domain=%d tip=%s: %d eski yedek silindi (keep %d)",
 		domainID, tip, len(old), keep)
 	return nil

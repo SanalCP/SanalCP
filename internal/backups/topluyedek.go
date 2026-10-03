@@ -74,7 +74,7 @@ func (h *Handlers) HepsiniYedekle(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(),
 		`SELECT d.id, d.alan_adi, d.sistem_kullanici,
 		        COALESCE(d.backup_freq,'none'), COALESCE(d.backup_retention,7),
-		        COALESCE(d.backup_manuel_retention,0)
+		        COALESCE(d.backup_manuel_retention,0), COALESCE(d.backup_saklama_gun,0)
 		 FROM domains d`+kosul+ek+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
@@ -84,7 +84,7 @@ func (h *Handlers) HepsiniYedekle(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d dueDomain
 		if err := rows.Scan(&d.ID, &d.AlanAdi, &d.SK, &d.Freq, &d.Retention,
-			&d.ManuelRetention); err != nil {
+			&d.ManuelRetention, &d.SaklamaGun); err != nil {
 			continue
 		}
 		hedefler = append(hedefler, d)
@@ -162,6 +162,9 @@ func topluCalistir(db *sql.DB, hedefler []dueDomain) {
 		}
 		if err := pruneManuel(db, d.ID, d.SK, d.ManuelRetention); err != nil {
 			log.Printf("toplu yedek manuel retention %s: %v", d.AlanAdi, err)
+		}
+		if err := pruneEski(db, d.ID, d.SK, d.SaklamaGun); err != nil {
+			log.Printf("toplu yedek saklama süresi %s: %v", d.AlanAdi, err)
 		}
 	}
 	topluMu.Lock()

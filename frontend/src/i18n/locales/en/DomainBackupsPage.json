@@ -40,6 +40,16 @@
     "hour_label": "Run hour (local)",
     "retention_label": "Number of automatic backups to keep",
     "retention_hint": "Older AUTOMATIC backups beyond this number are deleted. This is a count, not days.",
+    "keep_days_label": "Backup retention period",
+    "keep_days_options": {
+      "0": "No day limit",
+      "3": "3 days",
+      "5": "5 days",
+      "7": "1 week",
+      "30": "1 month"
+    },
+    "keep_days_hint": "AUTOMATIC backups older than {{n}} days are deleted. The newest backup is always kept.",
+    "keep_days_hint_off": "Only the count limit above applies.",
     "manual_retention_label": "Number of manual backups to keep",
     "manual_retention_hint": "The newest {{n}} manual backups are kept, older ones deleted. Enter 0 to remove the limit.",
     "manual_retention_hint_unlimited": "0 = unlimited. Backups you take by hand are never auto-deleted; enter 1-90 to set a limit.",
