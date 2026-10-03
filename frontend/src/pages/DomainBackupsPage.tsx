@@ -20,9 +20,13 @@ type Schedule = {
   freq: 'none' | 'daily' | 'weekly' | 'monthly'; hour: number
   retention: number          // kaç OTOMATİK yedek tutulacak
   manuel_retention: number   // kaç MANUEL yedek tutulacak — 0 = sınırsız
+  saklama_gun: number        // OTOMATİK yedekler en fazla kaç gün tutulur — 0 = gün sınırı yok
   last_backup_at?: string
 }
-const bosSchedule: Schedule = { freq: 'none', hour: 3, retention: 7, manuel_retention: 0 }
+const bosSchedule: Schedule = { freq: 'none', hour: 3, retention: 7, manuel_retention: 0, saklama_gun: 0 }
+
+// Saklama süresi seçenekleri (gün). 0 = gün sınırı yok, yalnız adet sınırı geçerli.
+const SAKLAMA_GUNLERI = [0, 3, 5, 7, 30] as const
 type Destination = {
   yok?: boolean
   id?: number; tip?: DestTip; host?: string; port?: number
@@ -358,7 +362,7 @@ export default function DomainBackupsPage() {
         </div>
 
         {sched.freq !== 'none' && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:schedule.hour_label')}</span>
               <select
@@ -379,6 +383,23 @@ export default function DomainBackupsPage() {
                 disabled={schedKayit}
                 className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm font-mono"/>
               <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5 block">{t('DomainBackupsPage:schedule.retention_hint')}</span>
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:schedule.keep_days_label')}</span>
+              <select
+                value={sched.saklama_gun}
+                onChange={e => scheduleKaydet({ ...sched, saklama_gun: Number(e.target.value) })}
+                disabled={schedKayit}
+                className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-800">
+                {SAKLAMA_GUNLERI.map(g =>
+                  <option key={g} value={g}>{t(`DomainBackupsPage:schedule.keep_days_options.${g}`)}</option>
+                )}
+              </select>
+              <span className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5 block">
+                {sched.saklama_gun === 0
+                  ? t('DomainBackupsPage:schedule.keep_days_hint_off')
+                  : t('DomainBackupsPage:schedule.keep_days_hint', { n: sched.saklama_gun })}
+              </span>
             </label>
           </div>
         )}

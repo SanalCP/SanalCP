@@ -123,6 +123,7 @@ type OzetSatir struct {
 	Freq            string `json:"freq"`
 	Retention       int    `json:"retention"`
 	ManuelRetention int    `json:"manuel_retention"`
+	SaklamaGun      int    `json:"saklama_gun"` // 0 = gün sınırı yok
 }
 
 // otomatikDosya: dosya adından yedeğin otomatik mi olduğunu söyler.
@@ -142,7 +143,8 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(),
 		`SELECT d.id, d.alan_adi, d.sistem_kullanici,
 		        COALESCE(d.backup_freq,'none'), COALESCE(d.backup_hour,3),
-		        COALESCE(d.backup_retention,7), COALESCE(d.backup_manuel_retention,0)
+		        COALESCE(d.backup_retention,7), COALESCE(d.backup_manuel_retention,0),
+		        COALESCE(d.backup_saklama_gun,0)
 		 FROM domains d`+kosul+` ORDER BY d.alan_adi`, arg...)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
@@ -159,13 +161,16 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	saatKarisik := false
 	retMin, retMax := 0, 0
 	manRetMin, manRetMax := -1, -1
+	// Gün sınırı yalnız otomatik yedeği açık domainlerde anlamlıdır. 0 = sınır
+	// yok; min 0 ama max > 0 ise domainler karışık ayardadır.
+	gunMin, gunMax := -1, -1
 	for rows.Next() {
 		var id int64
 		var alanAdi, sk string
 		var hour int
 		s := OzetSatir{}
 		if err := rows.Scan(&id, &alanAdi, &sk, &s.Freq, &hour,
-			&s.Retention, &s.ManuelRetention); err != nil {
+			&s.Retention, &s.ManuelRetention, &s.SaklamaGun); err != nil {
 			continue
 		}
 		s.DomainID, s.AlanAdi = id, alanAdi
@@ -207,6 +212,12 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 			if s.Retention > retMax {
 				retMax = s.Retention
 			}
+			if gunMin == -1 || s.SaklamaGun < gunMin {
+				gunMin = s.SaklamaGun
+			}
+			if s.SaklamaGun > gunMax {
+				gunMax = s.SaklamaGun
+			}
 		}
 		if manRetMin == -1 || s.ManuelRetention < manRetMin {
 			manRetMin = s.ManuelRetention
@@ -227,6 +238,9 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 	if manRetMin == -1 {
 		manRetMin, manRetMax = 0, 0
 	}
+	if gunMin == -1 {
+		gunMin, gunMax = 0, 0
+	}
 	var hedefSayisi int
 	_ = h.DB.QueryRow(`SELECT COUNT(*) FROM backup_destinations WHERE aktif=1`).Scan(&hedefSayisi)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
@@ -242,6 +256,8 @@ func (h *Handlers) Ozet(w http.ResponseWriter, r *http.Request) {
 		"retention_max":   retMax,
 		"manuel_ret_min":  manRetMin,
 		"manuel_ret_max":  manRetMax,
+		"saklama_gun_min": gunMin,
+		"saklama_gun_max": gunMax,
 	})
 }
 

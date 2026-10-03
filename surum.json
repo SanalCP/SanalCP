@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.72",
-  "duyuru": "Canlı site günlüğü yeniden çalışıyor, pano kaynak kullanımı daha hızlı yükleniyor. Webhook imzaları ayrı anahtarla doğrulanır; bayi ve müşteri hata mesajlarında sunucu iç ayrıntısı gösterilmez.",
+  "son_surum": "0.9.73",
+  "duyuru": "Yedekleme ekranına saklama süresi ayarı geldi: otomatik yedekler 3 gün, 5 gün, 1 hafta veya 1 ay sonra kendiliğinden silinebilir. Yedek Yöneticisi her domainin saklama ayarını gösterir.",
   "kritik": false,
-  "yayin_tarihi": "2026-10-02"
+  "yayin_tarihi": "2026-10-03"
 }
