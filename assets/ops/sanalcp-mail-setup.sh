@@ -389,15 +389,41 @@ SQL
     DESKEY=$(openssl rand -hex 16)
     echo "PANEL_ROUNDCUBE_DES_KEY=${DESKEY}" >> "$ENV"
   fi
+  # 🔴 CANLIDA BULUNDU (Debian): sahiplik "apache" diye sabit yazılıydı. Debian'da
+  # havuz www-data ile çalışır ve apache kullanıcısı yoktur → iki chown da SESSİZCE
+  # başarısız oldu, config.inc.php root:root 640 kaldı. Roundcube config'i okuyamayıp
+  # DB'ye parolasız bağlanmaya çalıştı ("using password: NO") ve TÜM domainlerin
+  # webmail'i "Internal Error" verdi. Kullanıcı kurulu havuzdan okunur (sanalcp-repair'in
+  # phpMyAdmin bölümüyle aynı desen).
+  RCPOOL="$SYS_PHP_POOL_DIR/roundcube.conf"
+  RCUSER=$(awk -F= '/^[[:space:]]*user[[:space:]]*=/{gsub(/ /,"",$2);print $2}' "$RCPOOL" 2>/dev/null)
+  RCGROUP=$(awk -F= '/^[[:space:]]*group[[:space:]]*=/{gsub(/ /,"",$2);print $2}' "$RCPOOL" 2>/dev/null)
+  RCUSER=${RCUSER:-$(debian_mi && echo "$WEB_USER" || echo apache)}
+  RCGROUP=${RCGROUP:-$RCUSER}
+  if ! id -u "$RCUSER" >/dev/null 2>&1 || ! getent group "$RCGROUP" >/dev/null 2>&1; then
+    log "✗ roundcube havuz kullanıcısı/grubu yok (${RCUSER}:${RCGROUP}, havuz: $RCPOOL)"
+    exit 1
+  fi
+
   mkdir -p /opt/roundcube/config
   sed -e "s/DB_PASS_BURAYA/${RCDBPASS}/" -e "s/DES_KEY_BURAYA/${DESKEY}/" \
     "$TMPL/roundcube/config.inc.php.tmpl" > /opt/roundcube/config/config.inc.php
-  chown root:apache /opt/roundcube/config/config.inc.php
-  chmod 640 /opt/roundcube/config/config.inc.php
 
   mkdir -p /var/lib/roundcube/sessions /var/lib/roundcube/temp
-  chown -R apache:apache /opt/roundcube /var/lib/roundcube
-  restorecon -R /opt/roundcube /var/lib/roundcube >/dev/null 2>&1
+  # -R ÖNCE: sonra çalışırsa config.inc.php'nin root:<grup> sahipliğini ezer.
+  chown -R "$RCUSER:$RCGROUP" /opt/roundcube /var/lib/roundcube \
+    || { log "✗ roundcube dizin sahipliği ayarlanamadı"; exit 1; }
+  chown "root:$RCGROUP" /opt/roundcube/config/config.inc.php \
+    && chmod 640 /opt/roundcube/config/config.inc.php \
+    || { log "✗ config.inc.php izinleri ayarlanamadı"; exit 1; }
+  rhel_mi && restorecon -R /opt/roundcube /var/lib/roundcube >/dev/null 2>&1
+
+  # Sessiz bozulmayı yakala: havuz kullanıcısı config'i okuyup log/temp/session'a yazabilmeli.
+  for rcp in "-r /opt/roundcube/config/config.inc.php" "-w /opt/roundcube/logs" \
+             "-w /var/lib/roundcube/temp" "-w /var/lib/roundcube/sessions"; do
+    # shellcheck disable=SC2086
+    runuser -u "$RCUSER" -- test $rcp || { log "✗ ${RCUSER} için erişim yok: test $rcp"; exit 1; }
+  done
   # php-fpm pool'u (assets/php-fpm/roundcube.conf) install.sh'ın "ARTIFACT DEPLOY" adımında
   # zaten $SYS_PHP_POOL_DIR/roundcube.conf'a kopyalanmış olmalı (phpmyadmin.conf ile aynı
   # desen). Birim adı da aileye göre değişir: php-fpm ↔ php8.3-fpm.

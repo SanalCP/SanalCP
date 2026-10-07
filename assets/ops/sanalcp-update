@@ -404,8 +404,33 @@ $config['smtp_conn_options'] = [
     ],
 ];
 RCEOF
-  systemctl reload php-fpm >/dev/null 2>&1 || systemctl restart php-fpm >/dev/null 2>&1 || true
+  systemctl reload "${SYS_PHP_SVC:-php-fpm}" >/dev/null 2>&1 || systemctl restart "${SYS_PHP_SVC:-php-fpm}" >/dev/null 2>&1 || true
   ok "$(t "webmail SMTP ayarı onarıldı (giden e-posta kimlik doğrulaması)" "webmail SMTP settings repaired (outgoing mail authentication)")"
+fi
+
+# Roundcube permission heal — 🔴 LIVE BUG (Debian): sanalcp-mail-setup.sh hard-coded
+# the owner as "apache". On Debian the pool runs as www-data and there is no apache
+# user, so both chowns failed SILENTLY: config.inc.php stayed root:root 640, Roundcube
+# could not read it, connected to the DB without a password ("using password: NO") and
+# webmail showed "Internal Error" for EVERY domain. Existing installs never re-run
+# mail-setup, so repair in place. Idempotent: only acts when the pool user lacks access.
+RCPOOL="${SYS_PHP_POOL_DIR:-/etc/php-fpm.d}/roundcube.conf"
+if [ -f "$RCCFG" ] && [ -f "$RCPOOL" ]; then
+  RCUSER=$(awk -F= '/^[[:space:]]*user[[:space:]]*=/{gsub(/ /,"",$2);print $2}' "$RCPOOL")
+  RCGROUP=$(awk -F= '/^[[:space:]]*group[[:space:]]*=/{gsub(/ /,"",$2);print $2}' "$RCPOOL")
+  RCGROUP=${RCGROUP:-$RCUSER}
+  if [ -n "$RCUSER" ] && id -u "$RCUSER" >/dev/null 2>&1 \
+     && ! { runuser -u "$RCUSER" -- test -r "$RCCFG" \
+            && runuser -u "$RCUSER" -- test -w /opt/roundcube/logs \
+            && runuser -u "$RCUSER" -- test -w /var/lib/roundcube/temp \
+            && runuser -u "$RCUSER" -- test -w /var/lib/roundcube/sessions; } 2>/dev/null; then
+    mkdir -p /var/lib/roundcube/sessions /var/lib/roundcube/temp
+    chown -R "$RCUSER:$RCGROUP" /opt/roundcube /var/lib/roundcube || true
+    { chown "root:$RCGROUP" "$RCCFG" && chmod 640 "$RCCFG"; } || true
+    rhel_mi && restorecon -R /opt/roundcube /var/lib/roundcube >/dev/null 2>&1 || true
+    systemctl reload "${SYS_PHP_SVC:-php-fpm}" >/dev/null 2>&1 || systemctl restart "${SYS_PHP_SVC:-php-fpm}" >/dev/null 2>&1 || true
+    ok "$(t "webmail dosya izinleri onarıldı ($RCUSER)" "webmail file permissions repaired ($RCUSER)")"
+  fi
 fi
 
 # 10b) Disk quota GRUB config — 🔴 LIVE SERVER: DO NOT AUTO-REBOOT.
