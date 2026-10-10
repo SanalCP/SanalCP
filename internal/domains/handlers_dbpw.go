@@ -30,8 +30,8 @@ func (h *Handlers) SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
 	if req.Parola == "" {
 		req.Parola = hesaplar.RandomParola(24)
 	}
-	if len(req.Parola) < 6 {
-		httpx.WriteError(w, http.StatusBadRequest, "parola en az 6 karakter olmalı")
+	if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
+		httpx.WriteError(w, http.StatusBadRequest, neden)
 		return
 	}
 

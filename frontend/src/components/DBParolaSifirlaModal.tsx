@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Modal from './Modal'
 import ParolaGirdisi from './ParolaGirdisi'
+import { parolaGucluMu } from '@/lib/parola'
 
 type DB = { id: number; db_adi: string; db_kullanici: string }
 
@@ -21,7 +22,7 @@ export default function DBParolaSifirlaModal({ db, onKapat, onTamam }: {
   const [yeniPw, setYeniPw] = useState<string | null>(null)
 
   async function sifirla(rastgele: boolean) {
-    if (!rastgele && ozelPw.length < 6) {
+    if (!rastgele && !parolaGucluMu(ozelPw)) {
       setHata(t('DBParolaSifirlaModal:custom_password_too_short'))
       return
     }

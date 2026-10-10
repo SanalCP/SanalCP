@@ -87,8 +87,8 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
 		return
 	}
-	if len(b.Yeni) < ParolaEnAzKarakter {
-		httpx.WriteError(w, http.StatusBadRequest, "yeni parola en az 8 karakter olmalı")
+	if ok, neden := ParolaGucluMu(b.Yeni); !ok {
+		httpx.WriteError(w, http.StatusBadRequest, "yeni "+neden)
 		return
 	}
 

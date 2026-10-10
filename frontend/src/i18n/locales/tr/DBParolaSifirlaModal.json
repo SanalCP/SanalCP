@@ -3,7 +3,7 @@
   "reset_user_desc": "{{kullanici}} kullanıcısının parolası MariaDB ve panel'de eşzamanlı güncellenir.",
   "custom_password_label": "Özel parola (boş bırakırsanız rastgele)",
   "custom_password_placeholder": "En az 6 karakter",
-  "custom_password_too_short": "Parola en az 6 karakter olmalı",
+  "custom_password_too_short": "Parola en az 12 karakter olmalı ve harf ile rakam içermeli",
   "reset_failed": "Parola sıfırlama başarısız",
   "cancel": "İptal",
   "set_this": "Bunu Ayarla",

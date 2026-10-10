@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ParolaGirdisi from '@/components/ParolaGirdisi'
+import { parolaGucluMu } from '@/lib/parola'
 import { useAuth } from '@/store/auth'
 import { setLang, type Lang } from '@/i18n'
 
@@ -134,7 +135,7 @@ export default function SettingsPage() {
 
   async function parolaDegistir(e: React.FormEvent) {
     e.preventDefault(); setPaOk(''); setPaErr('')
-    if (yeni.length < 8) { setPaErr(t('SettingsPage:password.too_short')); return }
+    if (!parolaGucluMu(yeni)) { setPaErr(t('SettingsPage:password.too_short')); return }
     if (yeni !== yeni2) { setPaErr(t('SettingsPage:password.mismatch')); return }
     setPaYuk(true)
     try {

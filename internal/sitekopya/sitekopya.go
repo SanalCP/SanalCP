@@ -285,9 +285,17 @@ func adjustAppURLs(ctx context.Context, target sqlimport.Hedef, oldHost, newHost
 		}
 		var q string
 		if strings.HasSuffix(table, "_options") {
-			q = fmt.Sprintf("UPDATE `%s` SET option_value='http://%s' WHERE option_name IN ('home','siteurl');", table, sqlString(newHost))
+			// Tablo adı GecerliDBKimlik'ten geçti; yine de MySQLIdent ile
+			// backtick'liyoruz. Değerler MySQLStringLiteral ile kaçırılıyor —
+			// sqlString'in eksik kaçışı (NUL/LF/Ctrl+Z) kapatıldı.
+			q = fmt.Sprintf("UPDATE %s SET option_value=%s WHERE option_name IN ('home','siteurl');",
+				hesaplar.MySQLIdent(table), hesaplar.MySQLStringLiteral("http://"+newHost))
 		} else if strings.HasSuffix(table, "_shop_url") {
-			q = fmt.Sprintf("UPDATE `%s` SET domain='%s',domain_ssl='%s' WHERE domain IN ('%s','www.%s') OR domain_ssl IN ('%s','www.%s');", table, sqlString(newHost), sqlString(newHost), sqlString(oldHost), sqlString(oldHost), sqlString(oldHost), sqlString(oldHost))
+			nh := hesaplar.MySQLStringLiteral(newHost)
+			oh := hesaplar.MySQLStringLiteral(oldHost)
+			ohw := hesaplar.MySQLStringLiteral("www." + oldHost)
+			q = fmt.Sprintf("UPDATE %s SET domain=%s,domain_ssl=%s WHERE domain IN (%s,%s) OR domain_ssl IN (%s,%s);",
+				hesaplar.MySQLIdent(table), nh, nh, oh, ohw, oh, ohw)
 		}
 		if q != "" {
 			_ = sqlimport.Uygula(ctx, target, strings.NewReader(q))
@@ -295,9 +303,6 @@ func adjustAppURLs(ctx context.Context, target sqlimport.Hedef, oldHost, newHost
 	}
 }
 
-func sqlString(v string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(v, `\`, `\\`), `'`, `\'`)
-}
 func nullable(v sql.NullInt64) any {
 	if v.Valid {
 		return v.Int64

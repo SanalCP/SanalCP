@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"sanalcp/internal/adlar"
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/provisioner"
 )
 
@@ -318,8 +319,8 @@ func MySQLLimitUygula(ctx context.Context, db *sql.DB, domainID int64, l Limitle
 				continue
 			}
 			stmt := fmt.Sprintf(
-				"ALTER USER '%s'@'%s' WITH MAX_USER_CONNECTIONS %d MAX_QUERIES_PER_HOUR %d MAX_UPDATES_PER_HOUR %d;",
-				user, host,
+				"ALTER USER %s WITH MAX_USER_CONNECTIONS %d MAX_QUERIES_PER_HOUR %d MAX_UPDATES_PER_HOUR %d;",
+				hesaplar.MySQLUserHost(user, host),
 				nonNeg(l.MySQLMaxBaglanti), nonNeg(l.DBMaxQueriesPerHr), nonNeg(l.DBMaxUpdatesPerHr))
 			if out, e := exec.CommandContext(ctx, "mysql", "-uroot", "-e", stmt).CombinedOutput(); e != nil {
 				log.Printf("governor ALTER %s@%s başarısız: %s: %v", user, host, strings.TrimSpace(string(out)), e)
@@ -344,7 +345,7 @@ func mysqlUserHosts(ctx context.Context, user string) []string {
 		return nil
 	}
 	out, err := exec.CommandContext(ctx, "mysql", "-uroot", "-N", "-B", "-e",
-		fmt.Sprintf("SELECT Host FROM mysql.user WHERE User='%s'", user)).Output()
+		fmt.Sprintf("SELECT Host FROM mysql.user WHERE User=%s", hesaplar.MySQLStringLiteral(user))).Output()
 	if err != nil {
 		return nil
 	}

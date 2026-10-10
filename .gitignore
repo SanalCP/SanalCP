@@ -17,6 +17,7 @@ yarn-error.log*
 # --- Ortam / gizli ---
 .env
 .env.*
+!.env.local.example
 *.pem
 *.key
 id_rsa*

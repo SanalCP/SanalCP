@@ -187,11 +187,15 @@ func atomicPasswordFile(name string, data []byte) error {
 	if _, err := f.Write(data); err != nil {
 		return err
 	}
-	if err := f.Chmod(0644); err != nil {
+	if err := f.Chmod(0640); err != nil {
 		return err
 	}
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	return os.Rename(f.Name(), name)
+	if err := os.Rename(f.Name(), name); err != nil {
+		return err
+	}
+	htpasswdIzniAyarla(name) // 0640 root:web — migrate yolunda da
+	return nil
 }
