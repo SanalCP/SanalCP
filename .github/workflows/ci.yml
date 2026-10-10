@@ -49,8 +49,9 @@ jobs:
       # derlenir, çünkü 1.24 ve 1.25 hatları 1.27.0 çıkınca destekten düştü.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.x'
-          check-latest: true
+          # go.mod'daki toolchain direktifiyle AYNI yama sürümü — stdlib
+          # açıkları yalnız yamayla kapanır (1.26.9: GO-2026-66xx serisi).
+          go-version-file: 'go.mod'
           cache: true
 
       - name: gofmt
@@ -91,8 +92,10 @@ jobs:
       # için her koşuda latest (1.26.x serisi) indirilmeli.
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.x'
-          check-latest: true
+          # go.mod'daki toolchain ile aynı — tarama ile üretim binary'si
+          # farklı stdlib yamaları görmesin. cache=false: her koşuda güncel
+          # toolchain indirilsin (bkz. önceki not).
+          go-version-file: 'go.mod'
           cache: false
 
       # Sürüm pinli; açık VERİTABANI her koşuda canlı çekilir, dolayısıyla pin
@@ -162,5 +165,9 @@ jobs:
       - name: build
         run: npm run build
 
+      # --omit=dev: kalan açıklar yalnızca tailwindcss'in build zincirinde
+      # (braces/chokidar/micromatch/fast-glob). Bunlar devDependency'dir ve
+      # üretime (dist/) hiç girmez; `npm ci --omit=dev` ile kurulmazlar.
+      # Tailwind 4'e geçiş kırıcı değişiklik — ayrı iş.
       - name: npm audit
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
