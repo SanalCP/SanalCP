@@ -13,6 +13,7 @@ import EmptyState from '@/components/EmptyState'
 import ListToolbar from '@/components/ListToolbar'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { parolaGucluMu } from '@/lib/parola'
 import { T } from '@/lib/tablo'
 
 type Kullanici = {
@@ -533,7 +534,7 @@ export default function KullanicilarPage() {
             />
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setParolaHedef(null)} className="px-3.5 py-2 text-sm rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">{t('common:giveUp')}</button>
-              <button onClick={parolaSifirla} disabled={kaydediliyor || yeniParola.length < 8} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
+              <button onClick={parolaSifirla} disabled={kaydediliyor || !parolaGucluMu(yeniParola)} className="px-3.5 py-2 text-sm font-medium rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 transition">
                 {kaydediliyor ? t('common:saving') : t('KullanicilarPage:modal_password.submit')}
               </button>
             </div>

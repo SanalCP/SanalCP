@@ -75,8 +75,9 @@
     "title": "Set Password",
     "desc_suffix": "new password.",
     "user_hint": "This is the customer's panel account password. The customer can only log in to the panel with this username and password; they cannot log in without a password set.",
-    "placeholder": "At least 8 characters",
-    "submit": "Set Password"
+    "placeholder": "At least 12 characters (letters+digits)",
+    "submit": "Set Password",
+    "password_hint": "At least 12 characters, mix of letters and digits. The password is only shown now — pass it on to the user."
   },
   "modal_limits": {
     "title": "Reseller Limits",

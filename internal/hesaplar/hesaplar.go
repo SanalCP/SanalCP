@@ -169,13 +169,25 @@ func GecerliDBSonek(s string) bool {
 	return reDBSonek.MatchString(s)
 }
 
-// ParolaGucluMu: musteri DB parolasi yeterince guclu mu? >=12 karakter + karisik
-// (en az bir harf ve bir rakam) + tek satir. UI'de gosterilmek uzere Turkce neden dondurur.
+// ParolaEnAzKarakter: yeni parolalar için asgari uzunluk.
+//
+// Tek eşik: 12 karakter. Eskiden panel 8, DB 12, htpasswd 4, DB-şifre UI 6
+// kullanıyordu — kullanıcıya göre değişen zayıf politika kafa karıştırıyordu.
+// Artık ParolaGucluMu (>=12 + karışık + tek satır) her yerde geçerlidir.
+// (auth paketi de bu fonksiyonları kullanır; import döngüsü olmaması için
+// politika burada — en alt paket — durur.)
+const ParolaEnAzKarakter = 12
+
+// ParolaGucluMu: kullanıcı parolası yeterince güçlü mu?
+// >=12 karakter + karışık (en az bir harf ve bir rakam) + tek satır.
+// UI'de gösterilmek üzere Türkçe neden döndürür.
+//
+// Panel hesabı, DB parolası, htpasswd ve FTP parolası için TEK politika.
 func ParolaGucluMu(pw string) (bool, string) {
 	if !ParolaGecerli(pw) {
 		return false, "parola geçersiz karakter (satır sonu/kontrol) içeriyor"
 	}
-	if len([]rune(pw)) < 12 {
+	if len([]rune(pw)) < ParolaEnAzKarakter {
 		return false, "parola en az 12 karakter olmalı"
 	}
 	var harf, rakam bool
@@ -193,6 +205,11 @@ func ParolaGucluMu(pw string) (bool, string) {
 	return true, ""
 }
 
+// ParolaGecerli: parola tek-satır mı? chpasswd/mysql satır-enjeksiyonunu engeller.
+func ParolaGecerli(pw string) bool {
+	return !strings.ContainsAny(pw, "\r\n\x00")
+}
+
 // MusteriDBKimlikGecerli: musteri-verdigi ad guvenli VE domain kullanicisiyla namespaced mi?
 func MusteriDBKimlikGecerli(sk, s string) bool {
 	if !GecerliDBKimlik(s) {
@@ -201,17 +218,7 @@ func MusteriDBKimlikGecerli(sk, s string) bool {
 	return s == sk || strings.HasPrefix(s, sk+"_")
 }
 
-// sqlKac: MySQL string-literal ('...') icin kacis (ters-bolu + tek-tirnak)
-func sqlKac(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "'", "\\'")
-	return s
-}
-
-// ParolaGecerli: parola tek-satir mi? chpasswd/mysql satir-enjeksiyonunu engeller.
-func ParolaGecerli(pw string) bool {
-	return !strings.ContainsAny(pw, "\r\n\x00")
-}
+// sqlKac kaldırıldı — yerine MySQLStringLiteral (tırnaklar dahil) kullanın.
 
 // FTPCreate: ftp_accounts tablosuna kayit ekler. Parola DB'ye yescrypt ($y$)
 // hash'i olarak yazılır — düz metin hiçbir zaman diske inmez (bkz. yescrypt.go).
@@ -256,10 +263,10 @@ func MySQLCreateDB(db *sql.DB, domainID int64, dbName, dbUser, dbPass string) er
 	}
 	// 1) MariaDB'de DB + user create (root, native driver — bkz. Init/rootDB)
 	if err := rootExecAll(
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName),
-		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", MySQLIdent(dbName)),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS %s IDENTIFIED BY %s", MySQLUserHost(dbUser, "localhost"), MySQLStringLiteral(dbPass)),
+		fmt.Sprintf("ALTER USER %s IDENTIFIED BY %s", MySQLUserHost(dbUser, "localhost"), MySQLStringLiteral(dbPass)),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", MySQLIdent(dbName), MySQLUserHost(dbUser, "localhost")),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return err
@@ -295,8 +302,8 @@ func MySQLCreateDBForUser(db *sql.DB, domainID int64, dbName, dbUser string) err
 	}
 	// DB olustur + mevcut kullaniciya GRANT (CREATE/ALTER USER YOK → parola korunur).
 	if err := rootExecAll(
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", dbName),
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", MySQLIdent(dbName)),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", MySQLIdent(dbName), MySQLUserHost(dbUser, "localhost")),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return err
@@ -314,8 +321,8 @@ func MySQLDropDB(db *sql.DB, dbName, dbUser string) error {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
 	}
 	if err := rootExecAll(
-		fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName),
-		fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser),
+		fmt.Sprintf("DROP DATABASE IF EXISTS %s", MySQLIdent(dbName)),
+		fmt.Sprintf("DROP USER IF EXISTS %s", MySQLUserHost(dbUser, "localhost")),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return err
@@ -331,7 +338,7 @@ func MySQLDropDBKeepUser(db *sql.DB, dbName string) error {
 	if !GecerliDBKimlik(dbName) {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı")
 	}
-	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", dbName)); err != nil {
+	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS %s", MySQLIdent(dbName))); err != nil {
 		return err
 	}
 	_, err := db.Exec(`DELETE FROM db_accounts WHERE db_name=?`, dbName)
@@ -345,9 +352,9 @@ func MySQLGrantNewUser(db *sql.DB, domainID int64, dbName, dbUser, dbPass string
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
 	}
 	if err := rootExecAll(
-		fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(dbPass)),
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("CREATE USER IF NOT EXISTS %s IDENTIFIED BY %s", MySQLUserHost(dbUser, "localhost"), MySQLStringLiteral(dbPass)),
+		fmt.Sprintf("ALTER USER %s IDENTIFIED BY %s", MySQLUserHost(dbUser, "localhost"), MySQLStringLiteral(dbPass)),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", MySQLIdent(dbName), MySQLUserHost(dbUser, "localhost")),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return err
@@ -377,7 +384,7 @@ func MySQLGrantExistingUser(db *sql.DB, domainID int64, dbName, dbUser string) e
 		return fmt.Errorf("mevcut kullanıcı parolası bulunamadı: %w", err)
 	}
 	if err := rootExecAll(
-		fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", dbName, dbUser),
+		fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", MySQLIdent(dbName), MySQLUserHost(dbUser, "localhost")),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return err
@@ -397,9 +404,9 @@ func MySQLRevokeUser(db *sql.DB, dbName, dbUser string, dropUser bool) error {
 	if !GecerliDBKimlik(dbName) || !GecerliDBKimlik(dbUser) {
 		return fmt.Errorf("güvenlik: geçersiz veritabanı adı veya kullanıcısı")
 	}
-	stmts := []string{fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%s`.* FROM '%s'@'localhost'", dbName, dbUser)}
+	stmts := []string{fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s.* FROM %s", MySQLIdent(dbName), MySQLUserHost(dbUser, "localhost"))}
 	if dropUser {
-		stmts = append(stmts, fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", dbUser))
+		stmts = append(stmts, fmt.Sprintf("DROP USER IF EXISTS %s", MySQLUserHost(dbUser, "localhost")))
 	}
 	stmts = append(stmts, "FLUSH PRIVILEGES")
 	if err := rootExecAll(stmts...); err != nil {
@@ -423,10 +430,10 @@ func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeni
 		}
 	}
 
-	temizle := func() { _ = rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", yeniAd)) }
+	temizle := func() { _ = rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS %s", MySQLIdent(yeniAd))) }
 
 	if err := rootExecAll(
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", yeniAd),
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", MySQLIdent(yeniAd)),
 	); err != nil {
 		return err
 	}
@@ -460,8 +467,8 @@ func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeni
 	grants := make([]string, 0, len(kullanicilar)*2+1)
 	for _, u := range kullanicilar {
 		grants = append(grants,
-			fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", yeniAd, u),
-			fmt.Sprintf("REVOKE ALL PRIVILEGES ON `%s`.* FROM '%s'@'localhost'", eskiAd, u))
+			fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO %s", MySQLIdent(yeniAd), MySQLUserHost(u, "localhost")),
+			fmt.Sprintf("REVOKE ALL PRIVILEGES ON %s.* FROM %s", MySQLIdent(eskiAd), MySQLUserHost(u, "localhost")))
 	}
 	grants = append(grants, "FLUSH PRIVILEGES")
 	if err := rootExecAll(grants...); err != nil {
@@ -478,7 +485,7 @@ func MySQLRenameDB(ctx context.Context, db *sql.DB, domainID int64, eskiAd, yeni
 		temizle()
 		return fmt.Errorf("metadata güncelleme (eski veritabanına dokunulmadı): %w", err)
 	}
-	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", eskiAd)); err != nil {
+	if err := rootExecAll(fmt.Sprintf("DROP DATABASE IF EXISTS %s", MySQLIdent(eskiAd))); err != nil {
 		return fmt.Errorf("yeni veritabanı aktif ama eski silinemedi (elle temizleyin): %w", err)
 	}
 	return nil

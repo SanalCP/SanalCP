@@ -10,7 +10,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import Modal from '@/components/Modal'
 import { T } from '@/lib/tablo'
-import { uretGucluParola } from '@/lib/parola'
+import { uretGucluParola, parolaGucluMu } from '@/lib/parola'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 type DB = {
@@ -170,7 +170,7 @@ function YeniDBModal({ domainId, sk, mevcutKullanicilar, onKapat, onTamam, t }: 
   const dbAdiOnizleme = onek + (dbSonek || '…')
   const kullaniciOnizleme = onek + (kullaniciSonek || '…')
   const parolaGucSorunu =
-    parola !== '' && (parola.length < 12 || !/[A-Za-z]/.test(parola) || !/[0-9]/.test(parola))
+    parola !== '' && !parolaGucluMu(parola)
 
   function yerelDogrula(): string | null {
     if (otomatik) return null

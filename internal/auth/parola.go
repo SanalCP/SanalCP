@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"sanalcp/internal/hesaplar"
 )
 
 // Panel hesaplarının parola katmanı.
@@ -25,11 +27,23 @@ import (
 // bcryptMaliyet: 12, mevcut root hash'iyle aynı seviye ($2a$12$...).
 const bcryptMaliyet = 12
 
-// ParolaEnAzKarakter: yeni parolalar için asgari uzunluk. Mevcut
-// ParolaDegistir ucundaki 8 karakter kuralıyla aynı tutuldu.
-const ParolaEnAzKarakter = 8
+// ParolaEnAzKarakter / ParolaGucluMu / ParolaGecerli: TEK politika
+// hesaplar paketindedir (import döngüsü olmaması için). Buradakiler
+// yalnız ad takma adlarıdır — farklı eşik tanımlamayın.
+const ParolaEnAzKarakter = hesaplar.ParolaEnAzKarakter
 
-var ErrParolaKisa = errors.New("parola en az 8 karakter olmalı")
+var ErrParolaKisa = errors.New("parola en az 12 karakter olmalı")
+
+// ParolaGecerli: parola tek-satır mı? chpasswd/mysql satır-enjeksiyonunu engeller.
+func ParolaGecerli(pw string) bool {
+	return hesaplar.ParolaGecerli(pw)
+}
+
+// ParolaGucluMu: kullanıcı parolası yeterince güçlü mü?
+// >=12 karakter + karışık + tek satır. Ayrıntı: hesaplar.ParolaGucluMu.
+func ParolaGucluMu(pw string) (bool, string) {
+	return hesaplar.ParolaGucluMu(pw)
+}
 
 // KullaniciRootMu: bu kullanıcı adı sistemin root hesabı mı?
 // true ise parola /etc/shadow'dan okunur/yazılır, users tablosundan değil.
@@ -38,8 +52,9 @@ func KullaniciRootMu(kullaniciAdi string) bool {
 }
 
 // ParolaHashle: panel hesabı parolasını bcrypt ile hash'ler.
+// Yalnız uzunluk değil, tam ParolaGucluMu politikasını uygular.
 func ParolaHashle(parola string) (string, error) {
-	if len(parola) < ParolaEnAzKarakter {
+	if ok, _ := ParolaGucluMu(parola); !ok {
 		return "", ErrParolaKisa
 	}
 	h, err := bcrypt.GenerateFromPassword([]byte(parola), bcryptMaliyet)

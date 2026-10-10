@@ -24,7 +24,7 @@
     "changing": "Değiştiriliyor…",
     "changed": "Parola değiştirildi. Yeni parolanızla tekrar giriş yapın.",
     "change_failed": "Parola değiştirilemedi",
-    "too_short": "Yeni parola en az 8 karakter olmalı.",
+    "too_short": "Yeni parola en az 12 karakter olmalı ve harf ile rakam içermeli.",
     "mismatch": "Yeni parolalar eşleşmiyor."
   },
   "twofa": {

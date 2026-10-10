@@ -42,7 +42,15 @@ func TestParolaHashleVeDogrula(t *testing.T) {
 
 func TestParolaKisaReddedilir(t *testing.T) {
 	if _, err := ParolaHashle("kisa"); err == nil {
-		t.Error("8 karakterden kısa parola reddedilmeliydi")
+		t.Error("12 karakterden kısa parola reddedilmeliydi")
+	}
+	// 12 karakter ama karışık değil (harf yok)
+	if _, err := ParolaHashle("123456789012"); err == nil {
+		t.Error("karışık olmayan parola reddedilmeliydi")
+	}
+	// 12 karakter, karışık — kabul edilmeli
+	if _, err := ParolaHashle("guvenliPar12"); err != nil {
+		t.Errorf("geçerli parola kabul edilmeliydi: %v", err)
 	}
 }
 

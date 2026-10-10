@@ -3,7 +3,7 @@
   "reset_user_desc": "The password for user {{kullanici}} is updated in MariaDB and the panel at the same time.",
   "custom_password_label": "Custom password (leave blank for random)",
   "custom_password_placeholder": "At least 6 characters",
-  "custom_password_too_short": "Password must be at least 6 characters",
+  "custom_password_too_short": "Password must be at least 12 characters and contain letters and digits",
   "reset_failed": "Password reset failed",
   "cancel": "Cancel",
   "set_this": "Set This",

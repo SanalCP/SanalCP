@@ -13,6 +13,27 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.74** (2026-10-10) — güvenlik sertleştirmeleri: SQL kaçışı, parola politikası, sırlar
+
+- **SQL string kaçışı tamamlandı.** `sqlKac` yalnız backslash ve tek tırnak
+  kaçırıyordu; NUL, satır sonu ve Ctrl+Z gibi karakterler eksikti. Yeni
+  `MySQLStringLiteral` / `MySQLIdent` / `MySQLUserHost` yardımcıları ile
+  CREATE/ALTER/DROP USER, GRANT/REVOKE ve site kopyalama sorguları güvenli
+  literal üzerinden yazılıyor.
+- **Parola politikası tek eşikte.** Eskiden panel 8, veritabanı 12, dizin
+  koruması (htpasswd) 4, DB parola ekranı 6 karakter istiyordu. Artık her
+  yerde aynı kural geçerli: **en az 12 karakter, harf ve rakam karışık, tek
+  satır.** Mevcut parolalar girişte çalışmaya devam eder; yalnız yeni veya
+  değiştirilen parolalar bu kurala tabidir.
+- **htpasswd dosyaları 0640 root:web.** Dizin koruması hash'leri artık dünya
+  tarafından okunamaz; yalnız root ve web sunucu kullanıcısı (Debian'da
+  www-data, RHEL'de nginx) okuyabilir.
+- **Sırlar depo ağacından çıkarıldı.** Örnek ortam dosyası (`.env.local.example`)
+  eklendi; gerçek `PANEL_JWT_SECRET` / `PANEL_SECRET_KEY` değerleri
+  `/etc/sanalcp/env` (0600) içinde tutulmalı, depo ağacına yazılmamalıdır.
+- Frontend parola doğrulaması backend ile aynı kuralı uygular; i18n mesajları
+  güncellendi.
+
 **0.9.73** (2026-10-03) — yedekler için gün bazlı saklama süresi
 
 - Yedekleme ekranına "Yedek saklama süresi" ayarı eklendi: gün sınırı yok,

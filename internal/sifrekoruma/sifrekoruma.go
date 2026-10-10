@@ -11,13 +11,16 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"sanalcp/internal/adlar"
+	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/osfam"
 	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
@@ -118,8 +121,8 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz kullanıcı adı")
 		return
 	}
-	if len(req.Parola) < 4 || len(req.Parola) > 128 {
-		httpx.WriteError(w, http.StatusBadRequest, "parola 4-128 karakter olmalı")
+	if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
+		httpx.WriteError(w, http.StatusBadRequest, neden)
 		return
 	}
 	if err := os.MkdirAll(htpasswdDir, 0o755); err != nil {
@@ -144,7 +147,10 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = exec.Command("restorecon", dosya).Run() // SELinux: httpd_config_t
-	_ = os.Chmod(dosya, 0o644)
+	// 0640 root:web — hash'ler world-readable olmasın (offline cracking).
+	// nginx worker'ı dosyayı okuyabilmeli; osfam.WebKullanici() Debian'da
+	// www-data, RHEL'de nginx döner.
+	htpasswdIzniAyarla(dosya)
 
 	if _, err := h.DB.Exec(
 		`INSERT INTO korumali_dizinler (domain_id, yol, kullanici, htpasswd_dosya) VALUES (?,?,?,?)
@@ -243,4 +249,15 @@ func normalizeYol(y string) string {
 
 func passwordFile(dir string, domainID int64, yol string) string {
 	return fmt.Sprintf("%s/v2_d%d_%x", dir, domainID, sha256.Sum256([]byte(yol)))
+}
+
+// htpasswdIzniAyarla: htpasswd dosyasını 0640 root:web yapar.
+// Hash'ler yalnız root ve web sunucu kullanıcısı tarafından okunabilir.
+func htpasswdIzniAyarla(dosya string) {
+	_ = os.Chmod(dosya, 0o640)
+	if g, err := user.LookupGroup(osfam.WebKullanici()); err == nil {
+		if gid, e := strconv.Atoi(g.Gid); e == nil {
+			_ = os.Chown(dosya, 0, gid)
+		}
+	}
 }

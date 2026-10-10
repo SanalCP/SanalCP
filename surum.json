@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.73",
-  "duyuru": "Yedekleme ekranına saklama süresi ayarı geldi: otomatik yedekler 3 gün, 5 gün, 1 hafta veya 1 ay sonra kendiliğinden silinebilir. Yedek Yöneticisi her domainin saklama ayarını gösterir.",
-  "kritik": false,
-  "yayin_tarihi": "2026-10-03"
+  "son_surum": "0.9.74",
+  "duyuru": "Güvenlik sertleştirmeleri: SQL kaçışı tamamlandı, parola politikası tek eşikte birleştirildi (en az 12 karakter, harf ve rakam karışık), htpasswd dosyaları artık yalnız root ve web sunucusu tarafından okunabilir.",
+  "kritik": true,
+  "yayin_tarihi": "2026-10-10"
 }

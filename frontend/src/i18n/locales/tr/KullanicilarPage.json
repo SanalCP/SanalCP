@@ -75,8 +75,9 @@
     "title": "Parola Belirle",
     "desc_suffix": "için yeni parola.",
     "user_hint": "Bu müşterinin panel hesabı parolası. Müşteri panele yalnızca bu kullanıcı adı ve parolayla girebilir; parola atanmadan giriş yapamaz.",
-    "placeholder": "En az 8 karakter",
-    "submit": "Parolayı Belirle"
+    "placeholder": "En az 12 karakter (harf+rakam)",
+    "submit": "Parolayı Belirle",
+    "password_hint": "En az 12 karakter, harf ve rakam karışık. Parola yalnız şimdi görünür — kullanıcıya iletin."
   },
   "modal_limits": {
     "title": "Bayi Limitleri",

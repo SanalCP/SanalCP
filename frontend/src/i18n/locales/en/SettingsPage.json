@@ -24,7 +24,7 @@
     "changing": "Changing…",
     "changed": "Password changed. Sign in again with your new password.",
     "change_failed": "Could not change password",
-    "too_short": "New password must be at least 8 characters.",
+    "too_short": "New password must be at least 12 characters and contain letters and digits.",
     "mismatch": "New passwords don't match."
   },
   "twofa": {

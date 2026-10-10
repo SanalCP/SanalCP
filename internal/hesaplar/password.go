@@ -22,7 +22,7 @@ func MySQLChangePassword(panelDB *sql.DB, dbUser, yeniPw string) error {
 		return fmt.Errorf("güvenlik: geçersiz kullanıcı adı")
 	}
 	if err := rootExecAll(
-		fmt.Sprintf("ALTER USER '%s'@'localhost' IDENTIFIED BY '%s'", dbUser, sqlKac(yeniPw)),
+		fmt.Sprintf("ALTER USER %s IDENTIFIED BY %s", MySQLUserHost(dbUser, "localhost"), MySQLStringLiteral(yeniPw)),
 		"FLUSH PRIVILEGES",
 	); err != nil {
 		return fmt.Errorf("mysql alter: %w", err)
