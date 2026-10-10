@@ -2,6 +2,8 @@ module sanalcp
 
 go 1.26.0
 
+toolchain go1.26.9
+
 // Go 1.25 dil sürümüne geçerken DAVRANIŞ değişikliklerini bilerek sabitliyoruz.
 // (go direktifini bump'lamak, GODEBUG varsayılanlarını da 1.25'e taşır.)
 //
