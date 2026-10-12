@@ -13,6 +13,26 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.75** (2026-10-12) — parola üreteci ve dizin koruması düzeltmeleri
+
+- **Rastgele parolalar artık her zaman politikaya uyuyor.** Panelin ürettiği
+  parolalar (DB parolası "rastgele" sıfırlama, "Parola üret" butonu) rakam
+  garantisi vermiyordu; yeni 12 karakter + harf/rakam kuralı nedeniyle
+  sıfırlamaların ~%2-5'i "parola harf ve rakam içermeli" hatasıyla
+  başarısız oluyordu. Üreteçler (Go ve tarayıcı) artık en az bir harf ve bir
+  rakam garanti ediyor.
+- Panel hesabı parolası reddedildiğinde gerçek neden gösteriliyor (eskiden
+  rakamsız parolada da "en az 12 karakter olmalı" yazıyordu). DB parola
+  sıfırlama ve yeni kullanıcı formundaki eski "6/8 karakter" ipuçları
+  güncellendi.
+- **htpasswd izinleri güvenli hale getirildi.** Web sunucu grubu
+  çözülemezse dosyaya dokunulmuyor (eskiden 0640 root:root kalıp nginx'e
+  okunamaz olabiliyordu); göç yolunda izinler dosya yerine geçmeden
+  ayarlanıyor. 0.9.74 öncesi 0644 kalan dosyalar panel açılışında
+  0640 root:web'e çekiliyor.
+- Telemetri Firestore kuralları her alan için tip ve boyut sınırı uyguluyor
+  (`firestore.rules`; Firebase'e ayrıca yayınlanmalıdır).
+
 **0.9.74** (2026-10-10) — güvenlik sertleştirmeleri: SQL kaçışı, parola politikası, sırlar
 
 - **SQL string kaçışı tamamlandı.** `sqlKac` yalnız backslash ve tek tırnak
