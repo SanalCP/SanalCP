@@ -66,7 +66,7 @@
     "username_placeholder": "ornek_bayi",
     "username_hint": "3-32 karakter, küçük harfle başlar; harf, rakam, _ ve - içerebilir.",
     "password": "Parola",
-    "password_hint": "En az 8 karakter. Parola yalnız şimdi görünür — kullanıcıya iletin.",
+    "password_hint": "En az 12 karakter, harf ve rakam karışık. Parola yalnız şimdi görünür — kullanıcıya iletin.",
     "role": "Rol",
     "role_hint_reseller": "Bayiler yalnız müşteri hesabı açabilir.",
     "full_name": "Ad Soyad"

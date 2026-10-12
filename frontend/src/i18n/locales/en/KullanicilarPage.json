@@ -66,7 +66,7 @@
     "username_placeholder": "example_reseller",
     "username_hint": "3-32 characters, starts with a lowercase letter; may contain letters, digits, _ and -.",
     "password": "Password",
-    "password_hint": "At least 8 characters. The password is only shown now — pass it on to the user.",
+    "password_hint": "At least 12 characters, mix of letters and digits. The password is only shown now — pass it on to the user.",
     "role": "Role",
     "role_hint_reseller": "Resellers can only create customer accounts.",
     "full_name": "Full Name"

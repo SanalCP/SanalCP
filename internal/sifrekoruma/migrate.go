@@ -3,8 +3,10 @@ package sifrekoruma
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -29,6 +31,15 @@ func HealLegacyFiles(ctx context.Context, db *sql.DB) error {
 	entries, err := migrateFiles(ctx, db, htpasswdDir)
 	if err != nil {
 		return err
+	}
+	// v0.9.74 öncesi dosyalar 0644 (world-readable hash) kaldı; her açılışta
+	// 0640 root:web'e çekilir. Başarısızlık açılışı durdurmaz: dosya eski
+	// izinleriyle nginx'e okunur kalır, yalnız sertleştirme ertelenir.
+	for _, e := range entries {
+		dosya := passwordFile(htpasswdDir, e.domainID, e.path)
+		if err := htpasswdIzniAyarla(dosya); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			log.Printf("koruma: %s izinleri sertleştirilemedi: %v", filepath.Base(dosya), err)
+		}
 	}
 	h := &Handlers{DB: db}
 	seen := map[int64]bool{}
@@ -187,15 +198,13 @@ func atomicPasswordFile(name string, data []byte) error {
 	if _, err := f.Write(data); err != nil {
 		return err
 	}
-	if err := f.Chmod(0640); err != nil {
+	// İzin ve grup, dosya yerine geçmeden ayarlanır: rename sonrası hiçbir an
+	// world-readable ya da nginx'e okunamaz olmaz.
+	if err := htpasswdIzniAyarla(f.Name()); err != nil {
 		return err
 	}
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	if err := os.Rename(f.Name(), name); err != nil {
-		return err
-	}
-	htpasswdIzniAyarla(name) // 0640 root:web — migrate yolunda da
-	return nil
+	return os.Rename(f.Name(), name)
 }

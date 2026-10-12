@@ -12,6 +12,13 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+// Root olmayan test süreci www-data/nginx grubuna chown edemez; kendi
+// grubunu "web grubu" olarak kullan.
+func TestMain(m *testing.M) {
+	webGrupGID = func() (int, error) { return os.Getgid(), nil }
+	os.Exit(m.Run())
+}
+
 func TestMigrationDatabaseFailurePreservesLegacyPasswords(t *testing.T) {
 	dir := t.TempDir()
 	legacy := filepath.Join(dir, "d1_a_b")
@@ -102,6 +109,13 @@ func TestMigrationSeparatesExistingFiles(t *testing.T) {
 		if err != nil || string(b) != want {
 			t.Fatalf("%s: %q %v", p, b, err)
 		}
+		st, err := os.Stat(passwordFile(dir, 1, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.Mode().Perm() != 0o640 {
+			t.Fatalf("%s: hash dosyası 0640 olmalı, %v", p, st.Mode().Perm())
+		}
 	}
 	b, err := os.ReadFile(legacy)
 	if err != nil || len(b) != 0 {
@@ -122,5 +136,24 @@ func TestMigrationSeparatesExistingFiles(t *testing.T) {
 	b, _ = os.ReadFile(passwordFile(dir, 1, "/a-b"))
 	if !strings.Contains(string(b), "hashA") {
 		t.Fatal("retry lost password")
+	}
+}
+
+// Web grubu çözülemezse mevcut parola dosyası yerinde kalmalı: 0640 root:root
+// bir dosya nginx'e okunamaz ve korumalı dizini herkese kapatırdı.
+func TestAtomicPasswordFileGrupYoksaDosyayaDokunmaz(t *testing.T) {
+	eski := webGrupGID
+	webGrupGID = func() (int, error) { return 0, errors.New("grup yok") }
+	defer func() { webGrupGID = eski }()
+
+	dosya := filepath.Join(t.TempDir(), "v2_d1_x")
+	if err := os.WriteFile(dosya, []byte("alice:hashA\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := atomicPasswordFile(dosya, []byte("alice:yeni\n")); err == nil {
+		t.Fatal("grup çözülemediği halde dosya yazıldı")
+	}
+	if b, _ := os.ReadFile(dosya); string(b) != "alice:hashA\n" {
+		t.Fatalf("mevcut dosya değişti: %q", b)
 	}
 }
