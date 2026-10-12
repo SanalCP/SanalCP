@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.74",
-  "duyuru": "Güvenlik sertleştirmeleri: SQL kaçışı tamamlandı, parola politikası tek eşikte birleştirildi (en az 12 karakter, harf ve rakam karışık), htpasswd dosyaları artık yalnız root ve web sunucusu tarafından okunabilir.",
-  "kritik": true,
-  "yayin_tarihi": "2026-10-10"
+  "son_surum": "0.9.75",
+  "duyuru": "Düzeltme sürümü: rastgele üretilen parolalar artık her zaman parola kuralına uyuyor (DB parola sıfırlaması ara sıra başarısız oluyordu), dizin koruması parola dosyalarının izinleri sertleştirildi.",
+  "kritik": false,
+  "yayin_tarihi": "2026-10-12"
 }

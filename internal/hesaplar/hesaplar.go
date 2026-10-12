@@ -117,7 +117,7 @@ func DecryptDBPassword(enc string) (string, error) {
 
 // RandomParola: URL-safe alphanumeric parola (default 20 karakter).
 //
-// İki incelik — ikisi de "sessizce zayıf parola üretme" riskine karşı:
+// Üç incelik — üçü de "sessizce zayıf/geçersiz parola üretme" riskine karşı:
 //
 //  1. rand.Read hatası YUTULMAZ. Go 1.23'te crypto/rand.Read hâlâ hata
 //     dönebilir (hiç dönmeme garantisi 1.24 ile geldi); yutulsaydı tampon
@@ -127,10 +127,23 @@ func DecryptDBPassword(enc string) (string, error) {
 //  2. Doğrudan modulo yerine reddetme örneklemesi. 256 % 56 = 32 olduğundan
 //     `b[i] % 56` alfabenin ilk 32 karakterini diğerlerinden %25 daha olası
 //     kılardı; eşiğin (224) üstündeki baytları atıp yeniden çekiyoruz.
+//  3. n >= 2 için sonuç en az bir harf ve bir rakam içerir (ParolaGucluMu).
+//     Alfabede 8 rakam / 56 karakter var; aksi halde 24 karakterlik parolaların
+//     ~%2,4'ü rakamsız çıkıp politikaya takılıyordu. Karışık olmayanı atıp
+//     yeniden üretmek dağılımı geçerli parolalar üzerinde düzgün tutar.
 func RandomParola(n int) string {
 	if n <= 0 {
 		n = 20
 	}
+	for {
+		p := rastgeleAlfanumerik(n)
+		if n < 2 || harfVeRakamVar(p) {
+			return p
+		}
+	}
+}
+
+func rastgeleAlfanumerik(n int) string {
 	const harf = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
 	const esik = 256 - (256 % len(harf)) // 224
 	out := make([]byte, 0, n)
@@ -190,6 +203,14 @@ func ParolaGucluMu(pw string) (bool, string) {
 	if len([]rune(pw)) < ParolaEnAzKarakter {
 		return false, "parola en az 12 karakter olmalı"
 	}
+	if !harfVeRakamVar(pw) {
+		return false, "parola harf ve rakam içermeli (karışık)"
+	}
+	return true, ""
+}
+
+// harfVeRakamVar: en az bir ASCII harf ve bir rakam var mı?
+func harfVeRakamVar(pw string) bool {
 	var harf, rakam bool
 	for _, r := range pw {
 		switch {
@@ -199,10 +220,7 @@ func ParolaGucluMu(pw string) (bool, string) {
 			rakam = true
 		}
 	}
-	if !harf || !rakam {
-		return false, "parola harf ve rakam içermeli (karışık)"
-	}
-	return true, ""
+	return harf && rakam
 }
 
 // ParolaGecerli: parola tek-satır mı? chpasswd/mysql satır-enjeksiyonunu engeller.

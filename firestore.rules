@@ -6,28 +6,46 @@ rules_version = '2';
 // Okuma tamamen kapalı: yalnız proje sahibi Firebase Console / Admin SDK
 // üzerinden görür. Yazma yalnız kendi doküman ID'sine (kurulum_kimlik),
 // whitelist'li alanlarla. ilk_kurulum_zamani ilk yazımdan sonra değişmez.
+//
+// Web API anahtarı depoda herkese açık (Firebase tasarımı gereği gizli
+// değildir); tek savunma bu kurallardır. Bu yüzden her alanın tipi ve boyutu
+// sınırlanır — aksi halde anahtarı bilen biri büyük/çöp dokümanlarla
+// koleksiyonu doldurabilirdi. Alan biçimleri internal/system/telemetri.go
+// (firestoreDegerleriOlustur) ile birebir eşleşir.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function telemetriAlanlari() {
+      return ['kurulum_kimlik', 'mevcut_surum', 'kaynak_ip', 'osfam',
+              'panel_dili', 'ilk_kurulum_zamani', 'son_gorulme_zamani'];
+    }
+
+    function gecerliDokuman(d) {
+      return d.keys().hasAll(telemetriAlanlari())
+          && d.keys().hasOnly(telemetriAlanlari())
+          && d.kurulum_kimlik is string
+          && d.kurulum_kimlik.matches('^[A-Za-z0-9_-]{16,64}$')
+          && d.mevcut_surum is string && d.mevcut_surum.size() <= 32
+          // ipTespitEt başarısızsa boş string gönderilir; IPv6 en fazla 45 karakter.
+          && d.kaynak_ip is string && d.kaynak_ip.size() <= 45
+          && d.osfam is string && d.osfam.size() <= 32
+          && d.panel_dili is string && d.panel_dili.size() <= 8
+          && d.ilk_kurulum_zamani is timestamp
+          && d.son_gorulme_zamani is timestamp
+          // Saat kayması payı 10 dk; geleceğe tarihli kayıtları reddet.
+          && d.son_gorulme_zamani <= request.time + duration.value(10, 'm')
+          && d.ilk_kurulum_zamani <= d.son_gorulme_zamani;
+    }
+
     match /kurulumlar/{kurulumId} {
       allow read: if false;
       allow delete: if false;
 
-      allow create: if request.resource.data.keys().hasOnly([
-                        'kurulum_kimlik', 'mevcut_surum', 'kaynak_ip',
-                        'osfam', 'panel_dili',
-                        'ilk_kurulum_zamani', 'son_gorulme_zamani'
-                      ])
-                      && request.resource.data.kurulum_kimlik == kurulumId
-                      && request.resource.data.kurulum_kimlik is string
-                      && request.resource.data.kurulum_kimlik.size() >= 16;
+      allow create: if gecerliDokuman(request.resource.data)
+                    && request.resource.data.kurulum_kimlik == kurulumId;
 
-      allow update: if request.resource.data.keys().hasOnly([
-                        'kurulum_kimlik', 'mevcut_surum', 'kaynak_ip',
-                        'osfam', 'panel_dili',
-                        'ilk_kurulum_zamani', 'son_gorulme_zamani'
-                      ])
-                      && request.resource.data.kurulum_kimlik == resource.data.kurulum_kimlik
-                      && request.resource.data.ilk_kurulum_zamani == resource.data.ilk_kurulum_zamani;
+      allow update: if gecerliDokuman(request.resource.data)
+                    && request.resource.data.kurulum_kimlik == resource.data.kurulum_kimlik
+                    && request.resource.data.ilk_kurulum_zamani == resource.data.ilk_kurulum_zamani;
     }
   }
 }

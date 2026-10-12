@@ -129,6 +129,13 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd dizini oluşturulamadı")
 		return
 	}
+	// Grup, dosyaya dokunmadan önce çözülür: sonradan başarısız olursa mevcut
+	// kullanıcının parolası değişmiş ama dosya nginx'e okunamaz kalırdı.
+	webGID, err := webGrupGID()
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd izinleri ayarlanamaz: "+err.Error())
+		return
+	}
 	dosya := passwordFile(htpasswdDir, id, yol)
 	flag := "-iB"
 	if _, e := os.Stat(dosya); e != nil {
@@ -148,9 +155,10 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = exec.Command("restorecon", dosya).Run() // SELinux: httpd_config_t
 	// 0640 root:web — hash'ler world-readable olmasın (offline cracking).
-	// nginx worker'ı dosyayı okuyabilmeli; osfam.WebKullanici() Debian'da
-	// www-data, RHEL'de nginx döner.
-	htpasswdIzniAyarla(dosya)
+	if err := htpasswdIzniUygula(dosya, webGID); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd izinleri ayarlanamadı: "+err.Error())
+		return
+	}
 
 	if _, err := h.DB.Exec(
 		`INSERT INTO korumali_dizinler (domain_id, yol, kullanici, htpasswd_dosya) VALUES (?,?,?,?)
@@ -251,13 +259,32 @@ func passwordFile(dir string, domainID int64, yol string) string {
 	return fmt.Sprintf("%s/v2_d%d_%x", dir, domainID, sha256.Sum256([]byte(yol)))
 }
 
-// htpasswdIzniAyarla: htpasswd dosyasını 0640 root:web yapar.
-// Hash'ler yalnız root ve web sunucu kullanıcısı tarafından okunabilir.
-func htpasswdIzniAyarla(dosya string) {
-	_ = os.Chmod(dosya, 0o640)
-	if g, err := user.LookupGroup(osfam.WebKullanici()); err == nil {
-		if gid, e := strconv.Atoi(g.Gid); e == nil {
-			_ = os.Chown(dosya, 0, gid)
-		}
+// webGrupGID: nginx worker grubunun GID'i (Debian'da www-data, RHEL'de nginx).
+// Testler kendi GID'leriyle değiştirir — root olmayan süreç başka gruba chown edemez.
+var webGrupGID = func() (int, error) {
+	ad := osfam.WebKullanici()
+	g, err := user.LookupGroup(ad)
+	if err != nil {
+		return 0, fmt.Errorf("web sunucu grubu %q bulunamadı: %w", ad, err)
 	}
+	return strconv.Atoi(g.Gid)
+}
+
+// htpasswdIzniAyarla: htpasswd dosyasını 0640 <sahip>:web yapar; hash'ler
+// yalnız root ve web sunucu grubu tarafından okunabilir. Grup önce çözülür ve
+// chown, chmod'dan ÖNCE yapılır: aksi halde 0640 root:root dosya nginx'in
+// okuyamayacağı hale gelir ve korumalı dizin herkese kapanır.
+func htpasswdIzniAyarla(dosya string) error {
+	gid, err := webGrupGID()
+	if err != nil {
+		return err
+	}
+	return htpasswdIzniUygula(dosya, gid)
+}
+
+func htpasswdIzniUygula(dosya string, gid int) error {
+	if err := os.Chown(dosya, -1, gid); err != nil {
+		return err
+	}
+	return os.Chmod(dosya, 0o640)
 }

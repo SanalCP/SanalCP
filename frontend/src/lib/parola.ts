@@ -1,11 +1,15 @@
-// uretGucluParola: tarayıcı tarafı güçlü parola (harf+rakam karışık, min-güç geçer).
+// uretGucluParola: tarayıcı tarafı güçlü parola. n >= 2 için en az bir harf ve
+// bir rakam garanti edilir (alfabede 8/56 rakam var; garanti olmadan 20
+// karakterlik parolaların ~%4,7'si rakamsız çıkıp parolaGucluMu'ya takılıyordu).
 export function uretGucluParola(n = 20): string {
   const harf = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   const buf = new Uint32Array(n)
-  ;(window.crypto || (window as any).msCrypto).getRandomValues(buf)
-  let s = ''
-  for (let i = 0; i < n; i++) s += harf[buf[i] % harf.length]
-  return s
+  for (;;) {
+    window.crypto.getRandomValues(buf)
+    let s = ''
+    for (let i = 0; i < n; i++) s += harf[buf[i] % harf.length]
+    if (n < 2 || (/[A-Za-z]/.test(s) && /[0-9]/.test(s))) return s
+  }
 }
 
 // parolaGucluMu: backend hesaplar.ParolaGucluMu ile AYNI politika.

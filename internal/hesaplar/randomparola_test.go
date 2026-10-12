@@ -29,6 +29,20 @@ func TestRandomParola_UzunlukVeAlfabe(t *testing.T) {
 	}
 }
 
+// TestRandomParola_PolitikayaUyar — panel kendi ürettiği parolayı reddetmemeli.
+// Eski üreteç rakam garantisi vermiyordu: RandomParola(24) ~%2,4,
+// RandomParola(20) ~%4,7 olasılıkla ParolaGucluMu'ya takılıyordu.
+func TestRandomParola_PolitikayaUyar(t *testing.T) {
+	for _, n := range []int{ParolaEnAzKarakter, 18, 20, 24} {
+		for range 2000 {
+			p := RandomParola(n)
+			if ok, neden := ParolaGucluMu(p); !ok {
+				t.Fatalf("RandomParola(%d) = %q politikaya uymuyor: %s", n, p, neden)
+			}
+		}
+	}
+}
+
 // TestRandomParola_ModuloBiasYok — asıl regresyon testi.
 //
 // Eski kod `harf[b[i]%56]` yapıyordu; 256%56=32 olduğundan alfabenin ilk 32

@@ -45,8 +45,8 @@ jobs:
 
       # Üretimde dağıtılan binary ile aynı toolchain hattı, daima en güncel yama
       # sürümü — stdlib açıkları yalnızca yamayla kapanır. go.mod'un dil sürümü
-      # 1.25.0'dır (bağımlılıklar `go >= 1.25.0` istiyor); binary ise 1.26 ile
-      # derlenir, çünkü 1.24 ve 1.25 hatları 1.27.0 çıkınca destekten düştü.
+      # 1.26.0'dır (golang.org/x/crypto v0.56.0 `go 1.26.0` istiyor); binary de
+      # 1.26 ile derlenir, çünkü 1.24 ve 1.25 hatları 1.27.0 çıkınca destekten düştü.
       - uses: actions/setup-go@v5
         with:
           # go.mod'daki toolchain direktifiyle AYNI yama sürümü — stdlib

@@ -32,8 +32,6 @@ const bcryptMaliyet = 12
 // yalnız ad takma adlarıdır — farklı eşik tanımlamayın.
 const ParolaEnAzKarakter = hesaplar.ParolaEnAzKarakter
 
-var ErrParolaKisa = errors.New("parola en az 12 karakter olmalı")
-
 // ParolaGecerli: parola tek-satır mı? chpasswd/mysql satır-enjeksiyonunu engeller.
 func ParolaGecerli(pw string) bool {
 	return hesaplar.ParolaGecerli(pw)
@@ -54,8 +52,8 @@ func KullaniciRootMu(kullaniciAdi string) bool {
 // ParolaHashle: panel hesabı parolasını bcrypt ile hash'ler.
 // Yalnız uzunluk değil, tam ParolaGucluMu politikasını uygular.
 func ParolaHashle(parola string) (string, error) {
-	if ok, _ := ParolaGucluMu(parola); !ok {
-		return "", ErrParolaKisa
+	if ok, neden := ParolaGucluMu(parola); !ok {
+		return "", errors.New(neden)
 	}
 	h, err := bcrypt.GenerateFromPassword([]byte(parola), bcryptMaliyet)
 	if err != nil {
