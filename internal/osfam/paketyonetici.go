@@ -15,7 +15,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 )
+
+// IptalBekleme: iptal edilen komuta SIGTERM sonrası tanınan temizlik süresi.
+const IptalBekleme = 10 * time.Second
 
 // AptOrtam: apt komutlarına eklenen ortam değişkenleri. Etkileşimli soruları
 // kapatır ve Debian'ın "yeni yapılandırma dosyası ne yapılsın?" sorusunu
@@ -206,6 +211,11 @@ func (b Bilgi) Komut(ctx context.Context, args []string) *exec.Cmd {
 		return nil
 	}
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	// İptalde SIGKILL yerine SIGTERM: dnf/apt geçici dosyalarını ve kilitlerini
+	// temizleyebilsin (SIGKILL'de dnf tmpdir artıkları diski dolduruyordu).
+	// IptalBekleme sonra hâlâ yaşıyorsa os/exec SIGKILL gönderir ve borular kapanır.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = IptalBekleme
 	if b.DebianMi() {
 		cmd.Env = append(os.Environ(), AptOrtam...)
 	}
@@ -231,7 +241,17 @@ func PaketSil(ctx context.Context, paketler ...string) ([]byte, error) {
 // "installed" kabul edilir — aksi halde kaldırılmış bir paket kurulu sanılırdı.
 func PaketKurulu(ctx context.Context, paket string) bool {
 	b := Mevcut()
-	out, err := b.Komut(ctx, b.KuruluMuArgs(paket)).Output()
+	return b.kuruluMu(ctx, b.KuruluMuArgs(paket))
+}
+
+// PaketKuruluOnbellekten: PaketKurulu, ama metadata indirmeden (arka plan sorguları için).
+func PaketKuruluOnbellekten(ctx context.Context, paket string) bool {
+	b := Mevcut()
+	return b.kuruluMu(ctx, b.Onbellekten(b.KuruluMuArgs(paket)))
+}
+
+func (b Bilgi) kuruluMu(ctx context.Context, args []string) bool {
+	out, err := b.Komut(ctx, args).Output()
 	if err != nil {
 		return false
 	}
@@ -247,8 +267,25 @@ func PaketMevcut(ctx context.Context, paket string) bool {
 	return b.Komut(ctx, b.MevcutMuArgs(paket)).Run() == nil
 }
 
+// PaketMevcutOnbellekten: PaketMevcut, ama metadata indirmeden (arka plan sorguları için).
+func PaketMevcutOnbellekten(ctx context.Context, paket string) bool {
+	b := Mevcut()
+	return b.Komut(ctx, b.Onbellekten(b.MevcutMuArgs(paket))).Run() == nil
+}
+
 // DepoTazele: paket dizinini tazeler (Debian'da kurulum öncesi gereklidir).
 func DepoTazele(ctx context.Context) ([]byte, error) {
 	b := Mevcut()
 	return b.Komut(ctx, b.DepoTazeleArgs()).CombinedOutput()
+}
+
+// Onbellekten: sorgu komutunu metadata İNDİRMEYECEK biçime çevirir (RHEL: dnf -C).
+// Arka plan sorguları kısa timeout'la çalışır; metadata indirmesi buna sığmayıp
+// yarıda kesilirse dnf /var/cache/dnf/*/tmpdir.* artığı bırakır. Önbelleği
+// tazelemek DepoTazele'nin işidir. Debian sorguları (dpkg-query, apt-cache) zaten yereldir.
+func (b Bilgi) Onbellekten(args []string) []string {
+	if b.DebianMi() || len(args) == 0 || args[0] != "dnf" {
+		return args
+	}
+	return append([]string{"dnf", "-C"}, args[1:]...)
 }

@@ -78,7 +78,8 @@ const cveCacheTTL = 30 * time.Minute
 func cveRun(d time.Duration, args ...string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	out, _ := exec.CommandContext(ctx, "dnf", args...).Output()
+	// osfam.Komut: timeout'ta SIGTERM → dnf tmpdir artığı bırakmaz.
+	out, _ := osfam.Mevcut().Komut(ctx, append([]string{"dnf"}, args...)).Output()
 	return string(out)
 }
 

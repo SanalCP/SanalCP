@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.77",
-  "duyuru": "Düzeltme sürümü: müşteriler çıkış yaptıktan sonra müşteri giriş ekranı (/cp) yerine yönetici giriş ekranına düşüyor ve tekrar giriş yapamıyordu. Çıkış artık doğru ekrana dönüyor; yönetici ekranından giriş yapmaya çalışan müşteriler de kendi panellerine yönlendiriliyor.",
+  "son_surum": "0.9.78",
+  "duyuru": "Düzeltme sürümü: arka planda çalışan paket sorguları zaman aşımında yarıda kesildiğinde /var/cache/dnf altında geçici klasörler bırakıyordu; düşük RAM'li sunucularda bu birikme haftalar içinde diski doldurup paneli ve yedekleri durdurabiliyordu. Sorgular artık yerel önbellekten yapılıyor, kesilen işlemler kendi temizliğini yapıyor. Diski dolmuş sunucularda güncellemeden önce /var/cache/dnf temizlenmeli (dnf clean all).",
   "kritik": false,
   "yayin_tarihi": "2026-10-16"
 }

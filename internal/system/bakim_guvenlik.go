@@ -51,7 +51,7 @@ func guvenlikBekleyen(ctx context.Context) int {
 		b, _ := exec.CommandContext(ctx, "apt-get", "-s", "-o", "Debug::NoLocking=true", "dist-upgrade").CombinedOutput()
 		return len(aptGuvenlikPaketleriniAyristir(string(b)))
 	}
-	b, _ := exec.CommandContext(ctx, "dnf", "-q", "updateinfo", "list", "--security", "updates").Output()
+	b, _ := osfam.Mevcut().Komut(ctx, []string{"dnf", "-q", "updateinfo", "list", "--security", "updates"}).Output()
 	n := 0
 	for _, s := range strings.Split(string(b), "\n") {
 		f := strings.Fields(s)
