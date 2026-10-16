@@ -1,7 +1,7 @@
 import { lazySayfa } from '@/lib/chunk'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '@/store/auth'
+import { girisYolu, useAuth } from '@/store/auth'
 import LoginPage from '@/pages/LoginPage'
 import DashboardLayout from '@/components/DashboardLayout'
 import CPanelGirisPage from '@/pages/CPanelGirisPage'
@@ -79,7 +79,7 @@ function GuardedRoute({ children }: { children: React.ReactNode }) {
   // Yalnız yönlendirme kararı: gerçek yetki her istekte sunucuda, oturum
   // çerezinden çözülür. Bu bayrağın elle değiştirilmesi hiçbir kapı açmaz.
   const oturumVar = useAuth((s) => s.oturumVar)
-  if (!oturumVar) return <Navigate to="/giris" replace />
+  if (!oturumVar) return <Navigate to={girisYolu()} replace />
   return <>{children}</>
 }
 

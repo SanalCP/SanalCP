@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { isAxiosError } from 'axios'
 import { api, apiHata } from '@/lib/api'
 import { useAuth } from '@/store/auth'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -13,6 +14,8 @@ type LoginResp = {
   kullanici?: { id: number; adi: string; rol: 'admin' | 'reseller' | 'user'; ad_soyad?: string }
   iki_fa_gerekli?: boolean
 }
+
+type MusteriLoginResp = { bitis: number; domain_id: number; alan_adi: string }
 
 export default function LoginPage() {
   const { t } = useTranslation(['LoginPage'])
@@ -45,6 +48,19 @@ export default function LoginPage() {
       giris(data.kullanici!, data.bitis!)
       navigate('/', { replace: true })
     } catch (err) {
+      // 403 = parola doğru ama hesap bu ekrandan giremiyor (müşteri rolü ya da
+      // askıda). Müşteri yanlışlıkla buraya geldiyse aynı bilgilerle müşteri
+      // girişini dene; o da reddederse asıl hatayı göster.
+      if (isAxiosError(err) && err.response?.status === 403 && !ikiFa) {
+        try {
+          const { data: m } = await api.post<MusteriLoginResp>('/musteri/login', { kullanici, parola })
+          useAuth.getState().girisMusteri(m.bitis, m.domain_id, m.alan_adi, kullanici)
+          navigate('/abonelikler/' + m.domain_id, { replace: true })
+          // CPanelGirisPage ile aynı: müşteri arayüzü temiz bir yüklemeyle açılsın.
+          setTimeout(() => window.location.reload(), 100)
+          return
+        } catch { /* asıl hatayı göster */ }
+      }
       setHata(apiHata(err, t('LoginPage:login_failed')))
     } finally {
       setYukleniyor(false)

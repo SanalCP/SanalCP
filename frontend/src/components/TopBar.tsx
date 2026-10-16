@@ -5,7 +5,7 @@ import KopyalaButton from '@/components/KopyalaButton'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '@/store/auth'
+import { girisYolu, useAuth } from '@/store/auth'
 import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import { api } from '@/lib/api'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -219,7 +219,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
 
   function onCikis() {
     cikis()
-    navigate('/giris', { replace: true })
+    navigate(girisYolu(), { replace: true })
   }
 
   return (

@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.77** (2026-10-16) — müşteri çıkışı düzeltmesi
+
+- **Müşteri çıkışı doğru giriş ekranına dönüyor.** `/cp` üzerinden giren
+  müşteriler çıkış yaptığında (ya da oturumları düştüğünde) yönetici giriş
+  ekranına gönderiliyor, orada "bu hesap yönetim paneline giriş yapamaz"
+  hatası alıp takılıyordu. Çıkış artık kullanıcıyı geldiği giriş ekranına
+  döndürüyor.
+- Yönetici giriş ekranından doğru parolayla giriş yapmaya çalışan bir
+  müşteri artık hata yerine kendi paneline alınıyor (eski yer imleri için).
+
 **0.9.76** (2026-10-16) — müşteri girişi düzeltmesi
 
 - **Müşteriler giriş sonrası login ekranına geri düşmüyor.** Boşta kalma

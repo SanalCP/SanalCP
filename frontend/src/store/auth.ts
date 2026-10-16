@@ -43,6 +43,21 @@ const KEY_MUSTERI      = 'sanalcp.musteri'
 const KEY_MUSTERI_DOM  = 'sanalcp.musteri.domain_id'
 const KEY_MUSTERI_ALAN = 'sanalcp.musteri.alan_adi'
 
+// Son girişin hangi ekrandan yapıldığı. Diğer anahtarların aksine çıkışta
+// SİLİNMEZ: çıkış ve oturum düşmesi kullanıcıyı geldiği giriş ekranına
+// döndürmek için buna bakar. Eskiden herkes /giris'e gidiyordu; müşteri orada
+// "bu hesap yönetim paneline giriş yapamaz" hatası alıp takılıyordu.
+const KEY_GIRIS_YOLU = 'sanalcp.giris_yolu'
+
+// girisYolu: çıkışta/oturum düşünce gidilecek giriş ekranı.
+export function girisYolu(): '/cp' | '/giris' {
+  try {
+    return localStorage.getItem(KEY_GIRIS_YOLU) === 'cp' ? '/cp' : '/giris'
+  } catch {
+    return '/giris'
+  }
+}
+
 function musteriBayrakSil() {
   localStorage.removeItem(KEY_MUSTERI)
   localStorage.removeItem(KEY_MUSTERI_DOM)
@@ -99,6 +114,7 @@ export const useAuth = create<AuthState>((set) => ({
     localStorage.setItem(KEY_USER, JSON.stringify(kullanici))
     localStorage.setItem(KEY_EXP, String(bitis))
     musteriBayrakSil()
+    localStorage.removeItem(KEY_GIRIS_YOLU)
     set({ oturumVar: true, kullanici, bitis })
   },
   girisMusteri: (bitis, domainID, alanAdi, kullaniciAdi) => {
@@ -108,6 +124,7 @@ export const useAuth = create<AuthState>((set) => ({
     localStorage.setItem(KEY_MUSTERI, '1')
     localStorage.setItem(KEY_MUSTERI_DOM, String(domainID))
     localStorage.setItem(KEY_MUSTERI_ALAN, alanAdi)
+    localStorage.setItem(KEY_GIRIS_YOLU, 'cp')
     set({ oturumVar: true, kullanici: synth, bitis })
   },
   guncelleAd: (adSoyad) => set((s) => {
