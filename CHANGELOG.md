@@ -13,6 +13,22 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.78** (2026-10-16) — dnf disk sızıntısı düzeltmesi
+
+- **Arka plan paket sorguları diski doldurmuyor.** PHP sürüm listesini
+  hazırlayan arka plan taraması her 10 dakikada bir dnf'i 3 saniyelik
+  zaman aşımıyla çalıştırıyordu. Metadata indirmesi buna sığmayınca dnf
+  öldürülüyor ve `/var/cache/dnf/*/tmpdir.*` altında ~14 MB'lık bir klasör
+  kalıyordu; metadata tazelenemediği için bu her turda tekrarlıyordu. 1 GB
+  RAM'li bir sunucuda üç haftada 43 GB birikip diski doldurdu. Tarama artık
+  tur başında önbelleği bir kez tazeliyor, sorguları yerel önbellekten
+  (`dnf -C`) yapıyor ve 10 dakika yerine 6 saatte bir çalışıyor.
+- Zaman aşımına uğrayan paket yöneticisi komutlarına (CVE taraması ve
+  güvenlik güncellemesi kontrolü dahil) artık önce SIGTERM gönderiliyor;
+  dnf/apt kendi geçici dosyalarını ve kilitlerini temizleyebiliyor.
+- Diski bu yüzden dolmuş sunucularda güncellemeden önce `dnf clean all`
+  ile önbelleği temizleyin.
+
 **0.9.77** (2026-10-16) — müşteri çıkışı düzeltmesi
 
 - **Müşteri çıkışı doğru giriş ekranına dönüyor.** `/cp` üzerinden giren
