@@ -32,6 +32,9 @@ func TestPaketMevcutCacheOnly(t *testing.T) {
 		return pkg == "php82-php-fpm" // sadece php82 kurulabilir
 	}
 	defer func() { dnfProbe = old }()
+	eskiTazele := depoTazele
+	depoTazele = func() {}
+	defer func() { depoTazele = eskiTazele }()
 
 	// Cache'i elle (senkron) doldur — normalde bunu arka-plan sweeper yapar.
 	sweepOnce()
@@ -75,6 +78,9 @@ func TestBosCacheBloklamaz(t *testing.T) {
 	old := dnfProbe
 	dnfProbe = func(pkg string) bool { t.Fatalf("istek path'inde dnf çağrıldı: %s", pkg); return false }
 	defer func() { dnfProbe = old }()
+	eskiTazele := depoTazele
+	depoTazele = func() {}
+	defer func() { depoTazele = eskiTazele }()
 
 	// Cache'i boşalt (ilk-boot simülasyonu).
 	availMu.Lock()

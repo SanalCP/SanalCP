@@ -87,12 +87,18 @@ var (
 	availMu     sync.Mutex
 	availCache  = map[string]bool{} // pkg -> kurulabilir mi (arka-plan sweep doldurur)
 	sweeperOnce sync.Once
-	dnfProbe    = dnfPaketVar // test için enjekte edilebilir (varsayılan gerçek dnf)
+	dnfProbe    = dnfPaketVar     // test için enjekte edilebilir (varsayılan gerçek dnf)
+	depoTazele  = sweepDepoTazele // test için enjekte edilebilir
 )
 
 const (
-	availTTL   = 10 * time.Minute // arka-plan sweep periyodu
-	dnfTimeout = 3 * time.Second  // her dnf sorgusu için üst sınır (yalnızca sweeper)
+	// 🔴 DİSK: eskiden 10 dk + 3 sn idi. 3 sn metadata indirmesine yetmeyince dnf öldürülüyor,
+	// /var/cache/dnf/*/tmpdir.* artığı kalıyor ve metadata hiç tazelenmediği için her turda
+	// tekrarlıyordu (1 GB RAM'li sunucuda 3 haftada 43 GB). Artık sorgular önbellekten
+	// (dnf -C), önbelleği tur başında tek bir geniş timeout'lu tazeleme doldurur.
+	availTTL      = 6 * time.Hour    // arka-plan sweep periyodu (sürüm listesi nadiren değişir)
+	dnfTimeout    = 30 * time.Second // önbellekten tek sorgu için üst sınır (yalnızca sweeper)
+	tazeleTimeout = 10 * time.Minute // tur başındaki metadata tazelemesi için üst sınır
 )
 
 // StartAvailabilitySweeper: arka-plan dnf sweep döngüsünü (bir kez) başlatır. Sunucu
@@ -114,6 +120,7 @@ func sweepLoop() {
 
 // sweepOnce: tek bir dnf tarama turu. Sonucu availCache'e atomik yazar (kısmi güncelleme yok).
 func sweepOnce() {
+	depoTazele()
 	yeni := map[string]bool{}
 	for _, m := range DesteklenenSurumler {
 		if m.Kaynak == "appstream" {
@@ -130,18 +137,31 @@ func sweepOnce() {
 	availMu.Unlock()
 }
 
+// sweepDepoTazele: sweep turu başında paket metadata'sını tazeler (RHEL: dnf makecache;
+// süresi dolmamışsa dnf hiçbir şey indirmez). Debian'da sorgular dpkg/apt önbelleğinden
+// yapıldığından ve apt-get update ağır olduğundan sweeper dokunmaz. Hata yutulur:
+// önbellek eski de olsa sorgular son bilinen metadata ile yanıt verir.
+func sweepDepoTazele() {
+	if osfam.Mevcut().DebianMi() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), tazeleTimeout)
+	defer cancel()
+	_, _ = osfam.DepoTazele(ctx)
+}
+
 // dnfPaketVar: TEK paket için dnf sorgusu (yalnızca arka-plan sweeper'dan çağrılır).
-// installed VEYA available → bulunursa dnf exit 0. Her sorgu dnfTimeout ile sınırlı; dnf
-// kilitli/yavaşsa 3sn'de vazgeçer (istek path'ini etkilemez, sadece sweep'i sınırlar).
+// installed VEYA available → bulunursa dnf exit 0. Sorgular önbellekten yapılır (metadata
+// İNDİRMEZ); her biri dnfTimeout ile sınırlı (istek path'ini etkilemez, sadece sweep'i sınırlar).
 func dnfPaketVar(pkg string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), dnfTimeout)
 	defer cancel()
-	if osfam.PaketKurulu(ctx, pkg) {
+	if osfam.PaketKuruluOnbellekten(ctx, pkg) {
 		return true
 	}
 	ctx2, cancel2 := context.WithTimeout(context.Background(), dnfTimeout)
 	defer cancel2()
-	return osfam.PaketMevcut(ctx2, pkg)
+	return osfam.PaketMevcutOnbellekten(ctx2, pkg)
 }
 
 // paketMevcut: phpXX-php-fpm paketi bu OS'ta (Remi) kurulabilir/kurulu mu?
