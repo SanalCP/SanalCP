@@ -110,7 +110,10 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, true)
-	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=? WHERE id=?`, ip, uid)
+	// Yeni oturum, önceki oturumun boşta kalma sayacını miras almamalı (bkz.
+	// auth.Handlers.Login): last_activity_at limitten eskiyse çerez yazıldıktan
+	// sonraki ilk istek 401 alır ve kullanıcı login ekranına geri düşer.
+	_, _ = h.DB.Exec(`UPDATE users SET last_login_at=NOW(), last_login_ip=?, last_activity_at=NOW() WHERE id=?`, ip, uid)
 
 	// Oturum yalnız HttpOnly çerezde döner; yanıt gövdesinde token YOKTUR
 	// (gerekçe: internal/auth/cookie.go ve auth.loginResp).
