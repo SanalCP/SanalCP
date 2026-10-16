@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.75",
-  "duyuru": "Düzeltme sürümü: rastgele üretilen parolalar artık her zaman parola kuralına uyuyor (DB parola sıfırlaması ara sıra başarısız oluyordu), dizin koruması parola dosyalarının izinleri sertleştirildi.",
-  "kritik": false,
-  "yayin_tarihi": "2026-10-12"
+  "son_surum": "0.9.76",
+  "duyuru": "Düzeltme sürümü: panele bir süredir girmemiş müşteriler, parolaları doğru olduğu hâlde giriş sonrası tekrar giriş ekranına düşüyordu (boşta kalma zaman aşımı açık sunucularda). Müşteri girişi artık bu sayacı sıfırlıyor.",
+  "kritik": true,
+  "yayin_tarihi": "2026-10-16"
 }

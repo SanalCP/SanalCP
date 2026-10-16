@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.76** (2026-10-16) — müşteri girişi düzeltmesi
+
+- **Müşteriler giriş sonrası login ekranına geri düşmüyor.** Boşta kalma
+  zaman aşımı (`oturum_bosta_dakika`) açık sunucularda, panele limitten uzun
+  süredir girmemiş bir müşteri doğru parolayla giriş yaptığında oturum
+  çerezi yazılıyor, ancak ilk istek "oturum boşta kaldığı için sona erdi"
+  ile reddedilip kullanıcı tekrar giriş ekranına gönderiliyordu. Müşteri
+  girişi, yönetici girişinde olduğu gibi artık boşta kalma sayacını
+  sıfırlıyor. Takılmış hesaplar güncellemeden sonra ek işlem gerekmeden
+  giriş yapabilir.
+
 **0.9.75** (2026-10-12) — parola üreteci ve dizin koruması düzeltmeleri
 
 - **Rastgele parolalar artık her zaman politikaya uyuyor.** Panelin ürettiği
