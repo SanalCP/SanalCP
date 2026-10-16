@@ -36,6 +36,7 @@ jobs:
         run: |
           bash scripts/recovery-acceptance-test.sh
           bash scripts/recovery-check-test.sh
+          bash scripts/demo-reset-test.sh
 
   go:
     name: Go — vet, test, gofmt

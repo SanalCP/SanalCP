@@ -21,11 +21,22 @@ set -euo pipefail
 mysql -N -B panel -e 'SELECT demo_modu_acik FROM panel_ayarlari WHERE id=1' 2>/dev/null | grep -qx 1 ||
   { echo "HATA: demo modu kapalı — bu script yalnız demo VPS'inde çalışır" >&2; exit 1; }
 
-DUMP=/var/backups/sanalcp/demo/demoseed.sql.gz
+DUMP="${SANAL_DEMO_DUMP:-/var/backups/sanalcp/demo/demoseed.sql.gz}"
 [ -f "$DUMP" ] || { echo "HATA: tohum dump'ı yok: $DUMP (önce scripts/demo_seed.go çalıştırılmalı)" >&2; exit 1; }
+
+# Panel DURDURULMADAN önce dump'ı doğrula: veritabanı silindikten sonra
+# geri yükleme patlarsa panel boş şemayla kalırdı.
+gzip -t "$DUMP" || { echo "HATA: tohum dump'ı bozuk: $DUMP" >&2; exit 1; }
 
 systemctl stop sanalcp
 
+# Tohum eski bir şemadan alınmış olabilir. Veritabanını silmeden yüklersek
+# dump'ta olmayan (sonradan eklenmiş) tablolar yeni kolonlarıyla kalır ama
+# schema_migrations eski haline döner; panel açılışta migration'ları yeniden
+# uygular ve "Duplicate column" ile crash döngüsüne girer. Silip kurulumdaki
+# karakter setiyle yeniden oluşturunca şema tam olarak tohumdaki hale döner,
+# eksik migration'lar da panel açılışında sırayla uygulanır.
+mysql -e 'DROP DATABASE IF EXISTS panel; CREATE DATABASE panel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
 zcat "$DUMP" | mysql panel
 
 journalctl --vacuum-time=1h >/dev/null 2>&1 || true
