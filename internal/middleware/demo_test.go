@@ -37,7 +37,7 @@ func TestDemoIleVeDemoPaneliMi(t *testing.T) {
 func TestDemoSaltOkunur_BayrakKapaliYazmaSerbest(t *testing.T) {
 	panelbayrak.OnbellekSifirla() // DemoModuAcik'in 5sn'lik önbelleği testler arası sızmasın
 	mock := mockDB(t)
-	mock.ExpectQuery(demoModuSorgu).
+	mock.ExpectQuery(panelbayrak.DemoModuSorgu).
 		WillReturnRows(sqlmockRows(0))
 
 	gecti := false
@@ -53,7 +53,7 @@ func TestDemoSaltOkunur_BayrakKapaliYazmaSerbest(t *testing.T) {
 func TestDemoSaltOkunur_BayrakAcikGetSerbest(t *testing.T) {
 	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
-	mock.ExpectQuery(demoModuSorgu).
+	mock.ExpectQuery(panelbayrak.DemoModuSorgu).
 		WillReturnRows(sqlmockRows(1))
 
 	gecti := false
@@ -69,7 +69,7 @@ func TestDemoSaltOkunur_BayrakAcikGetSerbest(t *testing.T) {
 func TestDemoSaltOkunur_BayrakAcikYazmaEngellenir(t *testing.T) {
 	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
-	mock.ExpectQuery(demoModuSorgu).
+	mock.ExpectQuery(panelbayrak.DemoModuSorgu).
 		WillReturnRows(sqlmockRows(1))
 
 	gecti := false
@@ -83,10 +83,10 @@ func TestDemoSaltOkunur_BayrakAcikYazmaEngellenir(t *testing.T) {
 }
 
 func TestDemoSaltOkunur_BeyazListeGecer(t *testing.T) {
-	for _, yol := range []string{"/api/v1/auth/login", "/api/v1/auth/cikis"} {
+	for _, yol := range []string{"/api/v1/auth/login", "/api/v1/musteri/login", "/api/v1/auth/cikis"} {
 		panelbayrak.OnbellekSifirla()
 		mock := mockDB(t)
-		mock.ExpectQuery(demoModuSorgu).
+		mock.ExpectQuery(panelbayrak.DemoModuSorgu).
 			WillReturnRows(sqlmockRows(1))
 
 		gecti := false
@@ -103,7 +103,7 @@ func TestDemoSaltOkunur_BeyazListeGecer(t *testing.T) {
 func TestDemoSaltOkunur_ContextTasinir(t *testing.T) {
 	panelbayrak.OnbellekSifirla()
 	mock := mockDB(t)
-	mock.ExpectQuery(demoModuSorgu).
+	mock.ExpectQuery(panelbayrak.DemoModuSorgu).
 		WillReturnRows(sqlmockRows(1))
 
 	var goruldu bool
@@ -115,5 +115,22 @@ func TestDemoSaltOkunur_ContextTasinir(t *testing.T) {
 
 	if !goruldu {
 		t.Fatal("bayrak açıkken context'e demo=true işlenmedi")
+	}
+}
+
+func TestDemoKapali(t *testing.T) {
+	gecti := false
+	h := DemoKapali(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { gecti = true }))
+
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, DemoIle(httptest.NewRequest(http.MethodGet, "/api/v1/domains/1/logs/oku", nil), true))
+	if gecti || w.Code != http.StatusForbidden {
+		t.Fatalf("demo modunda geçti: code=%d gecti=%v", w.Code, gecti)
+	}
+
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/domains/1/logs/oku", nil))
+	if !gecti || w.Code != http.StatusOK {
+		t.Fatalf("demo kapalıyken engellendi: code=%d gecti=%v", w.Code, gecti)
 	}
 }

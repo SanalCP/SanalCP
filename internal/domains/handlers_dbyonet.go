@@ -17,6 +17,7 @@ import (
 
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 	"sanalcp/internal/sqlimport"
 
 	"github.com/go-chi/chi/v5"
@@ -75,6 +76,7 @@ func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
+	demoPanel := middleware.DemoPaneliMi(r)
 	var out dbGrupDetay
 	out.DBAdi = dbAdi
 	for rows.Next() {
@@ -92,6 +94,8 @@ func (h *Handlers) DatabaseGrupDetay(w http.ResponseWriter, r *http.Request) {
 			// boş bırakmak yeterli — kart zaten diğer kullanıcıları listeler).
 			k.DBParola = ""
 		}
+		// DEMO: gerçek DB parolası demo panelde asla dönmez (bkz. ListDatabases).
+		k.DBParola = middleware.Maskele(demoPanel, k.DBParola)
 		out.Kullanicilar = append(out.Kullanicilar, k)
 	}
 	if len(out.Kullanicilar) == 0 {

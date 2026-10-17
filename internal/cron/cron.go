@@ -16,6 +16,7 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -195,8 +196,18 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"sistem_kullanici": sk,
 		"toplam":           len(list),
-		"gorevler":         list,
+		"gorevler":         komutlariMaskele(middleware.DemoPaneliMi(r), list),
 	})
+}
+
+// komutlariMaskele: demo panelde komut satırları maskelenir — içlerinde
+// parola/token olabilir (ör. mysqldump -p…, curl …?token=…). Zamanlama
+// alanları görünür kalır.
+func komutlariMaskele(demoPanel bool, list []Gorev) []Gorev {
+	for i := range list {
+		list[i].Komut = middleware.Maskele(demoPanel, list[i].Komut)
+	}
+	return list
 }
 
 func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
