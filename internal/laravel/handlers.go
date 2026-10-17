@@ -23,6 +23,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
+	"sanalcp/internal/middleware"
 )
 
 type Handlers struct{ DB *sql.DB }
@@ -172,6 +173,12 @@ func (h *Handlers) Bakim(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) EnvGet(w http.ResponseWriter, r *http.Request) {
+	// DEMO: .env ham metindir (DB parolası, APP_KEY) — tek alan gibi
+	// maskelenemez, tamamen kapatılır (bkz. monitor.SunucuLog emsali).
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+		return
+	}
 	_, p, err := h.kurulum(r, r.URL.Query().Get("dizin"))
 	if err != nil {
 		httpx.WriteError(w, 400, err.Error())
