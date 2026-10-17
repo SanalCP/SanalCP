@@ -25,6 +25,7 @@ import (
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
+	"sanalcp/internal/middleware"
 	"sanalcp/internal/osfam"
 )
 
@@ -299,6 +300,12 @@ type LogResp struct {
 }
 
 func (h *Handlers) Loglar(w http.ResponseWriter, r *http.Request) {
+	// DEMO: ham log içeriği tek alan gibi maskelenemez — tamamen kapatılır
+	// (bkz. monitor.SunucuLog emsali).
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+		return
+	}
 	d, p, e := h.install(r)
 	if e != nil {
 		httpx.WriteError(w, 400, e.Error())

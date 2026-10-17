@@ -23,6 +23,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/jailpath"
+	"sanalcp/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/sys/unix"
@@ -612,6 +613,12 @@ func (h *Handlers) Action(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Logs(w http.ResponseWriter, r *http.Request) {
+	// DEMO: uygulama journal'ı ham metindir (ortam değişkenleri, bağlantı
+	// dizeleri) — tek alan gibi maskelenemez, tamamen kapatılır.
+	if middleware.DemoPaneliMi(r) {
+		httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+		return
+	}
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if _, err := h.lookup(r.Context(), id); err != nil {
 		httpx.WriteError(w, 404, "site bulunamadı")
