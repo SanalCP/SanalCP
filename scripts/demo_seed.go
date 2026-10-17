@@ -31,8 +31,11 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	"sanalcp/internal/panelbayrak"
 )
 
 var ornekDomainler = []string{"vitrin-magaza.demo", "blog-ornegi.demo", "kurumsal-site.demo"}
@@ -87,6 +90,12 @@ func run(dsn, tabanURL, kullanici, parola string) error {
 	istemci := &http.Client{Jar: jar, Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // self-signed, loopback
 	}}
+
+	// Çalışan panel bayrağı panelbayrak.DemoModuOnbellekSuresi boyunca
+	// önbellekte tutar: hemen yazma denenirse eski "açık" değeri 403 döner.
+	bekle := panelbayrak.DemoModuOnbellekSuresi + time.Second
+	fmt.Printf("bayrak kapatıldı, panel önbelleği için %v bekleniyor...\n", bekle)
+	time.Sleep(bekle)
 
 	if err := girisYap(istemci, tabanURL, kullanici, parola); err != nil {
 		return fmt.Errorf("giriş: %v", err)

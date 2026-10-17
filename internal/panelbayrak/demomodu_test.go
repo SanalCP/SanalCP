@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
-
-const demoSorgu = `SELECT demo_modu_acik FROM panel_ayarlari WHERE id=1`
 
 func TestDemoModuAcik_BayrakBirIseAcik(t *testing.T) {
 	OnbellekSifirla()
@@ -18,7 +17,7 @@ func TestDemoModuAcik_BayrakBirIseAcik(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(demoSorgu).
+	mock.ExpectQuery(DemoModuSorgu).
 		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(1))
 
 	if !DemoModuAcik(context.Background(), db) {
@@ -33,7 +32,7 @@ func TestDemoModuAcik_BayrakSifirIseKapali(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(demoSorgu).
+	mock.ExpectQuery(DemoModuSorgu).
 		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(0))
 
 	if DemoModuAcik(context.Background(), db) {
@@ -52,7 +51,7 @@ func TestDemoModuAcik_DBHatasindaKapali(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(demoSorgu).WillReturnError(errors.New("bağlantı koptu"))
+	mock.ExpectQuery(DemoModuSorgu).WillReturnError(errors.New("bağlantı koptu"))
 
 	if DemoModuAcik(context.Background(), db) {
 		t.Fatal("DB hatasında açık raporlandı (fail-open ihlali)")
@@ -73,7 +72,7 @@ func TestDemoModuAcik_SatirYoksaKapali(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(demoSorgu).
+	mock.ExpectQuery(DemoModuSorgu).
 		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}))
 
 	if DemoModuAcik(context.Background(), db) {
@@ -91,7 +90,7 @@ func TestDemoModuAcik_OnbellekTekSorguYapar(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery(demoSorgu).
+	mock.ExpectQuery(DemoModuSorgu).
 		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(1))
 
 	birinci := DemoModuAcik(context.Background(), db)
@@ -102,5 +101,65 @@ func TestDemoModuAcik_OnbellekTekSorguYapar(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ikinci çağrı DB'ye tekrar gitti (önbellek çalışmadı): %v", err)
+	}
+}
+
+// onbellegiEskit: önbellekteki değeri tutar ama TTL'ini doldurur — sonraki
+// çağrı DB'ye gider.
+func onbellegiEskit() {
+	demoModuOnbellekKilit.Lock()
+	demoModuOnbellekAn = time.Now().Add(-2 * DemoModuOnbellekSuresi)
+	demoModuOnbellekKilit.Unlock()
+}
+
+// TestDemoModuAcik_IptalEdilenIstekKoruyuKaldirmaz: istemci bağlantıyı
+// koparıp isteğin context'ini iptal ettirse de sorgu çalışmalı. Aksi halde
+// "kapalı" önbelleğe yazılır ve demo panelinde yazma engeli kalkar.
+func TestDemoModuAcik_IptalEdilenIstekKoruyuKaldirmaz(t *testing.T) {
+	OnbellekSifirla()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery(DemoModuSorgu).
+		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(1))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if !DemoModuAcik(ctx, db) {
+		t.Fatal("iptal edilmiş istek context'i demo modunu kapalı gösterdi")
+	}
+}
+
+// TestDemoModuAcik_HataSonBilinenDegeriKorur: önbellek dolu iken DB hatası
+// "kapalı"ya düşürmemeli ve hata sonucu önbelleğe yazılmamalı.
+func TestDemoModuAcik_HataSonBilinenDegeriKorur(t *testing.T) {
+	OnbellekSifirla()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery(DemoModuSorgu).
+		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(1))
+	mock.ExpectQuery(DemoModuSorgu).WillReturnError(errors.New("bağlantı koptu"))
+	mock.ExpectQuery(DemoModuSorgu).
+		WillReturnRows(sqlmock.NewRows([]string{"demo_modu_acik"}).AddRow(1))
+
+	if !DemoModuAcik(context.Background(), db) {
+		t.Fatal("ilk okuma açık olmalıydı")
+	}
+	onbellegiEskit()
+	if !DemoModuAcik(context.Background(), db) {
+		t.Fatal("DB hatası son bilinen 'açık' değerini ezdi")
+	}
+	// Hata önbelleğe yazılmadıysa TTL hâlâ dolu: bir sonraki çağrı DB'ye gider.
+	if !DemoModuAcik(context.Background(), db) {
+		t.Fatal("üçüncü okuma açık olmalıydı")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("hata sonucu önbelleğe yazıldı: %v", err)
 	}
 }

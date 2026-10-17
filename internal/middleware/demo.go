@@ -8,10 +8,6 @@ import (
 	"sanalcp/internal/panelbayrak"
 )
 
-// demoModuSorgu: panelbayrak.DemoModuAcik'in çalıştırdığı sorgu — test
-// dosyasında sqlmock.ExpectQuery eşleşmesi için burada da tutulur.
-const demoModuSorgu = `SELECT demo_modu_acik FROM panel_ayarlari WHERE id=1`
-
 type demoCtxKey struct{}
 
 // DemoPaneliMi: bu istek demo-modu AÇIK bir panelden mi geliyor?
@@ -27,8 +23,8 @@ func DemoPaneliMi(r *http.Request) bool {
 
 // DemoIle: isteğe demo-modu bayrağı iliştirilmiş bir kopyasını döner.
 //
-// Yalnızca TESTLER için (bkz. ClaimsIle'nin üstündeki aynı uyarı) — üretimde
-// bunu DemoSaltOkunur yazar.
+// Üretimde yalnız DemoSaltOkunur çağırır; handler'lar ve testler başka
+// yerde çağırmamalı (bkz. ClaimsIle'nin üstündeki aynı uyarı).
 func DemoIle(r *http.Request, acik bool) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), demoCtxKey{}, acik))
 }
@@ -44,10 +40,12 @@ func Maskele(demoPanel bool, deger string) string {
 }
 
 // demoYazmaBeyazListesi: demo modunda dahi izinli kalan TEK state-changing
-// uçlar — oturum açma/kapama. Başka HİÇBİR yazma demo modunda geçmez.
+// uçlar — oturum açma/kapama (yönetici ve müşteri girişi; çıkış ikisinde de
+// /auth/cikis). Başka HİÇBİR yazma demo modunda geçmez.
 var demoYazmaBeyazListesi = map[string]bool{
-	"POST /api/v1/auth/login": true,
-	"POST /api/v1/auth/cikis": true,
+	"POST /api/v1/auth/login":    true,
+	"POST /api/v1/musteri/login": true,
+	"POST /api/v1/auth/cikis":    true,
 }
 
 // DemoSaltOkunur: panel_ayarlari.demo_modu_acik açıkken tüm yazan istekleri
@@ -60,14 +58,11 @@ var demoYazmaBeyazListesi = map[string]bool{
 // dışındaki uçlar da dahil olmak üzere hiçbir route'a tek tek dokunulmaz.
 func DemoSaltOkunur(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		acik := panelbayrak.DemoModuAcik(r.Context(), scopeDB)
-		if acik {
-			r = r.WithContext(context.WithValue(r.Context(), demoCtxKey{}, true))
-		}
-		if !acik {
+		if !panelbayrak.DemoModuAcik(r.Context(), scopeDB) {
 			next.ServeHTTP(w, r)
 			return
 		}
+		r = DemoIle(r, true)
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 			next.ServeHTTP(w, r)
@@ -78,5 +73,20 @@ func DemoSaltOkunur(next http.Handler) http.Handler {
 			return
 		}
 		httpx.WriteError(w, http.StatusForbidden, "demo modunda değişiklik yapılamaz")
+	})
+}
+
+// DemoKapali: demo modunda isteği 403 ile kapatır. Ham metin döndüren
+// (log, dump) ve tek alan gibi maskelenemeyen GET uçları için — route
+// tanımında takılır (bkz. cmd/server/main.go). Handler içi DemoPaneliMi
+// kontrolüyle aynı sonuç; internal/system gibi bu paketi import edemeyen
+// (döngü) paketlerin uçları da böylece kapsanır.
+func DemoKapali(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if DemoPaneliMi(r) {
+			httpx.WriteError(w, http.StatusForbidden, "demo modunda kullanılamaz")
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
