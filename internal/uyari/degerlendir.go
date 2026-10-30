@@ -23,8 +23,7 @@ func SSLDurum(aktif bool, kaynak string, bitis *time.Time, simdi time.Time) (Dur
 	if !aktif || kaynak == "self-signed" || bitis == nil {
 		return "", false
 	}
-	// DomainHealthCard ile aynı yuvarlama (yukarı).
-	kalan := int(math.Ceil(bitis.Sub(simdi).Hours() / 24))
+	kalan := kalanGun(*bitis, simdi)
 	switch {
 	case kalan <= 3:
 		return Hata, true
@@ -56,4 +55,9 @@ func YedekDurum(sonDogrulama string) (Durum, bool) {
 		return Ok, true
 	}
 	return "", false
+}
+
+// kalanGun: DomainHealthCard ile aynı yuvarlama (yukarı).
+func kalanGun(bitis, simdi time.Time) int {
+	return int(math.Ceil(bitis.Sub(simdi).Hours() / 24))
 }
