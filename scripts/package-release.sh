@@ -23,9 +23,9 @@ GO_PATCH="${GO_REST#*.}"; GO_PATCH="${GO_PATCH%%[^0-9]*}"
 case "$GO_MAJOR.$GO_MINOR.$GO_PATCH" in
   *[!0-9.]*) echo "geçersiz Go toolchain sürümü: $GO_TOOLCHAIN" >&2; exit 1 ;;
 esac
-if [ "$GO_MAJOR" -lt 1 ] || { [ "$GO_MAJOR" -eq 1 ] && { [ "$GO_MINOR" -lt 26 ] || { [ "$GO_MINOR" -eq 26 ] && [ "$GO_PATCH" -lt 7 ]; }; }; }; then
-  echo "release için Go >= 1.26.7 gerekli; bulunan: $GO_TOOLCHAIN" >&2
-  echo "örnek: GOTOOLCHAIN=go1.26.7 ./scripts/package-release.sh" >&2
+if [ "$GO_MAJOR" -lt 1 ] || { [ "$GO_MAJOR" -eq 1 ] && { [ "$GO_MINOR" -lt 26 ] || { [ "$GO_MINOR" -eq 26 ] && [ "$GO_PATCH" -lt 10 ]; }; }; }; then
+  echo "release için Go >= 1.26.10 gerekli; bulunan: $GO_TOOLCHAIN" >&2
+  echo "örnek: GOTOOLCHAIN=go1.26.10 ./scripts/package-release.sh" >&2
   exit 1
 fi
 echo "== Release toolchain: $GO_TOOLCHAIN =="

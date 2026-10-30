@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.80",
-  "duyuru": "E-posta teslimat takibi eklendi. Gerçek Postfix sonuçları, alıcı bazında teslim edildi/ertelendi/geri döndü durumları ve SMTP hata ayrıntılarıyla görüntülenebilir. Gönderen, alıcı, kuyruk kimliği, tarih ve duruma göre filtreleme; müşteriye ve bayiye göre kapsamlı mesaj geçmişi sunulur.",
+  "son_surum": "0.9.81",
+  "duyuru": "Güvenlik güncellemesi: panel Go 1.26.10 ile yeniden derlendi (crypto/x509 güvenlik düzeltmesi, GO-2026-6809) ve bir arayüz bağımlılığı güncellendi. Davranış değişikliği yoktur; e-posta teslimat takibi, posta kutusu kotası ve plan yetkileri 0.9.80'deki gibidir.",
   "kritik": false,
-  "yayin_tarihi": "2026-10-29"
+  "yayin_tarihi": "2026-10-30"
 }

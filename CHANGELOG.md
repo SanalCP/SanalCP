@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.81** (2026-10-30) — güvenlik güncellemesi
+
+- Panel **Go 1.26.10** ile derlendi. Önceki sürüm, Go standart kütüphanesindeki
+  `crypto/x509` açığını (GO-2026-6809: tehlikeye girmiş ara sertifikalara
+  güvenilmemesi) taşıyan 1.26.9 ile derlenmişti; panelin TLS istemcileri
+  (Let's Encrypt, GitHub vb.) etkilenebilirdi. `scripts/package-release.sh`
+  artık en az Go 1.26.10 ister.
+- Arayüz bağımlılığı `follow-redirects` 1.16.2'ye yükseltildi (npm audit, üretim).
+- Başka davranış değişikliği yoktur.
+
 **0.9.80** (2026-10-29) — e-posta teslimat takibi
 
 - **Teslimat geçmişi.** Postfix'in systemd journal kayıtlarından alıcı bazında
