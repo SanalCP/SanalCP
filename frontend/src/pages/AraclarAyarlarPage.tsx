@@ -17,6 +17,7 @@ import OturumBostaAyari from '@/components/OturumBostaAyari'
 import RootGirisiAyari from '@/components/RootGirisiAyari'
 import PanelErisimAyari from '@/components/PanelErisimAyari'
 import PanelHizLimitiAyari from '@/components/PanelHizLimitiAyari'
+import UyariBildirimAyari from '@/components/UyariBildirimAyari'
 import LisansBilgisi from '@/components/LisansBilgisi'
 import SunucuSaatiAyari from '@/components/SunucuSaatiAyari'
 import { DepolamaAyari, DNSCozumleyiciAyari, GuvenlikGuncellemeAyari, JournalAyari, RebootBilgisi, SunucuKimlikDNS, SwapAyari } from '@/components/GelismisSunucuAyarlari'
@@ -246,6 +247,7 @@ export default function AraclarAyarlarPage() {
           <RootGirisiAyari />
           <PanelErisimAyari />
           <PanelHizLimitiAyari />
+          <UyariBildirimAyari />
         </div>
       </section>
 
