@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.82",
-  "duyuru": "Uyarı bildirimleri: site erişilemez olduğunda, SSL sertifikası bitmek üzereyken ya da yedek doğrulaması başarısız olduğunda panel Telegram ve/veya e-posta ile haber verir (Araçlar & Ayarlar → Uyarı bildirimleri). Abonelik sayfasına domain sağlık kartı eklendi.",
+  "son_surum": "0.9.83",
+  "duyuru": "Arayüz düzeltmesi: Araçlar & Ayarlar ekranında panel erişimi, hız sınırı ve uyarı bildirimleri kartları arasındaki boşluk düzeltildi. Başka davranış değişikliği yoktur.",
   "kritik": false,
   "yayin_tarihi": "2026-10-30"
 }

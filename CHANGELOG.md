@@ -13,6 +13,12 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.83** (2026-10-30) — arayüz düzeltmesi
+
+- Araçlar & Ayarlar ekranında *Panel erişimi*, *Panel hız sınırı* ve *Uyarı
+  bildirimleri* kartları birbirine yapışık görünüyordu; aralarına boşluk eklendi.
+- Başka davranış değişikliği yoktur.
+
 **0.9.82** (2026-10-30) — uyarı bildirimleri
 
 - **Uyarı bildirimleri.** Panel her 5 dakikada bir aktif domain'leri kontrol eder
