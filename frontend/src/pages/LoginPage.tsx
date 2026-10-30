@@ -15,7 +15,7 @@ type LoginResp = {
   iki_fa_gerekli?: boolean
 }
 
-type MusteriLoginResp = { bitis: number; domain_id: number; alan_adi: string }
+type MusteriLoginResp = { iki_fa_gerekli?: boolean; bitis: number; domain_id: number; alan_adi: string }
 
 export default function LoginPage() {
   const { t } = useTranslation(['LoginPage'])
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [parola, setParola] = useState('')
   const [kod, setKod] = useState('')
   const [ikiFa, setIkiFa] = useState(false)
+  const [musteriGirisi, setMusteriGirisi] = useState(false)
   const [yukleniyor, setYukleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -37,9 +38,25 @@ export default function LoginPage() {
     fetch('/healthz').then(r => r.json()).then(d => { if (d?.surum) setSurum(d.surum) }).catch(() => {})
   }, [])
 
+  function musteriYanitiniIsle(m: MusteriLoginResp) {
+    if (m.iki_fa_gerekli) {
+      setMusteriGirisi(true)
+      setIkiFa(true)
+      return
+    }
+    useAuth.getState().girisMusteri(m.bitis, m.domain_id, m.alan_adi, kullanici)
+    navigate('/abonelikler/' + m.domain_id, { replace: true })
+    setTimeout(() => window.location.reload(), 100)
+  }
+
   async function girisYap() {
     setHata(null); setYukleniyor(true)
     try {
+      if (musteriGirisi) {
+        const { data } = await api.post<MusteriLoginResp>('/musteri/login', { kullanici, parola, kod })
+        musteriYanitiniIsle(data)
+        return
+      }
       const { data } = await api.post<LoginResp>('/auth/login', { kullanici, parola, kod })
       if (data.iki_fa_gerekli) {
         setIkiFa(true); setYukleniyor(false)
@@ -53,11 +70,8 @@ export default function LoginPage() {
       // girişini dene; o da reddederse asıl hatayı göster.
       if (isAxiosError(err) && err.response?.status === 403 && !ikiFa) {
         try {
-          const { data: m } = await api.post<MusteriLoginResp>('/musteri/login', { kullanici, parola })
-          useAuth.getState().girisMusteri(m.bitis, m.domain_id, m.alan_adi, kullanici)
-          navigate('/abonelikler/' + m.domain_id, { replace: true })
-          // CPanelGirisPage ile aynı: müşteri arayüzü temiz bir yüklemeyle açılsın.
-          setTimeout(() => window.location.reload(), 100)
+          const { data: m } = await api.post<MusteriLoginResp>('/musteri/login', { kullanici, parola, kod })
+          musteriYanitiniIsle(m)
           return
         } catch { /* asıl hatayı göster */ }
       }
@@ -102,6 +116,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 autoFocus
                 required
+                readOnly={ikiFa}
                 className="w-full px-3.5 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition"
               />
             </div>
@@ -126,6 +141,7 @@ export default function LoginPage() {
                   type="text"
                   inputMode="numeric"
                   value={kod}
+                  autoComplete="one-time-code"
                   onChange={(e) => setKod(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   autoFocus
                   placeholder="000000"
@@ -143,7 +159,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={yukleniyor}
+              disabled={yukleniyor || (ikiFa && kod.length !== 6)}
               className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 font-medium py-2.5 rounded-lg transition shadow-lg shadow-brand-600/20 disabled:shadow-none"
             >
               {yukleniyor ? t('LoginPage:signing_in') : ikiFa ? t('LoginPage:verify_and_login') : t('LoginPage:login')}

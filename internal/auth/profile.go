@@ -10,8 +10,6 @@ import (
 	"sanalcp/internal/panelbayrak"
 )
 
-// claims: RequireAuth middleware zaten doğruladı; header'dan tekrar parse ederek
-// (auth→middleware import cycle'ından kaçınmak için) UserID'yi alırız.
 // claims: isteğin doğrulanmış kimliği. Bu paketteki yedi uç da
 // middleware.RequireAuth'un ARKASINDA (bkz. cmd/server/main.go), dolayısıyla
 // context'teki değer daima doludur ve imza + hesap durumu + rol +
@@ -72,7 +70,7 @@ func (h *Handlers) ProfilGuncelle(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// POST /me/parola — sunucu root parolasını değiştir (mevcut parola doğrulanır → chpasswd)
+// POST /me/parola — kendi parolasını değiştir; root sistem parolasını kullanır.
 func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 	c := h.claims(r)
 	if c == nil {
@@ -93,8 +91,8 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// root'un parolası sistemdedir (/etc/shadow), panel DB'sinde değil —
-	// doğrulama shadow'dan, değiştirme chpasswd ile. Bayi hesaplarının
-	// sistemde karşılığı yoktur; onlar users.password_hash kullanır.
+	// doğrulama shadow'dan, değiştirme chpasswd ile. Diğer tüm roller
+	// (admin/bayi/müşteri) kendi users.password_hash kaydını kullanır.
 	if KullaniciRootMu(c.Username) {
 		// Panel root girişi KAPALIYKEN panel /etc/shadow'a hiç dokunmaz —
 		// giriş kapısıyla (bkz. Login) aynı ilke. Bayrak kapatıldıktan sonra
@@ -121,7 +119,12 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi: "+strings.TrimSpace(string(out)))
 			return
 		}
-		if _, err := h.DB.Exec(`UPDATE users SET auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, c.UserID); err != nil {
+		sonuc, err := h.DB.Exec(`UPDATE users SET auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, c.UserID)
+		if err != nil {
+			httpx.WriteError(w, http.StatusInternalServerError, "oturumlar sonlandırılamadı")
+			return
+		}
+		if adet, err := sonuc.RowsAffected(); err != nil || adet != 1 {
 			httpx.WriteError(w, http.StatusInternalServerError, "oturumlar sonlandırılamadı")
 			return
 		}
@@ -148,7 +151,12 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET password_hash=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, yeniHash, c.UserID); err != nil {
+	sonuc, err := h.DB.Exec(`UPDATE users SET password_hash=?, auth_version=auth_version+1, updated_at=NOW() WHERE id=?`, yeniHash, c.UserID)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi")
+		return
+	}
+	if adet, err := sonuc.RowsAffected(); err != nil || adet != 1 {
 		httpx.WriteError(w, http.StatusInternalServerError, "parola değiştirilemedi")
 		return
 	}
@@ -159,7 +167,8 @@ func (h *Handlers) ParolaDegistir(w http.ResponseWriter, r *http.Request) {
 
 // GET /me/2fa/setup — yeni secret üret (henüz aktifleştirilmez), otpauth URI döndür
 func (h *Handlers) TwoFASetup(w http.ResponseWriter, r *http.Request) {
-	if h.claims(r) == nil {
+	c := h.claims(r)
+	if c == nil {
 		httpx.WriteError(w, http.StatusUnauthorized, "oturum yok")
 		return
 	}
@@ -168,7 +177,7 @@ func (h *Handlers) TwoFASetup(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "secret üretilemedi")
 		return
 	}
-	uri := TOTPURI(secret, "root", "SanalCP")
+	uri := TOTPURI(secret, c.Username, "SanalCP")
 	resp := map[string]any{
 		"secret":      secret,
 		"otpauth":     uri, // geriye dönük uyum (elle giriş fallback)
@@ -192,17 +201,33 @@ func (h *Handlers) TwoFAEnable(w http.ResponseWriter, r *http.Request) {
 		Secret string `json:"secret"`
 		Kod    string `json:"kod"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&b)
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
 	b.Secret = strings.TrimSpace(b.Secret)
-	if !TOTPVerify(b.Secret, b.Kod) {
+	adim, ok := TOTPVerifyAdim(b.Secret, b.Kod, -1)
+	if !ok {
 		httpx.WriteError(w, http.StatusBadRequest, "kod doğrulanamadı — uygulamadaki 6 haneli kodu girin")
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET totp_secret=?, totp_enabled=1, auth_version=auth_version+1 WHERE id=?`, b.Secret, c.UserID); err != nil {
+	sonuc, err := h.DB.ExecContext(r.Context(),
+		`UPDATE users SET totp_secret=?, totp_enabled=1, totp_last_step=?, auth_version=auth_version+1 WHERE id=? AND auth_version=? AND totp_enabled=0`,
+		b.Secret, adim, c.UserID, c.Version)
+	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "kaydedilemedi")
 		return
 	}
-	WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.2fa.enable", "root", true)
+	if adet, err := sonuc.RowsAffected(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kaydedilemedi")
+		return
+	} else if adet != 1 {
+		httpx.WriteError(w, http.StatusConflict, "2FA veya oturum durumu değişti")
+		return
+	}
+	WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.2fa.enable", c.Username, true)
+	// auth_version bütün oturumları iptal eder; bu tarayıcı da yeniden girmeli.
+	OturumCerezSil(w, r)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -216,17 +241,37 @@ func (h *Handlers) TwoFADisable(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		Kod string `json:"kod"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&b)
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
 	var secret string
-	_ = h.DB.QueryRow(`SELECT totp_secret FROM users WHERE id=?`, c.UserID).Scan(&secret)
-	if !TOTPVerify(secret, b.Kod) {
+	var etkin int
+	if err := h.DB.QueryRowContext(r.Context(),
+		`SELECT totp_enabled, totp_secret FROM users WHERE id=?`, c.UserID).
+		Scan(&etkin, &secret); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "2FA durumu doğrulanamadı")
+		return
+	}
+	if etkin != 1 || !TOTPVerify(secret, b.Kod) {
 		httpx.WriteError(w, http.StatusBadRequest, "kod doğrulanamadı")
 		return
 	}
-	if _, err := h.DB.Exec(`UPDATE users SET totp_secret='', totp_enabled=0, auth_version=auth_version+1 WHERE id=?`, c.UserID); err != nil {
+	sonuc, err := h.DB.ExecContext(r.Context(),
+		`UPDATE users SET totp_secret='', totp_enabled=0, totp_last_step=0, auth_version=auth_version+1 WHERE id=? AND auth_version=? AND totp_enabled=1 AND totp_secret=?`,
+		c.UserID, c.Version, secret)
+	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "kapatılamadı")
 		return
 	}
-	WriteAudit(h.DB, c.UserID, "root", httpx.ClientIP(r), "auth.2fa.disable", "root", true)
+	if adet, err := sonuc.RowsAffected(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "kapatılamadı")
+		return
+	} else if adet != 1 {
+		httpx.WriteError(w, http.StatusConflict, "2FA veya oturum durumu değişti")
+		return
+	}
+	WriteAudit(h.DB, c.UserID, c.Username, httpx.ClientIP(r), "auth.2fa.disable", c.Username, true)
+	OturumCerezSil(w, r)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

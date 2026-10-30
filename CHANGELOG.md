@@ -13,6 +13,77 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.80** (2026-10-29) — e-posta teslimat takibi
+
+- **Teslimat geçmişi.** Postfix'in systemd journal kayıtlarından alıcı bazında
+  *teslim edildi / ertelendi / geri döndü / yönlendirildi* durumları, SMTP/DSN
+  yanıtı, aktarma sunucusu ve tüm yeniden denemeler izlenir. Kuyruğa alınma veya
+  SMTP kabulü teslim sayılmaz; `sent` Postfix'in iletiyi sonraki sunucuya ya da
+  yerel kutuya devrettiği anlamına gelir, okundu bilgisi değildir.
+- Gönderen, alıcı, kuyruk kimliği, durum ve tarih aralığına göre arama; mesaj
+  başına zaman çizelgesi. Yönetici tümünü, bayi yalnız müşterilerinin kayıtlarını,
+  müşteri yalnız kendi alan adının kayıtlarını görür. Aynı mesajın başka
+  müşteriye ait alıcıları gösterilmez. `E-posta` planı kapalı müşteriler erişemez.
+- Kayıtlar yalnızca root veya `postfix` kullanıcısıyla çalışan gerçek Postfix
+  programlarından kabul edilir; yerel bir kullanıcının `postfix/…` etiketli sahte
+  günlük girişleri kayıt veya görünürlük oluşturamaz. Taklit edilmiş `From`
+  adresi tek başına görünürlük sağlamaz; kimliği doğrulanmış SMTP kullanıcısı
+  veya eşlenmiş pickup UID'si gerekir.
+- Toplayıcı imleci ve kayıtlar aynı işlemde saklanır; yeniden başlatma ve
+  tekrar okuma kayıt çoğaltmaz. Journal geçmişi silindiğinde ekranda kalıcı
+  "geçmişte boşluk var" uyarısı çıkar. Kayıtlar 30 gün tutulur; yönetici
+  `postsuper -d` ile sildiği mesajlar kapatılır, büyük/küçük harf farklı kuyruk
+  kimlikleri ayrı mesajlardır.
+- Posta ekranlarında Türkçe/İngilizce teslimat paneli eklendi. Genel sunucu
+  kuyruk işlemleri bayiye açılmaz.
+- Güncellemeden sonra panel ilk açılışta en fazla son 7 günün journal geçmişini
+  içe aktarır; öncesi için kayıt bulunmaz ve bu "teslim edilmedi" anlamına gelmez.
+- **Posta kutusu kotası artık uygulanıyor.** Kutu başına kota Dovecot'a iletilir
+  (2.3 ve 2.4); kotayı aşan teslimat `552 5.2.2 Quota exceeded` ile reddedilir.
+  Yeni kutu planın `mailbox_quota_mb` değerini devralır (0 = sınırsız; ek alan
+  adları ana hesabın planını izler). Kutu kotası panelden değiştirilir ve
+  Dovecot'u yeniden başlatmadan geçerli olur. Müşteri planın üstüne çıkamaz ve
+  sınırsız seçemez; yönetici/bayi en çok 1 TiB'a kadar belirleyebilir. Kullanım,
+  Dovecot'un `maildirsize` dosyasından ucuz okunur; henüz oluşmadıysa "bilinmiyor"
+  gösterilir. Kurulu sunucularda Dovecot ayarı panel açılışında doğrulanarak
+  (doveconf, hatada geri alma) otomatik uygulanır. Aktarımla gelen `quota_bytes`
+  değerleri daha önce yok sayılıyordu, artık uygulanır.
+- **Panel alan adı sertifikası da Let's Encrypt staging ön denemesinden geçer.**
+  Önce ayrı bir geçici depoda staging ile doğrulanır, başarılıysa üretim CA'sına
+  gidilir; başarısızlıkta üretim isteği yapılmaz ve mevcut sertifika korunur.
+  (Site sertifikalarında bu zaten vardı.)
+- Postfix `cleanup`'ın "removed (canceled)" kaydı (istemci DATA sırasında
+  bağlantıyı kesti) artık teslimat kaydını kapatır; aksi halde saklama süresi
+  dolmadan sonsuza dek açık kalırdı. Gerçek sunucu günlüğü (41 bin kayıt)
+  ayrıştırıcıyla karşılaştırılarak bulundu.
+
+**0.9.79** (2026-10-29) — yedekleme güvenilirliği, hesap güvenliği ve plan yetkileri
+
+- Site yedekleri tek panel motorunda birleştirildi. Kurulum ve güncelleme eski
+  günlük cron'u/betiğini kaldırır; arşivler ve domainlerin yedekleme tercihleri
+  korunur. Eski `planli` kayıtları otomatik saklama havuzuna geçirilir.
+- Arşivler geçici dosyada üretilip ancak başarılı tamamlanınca yayımlanır.
+  Dump/tar hatasında başarı kaydı oluşmaz; DB kayıt hatasında arşiv temizlenir.
+- Adet/gün saklama kuralları ve toplu temizlik domainin son doğrulanmış sağlam
+  yedeğini korur; yeni yedek bekliyor veya başarısızsa sağlam eski kopya silinmez.
+  Açık tek-yedek silme işlemi bu otomatik korumadan ayrıdır.
+- Müşteriler Hesap Güvenliği ekranından panel parolasını ve 2FA'yı yönetebilir.
+  `/cp` ve yönetici girişinden müşteri geçişi TOTP kodu istemeyi destekler.
+- Müşteri ve yönetici/bayi girişleri aynı fail-closed 2FA kontrolünü kullanır.
+  Kod tüketimi atomiktir; aynı kodla eşzamanlı isteklerden yalnız biri kabul edilir.
+  Parola/2FA değişikliği tarayıcı oturumlarını iptal eder ve çerezi siler.
+- Hizmet planlarında DNS, e-posta, veritabanı, dosya, FTP, cron, yedek ve Git
+  yönetimi ayrı ayrı açılıp kapatılabilir. Müşteri menüleri/kısayolları ve
+  doğrudan API erişimleri aynı plan izinlerini izler; DB kimliğiyle silme,
+  parola değiştirme ve phpMyAdmin token yolları da denetlenir.
+- Plan değişiklikleri mevcut oturumlarda bir sonraki istekte uygulanır. Ek
+  alan adları eski plan kopyası yerine ana hesabın güncel planını izler.
+  Eski planlar/plansız hesaplar tüm erişimlerini korur; bozuk politika erişim
+  vermez. Yönetici/bayi destek yetkisi sahiplik sınırları içinde korunur.
+- Plan modül ayarları mevcut verileri silmez, hizmetleri veya zamanlanmış
+  işleri durdurmaz. İzinler yüklenemediğinde müşteri sayfaları açılmaz;
+  yeniden deneme ve paket dışı modül açıklamaları Türkçe/İngilizce sunulur.
+
 **0.9.78** (2026-10-16) — dnf disk sızıntısı düzeltmesi
 
 - **Arka plan paket sorguları diski doldurmuyor.** PHP sürüm listesini

@@ -215,7 +215,9 @@ if [ "${DVANA:-2}" -gt 2 ] 2>/dev/null || { [ "${DVANA:-2}" = 2 ] && [ "${DVIKI:
   # 10- dosyamızdan SONRA yüklenir; override 99- önekiyle en sona konmalı.
   # Ayrıntı için şablonun kendi başlığına bakın.
   cp "$TMPL/dovecot/99-sanalcp-lmtp-2.4.conf.tmpl" /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
-  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde, LMTP override yazıldı)"
+  # Kutu kotası (kota eklentisi + sürücü); limit userdb sorgusundan gelir.
+  cp "$TMPL/dovecot/95-sanalcp-quota-2.4.conf.tmpl" /etc/dovecot/conf.d/95-sanalcp-quota.conf
+  log "dovecot ${DVSURUM} → 2.4 şablonu kuruldu (SQL bağlantısı conf içinde, LMTP override + kota yazıldı)"
 else
   sed "s/__PANEL_MAIL_DB_PASS__/${DBPASS}/" "$TMPL/dovecot/dovecot-sql.conf.ext.tmpl" > /etc/dovecot/dovecot-sql.conf.ext
   chown root:dovecot /etc/dovecot/dovecot-sql.conf.ext
@@ -223,7 +225,10 @@ else
   cp "$TMPL/dovecot/10-sanalcp-mail.conf.tmpl" /etc/dovecot/conf.d/10-sanalcp-mail.conf
   # 2.4'ten geri düşülen kurulumda kalmasın: 2.3 bu ayarı tanımaz, dovecot açılmaz.
   rm -f /etc/dovecot/conf.d/99-sanalcp-lmtp.conf
-  log "dovecot ${DVSURUM:-2.3.x} → 2.3 şablonu kuruldu"
+  # Kutu kotası (kota eklentisi); limit dovecot-sql.conf.ext user_query'sinden gelir.
+  # 2.4'ten geri düşülen kurulumdaki 2.4 sözdizimli dosyanın üzerine yazılır.
+  cp "$TMPL/dovecot/95-sanalcp-quota.conf.tmpl" /etc/dovecot/conf.d/95-sanalcp-quota.conf
+  log "dovecot ${DVSURUM:-2.3.x} → 2.3 şablonu kuruldu (kutu kotası dahil)"
 fi
 # Stok PAM passdb'sini kapat: kutular sanaldır (SQL passdb). Açık kalırsa her
 # girişte önce PAM denenir, kullanıcı sistemde olmadığı için pam_unix gecikme

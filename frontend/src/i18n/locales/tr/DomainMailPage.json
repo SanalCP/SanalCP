@@ -57,7 +57,21 @@
     "activate": "Etkinleştir",
     "status_failed": "Kutu durumu değiştirilemedi",
     "delete_confirm": "\"{{email}}\" kutusunu silmek istediğinize emin misiniz? (Maildir diskte kalır, yalnızca hesap kaldırılır.)",
-    "delete_failed": "Silinemedi"
+    "delete_failed": "Silinemedi",
+    "quota_label": "Kota",
+    "quota_placeholder": "kota MB (boşsa paket: {{limit}})",
+    "quota_unlimited": "sınırsız",
+    "quota_help": "Kutu başına depolama sınırı, MB cinsinden. 0 = sınırsız. Boş bırakırsanız paketin varsayılanı uygulanır.",
+    "quota_usage_unknown": "kullanım henüz bilinmiyor",
+    "quota_over": "kota aşıldı",
+    "quota_near": "dolmak üzere",
+    "quota_edit": "Kota",
+    "quota_prompt": "\"{{email}}\" kutusunun kotası (MB). 0 = sınırsız.",
+    "quota_prompt_max": "Paketinizde kutu başına en fazla {{max}} MB.",
+    "quota_invalid": "Geçerli bir kota girin: 0 (sınırsız) veya pozitif tam sayı (MB).",
+    "quota_over_plan": "Paketinizde kutu başına en fazla {{max}} MB kota var.",
+    "quota_saved": "\"{{email}}\" kotası güncellendi.",
+    "quota_failed": "Kota güncellenemedi"
   },
   "forwarders": {
     "title": "Yönlendirmeler (Forwarder) & Catch-All",

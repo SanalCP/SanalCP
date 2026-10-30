@@ -33,6 +33,7 @@
   "account_menu": "Account menu",
   "theme_toggle_title": "Theme: {{theme}} — click to change",
   "profile_prefs": "Profile & Preferences",
+  "account_security": "Account Security",
   "logout": "Log Out",
   "types": {
     "sayfa": "page",

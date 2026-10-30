@@ -111,7 +111,7 @@ func (h *Handlers) Kaydet(w http.ResponseWriter, r *http.Request) {
 
 	// Let's Encrypt ACME sunucusuna ağ çıkışı yapar (order + challenge doğrulama) —
 	// yanıt gelmezse istek işleyen goroutine sonsuza dek asılı kalmasın diye üst sınır.
-	sslCtx, sslCancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	sslCtx, sslCancel := context.WithTimeout(r.Context(), 7*time.Minute) // staging ön denemesi (3 dk) + üretim (3 dk)
 	defer sslCancel()
 	sslDurum, sslHata, sslBitis := sslKur(sslCtx, domain)
 	if _, err := h.DB.ExecContext(r.Context(),
@@ -155,7 +155,7 @@ func sslKur(ctx context.Context, domain string) (durum, hata, bitis string) {
 	_, _ = exec.Command("restorecon", "-R", acmeWebroot).CombinedOutput()
 
 	issueArgs := []string{"--issue", "--webroot", acmeWebroot, "-d", domain, "--keylength", "2048"}
-	out, err := exec.CommandContext(ctx, acmeBinYolu, issueArgs...).CombinedOutput()
+	out, err := provisioner.IssueWithPreflight(ctx, acmeBinYolu, issueArgs)
 	if err != nil && strings.Contains(string(out), "invalidContact") {
 		// Kurulumda geçersiz bir contact-email ile (ör. admin@test.local — public suffix
 		// olmayan bir TLD) hesap kaydı BAŞARISIZ olmuş olabilir. acme.sh bu email'i HEM
@@ -168,7 +168,7 @@ func sslKur(ctx context.Context, domain string) (durum, hata, bitis string) {
 		// (bkz. sanalcp-install.sh'daki aynı sınıf düzeltme).
 		acmeContactTemizle()
 		_, _ = exec.CommandContext(ctx, acmeBinYolu, "--register-account", "--server", "letsencrypt").CombinedOutput()
-		out, err = exec.CommandContext(ctx, acmeBinYolu, issueArgs...).CombinedOutput()
+		out, err = provisioner.IssueWithPreflight(ctx, acmeBinYolu, issueArgs)
 	}
 	if err != nil {
 		// acme.sh exit code 2 = RENEW_SKIP: store'da zaten gecerli (yenileme penceresine

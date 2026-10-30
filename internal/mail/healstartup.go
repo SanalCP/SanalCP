@@ -22,6 +22,9 @@ func HealMailOnStartup(ctx context.Context, db *sql.DB) {
 			log.Printf("mail heal: %s eksik — sanalcp-mail-setup çalıştırılmamış olabilir", p)
 		}
 	}
+	// Kutu kotasını mevcut Dovecot kurulumuna uygula (userdb limiti + kota
+	// eklentisi). Güncelleme setup'ı yeniden çalıştırmadığı için burada yapılır.
+	HealDovecotQuota(ctx)
 
 	rows, err := db.QueryContext(ctx,
 		`SELECT sistem_kullanici, uid_n, gid_n, maildir_root FROM mail_domains WHERE durum='active'`)

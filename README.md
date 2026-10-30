@@ -178,12 +178,31 @@ Roller:
 |---|---|
 | **Yönetici (admin)** | Sunucunun tamamı. Birden fazla olabilir; son aktif yönetici rolünden düşürülemez. |
 | **Bayi (reseller)** | Yalnızca kendi müşterileri ve onların domainleri. Kendi kotaları vardır, yalnız müşteri hesabı açabilir. |
-| **Müşteri (user)** | Tek domain. Yönetim paneline giriş yapamaz; `/cp` üzerinden kendi domain paneline girer. |
+| **Müşteri (user)** | Kendisine bağlı domainler. `/cp` üzerinden müşteri paneline girer; yönetici işlemlerine erişemez. |
+
+### Plan bazlı müşteri modülleri
+
+**Hizmet Planları → Paket detayı** ekranından DNS, e-posta, veritabanları,
+dosyalar, FTP, cron, yedekler ve Git yönetimini ayrı ayrı açıp kapatabilirsiniz.
+Kapalı modüller müşteri menülerinden ve kısayollardan kaldırılır; doğrudan
+sayfa adresi veya API isteğiyle de açılamaz. Plan değişikliği mevcut oturumlarda
+bir sonraki API isteğine yansır; ek alan adları ana hesabın güncel planını izler.
+Eski planlar ve plansız hesaplar mevcut tüm erişimlerini korur. Yönetici ve bayi
+destek erişimi, mevcut sahiplik sınırları içinde devam eder.
+
+Bu ayarlar **yönetim yetkisidir**, hizmet kapatma değildir: mevcut veriler,
+FTP/DB/e-posta kimlikleri, çalışan hizmetler, cron ve otomatik yedek görevleri
+silinmez veya durdurulmaz. Git webhook'ları ve uygulama CLI erişimi de değişmez.
 
 ### Giriş güvenliği
 
-- **2FA (TOTP)** — tüm panel hesapları için; QR kod ile kurulur, kod tekrar kullanımına
-  (replay) karşı korumalıdır. 2FA durumu okunamazsa giriş **reddedilir** (fail-closed).
+- **2FA (TOTP)** — yönetici, bayi ve müşteri hesapları için; QR kod ile kurulur.
+  Müşteriler `/cp` ile girdikten sonra **Hesap Güvenliği** ekranından kendi panel
+  parolalarını ve 2FA'larını yönetir. 2FA açıkken kod olmadan oturum verilmez;
+  aynı kod eşzamanlı girişlerde de yalnız bir kez kabul edilir. 2FA durumu
+  okunamazsa giriş **reddedilir** (fail-closed).
+- Parola veya 2FA değişikliği tüm mevcut tarayıcı oturumlarını geçersizleştirir.
+  2FA açılırken kullanılan kod yeniden girişte kullanılamaz; sonraki kodu bekleyin.
 - **Kaba kuvvet koruması** — IP başına kayan pencere + kademeli gecikme + kilit.
   İstemci IP'si ters proxy başlıklarıyla spoof edilemez.
 - **Denetim kaydı (audit log)** — başarılı/başarısız girişler, hesap işlemleri ve
@@ -215,6 +234,8 @@ Roller:
 - **Yönetim API'si** — otomasyon için kişisel erişim token'ları ([docs/API.md](docs/API.md))
 - Backup yöneticisi, izleme/loglar, istatistikler
 - Hizmet planları ve kaynak limitleri (domain oluştururken varsayılan **Başlangıç**)
+- **E-posta teslimat takibi**: Postfix sonuçları alıcı bazında (teslim edildi, ertelendi, geri döndü), SMTP yanıtı ve yeniden denemelerle izlenir; müşteri/bayi/yönetici kapsamı ve 30 günlük saklama uygulanır. Kaynak systemd journal'dır; `sent` okundu bilgisi değil, sonraki sunucuya/kutuya devir anlamına gelir.
+- **Posta kutusu kotası**: kutu başına Dovecot kotası (aşımda `552 Quota exceeded`), plan varsayılanı, panelden değiştirme ve kullanım göstergesi.
 - Reverse proxy sitelerinde tenant kullanıcısıyla Node.js/Python giriş dosyasını systemd servisi olarak başlatma, durdurma, yeniden başlatma ve günlük görüntüleme. Kurulu yorumlayıcı seçimi, npm/pip kurulumu ve HTTP sağlık kontrolü desteklenir. Git Pull/webhook dağıtımı ayrı sürüm dizininde derler, sağlık kontrolünden sonra servisi yönlendirir ve hatada önceki sürüme döner. Uygulama `HOST=127.0.0.1` ve `PORT` değerleriyle dinlemelidir.
 
 ## Otomatik Saldırı Engelleme
@@ -344,7 +365,22 @@ systemctl start sanalcp
 
 ### Müşteri siteleri
 
-Müşteri siteleri + veritabanları ayrı bir işle yedeklenir: `sanalcp-backup-all` (cron, her gün 03:00 UTC, `/var/backups/sanalcp/<sistem_kullanıcı>/`, 14 gün saklama). Panel DB yedeği bu dizinlere **dokunmaz**.
+Müşteri siteleri ve kayıtlı veritabanları panelin **tek yedekleme motoruyla**
+yedeklenir. Domain → **Yedekler** ekranından otomatik yedeklemeyi kapatabilir veya
+günlük/haftalık/aylık frekans, saat, adet ve gün sınırı belirleyebilirsiniz.
+Manuel yedeklerin ayrı adet sınırı vardır; `0` sınırsızdır. Arşivler
+`/var/backups/sanalcp/<sistem_kullanıcı>/` altında tutulur.
+
+- Dump veya arşiv komutu başarısızsa başarı kaydı oluşturulmaz; yarım arşiv
+  yayımlanmaz. Panel CLI token'ı arşive alınmaz.
+- Adet/gün sınırları ve toplu temizlik, domainin **son doğrulanmış sağlam
+  yedeğini** ayrıca korur. Bu yüzden saklanan adet geçici olarak sınırı aşabilir.
+  Kullanıcının belirli bir yedeği açıkça silmesi bu korumadan ayrıdır.
+- Kurulum/güncelleme eski `sanalcp-backup-all` betiğini ve cron'unu kaldırır;
+  mevcut arşivleri ve domainlerin plan/saklama tercihlerini değiştirmez.
+  Eski `planli` kayıtları otomatik saklama havuzuna taşınır; arşiv içerikleri
+  yeniden yazılmaz. Otomatik yedekleme kapalıysa kapalı kalır.
+- Panel veritabanının ayrı günlük yedeği ve timer'ı bu geçişten etkilenmez.
 
 ## Güncelleme (SSH / CLI)
 

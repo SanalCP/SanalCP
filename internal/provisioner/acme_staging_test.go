@@ -70,7 +70,7 @@ func TestIssueWithPreflight(t *testing.T) {
 				t.Setenv("ACME_STAGING", "")
 			}
 
-			out, err := issueWithPreflight(context.Background(), bin,
+			out, err := IssueWithPreflight(context.Background(), bin,
 				[]string{"--issue", "--webroot", "/var/www/_acme", "-d", "ornek.com"})
 			if (err != nil) != tc.failStaging {
 				t.Fatalf("hata = %v, çıktı = %s", err, out)

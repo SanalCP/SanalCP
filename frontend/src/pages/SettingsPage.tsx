@@ -56,6 +56,7 @@ export default function SettingsPage() {
   const guncelleAd = useAuth((s) => s.guncelleAd)
   const cikis = useAuth((s) => s.cikis)
 
+  const musteriMi = useAuth((s) => s.kullanici?.rol === 'user')
   // Nameserver: admin panel genelini, bayi kendi white-label çiftini yönetir.
   // Müşteriler bunu Bağlantı Bilgisi ekranında yalnız görüntüler.
   const [ns, setNS] = useState<{ ns1: string; ns2: string; kaynak?: string; uyari?: string; oneri1?: string; oneri2?: string } | null>(null)
@@ -122,7 +123,9 @@ export default function SettingsPage() {
     }).catch(e => setYukHata(apiHata(e)))
   }
   useEffect(yukle, [])
-  useEffect(tokenlariYukle, [])
+  useEffect(() => {
+    if (!musteriMi) tokenlariYukle()
+  }, [musteriMi])
 
   async function profilKaydet(e: React.FormEvent) {
     e.preventDefault(); setPOk(''); setPErr(''); setPYuk(true)
@@ -155,12 +158,12 @@ export default function SettingsPage() {
     e.preventDefault(); setF2Err(''); setF2Yuk(true)
     try {
       await api.post('/me/2fa/enable', { secret: f2Kur!.secret, kod: f2Kod })
-      setF2Kur(null); setF2Kod(''); yukle()
+      setF2Kur(null); setF2Kod(''); cikis()
     } catch (e) { setF2Err(apiHata(e, t('SettingsPage:twofa.verify_failed'))) } finally { setF2Yuk(false) }
   }
   async function f2KapatOnay(e: React.FormEvent) {
     e.preventDefault(); setF2Err(''); setF2Yuk(true)
-    try { await api.post('/me/2fa/disable', { kod: kapatKod }); setF2Kapat(false); setKapatKod(''); yukle() }
+    try { await api.post('/me/2fa/disable', { kod: kapatKod }); setF2Kapat(false); setKapatKod(''); cikis() }
     catch (e) { setF2Err(apiHata(e, t('SettingsPage:twofa.verify_failed'))) } finally { setF2Yuk(false) }
   }
 
@@ -197,15 +200,19 @@ export default function SettingsPage() {
     } catch (e) { setNSErr(apiHata(e)) } finally { setNSYuk(false) }
   }
 
+  if (!ben) {
+    return <div className="ta-page">{yukHata ? <Uyari tip="err" mesaj={yukHata} /> : t('common:loading')}</div>
+  }
+
   const btn = 'ta-primary-button disabled:cursor-not-allowed disabled:opacity-50'
   const secretGruplu = f2Kur ? (f2Kur.secret.match(/.{1,4}/g) || []).join(' ') : ''
 
   return (
     <div className="ta-page">
-      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t('SettingsPage:title') }]} />
+      <Breadcrumb items={[{ etiket: t('common:home'), href: '/' }, { etiket: t(musteriMi ? 'SettingsPage:security_title' : 'SettingsPage:title') }]} />
       <p className="ta-eyebrow">SanalCP</p>
-      <h1 className="ta-page-title">{t('SettingsPage:title')}</h1>
-      <p className="ta-page-description mb-7">{t('SettingsPage:subtitle')}</p>
+      <h1 className="ta-page-title">{t(musteriMi ? 'SettingsPage:security_title' : 'SettingsPage:title')}</h1>
+      <p className="ta-page-description mb-7">{t(musteriMi ? 'SettingsPage:security_subtitle' : 'SettingsPage:subtitle')}</p>
       {yukHata && <div className="mb-4"><Uyari tip="err" mesaj={yukHata} /></div>}
 
       <div className="space-y-5">
@@ -213,6 +220,7 @@ export default function SettingsPage() {
             kartlar birbirinin boyuna uzamaz (API token kartı en uzunu). */}
         <div className="grid gap-5 items-start lg:grid-cols-2">
           {/* 1) Hesap Bilgileri */}
+        {!musteriMi && (
         <Kart baslik={t('SettingsPage:account.title')} aciklama={t('SettingsPage:account.desc')}
           ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
           cocuk={
@@ -235,6 +243,7 @@ export default function SettingsPage() {
               </div>
             </form>
           } />
+        )}
 
         {/* 2) Parola */}
         <Kart baslik={t('SettingsPage:password.title')} aciklama={t(ben?.adi === 'root' ? 'SettingsPage:password.desc_root' : 'SettingsPage:password.desc_account')}
@@ -298,7 +307,6 @@ export default function SettingsPage() {
                     <button type="submit" disabled={f2Yuk || f2Kod.length !== 6} className={btn}>{f2Yuk ? t('SettingsPage:twofa.verifying') : t('SettingsPage:twofa.verify_enable')}</button>
                     <button type="button" onClick={() => setF2Kur(null)} className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">{t('SettingsPage:twofa.cancel')}</button>
                   </div>
-                  <Uyari tip="err" mesaj={f2Err} />
                 </form>
               )}
 
@@ -314,14 +322,15 @@ export default function SettingsPage() {
                     <button type="submit" disabled={f2Yuk || kapatKod.length !== 6} className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50">{t('common:close')}</button>
                     <button type="button" onClick={() => setF2Kapat(false)} className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">{t('SettingsPage:twofa.give_up')}</button>
                   </div>
-                  <Uyari tip="err" mesaj={f2Err} />
                 </form>
               )}
+              <Uyari tip="err" mesaj={f2Err} />
             </div>
           } />
 
         {/* 3.4) API token'ları — otomasyon için. Token sahibinin ROLÜYLE çalışır
             (bkz. internal/auth/apitoken.go), yani ayrı bir izin seti yoktur. */}
+        {!musteriMi && (
         <Kart baslik={t('SettingsPage:apitoken.title')} aciklama={t('SettingsPage:apitoken.desc')}
           ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>}
           cocuk={
@@ -401,6 +410,7 @@ export default function SettingsPage() {
               </p>
             </div>
           } />
+        )}
 
         {/* 3.5) Nameserver — YALNIZ bayi. Admin'inki sunucu geneli bir ayar
             olduğu için Araçlar & Ayarlar sayfasındadır (NameserverAyari). */}
@@ -434,6 +444,7 @@ export default function SettingsPage() {
         </div>
 
         {/* 4) Tercihler — tek satır tam genişlik */}
+        {!musteriMi && (
         <Kart baslik={t('SettingsPage:prefs.title')} aciklama={t('SettingsPage:prefs.desc')}
           ikon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>}
           cocuk={
@@ -459,6 +470,7 @@ export default function SettingsPage() {
               </div>
             </div>
           } />
+        )}
       </div>
     </div>
   )

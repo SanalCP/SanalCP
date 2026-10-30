@@ -231,35 +231,11 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2FA — parola doğru; 2FA açıksa TOTP kodu da gerekir. Artık giriş yapan
-	// kullanıcının kendi kaydından okunuyor (eskiden id=1'e sabitti).
-	// FAIL-CLOSED: 2FA durumu okunamıyorsa (DB hatası) giriş REDDEDİLİR (eskiden
-	// hata yutulup 2FA sessizce atlanıyordu = fail-open).
-	{
-		var en int
-		var sec string
-		var sonAdim int64
-		if err := h.DB.QueryRow(`SELECT totp_enabled, totp_secret, totp_last_step, auth_version FROM users WHERE id=?`, uid).Scan(&en, &sec, &sonAdim, &surum); err != nil {
-			httpx.WriteError(w, http.StatusInternalServerError, "2FA durumu doğrulanamadı")
-			return
-		}
-		if en == 1 {
-			if strings.TrimSpace(sec) == "" {
-				httpx.WriteError(w, http.StatusInternalServerError, "2FA yapılandırması hatalı")
-				return
-			}
-			if strings.TrimSpace(req.Kod) == "" {
-				httpx.WriteJSON(w, http.StatusOK, map[string]any{"iki_fa_gerekli": true})
-				return
-			}
-			adim, ok := TOTPVerifyAdim(sec, req.Kod, sonAdim)
-			if !ok {
-				WriteAudit(h.DB, uid, kadi, ip, "auth.2fa", kadi, false)
-				httpx.WriteError(w, http.StatusUnauthorized, "2FA kodu hatalı veya tekrar kullanıldı")
-				return
-			}
-			_, _ = h.DB.Exec(`UPDATE users SET totp_last_step=? WHERE id=?`, adim, uid) // replay koruması
-		}
+	// Müşteri girişi de aynı fail-closed ve atomik replay kapısını kullanır.
+	var izin bool
+	surum, izin = DogrulaGiris2FA(w, r, h.DB, uid, kadi, req.Kod)
+	if !izin {
+		return
 	}
 
 	tok, err := Issue(h.Secret, h.LifetimeSec, uid, kadi, rol, surum)

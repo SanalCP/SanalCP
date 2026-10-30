@@ -5,6 +5,7 @@ import { AxiosProgressEvent } from 'axios'
 import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type ArsivOzet = {
   stage_id: string
@@ -48,6 +49,7 @@ const etiketSinif = 'block text-xs font-medium text-slate-600 dark:text-slate-40
 export default function DomainIceAktarimPage() {
   const { t } = useTranslation(['DomainIceAktarimPage', 'common'])
   const { id } = useParams()
+  const databaseAllowed = useDomainFeatures().allows('databases')
 
   const [hata, setHata] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -83,14 +85,14 @@ export default function DomainIceAktarimPage() {
   useEffect(() => {
     if (!id) return
     api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(() => {})
-    api.get<DB[]>(`/domains/${id}/databases`)
+    if (databaseAllowed) api.get<DB[]>(`/domains/${id}/databases`)
       .then(r => {
         setDBler(r.data || [])
         if (r.data?.length) setDBAdi(r.data[0].db_adi)
       })
       .catch(() => { /* liste boş kalır; hata ilgili adımda gösterilir */ })
     isleriYukle()
-  }, [id, isleriYukle])
+  }, [id, isleriYukle, databaseAllowed])
 
   useEffect(() => {
     if (!isler.some(j => j.durum === 'queued' || j.durum === 'running')) return
@@ -268,16 +270,16 @@ export default function DomainIceAktarimPage() {
         <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('DomainIceAktarimPage:db.title')}</h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{t('DomainIceAktarimPage:db.desc')}</p>
 
-        {dbler.length === 0 ? (
+        {databaseAllowed && dbler.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">{t('DomainIceAktarimPage:db.no_db')}</p>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className={etiketSinif}>{t('DomainIceAktarimPage:db.target')}</label>
-                <select value={dbAdi} onChange={e => setDBAdi(e.target.value)} className={girdi}>
+                {databaseAllowed ? <select value={dbAdi} onChange={e => setDBAdi(e.target.value)} className={girdi}>
                   {dbler.map(d => <option key={d.id} value={d.db_adi}>{d.db_adi}</option>)}
-                </select>
+                </select> : <input aria-label={t('DomainIceAktarimPage:db.target')} value={dbAdi} onChange={e => setDBAdi(e.target.value)} className={girdi} />}
               </div>
               <div>
                 <label className={etiketSinif}>{t('DomainIceAktarimPage:db.file')}</label>
@@ -290,7 +292,7 @@ export default function DomainIceAktarimPage() {
               <input type="checkbox" checked={bosalt} onChange={e => setBosalt(e.target.checked)} />
               <span className="text-rose-700 dark:text-rose-400">{t('DomainIceAktarimPage:db.wipe_first')}</span>
             </label>
-            <button onClick={dumpYukle} disabled={!dump || dumpYukleniyor} className={dugme}>
+            <button onClick={dumpYukle} disabled={!dump || !dbAdi.trim() || dumpYukleniyor} className={dugme}>
               {dumpYukleniyor ? t('DomainIceAktarimPage:db.importing', { pct: dumpIlerleme }) : t('DomainIceAktarimPage:db.apply')}
             </button>
           </>

@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import Modal from '@/components/Modal'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type Domain = {
   id: number; alan_adi: string; ipv4: string
@@ -22,6 +23,8 @@ type NS = { ns1: string; ns2: string; kaynak?: string; uyari?: string }
 export default function DomainConnectionPage() {
   const { t } = useTranslation(['DomainConnectionPage', 'common'])
   const { id } = useParams()
+  const { allows } = useDomainFeatures()
+  const dnsAllowed = allows('dns')
   const [domain, setDomain] = useState<Domain | null>(null)
   const [hata, setHata] = useState<string | null>(null)
   const [parolaModal, setParolaModal] = useState<{ tip: 'ftp' | 'db'; cikti?: string } | null>(null)
@@ -31,8 +34,8 @@ export default function DomainConnectionPage() {
     if (!id) return
     api.get<Domain>(`/domains/${id}`).then(r => setDomain(r.data)).catch(e => setHata(apiHata(e)))
     // Nameserver bilgisi ayrı uçtan: panel geneli / bayi override'ı burada çözülür.
-    api.get<NS>(`/domains/${id}/nameserver`).then(r => setNS(r.data)).catch(() => { /* kart gizlenir */ })
-  }, [id])
+    if (dnsAllowed) api.get<NS>(`/domains/${id}/nameserver`).then(r => setNS(r.data)).catch(() => { /* kart gizlenir */ })
+  }, [id, dnsAllowed])
 
 
   return (
@@ -55,23 +58,23 @@ export default function DomainConnectionPage() {
 
       {domain && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <Kart baslik={t('DomainConnectionPage:ftp_sftp')} renk="sky" ikon="M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z">
+          {allows('ftp') && <Kart baslik={t('DomainConnectionPage:ftp_sftp')} renk="sky" ikon="M3 16V8a2 2 0 012-2h6l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2z">
             <Sat e={t('DomainConnectionPage:server')} d={domain.ftp_host} />
             <Sat e={t('DomainConnectionPage:port')} d="21" />
             <Sat e={t('DomainConnectionPage:username')} d={domain.ftp_user} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="ftp" onAc={() => setParolaModal({ tip: 'ftp' })} />
             <Sat e={t('DomainConnectionPage:home_dir')} d={`/home/${domain.sistem_kullanici}`} mono />
             <Link to={`/abonelikler/${id}/ftp`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:ftp_manage_link')}</Link>
-          </Kart>
+          </Kart>}
 
-          <Kart baslik={t('DomainConnectionPage:mysql_mariadb')} renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
+          {allows('databases') && <Kart baslik={t('DomainConnectionPage:mysql_mariadb')} renk="violet" ikon="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3z">
             <Sat e={t('DomainConnectionPage:server')} d={domain.db_host} />
             <Sat e={t('DomainConnectionPage:port')} d="3306" />
             <Sat e={t('DomainConnectionPage:database')} d={domain.db_adi} mono />
             <Sat e={t('DomainConnectionPage:username')} d={domain.db_user} mono />
             <Parola e={t('DomainConnectionPage:password')} id={id!} tip="db" onAc={() => setParolaModal({ tip: 'db' })} />
             <Link to={`/abonelikler/${id}/veritabanlari`} className="block mt-2 text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium">{t('DomainConnectionPage:db_manage_link')}</Link>
-          </Kart>
+          </Kart>}
 
           <Kart baslik={t('DomainConnectionPage:web')} renk="amber" ikon="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" cift>
             <Sat e={t('DomainConnectionPage:web_root')} d={domain.web_root} mono />
@@ -81,7 +84,7 @@ export default function DomainConnectionPage() {
             <Sat e={t('DomainConnectionPage:https_url')} d={`https://${domain.alan_adi}/`} />
           </Kart>
 
-          {ns && (
+          {dnsAllowed && ns && (
             <Kart baslik={t('DomainConnectionPage:nameservers')} renk="emerald" ikon="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" cift>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
                 {t('DomainConnectionPage:nameservers_desc')}

@@ -11,6 +11,8 @@ export default function CPanelGirisPage() {
   const { t } = useTranslation(['CPanelGirisPage'])
   const [kullanici, setKullanici] = useState('')
   const [parola, setParola] = useState('')
+  const [kod, setKod] = useState('')
+  const [ikiFa, setIkiFa] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
   const [yuk, setYuk] = useState(false)
   const nav = useNavigate()
@@ -19,8 +21,12 @@ export default function CPanelGirisPage() {
     e.preventDefault()
     setYuk(true); setHata(null)
     try {
-      const r = await axios.post('/api/v1/musteri/login', { kullanici, parola })
-      const { bitis, domain_id, alan_adi } = r.data
+      const { data } = await axios.post('/api/v1/musteri/login', { kullanici, parola, kod })
+      if (data.iki_fa_gerekli) {
+        setIkiFa(true)
+        return
+      }
+      const { bitis, domain_id, alan_adi } = data
       // Oturum HttpOnly çerezde geldi; store yalnız arayüz durumunu yazıyor.
       useAuth.getState().girisMusteri(bitis, domain_id, alan_adi, kullanici)
       nav('/abonelikler/' + domain_id, { replace: true })
@@ -47,21 +53,39 @@ export default function CPanelGirisPage() {
 
         <form onSubmit={gir} className="space-y-3">
           <div>
-            <label className="ta-label-sm">{t('CPanelGirisPage:username')}</label>
-            <input type="text" value={kullanici} onChange={e => setKullanici(e.target.value)}
-              autoComplete="username" required autoFocus
+            <label htmlFor="musteri-kullanici" className="ta-label-sm">{t('CPanelGirisPage:username')}</label>
+            <input id="musteri-kullanici" type="text" value={kullanici} onChange={e => setKullanici(e.target.value)}
+              autoComplete="username" required autoFocus readOnly={ikiFa}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm focus:border-brand-500 outline-none" />
           </div>
           <div>
-            <label className="ta-label-sm">{t('CPanelGirisPage:password')}</label>
-            <input type="password" value={parola} onChange={e => setParola(e.target.value)}
-              autoComplete="current-password" required
+            <label htmlFor="musteri-parola" className="ta-label-sm">{t('CPanelGirisPage:password')}</label>
+            <input id="musteri-parola" type="password" value={parola} onChange={e => setParola(e.target.value)}
+              autoComplete="current-password" required readOnly={ikiFa}
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-sm focus:border-brand-500 outline-none" />
           </div>
-          <button type="submit" disabled={yuk || !kullanici || !parola}
+          {ikiFa && (
+            <div>
+              <label htmlFor="musteri-kod" className="ta-label-sm">{t('CPanelGirisPage:twofa_code')}</label>
+              <input id="musteri-kod" type="text" value={kod}
+                onChange={e => setKod(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
+                required autoFocus
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded font-mono text-center text-lg tracking-[0.3em] focus:border-brand-500 outline-none" />
+              <p className="mt-2 text-xs text-slate-500">{t('CPanelGirisPage:twofa_hint')}</p>
+            </div>
+          )}
+          <button type="submit" disabled={yuk || !kullanici || !parola || (ikiFa && kod.length !== 6)}
             className="w-full px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 font-medium rounded-md">
-            {yuk ? t('CPanelGirisPage:submitting') : t('CPanelGirisPage:submit')}
+            {yuk ? t('CPanelGirisPage:submitting') : ikiFa ? t('CPanelGirisPage:verify_and_login') : t('CPanelGirisPage:submit')}
           </button>
+          {ikiFa && (
+            <button type="button" disabled={yuk}
+              onClick={() => { setIkiFa(false); setKod(''); setParola(''); setHata(null) }}
+              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700">
+              {t('CPanelGirisPage:change_account')}
+            </button>
+          )}
         </form>
       </div>
     </div>

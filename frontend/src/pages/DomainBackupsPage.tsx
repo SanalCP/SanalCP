@@ -9,6 +9,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import Modal from '@/components/Modal'
 import { T } from '@/lib/tablo'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string }
 type Yedek = { id: number; domain_id: number; tip: string; dosya: string; boyut_b: number; notlar: string; olusturma: string; uzak_durum?: string; uzak_hata?: string; dogrulama_durum: string; dogrulama_hata?: string; dogrulama_sha256?: string; dogrulama_zamani?: string }
@@ -44,6 +45,7 @@ const bosDestForm = {
 export default function DomainBackupsPage() {
   const { t } = useTranslation(['DomainBackupsPage', 'common'])
   const { id } = useParams()
+  const databaseAllowed = useDomainFeatures().allows('databases')
   const [domain, setDomain] = useState<Domain | null>(null)
   const [yedekler, setYedekler] = useState<Yedek[]>([])
   const [yuk, setYuk] = useState(true)
@@ -73,7 +75,7 @@ export default function DomainBackupsPage() {
       api.get<Yedek[]>(`/domains/${id}/backups`),
       api.get<Schedule>(`/domains/${id}/backup-schedule`).catch(() => ({ data: bosSchedule })),
       api.get<Destination>(`/domains/${id}/backup-destination`).catch(() => ({ data: { yok: true } as Destination })),
-      api.get<DB[]>(`/domains/${id}/databases`).catch(() => ({ data: [] as DB[] })),
+      databaseAllowed ? api.get<DB[]>(`/domains/${id}/databases`).catch(() => ({ data: [] as DB[] })) : Promise.resolve({ data: [] as DB[] }),
     ]).then(([y, s, d, dbs]) => {
       setYedekler(y.data)
       setDatabases(dbs.data)
@@ -98,7 +100,7 @@ export default function DomainBackupsPage() {
     })
       .catch(e => setHata(apiHata(e)))
       .finally(() => setYuk(false))
-  }, [id])
+  }, [id, databaseAllowed])
 
   async function destKaydet() {
     setDestKayit(true); setHata(null); setBasari(null); setDestTest(null)
@@ -663,11 +665,12 @@ export default function DomainBackupsPage() {
             {restoreScope === 'database' && (
               <label className="block mt-3">
                 <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{t('DomainBackupsPage:restore_modal.database_label')}</span>
-                <select value={restoreDatabase} onChange={e => setRestoreDatabase(e.target.value)}
+                {databaseAllowed ? <select value={restoreDatabase} onChange={e => setRestoreDatabase(e.target.value)}
                   className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 font-mono text-sm">
                   {!databases.length && <option value="">{t('DomainBackupsPage:restore_modal.database_not_found')}</option>}
                   {databases.map(db => <option key={db.db_name} value={db.db_name}>{db.db_name}</option>)}
-                </select>
+                </select> : <input value={restoreDatabase} onChange={e => setRestoreDatabase(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 font-mono text-sm" />}
               </label>
             )}
             <div className="mt-4 p-3 rounded bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-800 dark:text-amber-200">

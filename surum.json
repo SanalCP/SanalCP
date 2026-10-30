@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.78",
-  "duyuru": "Düzeltme sürümü: arka planda çalışan paket sorguları zaman aşımında yarıda kesildiğinde /var/cache/dnf altında geçici klasörler bırakıyordu; düşük RAM'li sunucularda bu birikme haftalar içinde diski doldurup paneli ve yedekleri durdurabiliyordu. Sorgular artık yerel önbellekten yapılıyor, kesilen işlemler kendi temizliğini yapıyor. Diski dolmuş sunucularda güncellemeden önce /var/cache/dnf temizlenmeli (dnf clean all).",
+  "son_surum": "0.9.80",
+  "duyuru": "E-posta teslimat takibi eklendi. Gerçek Postfix sonuçları, alıcı bazında teslim edildi/ertelendi/geri döndü durumları ve SMTP hata ayrıntılarıyla görüntülenebilir. Gönderen, alıcı, kuyruk kimliği, tarih ve duruma göre filtreleme; müşteriye ve bayiye göre kapsamlı mesaj geçmişi sunulur.",
   "kritik": false,
-  "yayin_tarihi": "2026-10-16"
+  "yayin_tarihi": "2026-10-29"
 }

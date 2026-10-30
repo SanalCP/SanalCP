@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Domain } from './DomainList'
 import ToolCard from './ToolCard'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 const ICONS = {
   baglanti:  'M13.828 10.172a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656-5.656m.172-5.172a4 4 0 00-5.656 5.656l-3 3a4 4 0 005.656 5.656',
@@ -52,6 +53,7 @@ function Grup({ baslik, children }: { baslik: string; children: React.ReactNode 
 export default function DomainPano({ domain }: { domain: Domain }) {
   const { t } = useTranslation(['DomainPano'])
   const navigate = useNavigate()
+  const { allows } = useDomainFeatures()
   const git = (slug: string) => () => navigate(`/abonelikler/${domain.id}/${slug}`)
   return (
     <div>
@@ -62,21 +64,21 @@ export default function DomainPano({ domain }: { domain: Domain }) {
       </Grup>
 
       <Grup baslik={t('DomainPano:groups.domain_dns')}>
-        <ToolCard etiket={t('DomainPano:items.dns')}          aciklama={t('DomainPano:items.dns_desc')} ikon={ICONS.dns}       renk="sky"  onClick={git('dns')} />
-        <ToolCard etiket={t('DomainPano:items.cloudflare')} aciklama={t('DomainPano:items.cloudflare_desc')} ikon={ICONS.cloudflare} renk="amber" onClick={git('cloudflare')} />
+        {allows('dns') && <ToolCard etiket={t('DomainPano:items.dns')} aciklama={t('DomainPano:items.dns_desc')} ikon={ICONS.dns} renk="sky" onClick={git('dns')} />}
+        {allows('dns') && <ToolCard etiket={t('DomainPano:items.cloudflare')} aciklama={t('DomainPano:items.cloudflare_desc')} ikon={ICONS.cloudflare} renk="amber" onClick={git('cloudflare')} />}
         <ToolCard etiket={t('DomainPano:items.addon_domains')}        aciklama={t('DomainPano:items.addon_domains_desc')} ikon={ICONS.ekdomain} renk="indigo" onClick={git('ek-alanlar')} />
       </Grup>
 
-      <Grup baslik={t('DomainPano:groups.email')}>
+      {allows('mail') && <Grup baslik={t('DomainPano:groups.email')}>
         <ToolCard etiket={t('DomainPano:items.mail_accounts')} aciklama={t('DomainPano:items.mail_accounts_desc')} ikon={ICONS.posta} renk="indigo" onClick={git('mail')} />
-      </Grup>
+      </Grup>}
 
       <Grup baslik={t('DomainPano:groups.files_db')}>
         <ToolCard etiket={t('DomainPano:items.connection_info')}      aciklama={t('DomainPano:items.connection_info_desc')}  ikon={ICONS.baglanti} renk="emerald" onClick={git('baglanti')} />
-        <ToolCard etiket={t('DomainPano:items.files')}              aciklama={t('DomainPano:items.files_desc')}  ikon={ICONS.dosyalar} renk="amber"   faz="F6"  onClick={git('dosyalar')} />
-        <ToolCard etiket={t('DomainPano:items.databases')}         aciklama={domain.db_adi}     ikon={ICONS.db}       renk="violet"  faz="F5"  onClick={git('veritabanlari')} />
-        <ToolCard etiket={t('DomainPano:items.ftp')}                   aciklama={t('DomainPano:items.ftp_desc')}     ikon={ICONS.ftp}      renk="sky"     faz="F4"  onClick={git('ftp')} />
-        <ToolCard etiket={t('DomainPano:items.backup_restore')} aciklama={t('DomainPano:items.backup_restore_desc')}    ikon={ICONS.yedek}    renk="rose"    faz="F12" onClick={git('yedekler')} />
+        {allows('files') && <ToolCard etiket={t('DomainPano:items.files')} aciklama={t('DomainPano:items.files_desc')} ikon={ICONS.dosyalar} renk="amber" faz="F6" onClick={git('dosyalar')} />}
+        {allows('databases') && <ToolCard etiket={t('DomainPano:items.databases')} aciklama={domain.db_adi} ikon={ICONS.db} renk="violet" faz="F5" onClick={git('veritabanlari')} />}
+        {allows('ftp') && <ToolCard etiket={t('DomainPano:items.ftp')} aciklama={t('DomainPano:items.ftp_desc')} ikon={ICONS.ftp} renk="sky" faz="F4" onClick={git('ftp')} />}
+        {allows('backups') && <ToolCard etiket={t('DomainPano:items.backup_restore')} aciklama={t('DomainPano:items.backup_restore_desc')} ikon={ICONS.yedek} renk="rose" faz="F12" onClick={git('yedekler')} />}
         <ToolCard etiket={t('DomainPano:items.clone_site')}  aciklama={t('DomainPano:items.clone_site_desc')}          ikon={ICONS.kopya}    renk="sky"     onClick={git('kopyala')} />
         <ToolCard etiket={t('DomainPano:items.import')}      aciklama={t('DomainPano:items.import_desc')}              ikon={ICONS.iceaktarim} renk="violet" onClick={git('ice-aktarim')} />
       </Grup>
@@ -85,8 +87,8 @@ export default function DomainPano({ domain }: { domain: Domain }) {
         <ToolCard etiket={t('DomainPano:items.apache_nginx')}          aciklama={t('DomainPano:items.apache_nginx_desc')} ikon={ICONS.apache} renk="orange" onClick={git('web-sunucu')} />
         <ToolCard etiket={t('DomainPano:items.php')}                   aciklama={t('DomainPano:items.php_version', { version: domain.php_surum })} ikon={ICONS.php}      renk="indigo" faz="F3" onClick={git('php')} />
         <ToolCard etiket={t('DomainPano:items.logs')}             aciklama={t('DomainPano:items.logs_desc')}  ikon={ICONS.log}      renk="slate"  faz="F10" onClick={git('gunlukler')} />
-        <ToolCard etiket={t('DomainPano:items.cron')}  aciklama={t('DomainPano:items.cron_desc')}            ikon={ICONS.cron}     renk="teal"   faz="F8"  onClick={git('cron')} />
-        <ToolCard etiket={t('DomainPano:items.git')}                   aciklama={t('DomainPano:items.git_desc')} ikon={ICONS.git}    renk="orange" faz="F9"  onClick={git('git')} />
+        {allows('cron') && <ToolCard etiket={t('DomainPano:items.cron')} aciklama={t('DomainPano:items.cron_desc')} ikon={ICONS.cron} renk="teal" faz="F8" onClick={git('cron')} />}
+        {allows('git') && <ToolCard etiket={t('DomainPano:items.git')} aciklama={t('DomainPano:items.git_desc')} ikon={ICONS.git} renk="orange" faz="F9" onClick={git('git')} />}
         <ToolCard etiket={t('DomainPano:items.composer')}          aciklama={t('DomainPano:items.composer_desc')}  ikon={ICONS.composer} renk="amber" faz="F3"  onClick={git('composer')} />
         <ToolCard etiket={t('DomainPano:items.performance')}            aciklama={t('DomainPano:items.performance_desc')}   ikon={ICONS.hizmet} renk="emerald" onClick={git('performans')} />
         <ToolCard etiket={t('DomainPano:items.redis')}           aciklama={t('DomainPano:items.redis_desc')} ikon={ICONS.redis} renk="rose" onClick={git('redis')} />

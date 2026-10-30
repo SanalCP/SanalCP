@@ -1153,6 +1153,9 @@ func (h *Handlers) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
 		return
 	}
+	if !middleware.RequireFeature(w, r, domainID, "databases") {
+		return
+	}
 	if isDemo == 1 {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin DB'si silinemez")
 		return

@@ -11,6 +11,8 @@ import ListToolbar from '@/components/ListToolbar'
 import EmptyState from '@/components/EmptyState'
 import Modal from '@/components/Modal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import PlanFeatureFields from '@/components/PlanFeatureFields'
+import { allPlanFeatures, planFeatureKeys, type PlanFeatures } from '@/lib/planFeatures'
 
 type Plan = {
   id: number
@@ -22,12 +24,14 @@ type Plan = {
   max_db: number
   max_email: number
   max_ftp: number
+  mailbox_quota_mb: number // kutu başına posta kotası (MB); 0 = sınırsız
   php_surum: string
   fastcgi_cache: boolean
   client_max_body_mb: number
   nginx_ek_direktifler: string
   varsayilan: boolean
   olusturulma: string
+  features: PlanFeatures
 }
 type Surum = { surum: string; aciklama?: string }
 
@@ -85,7 +89,7 @@ export default function ServicePlansPage() {
         <EmptyState
           baslik={t('ServicePlansPage:empty.title')}
           aciklama={t('ServicePlansPage:empty.description')}
-          buton={{ etiket: t('ServicePlansPage:buttons.add_plan'), onClick: () => setModal({} as Plan) }}
+          buton={adminMi ? { etiket: t('ServicePlansPage:buttons.add_plan'), onClick: () => setModal({} as Plan) } : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -108,7 +112,13 @@ export default function ServicePlansPage() {
                 <Sat e={t('ServicePlansPage:card.labels.domain')} d={fmt(p.max_domain, 'count', locale, t)} />
                 <Sat e={t('ServicePlansPage:card.labels.database')} d={fmt(p.max_db, 'count', locale, t)} />
                 <Sat e={t('ServicePlansPage:card.labels.ftp')} d={fmt(p.max_ftp, 'ftp_account', locale, t)} />
+                <Sat e={t('ServicePlansPage:card.labels.mailbox_quota')} d={fmt(p.mailbox_quota_mb ?? 0, 'mb', locale, t)} />
               </dl>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {planFeatureKeys.map(key => <span key={key} className={`rounded px-2 py-1 text-xs ${p.features[key] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
+                  {t(`common:plan_features.modules.${key}`)} · {t(p.features[key] ? 'common:plan_features.enabled' : 'common:plan_features.disabled')}
+                </span>)}
+              </div>
 
               {/* Plan tanımı yöneticinin ürünüdür; bayi planları yalnız görür
                   (sunucu tarafında da /plans yazma uçları AdminOnly). */}
@@ -180,12 +190,14 @@ function PlanModal({ plan, surumler, onKapat, onKayit }: { plan: Plan; surumler:
     max_db: plan.max_db || 1,
     max_email: plan.max_email || 0,
     max_ftp: plan.max_ftp || 2,
+    mailbox_quota_mb: plan.mailbox_quota_mb || 0,
     php_surum: plan.php_surum || '8.3',
     fastcgi_cache: plan.fastcgi_cache || false,
     client_max_body_mb: plan.client_max_body_mb || 64,
     nginx_ek_direktifler: plan.nginx_ek_direktifler || '',
     varsayilan: plan.varsayilan || false,
     olusturulma: '',
+    features: plan.features || allPlanFeatures(),
   })
   const [isleniyor, setIsleniyor] = useState(false)
   const [hata, setHata] = useState<string | null>(null)
@@ -230,7 +242,9 @@ function PlanModal({ plan, surumler, onKapat, onKayit }: { plan: Plan; surumler:
           <Sayi etiket={t('ServicePlansPage:modal.fields.max_domain')} value={form.max_domain} setVal={v => setForm({ ...form, max_domain: v })} />
           <Sayi etiket={t('ServicePlansPage:modal.fields.max_db')} value={form.max_db} setVal={v => setForm({ ...form, max_db: v })} />
           <Sayi etiket={t('ServicePlansPage:modal.fields.max_ftp')} value={form.max_ftp} setVal={v => setForm({ ...form, max_ftp: v })} />
+          <Sayi etiket={t('ServicePlansPage:modal.fields.mailbox_quota_mb')} value={form.mailbox_quota_mb} setVal={v => setForm({ ...form, mailbox_quota_mb: v })} />
         </div>
+        <PlanFeatureFields value={form.features} onChange={features => setForm({ ...form, features })} disabled={isleniyor} />
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="checkbox" checked={form.varsayilan} onChange={e => setForm({ ...form, varsayilan: e.target.checked })} className="rounded" />
           {t('ServicePlansPage:modal.checkboxes.default_plan')}

@@ -30,6 +30,10 @@ func TestLogin_BasariliGirisBostaSayacini_Sifirlar(t *testing.T) {
 		WithArgs("c_ornek_com").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "password_hash", "role", "status", "auth_version"}).
 			AddRow(42, string(hash), "user", "active", 3))
+	mock.ExpectQuery(`SELECT totp_enabled, totp_secret, totp_last_step, auth_version FROM users WHERE id=\?`).
+		WithArgs(int64(42)).
+		WillReturnRows(sqlmock.NewRows([]string{"totp_enabled", "totp_secret", "totp_last_step", "auth_version"}).
+			AddRow(0, "", 0, 3))
 	mock.ExpectQuery(`SELECT d.id, d.alan_adi`).
 		WithArgs(int64(42)).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "alan_adi"}).AddRow(7, "ornek.com"))

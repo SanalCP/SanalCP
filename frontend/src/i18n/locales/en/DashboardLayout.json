@@ -72,6 +72,7 @@
   "server_management_back": "All Sites",
   "close_menu_aria": "Close menu",
   "profile_prefs": "Profile & Preferences",
+  "account_security": "Account Security",
   "critical_announcement_prefix": "Critical security announcement (v{{version}}):",
   "update_available_prefix": "New version available (v{{version}}):",
   "version_update_recommended": "A version update is recommended.",

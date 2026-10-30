@@ -83,14 +83,28 @@ func createArchive(ctx context.Context, db *sql.DB, domainID int64, domain, sk, 
 	// gidiyor (bkz. s3.go, remote.go); sızan tek bir arşiv o domain için geçerli
 	// bir API token'ı verirdi. Token panel tarafından yeniden üretilebildiği için
 	// geri yüklemede kaybı yok. Desen anchored değildir → <sk>/.sanalcp/token eşleşir.
-	args := []string{"czf", filePath, "--exclude=.sanalcp/token",
+	partial, err := os.CreateTemp(filepath.Dir(filePath), ".sanal-backup-*.partial")
+	if err != nil {
+		return 0, err
+	}
+	partialPath := partial.Name()
+	defer os.Remove(partialPath)
+	if err := partial.Close(); err != nil {
+		return 0, err
+	}
+	args := []string{"czf", partialPath, "--exclude=.sanalcp/token",
 		"-C", "/home", sk, "-C", stage, "manifest.json", "databases"}
 	if out, err := exec.CommandContext(ctx, "tar", args...).CombinedOutput(); err != nil {
-		_ = os.Remove(filePath)
 		return 0, fmt.Errorf("tar: %s: %w", strings.TrimSpace(string(out)), err)
 	}
-	info, err := os.Stat(filePath)
+	info, err := os.Stat(partialPath)
 	if err != nil {
+		return 0, err
+	}
+	if info.Size() == 0 {
+		return 0, fmt.Errorf("tar boş arşiv üretti")
+	}
+	if err := os.Rename(partialPath, filePath); err != nil {
 		return 0, err
 	}
 	return info.Size(), nil

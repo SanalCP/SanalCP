@@ -3,13 +3,18 @@ import { modalOnay, modalGirdi } from '@/lib/dialog'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ParolaGirdisi from '@/components/ParolaGirdisi'
+import MailDeliveryTracking from '@/components/MailDeliveryTracking'
+import { formatBayt, kotaDurumu, kotaGirdisiniDogrula, baytToMB } from '@/lib/mailQuota'
 
 type Domain = { id: number; alan_adi: string; ssl?: boolean }
-type Mailbox = { id: number; local_part: string; email: string; status: string; created_at: string }
-type Durum = { etkin: boolean; dkim_selector?: string; altyapi_eksik?: string[] }
+// quota_bytes: 0 = sınırsız. used_bytes: null = bilinmiyor (Dovecot maildirsize henüz yok).
+type Mailbox = { id: number; local_part: string; email: string; status: string; created_at: string; quota_bytes: number; used_bytes: number | null }
+// plan_kota_mb: paketin kutu başına kotası (0 = sınırsız). kota_plani_asabilir: yönetici/bayi bu sınırın üstünde kota verebilir.
+type Durum = { etkin: boolean; dkim_selector?: string; altyapi_eksik?: string[]; plan_kota_mb?: number; kota_plani_asabilir?: boolean }
 type Alias = { id: number; source: string; destination: string; catch_all: boolean; status: string; created_at: string }
 type SpamSettings = { enabled: boolean; greylist_score: number; add_header_score: number; reject_score: number }
 type SpamResponse = { settings: SpamSettings; rspamd: boolean }
@@ -32,6 +37,7 @@ export default function DomainMailPage() {
   const [ok, setOk] = useState<string | null>(null)
   const [localPart, setLocalPart] = useState('')
   const [parola, setParola] = useState('')
+  const [yeniKota, setYeniKota] = useState('')
   const [isleniyor, setIsleniyor] = useState(false)
   const [siliniyor, setSiliniyor] = useState(false)
   const [yeniPw, setYeniPw] = useState<{ email: string; parola: string } | null>(null)
@@ -141,16 +147,51 @@ export default function DomainMailPage() {
 
   async function ekle(e: React.FormEvent) {
     e.preventDefault()
-    setHata(null); setOk(null); setYeniPw(null); setIsleniyor(true)
+    setHata(null); setOk(null); setYeniPw(null)
+    // Kota alanı boşsa gönderilmez: sunucu paketin varsayılanını uygular.
+    let kotaMB: number | undefined
+    if (yeniKota.trim() !== '') {
+      const s = kotaGirdisiniDogrula(yeniKota, durum?.plan_kota_mb ?? 0, !!durum?.kota_plani_asabilir)
+      if (!s.ok) { setHata(kotaHatasi(s)); return }
+      kotaMB = s.mb
+    }
+    setIsleniyor(true)
     try {
-      const { data } = await api.post(`/domains/${id}/mail`, { local_part: localPart, parola })
+      const { data } = await api.post(`/domains/${id}/mail`, { local_part: localPart, parola, ...(kotaMB !== undefined ? { quota_mb: kotaMB } : {}) })
       await parolaGoster(data.id, data.email, data.parola_reveal_token)
-      setLocalPart(''); setParola('')
+      setLocalPart(''); setParola(''); setYeniKota('')
       yukle()
     } catch (e2) {
       setHata(apiHata(e2, t('DomainMailPage:mailbox.add_failed')))
     } finally {
       setIsleniyor(false)
+    }
+  }
+
+  function kotaHatasi(s: { ok: false; neden: 'gecersiz' | 'plan_ustu'; azami?: number }): string {
+    return s.neden === 'plan_ustu'
+      ? t('DomainMailPage:mailbox.quota_over_plan', { max: s.azami })
+      : t('DomainMailPage:mailbox.quota_invalid')
+  }
+
+  // Kutu kotasını değiştirir. Dovecot limiti userdb'den okur; sunucu önbelleği
+  // boşalttığı için yeniden başlatma gerekmez.
+  async function kotaDuzenle(k: Mailbox) {
+    const plan = durum?.plan_kota_mb ?? 0
+    const asabilir = !!durum?.kota_plani_asabilir
+    const mesaj = t('DomainMailPage:mailbox.quota_prompt', { email: k.email }) +
+      (plan > 0 && !asabilir ? ' ' + t('DomainMailPage:mailbox.quota_prompt_max', { max: plan }) : '')
+    const girdi = await modalGirdi(mesaj, String(baytToMB(k.quota_bytes)))
+    if (girdi === null) return // vazgeçildi
+    setHata(null); setOk(null)
+    const s = kotaGirdisiniDogrula(girdi, plan, asabilir)
+    if (!s.ok) { setHata(kotaHatasi(s)); return }
+    try {
+      await api.put(`/domains/${id}/mail/${k.id}/quota`, { quota_mb: s.mb })
+      setOk(t('DomainMailPage:mailbox.quota_saved', { email: k.email }))
+      yukle()
+    } catch (e) {
+      setHata(apiHata(e, t('DomainMailPage:mailbox.quota_failed')))
     }
   }
 
@@ -336,6 +377,8 @@ export default function DomainMailPage() {
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
         {ok && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{ok}</div>}
 
+        {id && <div className="mb-5"><MailDeliveryTracking domainID={id} /></div>}
+
         {yeniPw && (
           <div className="mb-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
             <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium mb-1">{t('DomainMailPage:newPassword.title', { email: yeniPw.email })}</p>
@@ -404,6 +447,10 @@ export default function DomainMailPage() {
                 <span className="text-slate-500 dark:text-slate-400 text-sm">@{domain?.alan_adi}</span>
                 <ParolaGirdisi value={parola} onChange={setParola} placeholder={t('DomainMailPage:mailbox.password_placeholder')}
                   className="w-40 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
+                <input type="number" min={0} max={1048576} step={1} value={yeniKota} onChange={e => setYeniKota(e.target.value)}
+                  placeholder={t('DomainMailPage:mailbox.quota_placeholder', { limit: (durum?.plan_kota_mb ?? 0) > 0 ? `${durum?.plan_kota_mb} MB` : t('DomainMailPage:mailbox.quota_unlimited') })}
+                  title={t('DomainMailPage:mailbox.quota_help')}
+                  className="w-44 px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none" />
                 <button disabled={isleniyor || !localPart} className="px-3 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg disabled:opacity-50">
                   {isleniyor ? t('DomainMailPage:mailbox.adding') : t('common:add')}
                 </button>
@@ -419,14 +466,16 @@ export default function DomainMailPage() {
               ) : (
                 <ul className="divide-y divide-slate-50 dark:divide-slate-700/50">
                   {liste.map(k => (
-                    <li key={k.id} className="flex items-center justify-between py-2.5">
-                      <div>
+                    <li key={k.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0 flex-1">
                         <span className="text-sm font-mono text-slate-800 dark:text-slate-200">{k.email}</span>
                         {k.status !== 'active' && (
                           <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">{t('DomainMailPage:mailbox.suspended')}</span>
                         )}
+                        <KotaCubugu k={k} t={t} />
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
+                        <button onClick={() => kotaDuzenle(k)} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">{t('DomainMailPage:mailbox.quota_edit')}</button>
                         <button onClick={() => parolaSifirla(k)} className="text-xs text-slate-600 dark:text-slate-300 hover:underline">{t('DomainMailPage:mailbox.reset_password')}</button>
                         <button onClick={() => kutuDurumDegistir(k)} className="text-xs text-amber-600 dark:text-amber-400 hover:underline">{k.status === 'active' ? t('DomainMailPage:mailbox.suspend') : t('DomainMailPage:mailbox.activate')}</button>
                         <button onClick={() => sil(k)} className="text-xs text-red-600 dark:text-red-400 hover:underline">{t('common:delete')}</button>
@@ -683,6 +732,36 @@ export default function DomainMailPage() {
         )}
 
         <div className="mt-4"><Link to={`/abonelikler/${id}`} className="text-sm text-brand-600 dark:text-brand-400">{t('DomainMailPage:back_to_subscription')}</Link></div>
+      </div>
+    </div>
+  )
+}
+
+// Kutu başına kota çubuğu. Limit yoksa (0) yalnız kullanım yazılır; kullanım
+// bilinmiyorsa (maildirsize henüz yok) sahte "0" gösterilmez.
+function KotaCubugu({ k, t }: { k: Mailbox; t: TFunction }) {
+  const kota = k.quota_bytes ?? 0
+  const kullanilan = k.used_bytes ?? null
+  const { durum, yuzde } = kotaDurumu(kullanilan, kota)
+  const limit = kota > 0 ? formatBayt(kota) : t('DomainMailPage:mailbox.quota_unlimited')
+  const kullanim = kullanilan === null ? t('DomainMailPage:mailbox.quota_usage_unknown') : formatBayt(kullanilan)
+  const renk = durum === 'asildi' ? 'bg-red-500' : durum === 'yaklasti' ? 'bg-amber-500' : 'bg-emerald-500'
+  return (
+    <div className="mt-1.5 max-w-xs">
+      {kota > 0 && (
+        <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden" role="progressbar"
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={yuzde} aria-label={t('DomainMailPage:mailbox.quota_label')}>
+          <div className={`h-full ${renk}`} style={{ width: `${yuzde}%` }} />
+        </div>
+      )}
+      <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="font-mono">{kullanim} / {limit}</span>
+        {durum === 'asildi' && (
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">{t('DomainMailPage:mailbox.quota_over')}</span>
+        )}
+        {durum === 'yaklasti' && (
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">{t('DomainMailPage:mailbox.quota_near')}</span>
+        )}
       </div>
     </div>
   )

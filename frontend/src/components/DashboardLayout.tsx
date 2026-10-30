@@ -11,6 +11,8 @@ import TopBar from './TopBar'
 import AltNavBar from './AltNavBar'
 import DomainSecici from './DomainSecici'
 import HataSiniri from './HataSiniri'
+import { DomainFeaturesProvider, DomainFeatureGate } from './DomainFeatures'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 const SURUM_UYARI_KAPALI_KEY = 'sp-surum-duyuru-kapatildi'
 type SurumKontrol = { guncelleme_var: boolean; kritik: boolean; duyuru: string; son: string; mevcut?: string; build_tarihi?: string }
@@ -182,10 +184,15 @@ function domainNav(id: string, t: TFunction): NavGroup[] {
 }
 
 export default function DashboardLayout() {
+  return <DomainFeaturesProvider><DashboardShell /></DomainFeaturesProvider>
+}
+
+function DashboardShell() {
   const { t } = useTranslation(['DashboardLayout'])
   const isMusteri = typeof window !== 'undefined' && localStorage.getItem('sanalcp.musteri') === '1'
   const musteriDomainID = typeof window !== 'undefined' ? localStorage.getItem('sanalcp.musteri.domain_id') || '' : ''
   const rol = useAuth((s) => s.kullanici?.rol)
+  const features = useDomainFeatures()
 
   // Sol menü bir akordeondur: aynı anda yalnız bir bölüm açık tutulur.
   // Aktif rotanın bölümü aşağıdaki effect ile kendiliğinden açılır.
@@ -241,9 +248,8 @@ export default function DashboardLayout() {
     }
   }, [mobilAcik])
 
-  // Müşteri navigasyonu — sadece kendi domain'i. Öğe kümesi öncekiyle aynı
-  // (yetkisi olmayan araçlar burada yok), yalnız gruplandı.
-  const my = (s = '') => `/abonelikler/${musteriDomainID}${s}`
+  // Müşteri menüsü seçili domainin güncel modül izinleriyle süzülür.
+  const my = (s = '') => `/abonelikler/${features.domainId || musteriDomainID}${s}`
   const MUSTERI_NAV: NavGroup[] = [
     { items: [{ to: my(), etiket: t('DashboardLayout:labels.overview'), ikon: ICONS.home, end: true }] },
     { baslik: t('DashboardLayout:groups.website'), baslikKey: 'website', items: [
@@ -254,6 +260,7 @@ export default function DashboardLayout() {
     { baslik: t('DashboardLayout:groups.domain_mail'), baslikKey: 'domain_mail', items: [
       { to: my('/dns'),           etiket: t('DashboardLayout:items.dns_settings'), ikon: ICONS.dns },
       { to: my('/ssl'),           etiket: t('DashboardLayout:items.ssl_tls'),      ikon: ICONS.kilit },
+      { to: my('/mail'),          etiket: t('DashboardLayout:items.mail'),         ikon: ICONS.posta },
     ]},
     { baslik: t('DashboardLayout:groups.data_backup'), baslikKey: 'data_backup', items: [
       { to: my('/veritabanlari'), etiket: t('DashboardLayout:items.databases'),    ikon: ICONS.db },
@@ -269,25 +276,24 @@ export default function DashboardLayout() {
     ]},
   ]
 
-  // Domain kipi: /abonelikler/:id/* altındayken kenar çubuğu o alan adının
-  // araçlarına dönüşür. Müşteri zaten tek domaine bağlı olduğu için kendi
-  // menüsünü korur (ve alan adı seçici görmez).
+  // Admin/bayi domain kipinde ayrı araç menüsünü, müşteri kendi menüsünü kullanır.
   const domainEslesme = konum.pathname.match(/^\/abonelikler\/(\d+)/)
   const aktifDomainID = domainEslesme?.[1] ?? ''
-  // Bayi de domain kipine girebilir (kendi müşterisinin domaini); yalnız
-  // müşteri kendi sabit menüsünde kalır.
+  // Bayi yalnız kendi müşterisinin domain kipine girebilir.
   const domainKipi = !isMusteri && aktifDomainID !== ''
 
   // Menü rolden türetilir. isMusteri, /cp'den giren oturumun localStorage
   // bayrağıdır ve rol='user' /me yanıtı gelmeden önce de bilinir; ikisi de
   // aynı müşteri menüsünü gösterir.
-  const aktifNav = isMusteri || rol === 'user'
+  const aktifNav = (isMusteri || rol === 'user'
     ? MUSTERI_NAV
     : domainKipi
     ? domainNav(aktifDomainID, t)
     : rol === 'reseller'
     ? bayiNav(t)
-    : nav(t)
+    : nav(t))
+    .map(group => ({ ...group, items: group.items.filter(item => features.allowsPath(item.to)) }))
+    .filter(group => group.items.length > 0)
 
   const rotaGrubu = aktifNav.find((grup) =>
     grup.baslikKey && grup.items.some((it) =>
@@ -449,7 +455,7 @@ export default function DashboardLayout() {
                 }`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.7}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={ICONS.profil} />
                 </svg>
-                <span className="truncate">{t('DashboardLayout:profile_prefs')}</span>
+                <span className="truncate">{t(isMusteri || rol === 'user' ? 'DashboardLayout:account_security' : 'DashboardLayout:profile_prefs')}</span>
               </>
             )}
           </NavLink>
@@ -521,7 +527,7 @@ export default function DashboardLayout() {
                   {t('DashboardLayout:page_loading')}
                 </div>
               }>
-                <Outlet />
+                <DomainFeatureGate><Outlet /></DomainFeatureGate>
               </Suspense>
             </HataSiniri>
           </div>

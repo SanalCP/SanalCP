@@ -15,7 +15,8 @@
       "traffic": "Trafik",
       "domain": "Domain",
       "database": "Veritabanı",
-      "ftp": "FTP"
+      "ftp": "FTP",
+      "mailbox_quota": "Kutu kotası"
     },
     "detail_button": "Detay & Kaynak Limitleri",
     "actions": { "delete": "Sil" }
@@ -47,7 +48,8 @@
       "php_version": "PHP Sürümü",
       "max_domain": "Max domain",
       "max_db": "Max DB",
-      "max_ftp": "Max FTP"
+      "max_ftp": "Max FTP",
+      "mailbox_quota_mb": "Kutu kotası (MB)"
     },
     "checkboxes": {
       "default_plan": "Yeni domainlerde varsayılan plan"

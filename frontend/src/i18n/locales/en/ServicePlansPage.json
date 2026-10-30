@@ -15,7 +15,8 @@
       "traffic": "Traffic",
       "domain": "Domain",
       "database": "Database",
-      "ftp": "FTP"
+      "ftp": "FTP",
+      "mailbox_quota": "Mailbox quota"
     },
     "detail_button": "Details & Resource Limits",
     "actions": { "delete": "Delete" }
@@ -47,7 +48,8 @@
       "php_version": "PHP Version",
       "max_domain": "Max domain",
       "max_db": "Max DB",
-      "max_ftp": "Max FTP"
+      "max_ftp": "Max FTP",
+      "mailbox_quota_mb": "Mailbox quota (MB)"
     },
     "checkboxes": {
       "default_plan": "Default plan for new domains"

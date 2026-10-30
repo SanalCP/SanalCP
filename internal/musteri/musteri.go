@@ -35,6 +35,7 @@ type Handlers struct {
 type loginReq struct {
 	Kullanici string `json:"kullanici"`
 	Parola    string `json:"parola"`
+	Kod       string `json:"kod"`
 }
 
 // Login: müşteri panel hesabıyla giriş; başarılıysa rol=user token'ı döner.
@@ -80,6 +81,12 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	if durum != "active" {
 		auth.WriteAudit(h.DB, uid, req.Kullanici, ip, "musteri.login", req.Kullanici, false)
 		httpx.WriteError(w, http.StatusForbidden, "hesap askıya alınmış")
+		return
+	}
+
+	var izin bool
+	surum, izin = auth.DogrulaGiris2FA(w, r, h.DB, uid, req.Kullanici, req.Kod)
+	if !izin {
 		return
 	}
 

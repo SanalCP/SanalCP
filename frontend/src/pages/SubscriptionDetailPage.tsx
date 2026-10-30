@@ -11,6 +11,7 @@ import DomainKaynakKart from '@/components/DomainKaynakKart'
 import DomainPano from "@/components/DomainPano"
 import type { Domain } from '@/components/DomainList'
 import { useAuth } from '@/store/auth'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type Plan = {
   id: number
@@ -38,6 +39,7 @@ export default function SubscriptionDetailPage() {
   const { t } = useTranslation(['SubscriptionDetailPage', 'common'])
   const { id } = useParams()
   const navigate = useNavigate()
+  const { allows } = useDomainFeatures()
   const adminMi = useAuth((s) => s.kullanici?.rol) === 'admin'
   const [domain, setDomain] = useState<Domain | null>(null)
   const [planlar, setPlanlar] = useState<Plan[]>([])
@@ -230,11 +232,11 @@ export default function SubscriptionDetailPage() {
         <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-500">{t('SubscriptionDetailPage:quick_links')}</h2>
         <div className="flex items-center gap-2 overflow-x-auto">
           <QuickLink to={`/abonelikler/${domain.id}/baglanti`} ikon={ICONS.baglanti}>{t('SubscriptionDetailPage:quick_link_connection')}</QuickLink>
-          <QuickLink to={`/abonelikler/${domain.id}/dns`} ikon={ICONS.dns}>{t('SubscriptionDetailPage:quick_link_dns')}</QuickLink>
-          <QuickLink to={`/abonelikler/${domain.id}/mail`} ikon={ICONS.posta}>{t('SubscriptionDetailPage:quick_link_mail')}</QuickLink>
-          <QuickLink to={`/abonelikler/${domain.id}/dosyalar`} ikon={ICONS.dosyalar}>{t('SubscriptionDetailPage:quick_link_files')}</QuickLink>
-          <QuickLink to={`/abonelikler/${domain.id}/veritabanlari`} ikon={ICONS.db}>{t('SubscriptionDetailPage:quick_link_databases')}</QuickLink>
-          <QuickLink to={`/abonelikler/${domain.id}/yedekler`} ikon={ICONS.yedek}>{t('SubscriptionDetailPage:quick_link_backup')}</QuickLink>
+          {allows('dns') && <QuickLink to={`/abonelikler/${domain.id}/dns`} ikon={ICONS.dns}>{t('SubscriptionDetailPage:quick_link_dns')}</QuickLink>}
+          {allows('mail') && <QuickLink to={`/abonelikler/${domain.id}/mail`} ikon={ICONS.posta}>{t('SubscriptionDetailPage:quick_link_mail')}</QuickLink>}
+          {allows('files') && <QuickLink to={`/abonelikler/${domain.id}/dosyalar`} ikon={ICONS.dosyalar}>{t('SubscriptionDetailPage:quick_link_files')}</QuickLink>}
+          {allows('databases') && <QuickLink to={`/abonelikler/${domain.id}/veritabanlari`} ikon={ICONS.db}>{t('SubscriptionDetailPage:quick_link_databases')}</QuickLink>}
+          {allows('backups') && <QuickLink to={`/abonelikler/${domain.id}/yedekler`} ikon={ICONS.yedek}>{t('SubscriptionDetailPage:quick_link_backup')}</QuickLink>}
         </div>
       </div>
 

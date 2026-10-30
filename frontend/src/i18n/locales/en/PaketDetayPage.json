@@ -6,7 +6,7 @@
   "loading": "Loading…",
   "not_found": "Plan not found",
   "save_failed": "Save failed",
-  "save_success": "\"{{name}}\" saved. Click \"Re-apply\" below to push it to assigned domains.",
+  "save_success": "\"{{name}}\" saved. Customer module permissions take effect on the next request; no re-apply is needed.",
   "reapply_success": "✓ Resource limits re-applied for {{domain}}",
   "save_button_saving": "Saving…",
   "save_button": "Save Changes",
@@ -77,7 +77,9 @@
     "desc": "Number of objects that can be created in the account bound to this plan. 0 = unlimited.",
     "domain": "Domain",
     "database": "Database",
-    "ftp": "FTP Account"
+    "ftp": "FTP Account",
+    "mailbox_quota": "Mailbox quota (MB)",
+    "mailbox_quota_hint": "Default storage limit for every mailbox on this plan. Customers cannot exceed it; admins/resellers can. 0 = unlimited. Affects NEW mailboxes only."
   },
   "web_server": {
     "title": "Web Server (nginx)",

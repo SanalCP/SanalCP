@@ -13,7 +13,9 @@ import (
 
 	"sanalcp/internal/httpx"
 	"sanalcp/internal/kaynaklimit"
+	"sanalcp/internal/kota"
 	"sanalcp/internal/middleware"
+	"sanalcp/internal/planfeatures"
 	"sanalcp/internal/provisioner"
 
 	"github.com/go-chi/chi/v5"
@@ -51,8 +53,12 @@ type Plan struct {
 	WafEnabled  bool   `json:"waf_enabled"`  // plan varsayilani WAF acik mi
 	WafMode     string `json:"waf_mode"`     // "on" (engelle) | "detect" (yalniz kaydet) | "off"
 	WafParanoia int    `json:"waf_paranoia"` // CRS paranoia 1..4
-	Varsayilan  bool   `json:"varsayilan"`
-	Olusturulma string `json:"olusturulma"`
+	// MailboxQuotaMB: bu plandaki domainlerde yeni e-posta kutularının varsayılan
+	// ve (müşteri için) azami kotası, kutu başına MB; 0 = sınırsız.
+	MailboxQuotaMB int                   `json:"mailbox_quota_mb"`
+	Varsayilan     bool                  `json:"varsayilan"`
+	Olusturulma    string                `json:"olusturulma"`
+	Features       planfeatures.Features `json:"features"`
 }
 
 type Handlers struct {
@@ -66,8 +72,8 @@ const selectAll = `SELECT id, ad, aciklama, disk_kota_mb, trafik_kota_mb,
   COALESCE(io_read_mbps,0), COALESCE(io_write_mbps,0), COALESCE(io_read_iops,0), COALESCE(io_write_iops,0),
   COALESCE(db_max_queries_per_hour,0), COALESCE(db_max_updates_per_hour,0), COALESCE(db_max_query_seconds,0),
   php_surum, fastcgi_cache, client_max_body_mb, COALESCE(nginx_ek_direktifler,''),
-  COALESCE(waf_enabled,0), COALESCE(waf_mode,'on'), COALESCE(waf_paranoia,1),
-  varsayilan, DATE_FORMAT(created_at,'%Y-%m-%d') FROM service_plans`
+  COALESCE(waf_enabled,0), COALESCE(waf_mode,'on'), COALESCE(waf_paranoia,1), COALESCE(mailbox_quota_mb,0),
+  varsayilan, DATE_FORMAT(created_at,'%Y-%m-%d'), features FROM service_plans`
 
 func b01(b bool) int {
 	if b {
@@ -79,6 +85,7 @@ func b01(b bool) int {
 func scan(rs interface{ Scan(...any) error }) (Plan, error) {
 	var p Plan
 	var vars, fc, wafEn int
+	var features sql.NullString
 	err := rs.Scan(&p.ID, &p.Ad, &p.Aciklama, &p.DiskKotaMB, &p.TrafikKotaMB,
 		&p.MaxDomain, &p.MaxDB, &p.MaxEmail, &p.MaxFTP,
 		&p.CPUYuzde, &p.RAMMB, &p.MaxProcess, &p.InodeKota, &p.IOAgirlik, &p.MySQLMaxBaglanti,
@@ -86,11 +93,14 @@ func scan(rs interface{ Scan(...any) error }) (Plan, error) {
 		&p.IOReadMBps, &p.IOWriteMBps, &p.IOReadIOPS, &p.IOWriteIOPS,
 		&p.DBMaxQueriesPerHr, &p.DBMaxUpdatesPerHr, &p.DBMaxQuerySeconds,
 		&p.PHPSurum, &fc, &p.ClientMaxBodyMB, &p.NginxEkDirektifler,
-		&wafEn, &p.WafMode, &p.WafParanoia,
-		&vars, &p.Olusturulma)
+		&wafEn, &p.WafMode, &p.WafParanoia, &p.MailboxQuotaMB,
+		&vars, &p.Olusturulma, &features)
 	p.Varsayilan = vars == 1
 	p.FastCgiCache = fc == 1
 	p.WafEnabled = wafEn == 1
+	if err == nil {
+		p.Features, err = planfeatures.Stored(features)
+	}
 	return p, err
 }
 
@@ -133,12 +143,17 @@ func (h *Handlers) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		p, err := scan(rows)
 		if err != nil {
-			continue
+			httpx.WriteError(w, http.StatusInternalServerError, "plan okunamadı")
+			return
 		}
 		if izinli != nil && !izinli[p.ID] {
 			continue
 		}
 		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "planlar okunamadı")
+		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
@@ -203,10 +218,64 @@ func varsayilanDoldur(p *Plan) {
 	}
 }
 
+// Raw features distinguish omission/null from an explicitly supplied object.
+// Updates preserve settings atomically when features is omitted or null.
+type planRequest struct {
+	Plan
+	Features json.RawMessage `json:"features"`
+	// MailboxQuotaMB işaretçidir: PUT gövdesinde alan yoksa mevcut değer korunur
+	// (alan yok ≠ 0/sınırsız). Gömülü Plan.MailboxQuotaMB'yi gölgeler.
+	MailboxQuotaMB *int `json:"mailbox_quota_mb"`
+}
+
+// mailboxKotaHata: mailbox_quota_mb sınır dışıysa istemciye dönen ileti.
+const mailboxKotaHata = "mailbox_quota_mb 0 (sınırsız) ile 1048576 (1 TiB) MB arasında olmalı"
+
+// mailboxKotaArg: UPDATE için COALESCE argümanı — alan gönderilmediyse nil
+// (mevcut değer kalır). Create için kullanılmaz (yoksa 0 = sınırsız yazılır).
+func mailboxKotaArg(req planRequest) any {
+	if req.MailboxQuotaMB == nil {
+		return nil
+	}
+	return *req.MailboxQuotaMB
+}
+
+func decodePlan(r *http.Request, create bool) (Plan, any, error) {
+	p, features, _, err := decodePlanReq(r, create)
+	return p, features, err
+}
+
+// decodePlanReq: decodePlan + UPDATE'te mailbox_quota_mb COALESCE argümanı.
+func decodePlanReq(r *http.Request, create bool) (Plan, any, any, error) {
+	var req planRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return Plan{}, nil, nil, err
+	}
+	p := req.Plan
+	if req.MailboxQuotaMB != nil {
+		p.MailboxQuotaMB = *req.MailboxQuotaMB
+	}
+	mq := mailboxKotaArg(req)
+	if len(req.Features) == 0 || (!create && strings.TrimSpace(string(req.Features)) == "null") {
+		p.Features = planfeatures.All()
+		if !create {
+			return p, nil, mq, nil
+		}
+	} else if err := json.Unmarshal(req.Features, &p.Features); err != nil {
+		return Plan{}, nil, nil, err
+	}
+	stored, err := json.Marshal(p.Features)
+	return p, string(stored), mq, err
+}
+
 func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
-	var p Plan
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+	p, features, _, err := decodePlanReq(r, true)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde veya features: "+err.Error())
+		return
+	}
+	if p.MailboxQuotaMB < 0 || p.MailboxQuotaMB > kota.MaxMailboxQuotaMB {
+		httpx.WriteError(w, http.StatusBadRequest, mailboxKotaHata)
 		return
 	}
 	p.Ad = strings.TrimSpace(p.Ad)
@@ -232,8 +301,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		   io_read_mbps, io_write_mbps, io_read_iops, io_write_iops,
 		   db_max_queries_per_hour, db_max_updates_per_hour, db_max_query_seconds,
 		   php_surum, fastcgi_cache, client_max_body_mb, nginx_ek_direktifler,
-		   waf_enabled, waf_mode, waf_paranoia, varsayilan)
-		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		   waf_enabled, waf_mode, waf_paranoia, varsayilan, features, mailbox_quota_mb)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.Ad, p.Aciklama, p.DiskKotaMB, p.TrafikKotaMB,
 		p.MaxDomain, p.MaxDB, p.MaxEmail, p.MaxFTP,
 		p.CPUYuzde, p.RAMMB, p.MaxProcess, p.InodeKota, p.IOAgirlik, p.MySQLMaxBaglanti,
@@ -241,22 +310,30 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		p.IOReadMBps, p.IOWriteMBps, p.IOReadIOPS, p.IOWriteIOPS,
 		p.DBMaxQueriesPerHr, p.DBMaxUpdatesPerHr, p.DBMaxQuerySeconds,
 		p.PHPSurum, b01(p.FastCgiCache), p.ClientMaxBodyMB, p.NginxEkDirektifler,
-		b01(p.WafEnabled), p.WafMode, p.WafParanoia, v)
+		b01(p.WafEnabled), p.WafMode, p.WafParanoia, v, features, p.MailboxQuotaMB)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	id, _ := res.LastInsertId()
 	row := h.DB.QueryRowContext(r.Context(), selectAll+" WHERE id=?", id)
-	saved, _ := scan(row)
+	saved, err := scan(row)
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "plan okunamadı")
+		return
+	}
 	httpx.WriteJSON(w, http.StatusCreated, saved)
 }
 
 func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var p Plan
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+	p, features, mailboxKota, err := decodePlanReq(r, false)
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde veya features: "+err.Error())
+		return
+	}
+	if p.MailboxQuotaMB < 0 || p.MailboxQuotaMB > kota.MaxMailboxQuotaMB {
+		httpx.WriteError(w, http.StatusBadRequest, mailboxKotaHata)
 		return
 	}
 	p.Ad = strings.TrimSpace(p.Ad)
@@ -282,7 +359,8 @@ func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 		   io_read_mbps=?, io_write_mbps=?, io_read_iops=?, io_write_iops=?,
 		   db_max_queries_per_hour=?, db_max_updates_per_hour=?, db_max_query_seconds=?,
 		   php_surum=?, fastcgi_cache=?, client_max_body_mb=?, nginx_ek_direktifler=?,
-		   waf_enabled=?, waf_mode=?, waf_paranoia=?, varsayilan=?
+		   waf_enabled=?, waf_mode=?, waf_paranoia=?, varsayilan=?, features=COALESCE(?,features),
+		   mailbox_quota_mb=COALESCE(?,mailbox_quota_mb)
 		 WHERE id=?`,
 		p.Ad, p.Aciklama, p.DiskKotaMB, p.TrafikKotaMB,
 		p.MaxDomain, p.MaxDB, p.MaxEmail, p.MaxFTP,
@@ -291,7 +369,7 @@ func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 		p.IOReadMBps, p.IOWriteMBps, p.IOReadIOPS, p.IOWriteIOPS,
 		p.DBMaxQueriesPerHr, p.DBMaxUpdatesPerHr, p.DBMaxQuerySeconds,
 		p.PHPSurum, b01(p.FastCgiCache), p.ClientMaxBodyMB, p.NginxEkDirektifler,
-		b01(p.WafEnabled), p.WafMode, p.WafParanoia, v, id); err != nil {
+		b01(p.WafEnabled), p.WafMode, p.WafParanoia, v, features, mailboxKota, id); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -305,7 +383,15 @@ func (h *Handlers) Update(w http.ResponseWriter, r *http.Request) {
 	// görüyordu. Artık WAF ile aynı desende, kaydeder kaydetmez arka planda uygulanır.
 	go h.kaynakPlanReapply(id)
 	row := h.DB.QueryRowContext(r.Context(), selectAll+" WHERE id=?", id)
-	saved, _ := scan(row)
+	saved, err := scan(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		httpx.WriteError(w, http.StatusNotFound, "plan bulunamadı")
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "plan okunamadı")
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, saved)
 }
 

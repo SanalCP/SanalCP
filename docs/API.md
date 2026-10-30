@@ -10,6 +10,29 @@ işlem otomasyona da açıktır.**
   taşınır — JavaScript okuyamaz, bu yüzden arayüz Authorization başlığı kurmaz.
 - İstek/yanıt gövdesi: JSON (`Content-Type: application/json`)
 
+### Müşteri oturumu ve hesap güvenliği
+
+`POST /musteri/login` gövdesi `{"kullanici":"...","parola":"...","kod":"..."}`.
+2FA etkin ve kod eksikse yanıt `200 {"iki_fa_gerekli":true}` olur; oturum
+çerezi verilmez. Aynı uç doğru parolayla ve yeni TOTP koduyla yeniden çağrılır.
+Yanlış veya tekrar kullanılan kod `401`, okunamayan/bozuk 2FA durumu `500`
+döndürür; bu durumlarda da oturum oluşturulmaz.
+
+Kimliği doğrulanmış müşteri kendi hesabında şu uçları kullanabilir:
+
+| Metot | Yol | Gövde / sonuç |
+|---|---|---|
+| `POST` | `/me/parola` | `{"mevcut":"...","yeni":"..."}` |
+| `GET` | `/me/2fa/setup` | Secret, hesaba ait otpauth URI ve QR döndürür; etkinleştirmez |
+| `POST` | `/me/2fa/enable` | `{"secret":"...","kod":"..."}` |
+| `POST` | `/me/2fa/disable` | `{"kod":"..."}` |
+
+Hedef hesap istek gövdesindeki kimlikten değil doğrulanmış oturumdan alınır.
+Başarılı parola/2FA değişikliği tarayıcı oturumlarını iptal eder ve çerezi siler;
+yeniden giriş gerekir. Etkinleştirmede kullanılan TOTP kodu tüketilir.
+Müşteriye profil düzenleme (`PUT /me`) veya API token yönetimi yetkisi verilmez.
+Çerezli değişiklik isteklerinde `Origin` başlığı zorunludur.
+
 ---
 
 ## 1. Token oluşturma
@@ -88,6 +111,89 @@ bayi hesabı kullanmak sızıntı halinde zararı sınırlar.
 
 Her token'ın **son kullanım zamanı ve IP'si** kaydedilir; token listesinden
 beklenmedik kullanım fark edilebilir.
+
+### Plan bazlı müşteri modülleri
+
+`POST /plans` ve `PUT /plans/{id}` gövdeleri `features` nesnesini destekler.
+Nesne verildiğinde sekiz alanın **tamamı** boolean olmalıdır:
+
+```json
+{
+  "dns": false,
+  "mail": true,
+  "databases": true,
+  "files": false,
+  "ftp": true,
+  "cron": true,
+  "backups": true,
+  "git": true
+}
+```
+
+Plan oluştururken alanı göndermemek tüm modülleri açar; açıkça `null` göndermek
+`400` döndürür. Güncellemede eksik veya `null` `features` mevcut izinleri korur.
+Eksik/bilinmeyen anahtarlar ve boolean olmayan değerler `400` döndürür.
+Planın diğer alanlarını korumak için önce mevcut planı okuyup tamamını
+`PUT /plans/{id}` ile gönderin; uç yalnız özelliklere özel bir PATCH değildir.
+
+`GET /domains/{id}/features`, sahiplik denetiminden sonra
+`{"features":{...},"enforced":true}` döndürür. İzinler domainin planından, ek
+alan adlarında ise ana hesabın güncel planından okunur. Eski planların SQL `NULL`
+ayarı ve plansız hesaplar tüm modülleri açık tutar; bozuk kayıt veya okunamayan
+politika müşteriye erişim vermez.
+
+Kısıtlar `user` rolündeki müşteriye uygulanır. Yönetici/bayi için `enforced`
+`false` olur; yanıt yine planın gerçek bayraklarını taşır ve mevcut sahiplik
+denetimleri geçerlidir. İzin değişiklikleri yeni giriş gerektirmeden bir sonraki
+istekte uygulanır.
+
+Kapalı modül `403 {"hata":"...","code":"feature_disabled","feature":"files"}`,
+okunamayan politika `503` döndürür. Veritabanı kimliğiyle silme/parola/phpMyAdmin
+token uçları da aynı denetime tabidir. `dns`, domain Cloudflare/nameserver
+işlemlerini; `git`, domain GitHub işlemlerini; `backups`, takvim/hedef/restore
+işlerini de kapsar.
+
+Bu izinler yönetim API'sini sınırlar; mevcut hizmetleri veya kimlik bilgilerini
+kapatmaz. Otomatik yedekler, cron görevleri, Git webhook'ları ve uygulama CLI
+erişimi değişmez. Bir modülü kapatmak, diğer bağımsız uygulama araçlarının
+dosya/veritabanı işlemlerini genel olarak yasaklayan bir sandbox değildir.
+
+### E-posta teslimat takibi
+
+| Metot | Yol | Kapsam |
+|---|---|---|
+| `GET` | `/mail/deliveries` | Yönetici tümü; bayi yalnız müşterileri |
+| `GET` | `/mail/deliveries/{id}` | Aynı kapsam; kapsam dışı `404` |
+| `GET` | `/domains/{id}/mail/deliveries` | Domain sahibi/müşteri; `E-posta` planı gerekir |
+| `GET` | `/domains/{id}/mail/deliveries/{id}` | Aynı alıcı kapsamı |
+
+Filtreler: `sender`, `recipient` (harfi harfine alt dize; `%` ve `_` joker değildir),
+`queue_id` (tam, büyük/küçük harf duyarlı), `status`
+(`pending|deferred|delivered|bounced|forwarded`), `from`/`to` (`YYYY-MM-DD` veya UTC
+RFC3339; son tarih günün sonunu içerir), `page`, `page_size` (en çok 100). Geçersiz
+değer `400` döndürür. Yanıt `items`, `total`, `page`, `page_size` ve
+`collector` (`state`, `warning`: `history_gap` veya `source_unavailable`,
+`last_collected_at`) içerir. Detay yanıtı yalnız ilgili alıcının denemelerini ve
+`events_truncated` bayrağını (son 1000 olay) taşır.
+
+`delivered`, Postfix'in iletiyi sonraki sunucuya veya yerel posta kutusuna
+devrettiğini gösterir; okunduğunu değil. `forwarded` ara adımdır. Boş sonuç
+`collector.state/warning` ile birlikte okunmalıdır: kaynak hatası ve geçmiş
+boşluğu "teslim edilmedi" anlamına gelmez.
+
+### Posta kutusu kotası
+
+| Metot | Yol | Açıklama |
+|---|---|---|
+| `POST` | `/domains/{id}/mail` | İsteğe bağlı `quota_mb`; verilmezse planın `mailbox_quota_mb` değeri |
+| `PUT` | `/domains/{id}/mail/{mid}/quota` | `{"quota_mb": n}` — `0` sınırsız; `E-posta` planı gerekir |
+| `GET` | `/domains/{id}/mail` | Kutular `quota_bytes` ve `used_bytes` (bilinmiyorsa `null`) taşır |
+
+Müşteri, planın `mailbox_quota_mb` değeri 0'dan büyükse `1..plan` aralığında kalmalıdır
+ve sınırsız seçemez; yönetici/bayi `0..1048576` MB belirleyebilir. Aralık dışı `400`,
+planı çözülemeyen hesap `503` döndürür. `service_plans.mailbox_quota_mb` plan
+`POST/PUT` gövdesinde gönderilir; güncellemede eksik alan mevcut değeri korur.
+Plan kotasını düşürmek mevcut kutuları değiştirmez.
 
 ---
 

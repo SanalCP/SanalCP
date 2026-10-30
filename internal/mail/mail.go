@@ -34,6 +34,11 @@ type Mailbox struct {
 	Email     string `json:"email"`
 	Status    string `json:"status"`
 	CreatedAt string `json:"created_at"`
+	// QuotaBytes: kutu başına depolama sınırı; 0 = sınırsız (bkz. quota.go).
+	QuotaBytes int64 `json:"quota_bytes"`
+	// UsedBytes: Dovecot'un maildirsize özetinden okunan kullanım. Dosya henüz
+	// yoksa/okunamıyorsa null (bilinmiyor) — 0 ile karıştırılmamalı.
+	UsedBytes *int64 `json:"used_bytes"`
 }
 
 type Durum struct {
@@ -42,6 +47,10 @@ type Durum struct {
 	// AltyapiEksik: sunucuda çalışmayan e-posta servisleri (boşsa altyapı hazır).
 	// Dolu olduğunda arayüz "Etkinleştir" butonunu kapatıp nedenini gösterir.
 	AltyapiEksik []string `json:"altyapi_eksik,omitempty"`
+	// PlanKotaMB: domain'in paketindeki kutu başına kota (MB; 0 = sınırsız).
+	// KotaPlaniAsabilir: çağıran rol (admin/bayi) bu sınırın üstünde kota verebilir mi.
+	PlanKotaMB        int64 `json:"plan_kota_mb"`
+	KotaPlaniAsabilir bool  `json:"kota_plani_asabilir"`
 }
 
 var reLocalPart = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$`)
@@ -77,10 +86,16 @@ func (h *Handlers) MailDurum(w http.ResponseWriter, r *http.Request) {
 		`SELECT durum, dkim_selector FROM mail_domains WHERE domain_id=?`, id).Scan(&durum, &selector)
 	// altyapi_eksik: arayüz "Etkinleştir" butonunu baştan devre dışı bırakıp
 	// nedenini gösterebilsin diye — kullanıcı tıklayıp hata almasın.
+	var planKota int64
+	if mb, err := kota.PlanMailboxQuotaMB(r.Context(), h.DB, id); err == nil {
+		planKota = mb
+	}
 	httpx.WriteJSON(w, http.StatusOK, Durum{
-		Etkin:        err == nil && durum == "active",
-		DKIMSelector: selector,
-		AltyapiEksik: MailAltyapisiVar(r.Context()),
+		Etkin:             err == nil && durum == "active",
+		DKIMSelector:      selector,
+		AltyapiEksik:      MailAltyapisiVar(r.Context()),
+		PlanKotaMB:        planKota,
+		KotaPlaniAsabilir: planiAsabilir(rolOf(r)),
 	})
 }
 
@@ -169,8 +184,12 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "domain bulunamadı")
 		return
 	}
+	// Kullanım Dovecot'un maildirsize özetinden okunur (dizin gezintisi yok);
+	// okunamayan kutu listelemeyi düşürmez, used_bytes null kalır.
 	rows, err := h.DB.QueryContext(r.Context(),
-		`SELECT id, local_part, email, status, created_at FROM mailboxes WHERE domain_id=? ORDER BY local_part`, id)
+		`SELECT m.id, m.local_part, m.email, m.status, m.created_at, m.quota_bytes, COALESCE(md.sistem_kullanici,'')
+		   FROM mailboxes m LEFT JOIN mail_domains md ON md.id=m.mail_domain_id
+		  WHERE m.domain_id=? ORDER BY m.local_part`, id)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "listelenemedi")
 		return
@@ -179,7 +198,11 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	out := []Mailbox{}
 	for rows.Next() {
 		var m Mailbox
-		if err := rows.Scan(&m.ID, &m.LocalPart, &m.Email, &m.Status, &m.CreatedAt); err == nil {
+		var sk string
+		if err := rows.Scan(&m.ID, &m.LocalPart, &m.Email, &m.Status, &m.CreatedAt, &m.QuotaBytes, &sk); err == nil {
+			if used, ok := kutuKullanimi(sk, m.LocalPart); ok {
+				m.UsedBytes = &used
+			}
 			out = append(out, m)
 		}
 	}
@@ -190,7 +213,7 @@ func (h *Handlers) Liste(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
-// POST /domains/{id}/mail  {local_part, parola?}
+// POST /domains/{id}/mail  {local_part, parola?, quota_mb?}
 func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	id, _, demo, ok := h.domain(r)
 	if !ok {
@@ -204,6 +227,8 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		LocalPart string `json:"local_part"`
 		Parola    string `json:"parola"`
+		// QuotaMB: opsiyonel; verilmezse paketin kutu başına varsayılanı (0 = sınırsız).
+		QuotaMB *int64 `json:"quota_mb"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpx.WriteError(w, http.StatusBadRequest, "geçersiz istek gövdesi")
@@ -241,6 +266,17 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusForbidden, err.Error())
 		return
 	}
+	quotaBytes, err := h.yeniKutuKotasi(r.Context(), rolOf(r), id, req.QuotaMB)
+	if err != nil {
+		kod := http.StatusForbidden
+		if errors.Is(err, errPlanOkunamadi) {
+			kod = http.StatusServiceUnavailable
+		} else if req.QuotaMB != nil && kotaMBGecerli(*req.QuotaMB) != nil {
+			kod = http.StatusBadRequest
+		}
+		httpx.WriteError(w, kod, err.Error())
+		return
+	}
 
 	email := lp + "@" + alanAdi
 	hash, err := HashPassword(req.Parola)
@@ -258,9 +294,9 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	_ = exec.Command("restorecon", "-R", maildir).Run() // SELinux: user_home_t, best-effort
 
 	res, err := h.DB.ExecContext(r.Context(),
-		`INSERT INTO mailboxes(domain_id, mail_domain_id, local_part, email, password_hash, maildir)
-		 VALUES(?,?,?,?,?,?)`,
-		id, mdID, lp, email, hash, maildir)
+		`INSERT INTO mailboxes(domain_id, mail_domain_id, local_part, email, password_hash, maildir, quota_bytes)
+		 VALUES(?,?,?,?,?,?,?)`,
+		id, mdID, lp, email, hash, maildir, quotaBytes)
 	if err != nil {
 		httpx.WriteError(w, http.StatusConflict, "kutu zaten var veya eklenemedi")
 		return

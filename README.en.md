@@ -178,12 +178,33 @@ Roles:
 |---|---|
 | **Administrator (admin)** | The whole server. There can be more than one; the last active admin cannot be demoted. |
 | **Reseller** | Only their own customers and their domains. Has its own quotas; can only create customer accounts. |
-| **Customer (user)** | A single domain. Cannot log in to the management panel; uses `/cp` for their own domain panel. |
+| **Customer (user)** | Domains assigned to their account. Uses `/cp` for the customer panel and cannot access administrator operations. |
+
+### Plan-based customer modules
+
+Use **Service Plans → Plan details** to enable or disable DNS, email, databases,
+files, FTP, cron, backups, and Git management independently. Disabled modules
+disappear from customer navigation and shortcuts; direct page URLs and API
+requests are denied too. Existing sessions pick up plan changes on their next
+API request; addon domains follow the canonical account's current plan.
+Legacy plans and accounts without a plan retain all existing access.
+Administrators and resellers retain support access within existing ownership
+boundaries.
+
+These settings control **management access**, not service availability: existing
+data, FTP/database/mail credentials, running services, cron jobs, and automatic
+backups are not deleted or stopped. Git webhooks and application CLI access are
+unchanged as well.
 
 ### Login security
 
-- **2FA (TOTP)** — for all panel accounts; set up via QR code, protected against code replay.
-  If 2FA state cannot be read, login is **denied** (fail-closed).
+- **2FA (TOTP)** — for administrator, reseller and customer accounts, with QR setup.
+  Customers sign in at `/cp` and manage their own panel password and 2FA under
+  **Account Security**. Enabled 2FA requires a code before a session is issued;
+  concurrent logins can consume the same code only once. Unreadable 2FA state
+  **denies** login (fail-closed).
+- Password and 2FA changes invalidate existing browser sessions. The code used
+  to enable 2FA is consumed; wait for the next code before signing in again.
 - **Brute-force protection** — per-IP sliding window + progressive delay + lockout.
   The client IP cannot be spoofed via reverse-proxy headers.
 - **Audit log** — successful/failed logins, account operations and permission changes are recorded.
@@ -214,6 +235,8 @@ Roles:
 - **Management API** — personal access tokens for automation ([docs/API.md](docs/API.md))
 - Backup manager, monitoring/logs, statistics
 - Service plans and resource limits (new domains default to the **Starter** plan)
+- **Email delivery tracking**: Postfix outcomes per recipient (delivered, deferred, bounced) with SMTP responses and retries, scoped for customers, resellers and administrators, retained for 30 days. The source is the systemd journal; `sent` means handoff to the next server or mailbox, not a read receipt.
+- **Mailbox quotas**: per-mailbox Dovecot quota (over-quota delivery is rejected with `552`), plan defaults, panel editing and usage display.
 - On reverse proxy sites, start, stop, restart, and view logs for a Node.js/Python entry file running as the tenant user. Select an installed interpreter, install npm/pip dependencies, and configure an HTTP health path. Git Pull/webhook deployment builds in a separate worktree, switches the service after preparation, and restores the previous release on health failure. The app must listen using the provided `HOST=127.0.0.1` and `PORT` values.
 
 ## Automatic Intrusion Blocking
@@ -343,7 +366,22 @@ systemctl start sanalcp
 
 ### Customer sites
 
-Customer sites + databases are backed up by a separate process: `sanalcp-backup-all` (cron, daily at 03:00 UTC, `/var/backups/sanalcp/<system_user>/`, 14-day retention). The panel DB backup never touches these directories.
+Customer sites and registered databases use the panel's **single backup engine**.
+Under Domain → **Backups**, disable automatic backups or select daily/weekly/monthly
+frequency, hour, count and age limits. Manual backups have a separate count
+limit; `0` means unlimited. Archives are stored under
+`/var/backups/sanalcp/<system_user>/`.
+
+- A failed dump or archive command never creates a success record or publishes
+  a partial archive. The panel CLI token is excluded.
+- Count/age retention and bulk cleanup additionally protect the domain's **last
+  verified good backup**. The retained count may temporarily exceed the configured
+  limit. Explicit deletion of an individual backup remains a separate user action.
+- Installation/update removes the legacy `sanalcp-backup-all` script and cron
+  without changing existing archives or per-domain schedule/retention settings.
+  Legacy `planli` records move into the automatic retention pool; archive contents
+  are not rewritten. Disabled automatic backups remain disabled.
+- The separate daily panel-database backup and its timer are unchanged.
 
 ## Update (SSH / CLI)
 

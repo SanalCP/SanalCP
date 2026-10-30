@@ -1,0 +1,30 @@
+# SanalCP — posta kutusu kotası (kutu başına depolama sınırı) · **Dovecot 2.4 sözdizimi**.
+#
+# Limit BU dosyada değil userdb'den gelir: 10-sanalcp-mail.conf içindeki
+# userdb sorgusu her kutunun mailboxes.quota_bytes değerini 'quota_storage_size'
+# alanı olarak döndürür ('<bayt>B'; 0B = sınırsız). Kotayı panelden değiştirmek
+# bu yüzden Dovecot'u yeniden başlatmayı gerektirmez.
+#
+# 🔴 SÜRÜCÜ 'maildir' (2.4'te önerilen 'count' DEĞİL): Maildir++ 'maildirsize'
+# dosyası kullanımı kutu kökünde tutar; panel kutu listesinde kullanımı dizin
+# gezmeden ve Dovecot'u çağırmadan buradan okur. 2.4'te dosyanın başlığındaki
+# limit yok sayılır, limit yalnız userdb'den gelir.
+mail_plugins {
+  quota = yes
+}
+protocol imap {
+  mail_plugins {
+    imap_quota = yes
+  }
+}
+protocol lmtp {
+  # Kota doluysa alıcıyı RCPT aşamasında reddet: teslimat sessizce kabul
+  # edilip sonra düşmez, gönderene "552 5.2.2 Quota exceeded" döner.
+  lmtp_rcpt_check_quota = yes
+}
+quota "User quota" {
+  driver = maildir
+  # Tolerans yok: limit, panelde gösterilen değerle birebir aynıdır.
+  # (2.4 varsayılanı 10 MB pay — küçük kutularda limiti anlamsızlaştırırdı.)
+  storage_grace = 0
+}

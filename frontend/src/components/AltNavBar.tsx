@@ -7,6 +7,8 @@
 // mevcut çekmeceyi açar — yani hiçbir sayfa erişilemez hâle gelmez.
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/store/auth'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type Sekme = { to: string; etiket: string; ikon: string; end?: boolean }
 
@@ -23,13 +25,11 @@ const IK = {
 export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
   const { t } = useTranslation(['AltNavBar'])
   const navigate = useNavigate()
+  const features = useDomainFeatures()
+  const rol = useAuth(s => s.kullanici?.rol)
 
-  const isMusteri =
-    typeof window !== 'undefined' && localStorage.getItem('sanalcp.musteri') === '1'
-  const domainID =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('sanalcp.musteri.domain_id') || ''
-      : ''
+  const isMusteri = rol === 'user' || (typeof window !== 'undefined' && localStorage.getItem('sanalcp.musteri') === '1')
+  const domainID = features.domainId
 
   // Yönetici: birincil eylem "yeni domain". Müşteri domain oluşturamaz —
   // onun için orta eylem yok, düz 4 sekme + menü.
@@ -46,7 +46,7 @@ export default function AltNavBar({ onMenuAc }: { onMenuAc: () => void }) {
     { to: `/abonelikler/${domainID}/yedekler`, etiket: t('AltNavBar:tabs.backups'), ikon: IK.yedek },
   ]
 
-  const sekmeler = isMusteri ? musteriSekmeler : yoneticiSekmeler
+  const sekmeler = (isMusteri ? musteriSekmeler : yoneticiSekmeler).filter(tab => features.allowsPath(tab.to))
 
   const sekmeSinif = ({ isActive }: { isActive: boolean }) =>
     `flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 min-w-0 transition ${

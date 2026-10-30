@@ -167,7 +167,7 @@ func runOneBackup(db *sql.DB, d dueDomain, notlar string) error {
 	if !adlar.SKGecerli(d.SK) {
 		return fmt.Errorf("güvensiz sk: %s", d.SK)
 	}
-	stamp := time.Now().UTC().Format("20060102-150405")
+	stamp := time.Now().UTC().Format("20060102-150405.000000000")
 	dir := filepath.Join(BackupRoot, d.SK)
 	_ = os.MkdirAll(dir, 0700)
 	dosya := fmt.Sprintf("%s-auto-%s.tar.gz", d.SK, stamp)
@@ -183,6 +183,7 @@ func runOneBackup(db *sql.DB, d dueDomain, notlar string) error {
 		`INSERT INTO backups(domain_id, tip, dosya, boyut_b, notlar) VALUES(?,?,?,?,?)`,
 		d.ID, TipOto, dosya, boyut, notlar)
 	if err != nil {
+		_ = os.Remove(abs)
 		return fmt.Errorf("DB kayıt: %w", err)
 	}
 	backupID, _ := res.LastInsertId()
@@ -220,16 +221,18 @@ func pruneManuel(db *sql.DB, domainID int64, sk string, keep int) error {
 // pruneEski: `gun` günden eski OTOMATİK yedekleri siler. gun < 1 ise hiçbir
 // şey silinmez (gün sınırı yok).
 //
-// En yeni otomatik yedek, yaşı ne olursa olsun KORUNUR. Yedeklemesi günlerdir
-// hata veren bir domainde (dolu disk, bozuk veritabanı) aksi halde süre
-// dolunca elde kalan son sağlam yedek de silinirdi — yani tam da yedeğe en
-// çok ihtiyaç duyulan anda hiç yedek kalmazdı.
+// En yeni otomatik kayıt ve domainin son doğrulanmış sağlam kopyası korunur.
+// Yeni yedek bekliyor veya başarısızsa, eski sağlam kopya yaş sınırını aşabilir.
 func pruneEski(db *sql.DB, domainID int64, sk string, gun int) error {
 	if gun < 1 {
 		return nil
 	}
 	if gun > MaxSaklamaGun {
 		gun = MaxSaklamaGun
+	}
+	protectedID, err := latestVerifiedBackup(db, domainID)
+	if err != nil {
+		return err
 	}
 	rows, err := db.Query(
 		`SELECT id, dosya, uzak_durum FROM backups
@@ -246,9 +249,15 @@ func pruneEski(db *sql.DB, domainID int64, sk string, gun int) error {
 	for rows.Next() {
 		var it pruneItem
 		if err := rows.Scan(&it.ID, &it.Dosya, &it.UzakDurum); err != nil {
+			return err
+		}
+		if it.ID == protectedID {
 			continue
 		}
 		eski = append(eski, it)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	rows.Close()
 	if len(eski) == 0 {
@@ -279,6 +288,10 @@ func silYedekler(db *sql.DB, domainID int64, sk string, items []pruneItem) {
 // pruneTip: tek bir yedek tipi içinde en yeni `keep` kaydı bırakır, gerisini
 // diskten + uzak hedeften + DB'den siler.
 func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
+	protectedID, err := latestVerifiedBackup(db, domainID)
+	if err != nil {
+		return err
+	}
 	rows, err := db.Query(
 		`SELECT id, dosya, uzak_durum FROM backups
 		 WHERE domain_id=? AND tip=?
@@ -292,19 +305,35 @@ func pruneTip(db *sql.DB, domainID int64, sk, tip string, keep int) error {
 	for rows.Next() {
 		var it pruneItem
 		if err := rows.Scan(&it.ID, &it.Dosya, &it.UzakDurum); err != nil {
-			continue
+			return err
 		}
 		all = append(all, it)
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 	rows.Close()
 	if len(all) <= keep {
 		return nil
 	}
-	// En yeni N tut, geri kalan sil
-	old := all[keep:]
+	// En yeni N kayda ek olarak son doğrulanmış kopya da tutulur.
+	old := make([]pruneItem, 0, len(all)-keep)
+	for _, it := range all[keep:] {
+		if it.ID != protectedID {
+			old = append(old, it)
+		}
+	}
 	sort.Slice(old, func(i, j int) bool { return old[i].ID < old[j].ID })
 	silYedekler(db, domainID, sk, old)
 	log.Printf("backup retention domain=%d tip=%s: %d eski yedek silindi (keep %d)",
 		domainID, tip, len(old), keep)
 	return nil
+}
+
+// latestVerifiedBackup is domain-wide: a pending/failed newer archive must not
+// displace the last proven recovery point, even across retention pools.
+func latestVerifiedBackup(db *sql.DB, domainID int64) (int64, error) {
+	var id int64
+	err := db.QueryRow(`SELECT COALESCE(MAX(id),0) FROM backups WHERE domain_id=? AND dogrulama_durum='dogrulandi'`, domainID).Scan(&id)
+	return id, err
 }

@@ -5,7 +5,7 @@
   "username": "Username",
   "password": "Password",
   "twofa_code": "Two-factor authentication code",
-  "twofa_hint": "Enter the 6-digit code from your authenticator app.",
+  "twofa_hint": "Enter the 6-digit code from your authenticator app. Wait for a new code if you just used the current one.",
   "login_failed": "Login failed",
   "signing_in": "Signing in…",
   "verify_and_login": "Verify and sign in",

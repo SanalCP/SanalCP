@@ -1,0 +1,36 @@
+# SanalCP — posta kutusu kotası (kutu başına depolama sınırı) · Dovecot 2.3.
+#
+# Limit BU dosyada değil userdb'den gelir: dovecot-sql.conf.ext içindeki
+# user_query her kutunun mailboxes.quota_bytes değerini 'quota_rule' alanı
+# olarak döndürür ('*:bytes=<bayt>'; 0 = sınırsız). Kotayı panelden değiştirmek
+# bu yüzden Dovecot'u yeniden başlatmayı gerektirmez.
+#
+# Kullanım Maildir++ 'maildirsize' dosyasında tutulur: panel kutu listesinde
+# kullanımı dizin gezmeden buradan okur.
+#
+# 🔴 NEDEN 'mail_plugins' HER PROTOKOLE AYRI YAZILIYOR, global DEĞİL:
+# 10-sanalcp-mail.conf, 'protocol lmtp { mail_plugins = $mail_plugins sieve }'
+# bloğunu bu dosyadan ÖNCE açar. Sonradan yazılan global 'mail_plugins', daha
+# önce açılmış protokol bloğunun içini DEĞİŞTİRMEZ (doveconf: "Global setting
+# mail_plugins won't change the setting inside an earlier filter") — LMTP'de
+# kota eklentisi hiç yüklenmez, teslimat kotayı sessizce aşardı. Blokları
+# burada tekrar açmak mevcut değerin ($mail_plugins) SONUNA ekler.
+protocol imap {
+  mail_plugins = $mail_plugins quota imap_quota
+}
+protocol lmtp {
+  mail_plugins = $mail_plugins quota
+  # Kota doluysa alıcıyı RCPT aşamasında reddet: teslimat sessizce kabul
+  # edilip sonra düşmez, gönderene "552 5.2.2 Quota exceeded" döner.
+  lmtp_rcpt_check_quota = yes
+}
+# 'doveadm quota get/recalc' için.
+protocol doveadm {
+  mail_plugins = $mail_plugins quota
+}
+plugin {
+  quota = maildir:User quota
+  # Tolerans yok: limit, panelde gösterilen değerle birebir aynıdır.
+  # (Varsayılan %10 pay, küçük kutularda "limit aşıldı" göstergesini yanıltırdı.)
+  quota_grace = 0
+}

@@ -18,11 +18,11 @@ func TestTumBilinenKayitlarTekSorguIleGruplar(t *testing.T) {
 	}
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"domain_id", "id", "tip", "dosya", "uzak_durum", "boyut_b", "UNIX_TIMESTAMP(created_at)"}).
-		AddRow(int64(7), int64(101), "oto", "c_a-auto-20260812-030000.tar.gz", "yüklendi", int64(1000), int64(1755000000)).
-		AddRow(int64(9), int64(202), "manuel", "c_b-20260812-131500.tar.gz", "", int64(2000), int64(1755001000))
+	rows := sqlmock.NewRows([]string{"domain_id", "id", "tip", "dosya", "uzak_durum", "boyut_b", "UNIX_TIMESTAMP(created_at)", "dogrulama_durum"}).
+		AddRow(int64(7), int64(101), "oto", "c_a-auto-20260812-030000.tar.gz", "yüklendi", int64(1000), int64(1755000000), "dogrulandi").
+		AddRow(int64(9), int64(202), "manuel", "c_b-20260812-131500.tar.gz", "", int64(2000), int64(1755001000), "bekliyor")
 
-	mock.ExpectQuery(`SELECT domain_id, id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP\(created_at\)\s+FROM backups WHERE domain_id IN \(\?,\?\)`).
+	mock.ExpectQuery(`SELECT domain_id, id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP\(created_at\), dogrulama_durum\s+FROM backups WHERE domain_id IN \(\?,\?\)`).
 		WithArgs(int64(7), int64(9)).
 		WillReturnRows(rows)
 

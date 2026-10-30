@@ -33,6 +33,7 @@
   "account_menu": "Hesap menüsü",
   "theme_toggle_title": "Tema: {{theme}} — tıkla değiştir",
   "profile_prefs": "Profil ve Tercihler",
+  "account_security": "Hesap Güvenliği",
   "logout": "Çıkış Yap",
   "types": {
     "sayfa": "sayfa",

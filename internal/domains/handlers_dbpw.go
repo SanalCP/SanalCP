@@ -22,18 +22,6 @@ type setDBPwReq struct {
 // Body bos ise rastgele uretir. Demo abonelige reddeder.
 func (h *Handlers) SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
 	dbid, _ := strconv.ParseInt(chi.URLParam(r, "dbid"), 10, 64)
-	var req setDBPwReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
-		return
-	}
-	if req.Parola == "" {
-		req.Parola = hesaplar.RandomParola(24)
-	}
-	if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
-		httpx.WriteError(w, http.StatusBadRequest, neden)
-		return
-	}
 
 	var dbName, dbUser string
 	var domainID int64
@@ -54,8 +42,23 @@ func (h *Handlers) SetDatabasePassword(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "DB kaydı bulunamadı")
 		return
 	}
+	if !middleware.RequireFeature(w, r, domainID, "databases") {
+		return
+	}
 	if isDemo == 1 {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin DB parolası değiştirilemez")
+		return
+	}
+	var req setDBPwReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "geçersiz gövde")
+		return
+	}
+	if req.Parola == "" {
+		req.Parola = hesaplar.RandomParola(24)
+	}
+	if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
+		httpx.WriteError(w, http.StatusBadRequest, neden)
 		return
 	}
 

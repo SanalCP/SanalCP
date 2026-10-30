@@ -1454,7 +1454,7 @@ func EnableLetsEncrypt(ctx context.Context, alanAdi, sk, phpSurum, backend strin
 	// Geçici staging deposu canlı cert/yenileme kayıtlarına dokunmaz.
 	issueCtx, issueCancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer issueCancel()
-	if out, e := issueWithPreflight(issueCtx, "/root/.acme.sh/acme.sh", args); e != nil {
+	if out, e := IssueWithPreflight(issueCtx, "/root/.acme.sh/acme.sh", args); e != nil {
 		// FAIL-SAFE (teardown YOK): mevcut/self-signed cert ile 443'ü KORU.
 		sebep := strings.TrimSpace(string(out))
 		if sebep == "" {

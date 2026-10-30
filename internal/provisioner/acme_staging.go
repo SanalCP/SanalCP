@@ -26,11 +26,12 @@ func AcmeServerArgs() []string {
 	return nil
 }
 
-// issueWithPreflight doğrulamayı ayrı bir acme.sh deposunda yapar. Aynı depo
+// IssueWithPreflight doğrulamayı ayrı bir acme.sh deposunda yapar. Aynı depo
 // kullanılırsa staging sertifikası üretim sertifikasının domain kaydını ve
 // otomatik yenileme ayarlarını değiştirebilir. Geçici depo silinmeden önce
 // staging sertifikası hiçbir zaman --install-cert ile canlıya taşınmaz.
-func issueWithPreflight(ctx context.Context, acmeBin string, issueArgs []string) ([]byte, error) {
+// Tenant ve panel alan adı sertifika akışları aynı kapıyı kullanır.
+func IssueWithPreflight(ctx context.Context, acmeBin string, issueArgs []string) ([]byte, error) {
 	if os.Getenv("ACME_STAGING") == "1" {
 		// Eski manuel/CI staging modu: üretim isteği yapılmaz.
 		args := append(append([]string{}, issueArgs...), AcmeServerArgs()...)

@@ -57,7 +57,21 @@
     "activate": "Activate",
     "status_failed": "Could not change mailbox status",
     "delete_confirm": "Are you sure you want to delete the mailbox \"{{email}}\"? (Maildir stays on disk, only the account is removed.)",
-    "delete_failed": "Could not delete"
+    "delete_failed": "Could not delete",
+    "quota_label": "Quota",
+    "quota_placeholder": "quota MB (blank = plan: {{limit}})",
+    "quota_unlimited": "unlimited",
+    "quota_help": "Storage limit per mailbox, in MB. 0 = unlimited. Leave blank to use the plan default.",
+    "quota_usage_unknown": "usage not known yet",
+    "quota_over": "over quota",
+    "quota_near": "almost full",
+    "quota_edit": "Quota",
+    "quota_prompt": "Quota for \"{{email}}\" (MB). 0 = unlimited.",
+    "quota_prompt_max": "Your plan allows at most {{max}} MB per mailbox.",
+    "quota_invalid": "Enter a valid quota: 0 (unlimited) or a positive whole number (MB).",
+    "quota_over_plan": "Your plan allows at most {{max}} MB of quota per mailbox.",
+    "quota_saved": "Quota for \"{{email}}\" updated.",
+    "quota_failed": "Could not update quota"
   },
   "forwarders": {
     "title": "Forwarders & Catch-All",

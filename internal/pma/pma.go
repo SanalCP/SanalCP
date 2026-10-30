@@ -70,6 +70,9 @@ func (h *Handlers) TokenIste(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusNotFound, "veritabanı bulunamadı")
 		return
 	}
+	if !middleware.RequireFeature(w, r, domainID, "databases") {
+		return
+	}
 	if demo == 1 {
 		httpx.WriteError(w, http.StatusForbidden, "demo aboneliğin phpMyAdmin'i etkin değildir")
 		return

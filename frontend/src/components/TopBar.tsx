@@ -10,6 +10,7 @@ import { getTheme, setTheme, type Theme } from '@/lib/theme'
 import { api } from '@/lib/api'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import IslemMerkezi from '@/components/IslemMerkezi'
+import { useDomainFeatures } from '@/lib/domainFeaturesContext'
 
 type AramaKaydi = {
   tur: 'sayfa' | 'domain' | 'musteri' | 'kullanici'
@@ -92,8 +93,10 @@ function normalize(s: string) {
 }
 
 
+// Domain search shortcuts consume the same freshly resolved permissions as the sidebar.
 export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; menuAcik?: boolean }) {
   const { t } = useTranslation(['TopBar', 'common'])
+  const { allowsPath } = useDomainFeatures()
   const kullanici = useAuth((s) => s.kullanici)
   const cikis = useAuth((s) => s.cikis)
   const navigate = useNavigate()
@@ -120,10 +123,10 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
     const q = normalize(arama.trim())
     if (!q) return []
     const sayfalarFiltrelenmis = SAYFALAR.filter(s => !s.roller || s.roller.includes(rol))
-    const domainSayfalariEslesen: AramaKaydi[] = domainID ? DOMAIN_SAYFALARI.map(([ek, baslik, aciklama]) => ({
+    const domainSayfalariEslesen: AramaKaydi[] = domainID ? DOMAIN_SAYFALARI.map<AramaKaydi>(([ek, baslik, aciklama]) => ({
       tur: 'sayfa', baslik, aciklama: `${aciklama}${t('TopBar:domain_pages.open_domain_suffix')}`, yol: `/abonelikler/${domainID}${ek}`,
       anahtarlar: 'domain site abonelik',
-    })) : []
+    })).filter(item => allowsPath(item.yol)) : []
     return [...sayfalarFiltrelenmis, ...domainSayfalariEslesen, ...kayitlar]
       .map((s) => {
         const metin = normalize(`${s.baslik} ${s.aciklama} ${s.anahtarlar || ''}`)
@@ -134,7 +137,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
       .sort((a, b) => a.puan - b.puan || a.s.baslik.localeCompare(b.s.baslik, 'tr'))
       .slice(0, 12)
       .map(x => x.s)
-  }, [arama, domainID, kayitlar, rol, SAYFALAR, DOMAIN_SAYFALARI, t])
+  }, [arama, domainID, kayitlar, rol, SAYFALAR, DOMAIN_SAYFALARI, t, allowsPath])
 
   async function aramaVerileriniYukle() {
     if (kayitlarYuklendi || aramaYukleniyor) return
@@ -363,7 +366,7 @@ export default function TopBar({ onMenuAc, menuAcik }: { onMenuAc?: () => void; 
                   onClick={() => { setMenuAcik(false); navigate('/profil') }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
                 >
-                  {t('TopBar:profile_prefs')}
+                  {t(rol === 'user' ? 'TopBar:account_security' : 'TopBar:profile_prefs')}
                 </button>
                 <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                 <button

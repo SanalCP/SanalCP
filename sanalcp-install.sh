@@ -607,7 +607,7 @@ for t in "$A"/ops/*; do
   install -m 0755 "$t" "/usr/local/bin/$nm" 2>/dev/null
 done
 cp "$A/ops/"* /opt/sanalcp/src/scripts/ 2>/dev/null
-ok "ops tools (/usr/local/bin: update, optimize, redis-setup, ftp-setup, backup-all, repair, jail, wp-redis)"
+ok "ops tools (/usr/local/bin: update, optimize, redis-setup, ftp-setup, repair, jail, wp-redis)"
 # sshaccess.EnsureInfra reads this from /opt/sanalcp/src/scripts/50-sanal-jail.conf and
 # applies it to /etc/ssh/sshd_config.d/ (at panel startup, idempotent) — here we just
 # place the source file.
@@ -921,18 +921,14 @@ if [ ! -x /usr/local/bin/composer ]; then
 fi
 [ -x /usr/local/bin/composer ] && ok "composer ($(/usr/local/bin/composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1))" || warn "composer install failed"
 
-# ---- daily backup cron (sanalcp-backup-all at 03:00 UTC) ----
-cat > /etc/cron.d/sanalcp-backup <<'CRON'
-# sanalcp — daily scheduled backup, 03:00 UTC
-SHELL=/bin/bash
-PATH=/usr/local/bin:/usr/bin:/bin
-0 3 * * * root /usr/local/bin/sanalcp-backup-all
-CRON
-# Start cron NOW + enable it (AlmaLinux's preset only enables it, doesn't start it
-# until reboot → the backup cron wouldn't run until the first reboot). enable --now
-# is idempotent. Unit name: crond on RHEL, cron on Debian.
+# Site backups use the panel scheduler and each domain's own settings.
+# Remove the old cron and its copies without touching existing archives.
+rm -f /etc/cron.d/sanalcp-backup /usr/local/bin/sanalcp-backup-all \
+  /opt/sanalcp/src/scripts/sanalcp-backup-all \
+  || die "could not remove the legacy site backup engine"
+# Cron is still required for customer cron jobs.
 systemctl enable --now "$(servis_ad cron)" >/dev/null 2>&1
-systemctl is-active --quiet "$(servis_ad cron)" && ok "daily backup cron + cron ACTIVE (03:00 UTC)" || warn "cron failed to start — the backup cron may not run"
+systemctl is-active --quiet "$(servis_ad cron)" && ok "cron ACTIVE (customer jobs); site backups use panel settings" || warn "cron failed to start — customer cron jobs may not run"
 
 # SELinux — RHEL only; Debian has no SELinux (AppArmor doesn't need any of this).
 if rhel_mi; then

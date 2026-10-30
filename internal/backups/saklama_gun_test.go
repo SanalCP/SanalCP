@@ -32,6 +32,9 @@ func TestPruneEskiSuresiDolanlariSiler(t *testing.T) {
 	}
 	defer db.Close()
 
+	mock.ExpectQuery(`SELECT COALESCE\(MAX\(id\),0\) FROM backups WHERE domain_id=\? AND dogrulama_durum='dogrulandi'`).
+		WithArgs(int64(7)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(13)))
 	mock.ExpectQuery(`SELECT id, dosya, uzak_durum FROM backups\s+WHERE domain_id=\? AND tip=\?\s+AND created_at < NOW\(\) - INTERVAL \? DAY\s+AND id < \(SELECT MAX\(id\) FROM backups WHERE domain_id=\? AND tip=\?\)`).
 		WithArgs(int64(7), TipOto, 3, int64(7), TipOto).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "dosya", "uzak_durum"}).

@@ -4,11 +4,15 @@ import { useTranslation } from 'react-i18next'
 import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import { T } from '@/lib/tablo'
+import { useAuth } from '@/store/auth'
+import PlanFeatureFields from '@/components/PlanFeatureFields'
+import type { PlanFeatures } from '@/lib/planFeatures'
 
 type Plan = {
   id: number; ad: string; aciklama: string
   disk_kota_mb: number; trafik_kota_mb: number
   max_domain: number; max_db: number; max_email: number; max_ftp: number
+  mailbox_quota_mb: number // kutu başına posta kotası (MB); 0 = sınırsız
   cpu_yuzde: number; ram_mb: number; max_process: number
   inode_kota: number; io_agirlik: number; mysql_max_baglanti: number
   pm_max_children: number
@@ -18,6 +22,7 @@ type Plan = {
   fastcgi_cache: boolean; client_max_body_mb: number; nginx_ek_direktifler: string
   waf_enabled: boolean; waf_mode: string; waf_paranoia: number
   varsayilan: boolean; olusturulma: string
+  features: PlanFeatures
 }
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string; durum: string; olusturulma: string }
 type GetResp = { plan: Plan; domain_sayisi: number }
@@ -26,6 +31,7 @@ type Surum = { surum: string; aciklama?: string }
 export default function PaketDetayPage() {
   const { t } = useTranslation(['PaketDetayPage', 'common'])
   const { id } = useParams()
+  const adminMi = useAuth(s => s.kullanici?.rol) === 'admin'
   const [plan, setPlan] = useState<Plan | null>(null)
   const [domainSayisi, setDomainSayisi] = useState(0)
   const [domainler, setDomainler] = useState<Domain[]>([])
@@ -54,7 +60,7 @@ export default function PaketDetayPage() {
   }, [])
 
   async function kaydet() {
-    if (!plan) return
+    if (!plan || !adminMi) return
     setIsleniyor(true); setHata(null); setBasari(null)
     try {
       await api.put(`/plans/${id}`, plan)
@@ -69,7 +75,7 @@ export default function PaketDetayPage() {
   }
 
   async function domainicinYenidenUygula(domID: number) {
-    if (!plan) return
+    if (!plan || !adminMi) return
     setIsleniyor(true)
     try {
       await api.put(`/domains/${domID}/plan`, { plan_id: plan.id })
@@ -81,7 +87,7 @@ export default function PaketDetayPage() {
   }
 
   function P<K extends keyof Plan>(k: K, v: Plan[K]) {
-    if (!plan) return
+    if (!plan || !adminMi) return
     setPlan({ ...plan, [k]: v })
   }
 
@@ -116,14 +122,16 @@ export default function PaketDetayPage() {
               {plan.aciklama || t('PaketDetayPage:no_description')} · <span className="font-mono">{domainSayisi}</span> {t('PaketDetayPage:used_in_domains_inline')}
             </p>
           </div>
-          <button onClick={kaydet} disabled={isleniyor}
+          {adminMi && <button onClick={kaydet} disabled={isleniyor}
             className="shrink-0 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-lg shadow-sm">
             {isleniyor ? t('PaketDetayPage:save_button_saving') : t('PaketDetayPage:save_button')}
-          </button>
+          </button>}
         </div>
 
         {hata && <div className="mb-4 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
         {basari && <div className="mb-4 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{basari}</div>}
+        <PlanFeatureFields value={plan.features} onChange={adminMi ? features => P('features', features) : undefined} disabled={isleniyor} />
+        <fieldset disabled={!adminMi || isleniyor}>
 
         {/* Genel */}
         <Kart baslik={t('PaketDetayPage:general.title')} ikon="⚙️">
@@ -226,6 +234,9 @@ export default function PaketDetayPage() {
             <Alan etiket={t('PaketDetayPage:numeric_limits.ftp')}>
               <input type="number" min={0} value={plan.max_ftp} onChange={e => P('max_ftp', Number(e.target.value) || 0)} className={inpNum} />
             </Alan>
+            <Alan etiket={t('PaketDetayPage:numeric_limits.mailbox_quota')} ipucu={t('PaketDetayPage:numeric_limits.mailbox_quota_hint')}>
+              <input type="number" min={0} max={1048576} value={plan.mailbox_quota_mb ?? 0} onChange={e => P('mailbox_quota_mb', Number(e.target.value) || 0)} className={inpNum} />
+            </Alan>
           </div>
         </Kart>
 
@@ -326,6 +337,7 @@ export default function PaketDetayPage() {
             </div>
           )}
         </Kart>
+        </fieldset>
       </div>
     </div>
   )

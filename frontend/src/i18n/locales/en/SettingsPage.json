@@ -1,6 +1,8 @@
 {
   "title": "Profile & Preferences",
   "subtitle": "Your account details, password, two-factor authentication and panel preferences.",
+  "security_title": "Account Security",
+  "security_subtitle": "Manage your panel password and two-factor authentication. Password and 2FA changes require you to sign in again.",
   "account": {
     "title": "Account Information",
     "desc": "Edit your full name and email address.",
@@ -29,7 +31,7 @@
   },
   "twofa": {
     "title": "Two-Factor Authentication (2FA)",
-    "desc": "Requires a 6-digit code from an authenticator app in addition to your password at login.",
+    "desc": "Requires a 6-digit authenticator code in addition to your password. Enabling or disabling it ends all sessions. After enabling, wait for the app's next code before signing in again.",
     "status": "Status:",
     "active": "● Active",
     "off": "○ Off",

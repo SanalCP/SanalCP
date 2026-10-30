@@ -158,11 +158,12 @@ func (h *Handlers) Temizle(w http.ResponseWriter, r *http.Request) {
 
 // dbKayit: backups tablosundaki bir yedek satırının temizlik için gereken alanları.
 type dbKayit struct {
-	ID        int64
-	Tip       string
-	UzakDurum string
-	BoyutB    int64
-	Olusturma int64
+	ID             int64
+	Tip            string
+	UzakDurum      string
+	BoyutB         int64
+	Olusturma      int64
+	DogrulamaDurum string
 }
 
 // tumBilinenKayitlar: verilen domainlerin TÜM backups kayıtlarını TEK sorguda
@@ -181,7 +182,7 @@ func tumBilinenKayitlar(ctx context.Context, db *sql.DB, domainIDs []int64) (map
 		args[i] = id
 	}
 	rows, err := db.QueryContext(ctx,
-		`SELECT domain_id, id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP(created_at)
+		`SELECT domain_id, id, tip, dosya, uzak_durum, boyut_b, UNIX_TIMESTAMP(created_at), dogrulama_durum
 		 FROM backups WHERE domain_id IN (`+placeholders+`)`, args...)
 	if err != nil {
 		return nil, err
@@ -192,8 +193,8 @@ func tumBilinenKayitlar(ctx context.Context, db *sql.DB, domainIDs []int64) (map
 		var k dbKayit
 		var dosya string
 		var ts sql.NullInt64
-		if err := rows.Scan(&domainID, &k.ID, &k.Tip, &dosya, &k.UzakDurum, &k.BoyutB, &ts); err != nil {
-			continue
+		if err := rows.Scan(&domainID, &k.ID, &k.Tip, &dosya, &k.UzakDurum, &k.BoyutB, &ts, &k.DogrulamaDurum); err != nil {
+			return nil, err
 		}
 		k.Olusturma = ts.Int64
 		if out[domainID] == nil {
@@ -262,9 +263,21 @@ func temizlikAdaylari(domainID int64, sk, mod string, esik time.Time, bilinen ma
 		adaylar[ad] = struct{}{}
 	}
 
+	// Toplu temizlik, açık tek-yedek silme işleminden farklıdır: domainin
+	// son doğrulanmış kopyası hiçbir toplu modda otomatik kaybedilmez.
+	var protectedID int64
+	for _, k := range bilinen {
+		if k.DogrulamaDurum == "dogrulandi" && k.ID > protectedID {
+			protectedID = k.ID
+		}
+	}
+
 	var out []temizlikAday
 	for ad := range adaylar {
 		k, dbVar := bilinen[ad]
+		if dbVar && k.ID == protectedID {
+			continue
+		}
 		fi, diskVar := diskte[ad]
 
 		var uygun bool

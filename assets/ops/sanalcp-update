@@ -177,6 +177,7 @@ if [ "$DRY" = 1 ]; then
   echo "  • $MIGR/  $(t "(yeni .sql eklenir; mevcut dizin ${MIGR}.bak olarak yedeklenir → rollback geri yükler)" "(new .sql files added; current directory backed up as ${MIGR}.bak → restored on rollback)")"
   echo "  • $(t "/usr/local/bin ops-tool'lar" "/usr/local/bin ops tools")" "+ $SCRIPTS"
   echo "  • $DBBK + /etc/systemd/system/sanalcp-db-backup.{service,timer} $(t "(timer enable --now)" "(timer enable --now)")"
+  echo "  • $(t "eski site-yedek cron'u ve betiği kaldırılır; yedek arşivleri korunur" "legacy site backup cron and script removed; backup archives preserved")"
   echo "  • $(t "migration'lardan ÖNCE panel DB dump'ı → $DBDIR  (DRY-RUN'da dump ALINMAZ)" "panel DB dump BEFORE migrations → $DBDIR  (no dump is taken in DRY RUN)")"
   echo "  • systemctl restart sanalcp  $(t "(env/DB/siteler KORUNUR)" "(env/DB/sites PRESERVED)")"
   exit 0
@@ -287,6 +288,12 @@ if [ -d "$A/ops" ]; then
   mkdir -p "$SCRIPTS"; cp "$A"/ops/* "$SCRIPTS/" 2>/dev/null || true
   ok "$(t "ops-tool'lar güncellendi" "ops tools updated")"
 fi
+
+# Cut over existing installations to the panel scheduler. Never remove archives
+# or overwrite per-domain scheduling/retention preferences.
+rm -f /etc/cron.d/sanalcp-backup /usr/local/bin/sanalcp-backup-all \
+  "$SCRIPTS/sanalcp-backup-all" \
+  || die "$(t "eski site-yedek motoru kaldırılamadı" "could not remove the legacy site backup engine")"
 
 # Aylık gerçek restore tatbikatı: son panel dump'ını rastgele geçici DB'ye açar,
 # tablo varlığını doğrular ve geçici DB'yi siler. Sonuç journald'da kalır.

@@ -153,7 +153,9 @@ func verifyAndRecord(ctx context.Context, db *sql.DB, id, domainID int64, domain
 }
 
 func verifyAndRecordExpected(ctx context.Context, db *sql.DB, id, domainID int64, domain, sk, archive, expectedSHA string) error {
-	_, _ = db.ExecContext(ctx, `UPDATE backups SET dogrulama_durum='dogrulaniyor',dogrulama_hata='' WHERE id=? AND domain_id=?`, id, domainID)
+	// A recheck must not temporarily remove the only proven recovery point
+	// from retention protection. Only an actual verification failure revokes it.
+	_, _ = db.ExecContext(ctx, `UPDATE backups SET dogrulama_durum='dogrulaniyor',dogrulama_hata='' WHERE id=? AND domain_id=? AND dogrulama_durum!='dogrulandi'`, id, domainID)
 	res, err := verifyArchive(ctx, archive, domain, sk)
 	if err == nil && expectedSHA != "" && !strings.EqualFold(expectedSHA, res.SHA256) {
 		err = fmt.Errorf("yedek SHA-256 özeti önceki doğrulamayla eşleşmiyor")

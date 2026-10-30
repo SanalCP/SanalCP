@@ -77,5 +77,28 @@
   "copy_manual_hint": "Panoya otomatik kopyalama yapılamadı. Aşağıdaki metni elle kopyalayabilirsiniz.",
   "copy_failed": "Kopyalanamadı, tekrar deneyin",
   "pagination_summary": "Toplam {{total}} kayıt",
-  "page_summary": "{{page}} / {{totalPages}}"
+  "page_summary": "{{page}} / {{totalPages}}",
+  "plan_features": {
+    "title": "Müşteri yönetim modülleri",
+    "description": "Bu izinler yalnızca müşteri panelindeki yönetimi sınırlar. Hizmetler, parolalar, kayıtlı veriler ve zamanlanmış görevler çalışmaya devam eder. Yönetici ve bayiler kısıtlanmaz.",
+    "enabled": "Açık",
+    "disabled": "Kapalı",
+    "loading": "Paket izinleri kontrol ediliyor…",
+    "load_failed": "Paket izinleri kontrol edilemedi",
+    "load_failed_hint": "İzinler doğrulanana kadar yönetim araçları kullanılamaz. Lütfen tekrar deneyin.",
+    "blocked_title": "Bu modül paketinizde bulunmuyor",
+    "blocked_hint": "Bu yönetim modülünü açmak için hizmet sağlayıcınızla iletişime geçin. Mevcut hizmetler ve veriler etkilenmez.",
+    "retry": "Tekrar kontrol et",
+    "overview": "Domain özeti",
+    "modules": {
+      "dns": "DNS ve Cloudflare",
+      "mail": "E-posta",
+      "databases": "Veritabanları",
+      "files": "Dosya yöneticisi",
+      "ftp": "FTP hesapları",
+      "cron": "Zamanlanmış görevler",
+      "backups": "Yedekleme ve geri yükleme",
+      "git": "Git ve GitHub"
+    }
+  }
 }

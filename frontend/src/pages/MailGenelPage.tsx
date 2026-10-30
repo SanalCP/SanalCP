@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next'
 import GenelListe, { type Kolon } from '@/components/GenelListe'
 import { api, apiHata } from '@/lib/api'
 import { T } from '@/lib/tablo'
+import MailDeliveryTracking from '@/components/MailDeliveryTracking'
+import { useAuth } from '@/store/auth'
 
 type Satir = {
   domain_id: number
@@ -31,6 +33,7 @@ function formatBoyut(b: number, t: (k: string, opts?: Record<string, unknown>) =
 
 export default function MailGenelPage() {
   const { t } = useTranslation(['MailGenelPage', 'common'])
+  const isAdmin = useAuth(state => state.kullanici?.rol === 'admin')
   const kolonlar: Kolon<Satir>[] = [
     {
       baslik: t('MailGenelPage:col_domain'),
@@ -89,15 +92,17 @@ export default function MailGenelPage() {
   const [queueIslem, setQueueIslem] = useState('')
 
   const queueYukle = useCallback(() => {
+    if (!isAdmin) return
     setQueueYuk(true); setQueueHata(null)
     api.get<{ messages: QueueMessage[] }>('/admin/mail/queue')
       .then(r => setQueue(r.data.messages || []))
       .catch(e => setQueueHata(apiHata(e, t('MailGenelPage:queue_failed'))))
       .finally(() => setQueueYuk(false))
-  }, [t])
+  }, [t, isAdmin])
   useEffect(queueYukle, [queueYukle])
 
   async function queueAction(action: 'flush'|'delete'|'hold'|'release'|'requeue', queue_id = '') {
+    if (!isAdmin) return
     if (action === 'delete' && !(await modalOnay(t('MailGenelPage:confirm_delete_queue', { id: queue_id })))) return
     setQueueIslem(action + queue_id); setQueueHata(null)
     try {
@@ -132,6 +137,8 @@ export default function MailGenelPage() {
           ]
         }}
       />
+      <div className="w-full px-6 pb-6"><MailDeliveryTracking /></div>
+      {isAdmin &&
       <div className="w-full px-6 pb-8">
         <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
           <div className="p-5 flex flex-col items-stretch justify-between gap-3 border-b border-slate-200 dark:border-slate-700 sm:flex-row sm:items-center">
@@ -178,7 +185,7 @@ export default function MailGenelPage() {
              </table>
            </div>}
         </div>
-      </div>
+      </div>}
     </>
   )
 }

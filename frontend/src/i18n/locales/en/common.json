@@ -77,5 +77,28 @@
   "copy_manual_hint": "Automatic clipboard copying failed. You can copy the text below manually.",
   "copy_failed": "Copy failed, try again",
   "pagination_summary": "{{total}} records total",
-  "page_summary": "{{page}} / {{totalPages}}"
+  "page_summary": "{{page}} / {{totalPages}}",
+  "plan_features": {
+    "title": "Customer management modules",
+    "description": "These permissions control customer panel management only. Services, credentials, stored data and scheduled jobs keep running. Administrators and resellers are not restricted.",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "loading": "Checking plan permissions…",
+    "load_failed": "Plan permissions could not be checked",
+    "load_failed_hint": "Management tools are unavailable until permissions can be checked. Please retry.",
+    "blocked_title": "This module is not included in your plan",
+    "blocked_hint": "Contact your hosting provider to enable this management module. Existing services and data are not affected.",
+    "retry": "Check again",
+    "overview": "Domain overview",
+    "modules": {
+      "dns": "DNS and Cloudflare",
+      "mail": "Email",
+      "databases": "Databases",
+      "files": "File manager",
+      "ftp": "FTP accounts",
+      "cron": "Scheduled tasks",
+      "backups": "Backups and restores",
+      "git": "Git and GitHub"
+    }
+  }
 }

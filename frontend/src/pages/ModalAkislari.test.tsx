@@ -19,6 +19,7 @@ beforeEach(() => {
     if (url.endsWith('/files')) return { data: { yol: '/public_html', icerik: [], toplam: 0 } }
     if (url.endsWith('/mail/durum')) return { data: { etkin: true } }
     if (url.endsWith('/mail/spam')) return { data: { settings: { enabled: true, greylist_score: 4, add_header_score: 6, reject_score: 15 }, rspamd: false } }
+    if (url.split('?')[0].endsWith('/mail/deliveries')) return { data: { items: [], total: 0, page: 1, page_size: 25, collector: { state: 'ok', warning: '', last_collected_at: null } } }
     return { data: [] }
   })
 })

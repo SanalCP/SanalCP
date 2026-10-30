@@ -5,7 +5,7 @@
   "username": "Kullanıcı adı",
   "password": "Parola",
   "twofa_code": "İki adımlı doğrulama kodu",
-  "twofa_hint": "Authenticator uygulamanızdaki 6 haneli kodu girin.",
+  "twofa_hint": "Authenticator uygulamanızdaki 6 haneli kodu girin. Az önce kullanılan kod yerine yeni kodu bekleyin.",
   "login_failed": "Giriş başarısız",
   "signing_in": "Giriş yapılıyor…",
   "verify_and_login": "Doğrula ve giriş yap",

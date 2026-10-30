@@ -280,7 +280,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stamp := time.Now().UTC().Format("20060102-150405")
+	stamp := time.Now().UTC().Format("20060102-150405.000000000")
 	dir := filepath.Join(BackupRoot, sk)
 	_ = os.MkdirAll(dir, 0700)
 	dosya := fmt.Sprintf("%s-%s.tar.gz", sk, stamp)
@@ -296,6 +296,7 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO backups(domain_id, tip, dosya, boyut_b, notlar) VALUES(?,?,?,?,?)`,
 		id, TipManuel, dosya, boyut, "alan adı: "+alanAdi)
 	if err != nil {
+		_ = os.Remove(abs)
 		httpx.WriteError(w, http.StatusInternalServerError, "DB kayıt: "+err.Error())
 		return
 	}
@@ -306,8 +307,8 @@ func (h *Handlers) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Manuel retention'ı BURADA uygula, scheduler'da değil: scheduler yalnızca
 	// backup_freq != 'none' olan domainlere uğrar, dolayısıyla otomatik yedeği
-	// kapalı bir domainde manuel sınır hiç işlemezdi. Yeni kayıt en yüksek
-	// id'ye sahip olduğu için budama onu asla silmez.
+	// kapalı bir domainde manuel sınır hiç işlemezdi. Son doğrulanmış sağlam
+	// kopya, yeni yedeğin asenkron doğrulaması bitene kadar da korunur.
 	var manuelRet int
 	if err := h.DB.QueryRowContext(r.Context(),
 		`SELECT COALESCE(backup_manuel_retention,0) FROM domains WHERE id=?`, id).

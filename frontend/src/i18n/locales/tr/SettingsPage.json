@@ -1,6 +1,8 @@
 {
   "title": "Profil ve Tercihler",
   "subtitle": "Hesap bilgileriniz, parola, iki adımlı doğrulama ve panel tercihleri.",
+  "security_title": "Hesap Güvenliği",
+  "security_subtitle": "Panel parolanızı ve iki adımlı doğrulamayı yönetin. Parola veya 2FA değişikliğinden sonra yeniden giriş yapmanız gerekir.",
   "account": {
     "title": "Hesap Bilgileri",
     "desc": "Ad soyad ve e-posta adresinizi düzenleyin.",
@@ -29,7 +31,7 @@
   },
   "twofa": {
     "title": "İki Adımlı Doğrulama (2FA)",
-    "desc": "Girişte parolaya ek olarak authenticator uygulamasından 6 haneli kod ister.",
+    "desc": "Girişte parolaya ek olarak authenticator uygulamasından 6 haneli kod ister. Açma/kapatma tüm oturumları sonlandırır. Açtıktan sonra yeniden giriş için uygulamadaki sonraki kodu bekleyin.",
     "status": "Durum:",
     "active": "● Aktif",
     "off": "○ Kapalı",

@@ -48,7 +48,7 @@ passdb sql {
 }
 
 userdb sql {
-  query = SELECT CONCAT('/home/',md.sistem_kullanici,'/mail/',m.local_part) AS home, md.uid_n AS uid, md.gid_n AS gid FROM mailboxes m JOIN mail_domains md ON md.id=m.mail_domain_id WHERE m.email='%{user}' AND m.status='active' AND md.durum='active'
+  query = SELECT CONCAT('/home/',md.sistem_kullanici,'/mail/',m.local_part) AS home, md.uid_n AS uid, md.gid_n AS gid, CONCAT(m.quota_bytes,'B') AS quota_storage_size FROM mailboxes m JOIN mail_domains md ON md.id=m.mail_domain_id WHERE m.email='%{user}' AND m.status='active' AND md.durum='active'
 }
 
 # Kimlik doğrulama önbelleği: Roundcube her HTTP isteğinde YENİ IMAP oturumu
