@@ -84,6 +84,7 @@ import (
 	"sanalcp/internal/system"
 	"sanalcp/internal/transfers"
 	"sanalcp/internal/users"
+	"sanalcp/internal/uyari"
 	"sanalcp/internal/waf"
 	"sanalcp/internal/wordpress"
 
@@ -192,6 +193,7 @@ func main() {
 		log.Printf("Git kimlik temizliği: %v", err)
 	}
 	cloudflare.Init(secretBox) // Cloudflare API token şifreleme kutusu
+	uyari.Init(secretBox)      // Telegram bot token şifreleme kutusu
 	appRuntimeH := &appruntime.Handlers{DB: d}
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -325,6 +327,8 @@ func main() {
 	sshaccess.EnsureInfra()
 	mail.EnsureInfra()
 	go maildelivery.Run(context.Background(), d)
+	uyariH := &uyari.Handlers{DB: d, Gonderici: uyari.Uretim}
+	go uyari.Run(context.Background(), d)
 	phpExtH := &phpext.Handlers{DB: d}
 	paketlerH := &paketler.Handlers{DB: d}
 	phpSurumH := &phpsurum.Handlers{DB: d}
@@ -479,6 +483,9 @@ func main() {
 			r.With(middleware.AdminOnly).Put("/system/panel-erisim/gecici", panelAyarH.GeciciErisimKaydet)
 			r.With(middleware.AdminOnly).Get("/system/panel-hiz-limiti", panelAyarH.HizLimiti)
 			r.With(middleware.AdminOnly).Put("/system/panel-hiz-limiti", panelAyarH.HizLimitiKaydet)
+			r.With(middleware.AdminOnly).Get("/system/uyari-bildirim", uyariH.Ayar)
+			r.With(middleware.AdminOnly).Put("/system/uyari-bildirim", uyariH.AyarKaydet)
+			r.With(middleware.AdminOnly).Post("/system/uyari-bildirim/test", uyariH.Test)
 			eklentiH.Routes(r)
 			// Süreç listesi ve sistem logları admin'de kalır: diğer tenantların
 			// süreçlerini/loglarını sızdırır, "sunucu sağlığı" bilgisinden fazlası.

@@ -119,6 +119,11 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	httpx.WriteJSON(w, http.StatusOK, Probe(alanAdi))
+}
+
+// Probe: HTTPS önce dener; bağlanamazsa HTTP'ye düşer (uyarı döngüsü de kullanır).
+func Probe(alanAdi string) DomainHealth {
 	res := probe("https://" + alanAdi)
 	res.Sema = "https"
 	if !res.Erisilebilir {
@@ -126,11 +131,10 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 		alt := probe("http://" + alanAdi)
 		if alt.Erisilebilir {
 			alt.Sema = "http"
-			httpx.WriteJSON(w, http.StatusOK, alt)
-			return
+			return alt
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, res)
+	return res
 }
 
 // errSSRFBlocked: çözümlenen IP loopback/link-local (bulut metadata dahil)/özel
