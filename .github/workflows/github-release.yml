@@ -1,0 +1,48 @@
+name: GitHub Release kaydı
+
+# Etiketin CHANGELOG bölümünden Releases sayfasına kayıt açar. /kur yayınından
+# ayrı tutulur: eski bir sürüm için elle tetiklemek kur betiğini geri almaz.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release kaydı açılacak mevcut sürüm etiketi (ör. v0.9.80)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Release kaydını aç
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Geçersiz sürüm etiketi"; exit 1;
+          }
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG için release kaydı zaten var"; exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "refs/tags/$TAG"
+          # Bölüm "**X.Y.Z** (tarih) — başlık" satırından bir sonraki sürüme,
+          # "## " başlığına ya da "---" ayracına kadar sürer.
+          git show "FETCH_HEAD:CHANGELOG.md" | awk -v v="${TAG#v}" '
+            index($0, "**" v "** ") == 1 { on = 1; print; next }
+            on && (/^\*\*[0-9]+\.[0-9]+\.[0-9]+\*\*/ || /^## / || /^---$/) { exit }
+            on { print }' > notlar.md
+          [[ -s notlar.md ]] || {
+            echo "::error::CHANGELOG.md içinde ${TAG#v} bölümü yok"; exit 1;
+          }
+          BASLIK=$(head -1 notlar.md | sed 's/^\*\*[^*]*\*\* ([^)]*) — //')
+          gh release create "$TAG" --verify-tag --title "$TAG — $BASLIK" --notes-file notlar.md
