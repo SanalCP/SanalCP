@@ -13,6 +13,24 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.84** (2026-10-30) — güvenlik ve sağlamlık düzeltmeleri
+
+- **Güncelleme altyapısı.** Migration dosyaları artık her biri tek işlemde
+  (transaction) uygulanır ve SQL ifadeleri tırnak/yorum farkındalığıyla
+  ayrıştırılır; metin içinde geçen noktalı virgüller ve satır içi yorumlar
+  yanlışlıkla ayrı ifade sayılmaz.
+- **Sistem aracı zaman aşımları.** Panelin çağırdığı sistem araçları (named,
+  systemctl, htpasswd, quota ...) artık 30 saniye tavanıyla çalışır; takılan bir
+  araç panel isteğini süresiz bloklayamaz. DNS yönetimi, kaynak limitleri ve
+  parola korumalı dizinler kapsanır.
+- **FTP parolası politikası.** FTP parola sıfırlamada panelin genel parola
+  politikası (en az 12 karakter, harf+rakam) zorunlu hale geldi; zayıf parolalar
+  sunucu tarafından reddedilir. SSH erişimi açık domain'lerde FTP parolası
+  sistem parolasıyla eşleştiği için kural SSH'i de kapsar. Parola girişi artık
+  gizli gösterilir ve zayıf parolada uyarı çıkar.
+- Arayüz: abonelik sayfasındaki *Askıdan Al (Geri Getir)* İngilizce'de bozuk
+  görünüyordu; site önizleme etiketleri ve "Ana içeriğe geç" bağlantısı çevrildi.
+
 **0.9.83** (2026-10-30) — arayüz düzeltmesi
 
 - Araçlar & Ayarlar ekranında *Panel erişimi*, *Panel hız sınırı* ve *Uyarı

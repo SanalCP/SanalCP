@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.83",
-  "duyuru": "Arayüz düzeltmesi: Araçlar & Ayarlar ekranında panel erişimi, hız sınırı ve uyarı bildirimleri kartları arasındaki boşluk düzeltildi. Başka davranış değişikliği yoktur.",
+  "son_surum": "0.9.84",
+  "duyuru": "Güvenlik ve sağlamlık düzeltmeleri: güncelleme altyapısı güçlendirildi, sistem araçlarına zaman aşımı eklendi, FTP parolasında panelin genel parola politikası zorunlu hale getirildi ve arayüz metinleri düzeltildi.",
   "kritik": false,
   "yayin_tarihi": "2026-10-30"
 }
