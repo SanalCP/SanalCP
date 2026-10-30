@@ -9,9 +9,10 @@ package kaynaklimit
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
+
+	"sanalcp/internal/komut"
 )
 
 type xfsKota struct{}
@@ -23,7 +24,7 @@ func (xfsKota) KernelBayragi() string { return "rootflags=uquota" }
 // noquota'da çıktı boş → (false,false). accounting açık + enforcement kapalı =
 // `uqnoenforce` durumu (kullanım sayılır, limit uygulanmaz).
 func (xfsKota) Aktif() (accounting, enforcement bool) {
-	out, err := exec.Command("xfs_quota", "-x", "-c", "state -u", kotaMount).CombinedOutput()
+	out, err := komut.BirlesikCikti(context.Background(), "xfs_quota", "-x", "-c", "state -u", kotaMount)
 	if err != nil {
 		return false, false
 	}
@@ -51,7 +52,7 @@ func kotaLimitArgs(sk string, diskMB, inode int) []string {
 }
 
 func (xfsKota) Uygula(ctx context.Context, sk string, diskMB, inode int) error {
-	out, err := exec.CommandContext(ctx, "xfs_quota", kotaLimitArgs(sk, diskMB, inode)...).CombinedOutput()
+	out, err := komut.BirlesikCikti(ctx, "xfs_quota", kotaLimitArgs(sk, diskMB, inode)...)
 	if err != nil {
 		return fmt.Errorf("xfs_quota limit %s: %s: %w", sk, strings.TrimSpace(string(out)), err)
 	}
@@ -61,7 +62,7 @@ func (xfsKota) Uygula(ctx context.Context, sk string, diskMB, inode int) error {
 // kotaReportSatir: `xfs_quota report -u -N <metric> /` çıktısında sk satırının Used + Hard
 // alanlarını döner (blok metriği KB; inode metriği adet). Satır: User Used Soft Hard [grace...].
 func kotaReportSatir(metric, sk string) (used, hard int) {
-	out, err := exec.Command("xfs_quota", "-x", "-c", "report -u -N "+metric, kotaMount).CombinedOutput()
+	out, err := komut.BirlesikCikti(context.Background(), "xfs_quota", "-x", "-c", "report -u -N "+metric, kotaMount)
 	if err != nil {
 		return 0, 0
 	}

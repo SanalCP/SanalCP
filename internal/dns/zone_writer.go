@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
+
+	"sanalcp/internal/komut"
 )
 
 // fqdn: hedef alan adi (NS/MX/CNAME/SRV) trailing nokta ile bitmeliki BIND
@@ -188,7 +189,7 @@ func WriteZone(ctx context.Context, db *sql.DB, domainID int64) error {
 	if err := os.WriteFile(tmpPath, buf.Bytes(), 0640); err != nil {
 		return err
 	}
-	if out, err := exec.Command("named-checkzone", alanAdi, tmpPath).CombinedOutput(); err != nil {
+	if out, err := komut.BirlesikCikti(ctx, "named-checkzone", alanAdi, tmpPath); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("zone geçersiz (%s): %s", alanAdi, strings.TrimSpace(string(out)))
 	}
@@ -203,13 +204,13 @@ func WriteZone(ctx context.Context, db *sql.DB, domainID int64) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	_, _ = exec.Command("chown", dnsKullanici+":"+dnsKullanici, zonePath).CombinedOutput()
-	_, _ = exec.Command("restorecon", zonePath).CombinedOutput()
+	_ = komut.Calistir(ctx, "chown", dnsKullanici+":"+dnsKullanici, zonePath)
+	_ = komut.Calistir(ctx, "restorecon", zonePath)
 
 	if err := updateZoneIncludes(ctx, db); err != nil {
 		return err
 	}
-	reloadNamed()
+	reloadNamed(ctx)
 	return nil
 }
 
@@ -217,23 +218,25 @@ func WriteZone(ctx context.Context, db *sql.DB, domainID int64) error {
 // rndc anahtarı yok/başarısız olur → o zaman systemctl reload.
 // (Eskiden sadece "rndc reload" vardı; başarısızsa değişiklik etki etmiyordu ve
 // operatör elle "systemctl restart named" yapmak zorunda kalıyordu.)
+// Sistem araçları komut.Calistir ile ZAMAN AŞIMLI çalıştırılır: takılan bir
+// rndc/systemctl istek goroutine'ini süresiz bloklamasın.
 //
 // 🔴 GÜVENLİK: son çare "systemctl restart named" named'i DURDURUP tekrar başlatır;
 // config geçersizse named AYAĞA KALKMAZ → tüm DNS çöker (outage). checkconf-gate'li
 // updateZoneIncludes bozuk include'un canlıya inmesini zaten engeller; yine de
 // defense-in-depth olarak restart'a TIRMANMADAN ÖNCE named-checkconf ile doğrula.
-func reloadNamed() {
-	if err := exec.Command("rndc", "reload").Run(); err == nil {
+func reloadNamed(ctx context.Context) {
+	if err := komut.Calistir(ctx, "rndc", "reload"); err == nil {
 		return
 	}
-	if err := exec.Command("systemctl", "reload", dnsServis).Run(); err == nil {
+	if err := komut.Calistir(ctx, "systemctl", "reload", dnsServis); err == nil {
 		return
 	}
-	if err := exec.Command("named-checkconf").Run(); err != nil {
+	if err := komut.Calistir(ctx, "named-checkconf"); err != nil {
 		log.Printf("dns reloadNamed: named-checkconf başarısız → 'systemctl restart named' ATLANDI (çalışan named korunuyor): %v", err)
 		return
 	}
-	_ = exec.Command("systemctl", "restart", dnsServis).Run()
+	_ = komut.Calistir(ctx, "systemctl", "restart", dnsServis)
 }
 
 // buildZoneIncludes: aktif kaydı olan tüm zone'lar için named include içeriğini üretir.
@@ -278,7 +281,7 @@ func updateZoneIncludes(ctx context.Context, db *sql.DB) error {
 	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
 		return err
 	}
-	if out, cerr := exec.Command("named-checkconf", tmp).CombinedOutput(); cerr != nil {
+	if out, cerr := komut.BirlesikCikti(ctx, "named-checkconf", tmp); cerr != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("zone-include geçersiz (canlıya inmedi): %s", strings.TrimSpace(string(out)))
 	}
@@ -286,7 +289,7 @@ func updateZoneIncludes(ctx context.Context, db *sql.DB) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	_, _ = exec.Command("restorecon", NamedConfInclude).CombinedOutput()
+	_ = komut.Calistir(ctx, "restorecon", NamedConfInclude)
 	return nil
 }
 
@@ -298,13 +301,13 @@ func HealZoneIncludes(ctx context.Context, db *sql.DB) error {
 	if err := updateZoneIncludes(ctx, db); err != nil {
 		return err
 	}
-	reloadNamed()
+	reloadNamed(ctx)
 	return nil
 }
 
 func DeleteZone(ctx context.Context, db *sql.DB, alanAdi string) error {
 	_ = os.Remove(filepath.Join(ZoneDir, alanAdi+".zone"))
 	_ = updateZoneIncludes(ctx, db)
-	reloadNamed()
+	reloadNamed(ctx)
 	return nil
 }

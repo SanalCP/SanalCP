@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"sanalcp/internal/adlar"
+	"sanalcp/internal/komut"
 	"strings"
 	"sync"
 	"time"
@@ -197,7 +197,7 @@ func KotaUygula(ctx context.Context, sk string, diskMB, inode int) error {
 		return nil // henüz provision edilmemiş → sessiz atla
 	}
 	// Kullanıcı gerçekten var mı + uid>0 (root'a/sisteme ASLA kota koyma).
-	uidOut, err := exec.Command("id", "-u", sk).Output()
+	uidOut, err := komut.Cikti(ctx, "id", "-u", sk)
 	if err != nil {
 		return nil
 	}

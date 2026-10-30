@@ -4,6 +4,7 @@
 package sifrekoruma
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/komut"
 	"sanalcp/internal/osfam"
 	"sanalcp/internal/provisioner"
 
@@ -147,13 +149,17 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "parola satır sonu veya NUL içeremez")
 		return
 	}
-	cmd := exec.CommandContext(r.Context(), "htpasswd", flag, dosya, req.Kullanici)
+	// Tavan süre: takılan bir htpasswd istek goroutine'ini süresiz bloklamasın
+	// (stdin'li çağrı tek istisna: komut.Calistir stdin almaz).
+	cctx, iptal := context.WithTimeout(r.Context(), komut.VarsayilanSure)
+	defer iptal()
+	cmd := exec.CommandContext(cctx, "htpasswd", flag, dosya, req.Kullanici)
 	cmd.Stdin = strings.NewReader(req.Parola + "\n")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd: "+strings.TrimSpace(string(out)))
 		return
 	}
-	_ = exec.Command("restorecon", dosya).Run() // SELinux: httpd_config_t
+	_ = komut.Calistir(r.Context(), "restorecon", dosya) // SELinux: httpd_config_t
 	// 0640 root:web — hash'ler world-readable olmasın (offline cracking).
 	if err := htpasswdIzniUygula(dosya, webGID); err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, "htpasswd izinleri ayarlanamadı: "+err.Error())
@@ -171,7 +177,7 @@ func (h *Handlers) Ekle(w http.ResponseWriter, r *http.Request) {
 	if err := h.reRender(id, sk, surum); err != nil {
 		// vhost doğrulanamadı → eklediğimizi geri al, htpasswd'den de kaldır, tekrar render
 		_, _ = h.DB.Exec(`DELETE FROM korumali_dizinler WHERE domain_id=? AND yol=? AND kullanici=?`, id, yol, req.Kullanici)
-		_ = exec.Command("htpasswd", "-D", dosya, req.Kullanici).Run()
+		_ = komut.Calistir(r.Context(), "htpasswd", "-D", dosya, req.Kullanici)
 		if kalan := h.kullaniciSayisi(id, yol); kalan == 0 {
 			_ = os.Remove(dosya)
 		}
@@ -203,7 +209,7 @@ func (h *Handlers) Sil(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusInternalServerError, "silinemedi")
 		return
 	}
-	_ = exec.Command("htpasswd", "-D", dosya, kullanici).Run()
+	_ = komut.Calistir(r.Context(), "htpasswd", "-D", dosya, kullanici)
 	if h.kullaniciSayisi(id, yol) == 0 {
 		_ = os.Remove(dosya) // bu yol için başka kullanıcı kalmadı → location bloğu da düşecek
 	}
@@ -231,7 +237,7 @@ func (h *Handlers) reRender(domainID int64, sk, surum string) error {
 	if err := provisioner.ApplyVhostForDomain(h.DB, domainID, socket, surum); err != nil {
 		if backup != nil {
 			_ = os.WriteFile(cfg, backup, 0o644) // diski bilinen-iyi hale döndür
-			_ = exec.Command("nginx", "-t").Run()
+			_ = komut.Calistir(context.Background(), "nginx", "-t")
 		}
 		return err
 	}

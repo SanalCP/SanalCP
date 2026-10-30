@@ -15,11 +15,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"sanalcp/internal/httpx"
+	"sanalcp/internal/komut"
 )
 
 // TemplateRow: şablondaki tek kayıt satırı.
@@ -143,7 +143,7 @@ func EnsureDKIM(ctx context.Context, db *sql.DB, domainID int64, alanAdi, select
 		`SELECT private_key, public_key FROM dkim_keys WHERE domain_id=? AND selector=?`,
 		domainID, selector).Scan(&priv, &pub)
 	if err == nil && pub != "" {
-		syncOpenDKIM(alanAdi, selector, priv, pub)
+		syncOpenDKIM(ctx, alanAdi, selector, priv, pub)
 		return dkimTXT(pub), nil
 	}
 
@@ -166,7 +166,7 @@ func EnsureDKIM(ctx context.Context, db *sql.DB, domainID int64, alanAdi, select
 		domainID, selector, privPEM, pubB64); err != nil {
 		return "", err
 	}
-	syncOpenDKIM(alanAdi, selector, privPEM, pubB64)
+	syncOpenDKIM(ctx, alanAdi, selector, privPEM, pubB64)
 	return dkimTXT(pubB64), nil
 }
 
@@ -192,7 +192,7 @@ func chunk64(s string) string {
 
 // syncOpenDKIM: OpenDKIM kuruluysa private key'i standart yola yazar ve KeyTable/SigningTable'a ekler.
 // Best-effort: OpenDKIM yoksa sessizce atlar (DNS TXT yayını yine de çalışır).
-func syncOpenDKIM(alanAdi, selector, privPEM, pubB64 string) {
+func syncOpenDKIM(ctx context.Context, alanAdi, selector, privPEM, pubB64 string) {
 	base := "/etc/opendkim"
 	if _, err := os.Stat(base); err != nil {
 		return
@@ -205,13 +205,13 @@ func syncOpenDKIM(alanAdi, selector, privPEM, pubB64 string) {
 	_ = os.WriteFile(privPath, []byte(privPEM), 0600)
 	txtPath := filepath.Join(keyDir, selector+".txt")
 	_ = os.WriteFile(txtPath, []byte(selector+"._domainkey."+alanAdi+" IN TXT ( \""+dkimTXT(pubB64)+"\" )\n"), 0644)
-	_, _ = exec.Command("chown", "-R", "opendkim:opendkim", keyDir).CombinedOutput()
+	_ = komut.Calistir(ctx, "chown", "-R", "opendkim:opendkim", keyDir)
 
 	appendUnique(filepath.Join(base, "KeyTable"),
 		selector+"._domainkey."+alanAdi+" "+alanAdi+":"+selector+":"+privPath)
 	appendUnique(filepath.Join(base, "SigningTable"),
 		"*@"+alanAdi+" "+selector+"._domainkey."+alanAdi)
-	_ = exec.Command("systemctl", "reload", "opendkim").Run()
+	_ = komut.Calistir(ctx, "systemctl", "reload", "opendkim")
 }
 
 // appendUnique: satır dosyada yoksa ekler (idempotent).

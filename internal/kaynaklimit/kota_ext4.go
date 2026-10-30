@@ -11,7 +11,6 @@ package kaynaklimit
 // SAF fonksiyonlardır → birim testli (bkz. kota_ext4_test.go).
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -20,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"sanalcp/internal/komut"
 )
 
 type ext4Kota struct{}
@@ -114,11 +115,9 @@ var quotaonSorgula = func() (string, error) {
 		})
 		return "", err
 	}
-	var stdout bytes.Buffer
-	cmd := exec.Command("quotaon", "-p", "-u", kotaMount)
-	cmd.Stdout = &stdout // stderr BİLEREK yutulur: kapalıyken tanı mesajı oraya gider
-	err := cmd.Run()
-	return stdout.String(), err
+	// stderr BİLEREK yutulur: kapalıyken tanı mesajı oraya gider (komut.Cikti yalnız stdout döndürür).
+	out, err := komut.Cikti(context.Background(), "quotaon", "-p", "-u", kotaMount)
+	return string(out), err
 }
 
 func mountKotaliOku() bool {
@@ -159,7 +158,7 @@ func ext4LimitArgs(sk string, diskMB, inode int) []string {
 }
 
 func (ext4Kota) Uygula(ctx context.Context, sk string, diskMB, inode int) error {
-	out, err := exec.CommandContext(ctx, "setquota", ext4LimitArgs(sk, diskMB, inode)...).CombinedOutput()
+	out, err := komut.BirlesikCikti(ctx, "setquota", ext4LimitArgs(sk, diskMB, inode)...)
 	if err != nil {
 		return fmt.Errorf("setquota %s: %s: %w", sk, strings.TrimSpace(string(out)), err)
 	}
@@ -228,8 +227,8 @@ func ext4CSVSatir(cikti, sk string) (blokKullanilanKB, blokHardKB, inodeKullanil
 
 func (ext4Kota) Durum(sk string) (kullanilanMB, limitMB, kullanilanInode, limitInode int) {
 	// DOĞRULANDI: kota kapalıyken repquota **rc=1** döner (quotaon'un aksine) → hata
-	// yolu güvenilir. Output() kullanılır ki stderr'deki tanı mesajı CSV'ye karışmasın.
-	out, err := exec.Command("repquota", "-u", "-O", "csv", kotaMount).Output()
+	// yolu güvenilir. Cikti (yalnız stdout) kullanılır ki stderr'deki tanı mesajı CSV'ye karışmasın.
+	out, err := komut.Cikti(context.Background(), "repquota", "-u", "-O", "csv", kotaMount)
 	if err != nil {
 		return 0, 0, 0, 0
 	}

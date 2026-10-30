@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 
 	"sanalcp/internal/adlar"
 	"sanalcp/internal/hesaplar"
+	"sanalcp/internal/komut"
 	"sanalcp/internal/provisioner"
 )
 
@@ -108,14 +108,14 @@ IOWeight=%d
 	if err := os.WriteFile(slicePath(sk), []byte(content), 0644); err != nil {
 		return fmt.Errorf("slice yaz: %w", err)
 	}
-	if out, err := exec.Command("systemctl", "daemon-reload").CombinedOutput(); err != nil {
+	if out, err := komut.BirlesikCikti(context.Background(), "systemctl", "daemon-reload"); err != nil {
 		return fmt.Errorf("daemon-reload: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 	// 🔴 CANLI GÜNCELLEME (süreç-öldürmez): slice zaten üye içeriyorsa (aktif),
 	// yeni limitleri set-property --runtime ile ANINDA uygula. restart KULLANMA —
 	// restart slice üyelerini (php-fpm worker'ları) öldürür. Dosya kalıcı kaynaktır;
 	// slice inaktifse (ilk oluşturma) FPM servisi başlarken dosyadaki değerleri alır.
-	if out, _ := exec.Command("systemctl", "is-active", sliceName(sk)).CombinedOutput(); strings.TrimSpace(string(out)) == "active" {
+	if out, _ := komut.BirlesikCikti(context.Background(), "systemctl", "is-active", sliceName(sk)); strings.TrimSpace(string(out)) == "active" {
 		cpu := nonzero(l.CPUYuzde, 100)
 		mem := nonzero(l.RAMMB, 512)
 		tasks := nonzero(l.MaxProcess, 50)
@@ -129,7 +129,7 @@ IOWeight=%d
 		}
 		// Mutlak disk G/Ç: >0 ise ayarla, 0 ise BOŞ atama ile temizle (>0→0 geçişi için ŞART).
 		args = append(args, ioSetPropertyArgs(l)...)
-		if out, err := exec.Command("systemctl", args...).CombinedOutput(); err != nil {
+		if out, err := komut.BirlesikCikti(context.Background(), "systemctl", args...); err != nil {
 			log.Printf("slice set-property %s: %s: %v", sk, strings.TrimSpace(string(out)), err)
 		}
 		// 🔴 systemd set-property BOŞ-atama (>0→0) yalnız systemd görünümünü sıfırlar;
@@ -161,7 +161,7 @@ func ioClearKernelLimits(sk string, l Limitler) {
 	if len(clears) == 0 {
 		return // tüm alanlar >0 → temizlenecek bir şey yok
 	}
-	cgOut, err := exec.Command("systemctl", "show", sliceName(sk), "-p", "ControlGroup", "--value").Output()
+	cgOut, err := komut.Cikti(context.Background(), "systemctl", "show", sliceName(sk), "-p", "ControlGroup", "--value")
 	cg := strings.TrimSpace(string(cgOut))
 	if err != nil || cg == "" {
 		return
@@ -235,7 +235,7 @@ func SystemdSliceSil(sk string) error {
 		return nil
 	}
 	_ = os.Remove(p)
-	_, _ = exec.Command("systemctl", "daemon-reload").CombinedOutput()
+	_, _ = komut.BirlesikCikti(context.Background(), "systemctl", "daemon-reload")
 	return nil
 }
 
@@ -322,7 +322,7 @@ func MySQLLimitUygula(ctx context.Context, db *sql.DB, domainID int64, l Limitle
 				"ALTER USER %s WITH MAX_USER_CONNECTIONS %d MAX_QUERIES_PER_HOUR %d MAX_UPDATES_PER_HOUR %d;",
 				hesaplar.MySQLUserHost(user, host),
 				nonNeg(l.MySQLMaxBaglanti), nonNeg(l.DBMaxQueriesPerHr), nonNeg(l.DBMaxUpdatesPerHr))
-			if out, e := exec.CommandContext(ctx, "mysql", "-uroot", "-e", stmt).CombinedOutput(); e != nil {
+			if out, e := komut.BirlesikCikti(ctx, "mysql", "-uroot", "-e", stmt); e != nil {
 				log.Printf("governor ALTER %s@%s başarısız: %s: %v", user, host, strings.TrimSpace(string(out)), e)
 			} else {
 				uygulandi++
@@ -330,7 +330,7 @@ func MySQLLimitUygula(ctx context.Context, db *sql.DB, domainID int64, l Limitle
 		}
 	}
 	if uygulandi > 0 {
-		if out, e := exec.CommandContext(ctx, "mysql", "-uroot", "-e", "FLUSH USER_RESOURCES;").CombinedOutput(); e != nil {
+		if out, e := komut.BirlesikCikti(ctx, "mysql", "-uroot", "-e", "FLUSH USER_RESOURCES;"); e != nil {
 			log.Printf("governor FLUSH USER_RESOURCES: %s: %v", strings.TrimSpace(string(out)), e)
 		}
 	}
@@ -344,8 +344,8 @@ func mysqlUserHosts(ctx context.Context, user string) []string {
 	if dbGovernorUserAtlanir(user) {
 		return nil
 	}
-	out, err := exec.CommandContext(ctx, "mysql", "-uroot", "-N", "-B", "-e",
-		fmt.Sprintf("SELECT Host FROM mysql.user WHERE User=%s", hesaplar.MySQLStringLiteral(user))).Output()
+	out, err := komut.Cikti(ctx, "mysql", "-uroot", "-N", "-B", "-e",
+		fmt.Sprintf("SELECT Host FROM mysql.user WHERE User=%s", hesaplar.MySQLStringLiteral(user)))
 	if err != nil {
 		return nil
 	}
@@ -402,8 +402,8 @@ func SlowQueryWatchdog(ctx context.Context, db *sql.DB) {
 func governorScanOnce(parent context.Context, db *sql.DB) {
 	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "mysql", "-uroot", "-N", "-B", "-e",
-		"SELECT ID,USER,TIME FROM information_schema.PROCESSLIST WHERE COMMAND<>'Sleep' AND TIME>0").Output()
+	out, err := komut.Cikti(ctx, "mysql", "-uroot", "-N", "-B", "-e",
+		"SELECT ID,USER,TIME FROM information_schema.PROCESSLIST WHERE COMMAND<>'Sleep' AND TIME>0")
 	if err != nil {
 		return
 	}
@@ -431,7 +431,7 @@ func governorScanOnce(parent context.Context, db *sql.DB) {
 		if qerr != nil || limit <= 0 || secs <= limit {
 			continue // db_accounts'ta değil / limit yok / henüz aşmadı
 		}
-		if kout, kerr := exec.CommandContext(ctx, "mysql", "-uroot", "-e", fmt.Sprintf("KILL QUERY %d", id)).CombinedOutput(); kerr != nil {
+		if kout, kerr := komut.BirlesikCikti(ctx, "mysql", "-uroot", "-e", fmt.Sprintf("KILL QUERY %d", id)); kerr != nil {
 			log.Printf("Governor: %s KILL başarısız (id=%d): %s: %v", user, id, strings.TrimSpace(string(kout)), kerr)
 		} else {
 			log.Printf("Governor: %s sorgusu %ds > %ds → KILL (id=%d)", user, secs, limit, id)
@@ -554,16 +554,16 @@ func planProbeHTTPS(alanAdi string) int {
 	if alanAdi == "" {
 		return 0
 	}
-	out, _ := exec.Command("curl", "-sk", "--max-time", "10",
+	out, _ := komut.Cikti(context.Background(), "curl", "-sk", "--max-time", "10",
 		"-o", os.DevNull, "-w", "%{http_code}",
-		"-H", "Host: "+alanAdi, "https://127.0.0.1/").Output()
+		"-H", "Host: "+alanAdi, "https://127.0.0.1/")
 	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 	return n
 }
 
 // servisAktif: systemd unit "active" mi.
 func servisAktif(unit string) bool {
-	out, _ := exec.Command("systemctl", "is-active", unit).CombinedOutput()
+	out, _ := komut.BirlesikCikti(context.Background(), "systemctl", "is-active", unit)
 	return strings.TrimSpace(string(out)) == "active"
 }
 

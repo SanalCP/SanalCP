@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"sanalcp/internal/komut"
 )
 
 type protectedEntry struct {
@@ -105,7 +107,7 @@ func migrateFiles(ctx context.Context, db *sql.DB, dir string) ([]protectedEntry
 			}
 			if _, err := exec.LookPath("restorecon"); err == nil {
 				c, cancel := context.WithTimeout(ctx, 5*time.Second)
-				err = exec.CommandContext(c, "restorecon", name).Run()
+				err = komut.Calistir(c, "restorecon", name)
 				cancel()
 				if err != nil {
 					return nil, err
