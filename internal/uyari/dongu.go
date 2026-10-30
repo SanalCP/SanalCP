@@ -88,35 +88,15 @@ func Tur(ctx context.Context, db *sql.DB, g Gonderici, probe func(string) monito
 	}
 	wg.Wait()
 
+	// Bir domain'deki DB hatası (ör. tur sırasında silinen domain → FK) diğerlerini
+	// ve zaten kaydedilmiş geçişlerin bildirimini düşürmesin.
 	var satirlar []string
 	for i, h := range hedefler {
-		k := anahtar{h.id, "web"}
-		d, ardisik := WebDurum(web[i], onceki[k].ardisik)
-		satir, err := isle(ctx, db, ayar.Dil, h.alanAdi, k, d, ardisik, true, onceki, simdi, web[i].DurumKodu)
+		satir, err := domainIsle(ctx, db, ayar.Dil, h, web[i], onceki, simdi)
+		satirlar = append(satirlar, satir...)
 		if err != nil {
-			return err
+			log.Printf("uyari: %s: %v", h.alanAdi, err)
 		}
-		satirlar = append(satirlar, satir...)
-
-		var bitis *time.Time
-		if t, err := time.Parse("2006-01-02", h.sslBitis); err == nil {
-			bitis = &t
-		}
-		d, ok := SSLDurum(h.sslAktif, h.sslKaynak, bitis, simdi)
-		gun := 0
-		if bitis != nil {
-			gun = kalanGun(*bitis, simdi)
-		}
-		if satir, err = isle(ctx, db, ayar.Dil, h.alanAdi, anahtar{h.id, "ssl"}, d, 0, ok, onceki, simdi, gun); err != nil {
-			return err
-		}
-		satirlar = append(satirlar, satir...)
-
-		d, ok = YedekDurum(h.yedek)
-		if satir, err = isle(ctx, db, ayar.Dil, h.alanAdi, anahtar{h.id, "yedek"}, d, 0, ok, onceki, simdi, 0); err != nil {
-			return err
-		}
-		satirlar = append(satirlar, satir...)
 	}
 
 	if len(satirlar) > 0 && ayar.Acik && ayar.kanalVar() {
@@ -125,6 +105,47 @@ func Tur(ctx context.Context, db *sql.DB, g Gonderici, probe func(string) monito
 		}
 	}
 	return nil
+}
+
+func domainIsle(ctx context.Context, db *sql.DB, dil string, h hedef, wh monitor.DomainHealth, onceki map[anahtar]kayit, simdi time.Time) ([]string, error) {
+	var satirlar []string
+	k := anahtar{h.id, "web"}
+	o, var_ := onceki[k]
+	oncekiArdisik := o.ardisik
+	if !var_ {
+		// İlk gözlemde zaten erişilemeyen site doğrudan 'hata' kaydedilsin; yoksa 2. turda ok→hata seli olur.
+		oncekiArdisik = 1
+	}
+	d, ardisik := WebDurum(wh, oncekiArdisik)
+	satir, err := isle(ctx, db, dil, h.alanAdi, k, d, ardisik, true, onceki, simdi, wh.DurumKodu)
+	satirlar = append(satirlar, satir...)
+	if err != nil {
+		return satirlar, err
+	}
+
+	var bitis *time.Time
+	if t, err := time.Parse("2006-01-02", h.sslBitis); err == nil {
+		bitis = &t
+	}
+	d, ok := SSLDurum(h.sslAktif, h.sslKaynak, bitis, simdi)
+	gun := 0
+	if bitis != nil {
+		gun = kalanGun(*bitis, simdi)
+	}
+	satir, err = isle(ctx, db, dil, h.alanAdi, anahtar{h.id, "ssl"}, d, 0, ok, onceki, simdi, gun)
+	satirlar = append(satirlar, satir...)
+	if err != nil {
+		return satirlar, err
+	}
+
+	// Doğrulama sürerken son durum korunur: satır silinirse ardından gelen
+	// 'basarisiz' ilk gözlem sayılıp sessiz kalırdı.
+	if h.yedek == "bekliyor" || h.yedek == "dogrulaniyor" {
+		return satirlar, nil
+	}
+	d, ok = YedekDurum(h.yedek)
+	satir, err = isle(ctx, db, dil, h.alanAdi, anahtar{h.id, "yedek"}, d, 0, ok, onceki, simdi, 0)
+	return append(satirlar, satir...), err
 }
 
 // isle: tek kontrolün durumunu kaydeder; bildirilecek geçiş varsa mesaj satırını döner.

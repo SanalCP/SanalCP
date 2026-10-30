@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -165,6 +166,55 @@ func TestUygulanmayanKontrolSilinir(t *testing.T) {
 	k.durumlar([]any{1, "web", "ok", 0}, []any{1, "ssl", "hata", 0})
 	k.mock.ExpectExec("DELETE FROM uyari_durumlari").WithArgs(1, "ssl").WillReturnResult(sqlmock.NewResult(0, 1))
 	if err := Tur(context.Background(), k.db, k.g, probeKod(200), testSimdi); err != nil {
+		t.Fatal(err)
+	}
+	if len(k.metinler) != 0 {
+		t.Fatalf("mesaj gitmemeli: %q", k.metinler)
+	}
+}
+
+func TestDBHatasindaOncekiBildirimlerGider(t *testing.T) {
+	k := yeniTur(t)
+	k.ayar(t, 1)
+	bitis := testSimdi.AddDate(0, 0, 3).Format("2006-01-02")
+	k.mock.ExpectQuery("FROM domains").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "alan_adi", "ssl_aktif", "ssl_kaynak", "ssl_bitis", "yedek"}).
+		AddRow(1, "ornek.com", 1, "letsencrypt", bitis, "").
+		AddRow(2, "silindi.com", 1, "letsencrypt", bitis, ""))
+	k.durumlar([]any{1, "web", "ok", 0}, []any{1, "ssl", "ok", 0}, []any{2, "web", "ok", 0}, []any{2, "ssl", "ok", 0})
+	k.mock.ExpectExec("INSERT INTO uyari_durumlari").WithArgs(1, "ssl", "hata", 0, testSimdi).WillReturnResult(sqlmock.NewResult(0, 1))
+	// Tur sırasında silinen domain: FK hatası.
+	k.mock.ExpectExec("INSERT INTO uyari_durumlari").WithArgs(2, "ssl", "hata", 0, testSimdi).WillReturnError(errors.New("Error 1452"))
+	_ = Tur(context.Background(), k.db, k.g, probeKod(200), testSimdi)
+	if len(k.metinler) != 1 || !strings.Contains(k.metinler[0], "ornek.com") {
+		t.Fatalf("kaydedilmiş geçiş bildirilmeliydi: %q", k.metinler)
+	}
+}
+
+func TestDogrulamaSurerkenYedekDurumuKorunur(t *testing.T) {
+	k := yeniTur(t)
+	k.ayar(t, 1)
+	k.mock.ExpectQuery("FROM domains").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "alan_adi", "ssl_aktif", "ssl_kaynak", "ssl_bitis", "yedek"}).
+		AddRow(1, "ornek.com", 0, "", "", "dogrulaniyor"))
+	k.durumlar([]any{1, "web", "ok", 0}, []any{1, "yedek", "ok", 0})
+	// yedek satırı silinmemeli: sonuç 'basarisiz' gelince ok→hata geçişi bildirilmeli.
+	if err := Tur(context.Background(), k.db, k.g, probeKod(200), testSimdi); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIlkGozlemdeErisilemezSessizHata(t *testing.T) {
+	k := yeniTur(t)
+	k.ayar(t, 1)
+	k.mock.ExpectQuery("FROM domains").WillReturnRows(sqlmock.NewRows(
+		[]string{"id", "alan_adi", "ssl_aktif", "ssl_kaynak", "ssl_bitis", "yedek"}).
+		AddRow(1, "ornek.com", 0, "", "", ""))
+	k.durumlar()
+	// Kurulumda zaten erişilemeyen site doğrudan 'hata' kaydedilir; 2. turda ok→hata seli olmaz.
+	k.mock.ExpectExec("INSERT INTO uyari_durumlari").WithArgs(1, "web", "hata", 2, testSimdi).WillReturnResult(sqlmock.NewResult(0, 1))
+	erisilemez := func(string) monitor.DomainHealth { return monitor.DomainHealth{} }
+	if err := Tur(context.Background(), k.db, k.g, erisilemez, testSimdi); err != nil {
 		t.Fatal(err)
 	}
 	if len(k.metinler) != 0 {

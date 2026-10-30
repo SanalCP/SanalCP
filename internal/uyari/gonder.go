@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"net/smtp"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"sanalcp/internal/secretcrypt"
 )
@@ -61,6 +63,9 @@ type Gonderici struct {
 // telegramMaks: Telegram mesaj sınırı 4096 karakter; payı bırakıp kesiyoruz.
 const telegramMaks = 4000
 
+// smtpZamanAsimi: yerel MTA takılırsa döngü durmasın (testler kısaltır).
+var smtpZamanAsimi = 30 * time.Second
+
 // Gonder: ayarlı her kanala gönderir; hatalar token içermez.
 func (g Gonderici) Gonder(ctx context.Context, a Ayar, metin string) error {
 	var hatalar []error
@@ -108,8 +113,35 @@ func (g Gonderici) eposta(a Ayar, metin string) error {
 	}
 	msg := "From: " + kimden + "\r\nTo: " + a.Eposta + "\r\nSubject: " + mime.QEncoding.Encode("utf-8", konu) +
 		"\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" + metin + "\r\n"
-	if err := smtp.SendMail(g.SMTPAddr, nil, kimden, []string{a.Eposta}, []byte(msg)); err != nil {
+	// smtp.SendMail kullanılmaz: sunulan STARTTLS'e kendiliğinden geçer ve Postfix'in
+	// self-signed sertifikası 127.0.0.1 için doğrulanamaz. Trafik makineden çıkmıyor.
+	conn, err := net.DialTimeout("tcp", g.SMTPAddr, smtpZamanAsimi)
+	if err != nil {
 		return fmt.Errorf("e-posta: %v", err)
 	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(smtpZamanAsimi))
+	sunucu, _, _ := net.SplitHostPort(g.SMTPAddr)
+	c, err := smtp.NewClient(conn, sunucu)
+	if err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	if err := c.Mail(kimden); err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	if err := c.Rcpt(a.Eposta); err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	wc, err := c.Data()
+	if err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	if _, err := wc.Write([]byte(msg)); err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("e-posta: %v", err)
+	}
+	_ = c.Quit()
 	return nil
 }
