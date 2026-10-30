@@ -211,7 +211,7 @@ export default function SubscriptionDetailPage() {
                   {domain.askida ? (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" /></svg>
-                      {t('SubscriptionDetailPage:suspended')}n Al (Geri Getir)
+                      {t('SubscriptionDetailPage:unsuspend')}
                     </>
                   ) : (
                     <>
@@ -365,7 +365,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-[9px] uppercase tracking-wider text-white/60">Web Sitesi</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/60">{t('SubscriptionDetailPage:website')}</div>
             <div className="text-xs font-semibold text-white truncate">{alanAdi}</div>
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
@@ -375,7 +375,7 @@ function WebSitePreview({ alanAdi, ssl }: { alanAdi: string; ssl: boolean }) {
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.9 2M18.5 9A7 7 0 006.6 7" />
               </svg>
-              Yenile
+              {t('SubscriptionDetailPage:refresh')}
             </button>
             <a href={url} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1 text-[11px] bg-white/90 hover:bg-white text-slate-900 px-2 py-1 rounded-md font-medium transition">

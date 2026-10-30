@@ -314,7 +314,7 @@ function DashboardShell() {
 
   return (
     <div className="min-h-screen flex items-start bg-[#f9fafb] dark:bg-[#101828]">
-      <a href="#sp-main-content" className="skip-link">Ana içeriğe geç</a>
+      <a href="#sp-main-content" className="skip-link">{t('DashboardLayout:skip_to_content')}</a>
       {/* Mobil perde — yalnız çekmece açıkken ve < lg genişlikte */}
       {mobilAcik && (
         <div
