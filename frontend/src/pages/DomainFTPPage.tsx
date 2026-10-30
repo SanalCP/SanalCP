@@ -1,10 +1,12 @@
 // sanal-dark-swept
 // sanal-dark-swept-v2
 import KopyalaButton from '@/components/KopyalaButton'
+import ParolaGirdisi from '@/components/ParolaGirdisi'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
 import { api, apiHata } from '@/lib/api'
+import { parolaGucluMu } from '@/lib/parola'
 import Breadcrumb from '@/components/Breadcrumb'
 
 type Domain = { id: number; alan_adi: string; sistem_kullanici: string; ftp_host: string; ftp_user: string }
@@ -17,6 +19,8 @@ export default function DomainFTPPage() {
   const [yeniPw, setYeniPw] = useState<string | null>(null)
   const [isleniyor, setIsleniyor] = useState(false)
   const [ozelPw, setOzelPw] = useState('')
+  // Backend'deki hesaplar.ParolaGucluMu ile AYNI politika (>=12 + harf/rakam).
+  const parolaGucSorunu = ozelPw !== '' && !parolaGucluMu(ozelPw)
 
   useEffect(() => {
     if (!id) return
@@ -62,17 +66,17 @@ export default function DomainFTPPage() {
 
           <div className="border-t border-slate-200 dark:border-slate-700 pt-5">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('DomainFTPPage:password_reset')}</h3>
-            <div className="flex items-center gap-2 mb-4">
-              <input
-                type="text"
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <ParolaGirdisi
                 value={ozelPw}
-                onChange={e => setOzelPw(e.target.value)}
+                onChange={setOzelPw}
                 placeholder={t('DomainFTPPage:password_placeholder')}
                 className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
               />
-              <button onClick={() => parolaSifirla(false)} disabled={isleniyor || !ozelPw} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-50 text-sm rounded-md">{t('DomainFTPPage:set_this_password')}</button>
+              <button onClick={() => parolaSifirla(false)} disabled={isleniyor || !ozelPw || parolaGucSorunu} className="px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 disabled:opacity-50 text-sm rounded-md">{t('DomainFTPPage:set_this_password')}</button>
               <button onClick={() => parolaSifirla(true)} disabled={isleniyor} className="px-3 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:opacity-60 text-sm font-medium rounded-md">{t('DomainFTPPage:generate_random')}</button>
             </div>
+            {parolaGucSorunu && <p className="mb-3 text-xs text-amber-600 dark:text-amber-400">{t('DomainFTPPage:password_warning')}</p>}
 
             {yeniPw && (
               <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-md p-4">

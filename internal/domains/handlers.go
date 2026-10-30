@@ -902,8 +902,11 @@ func (h *Handlers) SetFTPPassword(w http.ResponseWriter, r *http.Request) {
 	if req.Parola == "" {
 		req.Parola = hesaplar.RandomParola(20)
 	}
-	if !hesaplar.ParolaGecerli(req.Parola) {
-		httpx.WriteError(w, http.StatusBadRequest, "parola geçersiz karakter (satır sonu) içeriyor")
+	// Tek parola politikası (hesaplar.ParolaGucluMu): FTP parolası SSH açıksa
+	// sistem parolasına da senkronlandığı için zayıf parolaya izin YOK — tıpkı
+	// DB parolası akışında (SetDBPassword) olduğu gibi.
+	if ok, neden := hesaplar.ParolaGucluMu(req.Parola); !ok {
+		httpx.WriteError(w, http.StatusBadRequest, neden)
 		return
 	}
 	var sk string
