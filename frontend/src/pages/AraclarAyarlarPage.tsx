@@ -243,7 +243,7 @@ export default function AraclarAyarlarPage() {
           <OturumBostaAyari />
           <LisansBilgisi />
         </div>
-        <div className="mt-3">
+        <div className="mt-3 space-y-3">
           <RootGirisiAyari />
           <PanelErisimAyari />
           <PanelHizLimitiAyari />
