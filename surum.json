@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.81",
-  "duyuru": "Güvenlik güncellemesi: panel Go 1.26.10 ile yeniden derlendi (crypto/x509 güvenlik düzeltmesi, GO-2026-6809) ve bir arayüz bağımlılığı güncellendi. Davranış değişikliği yoktur; e-posta teslimat takibi, posta kutusu kotası ve plan yetkileri 0.9.80'deki gibidir.",
+  "son_surum": "0.9.82",
+  "duyuru": "Uyarı bildirimleri: site erişilemez olduğunda, SSL sertifikası bitmek üzereyken ya da yedek doğrulaması başarısız olduğunda panel Telegram ve/veya e-posta ile haber verir (Araçlar & Ayarlar → Uyarı bildirimleri). Abonelik sayfasına domain sağlık kartı eklendi.",
   "kritik": false,
   "yayin_tarihi": "2026-10-30"
 }

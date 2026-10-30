@@ -13,6 +13,18 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.82** (2026-10-30) — uyarı bildirimleri
+
+- **Uyarı bildirimleri.** Panel her 5 dakikada bir aktif domain'leri kontrol eder
+  (site erişilebilirliği, SSL bitişi, son yedeğin doğrulaması) ve durum
+  değiştiğinde Telegram ve/veya e-posta ile haber verir. Tek seferlik ağ
+  aksaklığı alarm üretmez (art arda 2 başarısız kontrol gerekir); ilk kurulumda
+  mevcut sorunlar için mesaj seli olmaz. Ayar: *Araçlar & Ayarlar → Uyarı
+  bildirimleri*. Telegram bot token'ı şifreli saklanır ve API'den dönmez.
+- **Domain sağlık kartı.** Abonelik sayfasında web, SSL, DNS, posta ve yedek
+  durumu tek bakışta görünür.
+- E-posta teslimat takibi yalnız posta servisi açık domain'lerde gösterilir.
+
 **0.9.81** (2026-10-30) — güvenlik güncellemesi
 
 - Panel **Go 1.26.10** ile derlendi. Önceki sürüm, Go standart kütüphanesindeki
