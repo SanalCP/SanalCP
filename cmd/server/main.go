@@ -995,31 +995,149 @@ func runMigrations(d *sql.DB) error {
 			return fmt.Errorf("%s takip durumu okunamadı: %w", e.Name(), err)
 		}
 		log.Printf("migration: %s", e.Name())
-		// Önce yorum satırlarını çıkar
-		var cleaned []string
-		for _, line := range strings.Split(string(body), "\n") {
-			t := strings.TrimSpace(line)
-			if t == "" || strings.HasPrefix(t, "--") {
-				continue
-			}
-			cleaned = append(cleaned, line)
+		// Dosya başına TEK transaction + TEK bağlantı: ifadeler aynı bağlantıda
+		// koşar (0001'deki `USE panel` gibi bağlantı-seçici ifadelerin etkisi
+		// sonraki ifadelere mutlaka geçer) ve DML içeren migration'lar atomik
+		// uygulanır — yarım kalan dosya tekrar koştuğunda önceki DML'i geri
+		// almadan yeniden yürütmek yerine tek parça halinde tekrar denenir.
+		// NOT: MariaDB'de DDL (CREATE/ALTER TABLE) ÖRTÜK COMMIT yapar; bu
+		// yüzden DDL içeren dosyalar hâlâ idempotent yazılmalıdır
+		// (CREATE TABLE IF NOT EXISTS, ADD COLUMN IF NOT EXISTS, ...).
+		tx, err := d.Begin()
+		if err != nil {
+			return fmt.Errorf("%s transaction açılamadı: %w", e.Name(), err)
 		}
-		sqlBody := strings.Join(cleaned, "\n")
-		for _, stmt := range strings.Split(sqlBody, ";") {
-			s := strings.TrimSpace(stmt)
-			if s == "" {
-				continue
-			}
-			if _, err := d.Exec(s); err != nil {
+		for _, stmt := range migrationIfadeleri(string(body)) {
+			if _, err := tx.Exec(stmt); err != nil {
+				_ = tx.Rollback()
 				return fmt.Errorf("%s uygulanamadı: %w", e.Name(), err)
 			}
 		}
-		if _, err := d.Exec(`INSERT INTO schema_migrations(name, checksum) VALUES(?,?)`,
+		if _, err := tx.Exec(`INSERT INTO schema_migrations(name, checksum) VALUES(?,?)`,
 			e.Name(), checksum); err != nil {
+			_ = tx.Rollback()
 			return fmt.Errorf("%s takip kaydı yazılamadı: %w", e.Name(), err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("%s transaction kapatılamadı: %w", e.Name(), err)
 		}
 	}
 	return nil
+}
+
+// migrationIfadeleri: SQL dosyasını noktalı virgülle İFADELERE böler ve yorumları
+// ayıklar. Yalnız runMigrations için vardır; genel amaçlı bir SQL ayrıştırıcı değildir.
+//
+// NEDEN VAR: naif `strings.Split(govde, ";")` üç kırılganlığa sahipti:
+//  1. String literali içindeki ';' ifadeyi ortadan ikiye bölerdi
+//     (INSERT ... VALUES ('a;b') tek ifadeyken iki "ifade"ye ayrılırdı).
+//  2. `;` sonrası satır içi `--` yorumları (CREATE TABLE ...; -- açıklama)
+//     tek başına "ifade" olarak MariaDB'ye gönderiliyordu.
+//  3. Gelecekteki trigger/procedure gövdelerindeki ';' bölmeyi bozardı.
+//
+// Ayrıştırıcı tek geçişte tırnak (', ", `) farkındalığıyla ilerler:
+//   - '...' / "..." / `...` içindeki ';' bölmez; \ kaçışı ve çiftleme kaçışları
+//     (çift tırnak, çift kesme işareti, çift ters tırnak) tanınır (MySQL sözdizimi).
+//   - `--<boşluk>` ve `#` satır yorumları ile /* ... */ blok yorumları tırnak
+//     DIŞINDAYKEN atlanır (satır yorumu önce kontrol edilir; yorum içindeki
+//     tırnaklar açılış sayılmaz).
+//   - /*!(...)*/ çalıştırılabilir yorumlar (mysqldump kalıbı) KORUNUR.
+func migrationIfadeleri(govde string) []string {
+	var (
+		ifadeler []string
+		sb       strings.Builder
+	)
+	b := []byte(govde) // UTF-8: çok-baytlı karakter baytları >= 0x80; ASCII ayraçlarla hiç çakışmaz
+	i, n := 0, len(b)
+	peek := func(sira int) byte {
+		if i+sira < n {
+			return b[i+sira]
+		}
+		return 0
+	}
+	ekle := func() {
+		if s := strings.TrimSpace(sb.String()); s != "" {
+			ifadeler = append(ifadeler, s)
+		}
+		sb.Reset()
+	}
+	// yorumBaslat: silinecek yorumdan önceki sonda-boşlukları da temizler
+	// (SQL için önemsizdir ama ifade gövdesini kirletmez; literallerin İÇİNE
+	// dokunmaz — yorum algılama yalnız tırnak DIŞINDA çalışır).
+	yorumBaslat := func() {
+		s := strings.TrimRight(sb.String(), " \t")
+		sb.Reset()
+		sb.WriteString(s)
+	}
+	for i < n {
+		c := b[i]
+		switch {
+		// Satır yorumu: '#' veya '--' + boşluk/EOL (MySQL'de '--x' yorum DEĞİLDİR).
+		case c == '#' || (c == '-' && peek(1) == '-' &&
+			(i+2 >= n || b[i+2] == ' ' || b[i+2] == '\t' || b[i+2] == '\n' || b[i+2] == '\r')):
+			yorumBaslat()
+			for i < n && b[i] != '\n' {
+				i++
+			}
+		// Blok yorum. /*! ... */ çalıştırılabilir yorumdur → olduğu gibi koru.
+		case c == '/' && peek(1) == '*':
+			if peek(2) == '!' {
+				sb.WriteString("/*!")
+				i += 3
+				for i < n && !(b[i] == '*' && peek(1) == '/') {
+					sb.WriteByte(b[i])
+					i++
+				}
+				if i < n {
+					sb.WriteString("*/")
+					i += 2
+				}
+				continue
+			}
+			yorumBaslat()
+			i += 2
+			for i < n && !(b[i] == '*' && peek(1) == '/') {
+				i++
+			}
+			if i < n {
+				i += 2
+			}
+		// Tırnaklı literaller: içerik ';' ve yorum başlatıcıları içerse de bölünmez.
+		case c == '\'' || c == '"' || c == '`':
+			kapanis := c
+			sb.WriteByte(c)
+			i++
+			for i < n {
+				if b[i] == '\\' && kapanis != '`' && i+1 < n { // \ kaçışı (backtick'te yok)
+					sb.WriteByte(b[i])
+					sb.WriteByte(b[i+1])
+					i += 2
+					continue
+				}
+				if b[i] == kapanis {
+					if peek(1) == kapanis { // '' / "" / `` çiftleme kaçışı
+						sb.WriteByte(b[i])
+						sb.WriteByte(b[i+1])
+						i += 2
+						continue
+					}
+					sb.WriteByte(b[i]) // kapanış tırnağı → literali bitir
+					i++
+					break
+				}
+				sb.WriteByte(b[i])
+				i++
+			}
+		case c == ';':
+			ekle()
+			i++
+		default:
+			sb.WriteByte(c)
+			i++
+		}
+	}
+	ekle()
+	return ifadeler
 }
 
 func detectIPv4() string {
