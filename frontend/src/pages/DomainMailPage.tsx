@@ -377,8 +377,6 @@ export default function DomainMailPage() {
         {hata && <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">{hata}</div>}
         {ok && <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-700 dark:text-emerald-300">{ok}</div>}
 
-        {id && <div className="mb-5"><MailDeliveryTracking domainID={id} /></div>}
-
         {yeniPw && (
           <div className="mb-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
             <p className="text-sm text-emerald-800 dark:text-emerald-200 font-medium mb-1">{t('DomainMailPage:newPassword.title', { email: yeniPw.email })}</p>
@@ -417,6 +415,7 @@ export default function DomainMailPage() {
           </div>
         ) : (
           <>
+            {id && <div className="mb-5"><MailDeliveryTracking domainID={id} /></div>}
             {/* Webmail — Roundcube panel vhost'unda /webmail/ altında servis edilir
                 (bkz. assets/nginx/_panel.conf). mail.<domain> ADRESİ DEĞİLDİR:
                 o kayıt MX hedefidir, web arayüzü sunmaz. */}

@@ -8,6 +8,7 @@ import { api, apiHata } from '@/lib/api'
 import Breadcrumb from '@/components/Breadcrumb'
 import ResourceCard from '@/components/ResourceCard'
 import DomainKaynakKart from '@/components/DomainKaynakKart'
+import DomainHealthCard from '@/components/DomainHealthCard'
 import DomainPano from "@/components/DomainPano"
 import type { Domain } from '@/components/DomainList'
 import { useAuth } from '@/store/auth'
@@ -305,6 +306,7 @@ export default function SubscriptionDetailPage() {
         </aside>
 
         <section className="order-1 col-span-12 xl:order-2 xl:col-span-6">
+          <DomainHealthCard domainId={domain.id} suspended={domain.askida} />
           <DomainPano domain={domain} />
 
           <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-500 flex-wrap gap-2">
@@ -317,7 +319,7 @@ export default function SubscriptionDetailPage() {
           </div>
         </section>
 
-        <aside className="order-3 col-span-12 md:col-span-6 xl:col-span-3">
+        <aside id="kaynaklar" className="order-3 col-span-12 md:col-span-6 xl:col-span-3">
           <DomainKaynakKart domainId={domain.id} />
         </aside>
       </div>
