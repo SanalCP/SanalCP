@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.89** (2026-11-01) — Rspamd belleği
+
+- **Tek tarama süreci.** Rspamd CPU sayısına göre 2+ tarama süreci açıyordu ve
+  her biri ~100 MB tutuyordu. Artık `local.d/worker-normal.inc` ile tek süreç
+  çalışır; mevcut kurulumlara güncellemeyle uygulanır (dosya önceden varsa
+  dokunulmaz, yapılandırma testi geçmezse geri alınır).
+
 **0.9.88** (2026-11-01) — panel sertifikası
 
 - **Panel SSL yenilemesi.** Panelin kendi alan adı sertifikası acme.sh ile

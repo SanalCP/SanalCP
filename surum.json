@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.88",
-  "duyuru": "Panel SSL düzeltmesi: panelin kendi sertifikası otomatik yenilendiğinde nginx yeniden yüklenmiyordu, eski sertifika sunulmaya devam edebiliyordu. Panel ayarlarındaki SSL bitiş tarihi artık sertifikadan okunuyor.",
+  "son_surum": "0.9.89",
+  "duyuru": "Bellek iyileştirmesi: Rspamd spam filtresi artık tek tarama süreciyle çalışıyor (yaklaşık 100 MB RAM tasarrufu).",
   "kritik": false,
   "yayin_tarihi": "2026-11-01"
 }

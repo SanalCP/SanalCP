@@ -41,7 +41,9 @@ if [ -n "$unformatted" ]; then
   echo "düzeltmek için: find cmd internal scripts -type f -name '*.go' -exec gofmt -w {} +" >&2
   exit 1
 fi
-go test ./...
+# Manifest kapsama testi aşağıda, manifest yeniden üretildikten SONRA koşar:
+# burada koşarsa yeni eklenen her asset dosyasında eski manifest yüzünden düşer.
+go test -skip '^TestAssetManifestiTumDosyalariKapsar$' ./...
 go vet ./...
 
 echo "== Frontend temiz kurulum + test + lint + build =="
@@ -91,6 +93,7 @@ find assets -type f ! -name SHA256SUMS ! -name SHA256SUMS.sig -print0 |
   LC_ALL=C sort -z |
   xargs -0 sha256sum > assets/SHA256SUMS
 sha256sum -c assets/SHA256SUMS
+go test -count=1 -run '^TestAssetManifestiTumDosyalariKapsar$' ./internal/osfam/
 
 echo "== Release imzası =="
 # 🔴 TEDARİK ZİNCİRİ: SHA256SUMS aynı arşivin içinden geldiği için tek başına
