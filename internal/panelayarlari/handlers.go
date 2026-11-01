@@ -70,6 +70,12 @@ func (h *Handlers) Durum(w http.ResponseWriter, r *http.Request) {
 	resp.OzelDomain = ozelDomain.String
 	resp.SSLHata = sslHata.String
 	resp.SSLBitis = sslBitis.String
+	// DB tarihi yalnız kurulum anını bilir; acme.sh yenilemelerini dosya söyler.
+	if resp.SSLDurum == "aktif" {
+		if b, err := certBitisOku(certYol); err == nil {
+			resp.SSLBitis = b
+		}
+	}
 	resp.SunucuIP = serverIPv4()
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
@@ -194,6 +200,8 @@ func sslKur(ctx context.Context, domain string) (durum, hata, bitis string) {
 		"--cert-file", certYol,
 		"--key-file", keyYol,
 		"--fullchain-file", certYol,
+		// acme.sh cron yenilemesi sonrası nginx yeni cert'i ancak reload ile görür.
+		"--reloadcmd", "systemctl reload nginx",
 	}
 	if out, err := exec.CommandContext(ctx, acmeBinYolu, insArgs...).CombinedOutput(); err != nil {
 		selfSignedaDon()
