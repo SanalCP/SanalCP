@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.85",
-  "duyuru": "Bellek iyileştirmesi: kullanılmayan ClamAV servisi (clamd) kapatıldı, virüs imzası otomatik güncellemesi açıldı ve MariaDB önbelleği veri boyutuna göre ayarlanıyor. Küçük sunucularda 1,5 GB'a kadar RAM boşalır.",
+  "son_surum": "0.9.86",
+  "duyuru": "0.9.85 düzeltmesi: ClamAV imza güncellemesinden sonra soket aktivasyonu clamd'yi yeniden başlatıyordu; soket de kapatılıyor. Bellek iyileştirmesi artık kalıcı.",
   "kritik": false,
   "yayin_tarihi": "2026-11-01"
 }

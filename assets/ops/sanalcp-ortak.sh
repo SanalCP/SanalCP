@@ -213,7 +213,9 @@ servis_ad(){
 # İmza güncelleyici ise AÇIK olmalı, yoksa taramalar eski imzalarla yapılır.
 # Idempotent; kurulum ve sanalcp-update çağırır.
 clamav_servisleri_ayarla(){
-  systemctl disable --now "$(servis_ad antivirus)" >/dev/null 2>&1 || true
+  # .socket da kapanmalı: Debian'da freshclam her güncellemede clamd'ye haber verir
+  # ve soket aktivasyonu clamd'yi geri başlatır (RHEL'de soket yok, hata yutulur).
+  systemctl disable --now "$(servis_ad antivirus).socket" "$(servis_ad antivirus)" >/dev/null 2>&1 || true
   systemctl enable --now clamav-freshclam >/dev/null 2>&1
 }
 

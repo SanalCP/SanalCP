@@ -13,6 +13,12 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.86** (2026-11-01) — 0.9.85 düzeltmesi
+
+- **ClamAV.** Debian'da `clamav-daemon.socket` açık kaldığı için freshclam'ın
+  imza güncellemesi sonrası gönderdiği bildirim clamd'yi yeniden başlatıyordu;
+  soket de kapatılır.
+
 **0.9.85** (2026-11-01) — bellek kullanımı
 
 - **ClamAV.** Panel taramayı `clamscan` ile yaptığı halde Debian'da `clamd`
