@@ -421,6 +421,20 @@ RCEOF
   ok "$(t "webmail SMTP ayarı onarıldı (giden e-posta kimlik doğrulaması)" "webmail SMTP settings repaired (outgoing mail authentication)")"
 fi
 
+# Rspamd tek tarama süreci (~100 MB RAM). Mevcut kurulumlar mail-setup'ı yeniden
+# çalıştırmaz; dosya yalnız YOKSA yazılır (yöneticinin ayarı ezilmez), configtest
+# geçmezse geri alınır. Milter default_action=accept: restart sırasında posta akar.
+RSW=/etc/rspamd/local.d/worker-normal.inc
+if [ -d /etc/rspamd/local.d ] && [ ! -e "$RSW" ] && [ -f "$A/mail/rspamd/worker-normal.inc" ]; then
+  install -m 0644 "$A/mail/rspamd/worker-normal.inc" "$RSW"
+  if rspamadm configtest >/dev/null 2>&1 && systemctl restart rspamd >/dev/null 2>&1; then
+    ok "$(t "rspamd: tek tarama süreci (bellek)" "rspamd: single scanner worker (memory)")"
+  else
+    rm -f "$RSW"; systemctl restart rspamd >/dev/null 2>&1 || true
+    warn "$(t "rspamd worker ayarı uygulanamadı, geri alındı" "rspamd worker setting could not be applied, reverted")"
+  fi
+fi
+
 # Roundcube permission heal — 🔴 LIVE BUG (Debian): sanalcp-mail-setup.sh hard-coded
 # the owner as "apache". On Debian the pool runs as www-data and there is no apache
 # user, so both chowns failed SILENTLY: config.inc.php stayed root:root 640, Roundcube

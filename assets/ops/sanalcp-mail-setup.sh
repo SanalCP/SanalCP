@@ -277,7 +277,7 @@ log "/etc/opendkim.conf + KeyTable/SigningTable/TrustedHosts (boş, panel DKIM �
 
 echo "════ Rspamd + Redis ════"
 mkdir -p /etc/rspamd/local.d
-for f in redis.conf actions.conf milter_headers.conf; do
+for f in redis.conf actions.conf milter_headers.conf worker-normal.inc; do
   cp "$TMPL/rspamd/$f" "/etc/rspamd/local.d/$f"
   chown root:root "/etc/rspamd/local.d/$f"
   chmod 644 "/etc/rspamd/local.d/$f"
