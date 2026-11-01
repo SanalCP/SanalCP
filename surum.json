@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.86",
-  "duyuru": "0.9.85 düzeltmesi: ClamAV imza güncellemesinden sonra soket aktivasyonu clamd'yi yeniden başlatıyordu; soket de kapatılıyor. Bellek iyileştirmesi artık kalıcı.",
+  "son_surum": "0.9.87",
+  "duyuru": "SSL yenileme düzeltmesi: başka sunucudan taşınan sitelerin Let's Encrypt sertifikaları otomatik yenilenmiyordu ve panel yanlış bitiş tarihi gösteriyordu. Panel artık gerçek bitiş tarihini okur ve yenilenmemiş sertifikaları kendisi yeniler. Güncelleme önerilir.",
   "kritik": false,
   "yayin_tarihi": "2026-11-01"
 }

@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.87** (2026-11-01) — SSL yenileme
+
+- **Taşınan sitelerin sertifikaları yenilenmiyordu.** acme.sh deposunda kaydı
+  olmayan Let's Encrypt sertifikaları (ör. sunucu taşıma sonrası) hiç
+  yenilenmiyordu. Panel 12 saatte bir kontrol eder; 20 günden az kalmış ve
+  acme.sh'in yenilemediği sertifikayı kendisi yeniden alır (acme.sh kaydı da
+  oluşur).
+- **Bitiş tarihi gerçek sertifikadan.** Panel bitişi "şimdi + 90 gün" diye
+  tahmin ediyordu; artık kurulu sertifikadan okur ve acme.sh yenilemelerinden
+  sonra da eşitler. SSL uyarıları bu tarihe dayandığı için önceden susabiliyordu.
+
 **0.9.86** (2026-11-01) — 0.9.85 düzeltmesi
 
 - **ClamAV.** Debian'da `clamav-daemon.socket` açık kaldığı için freshclam'ın
