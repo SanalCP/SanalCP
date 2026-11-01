@@ -35,6 +35,7 @@ DBBK=/usr/local/bin/sanalcp-db-backup   # panel DB dump tool (installed from ass
 DBDIR=/var/backups/sanalcp/db           # where dumps live (sibling dirs = domain backups)
 PREDUMP=""                                    # pre-update dump path (restored on rollback)
 
+ORIG_ARGS=("$@")   # yeni sürüme devrederken aynen geçirilir (bkz. "kendini yenile")
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -74,7 +75,11 @@ command -v tar  >/dev/null || die "$(t "tar gerekli" "tar required")"
 step "$(t "SanalCP güncelleme (github.com/$REPO@$BRANCH)" "SanalCP update (github.com/$REPO@$BRANCH)")"
 
 # 1) download
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+# SANALCP_UPDATE_REEXEC: eski sürümün bize devrederken bıraktığı geçici betik kopyası.
+# Yalnız mktemp biçimindeyse silinir: dışarıdan verilen değer rastgele dosya sildiremez.
+REEXEC_KOPYA=""
+case "${SANALCP_UPDATE_REEXEC:-}" in "${TMPDIR:-/tmp}"/tmp.*) REEXEC_KOPYA="$SANALCP_UPDATE_REEXEC" ;; esac
+TMP=$(mktemp -d); trap 'rm -rf "$TMP" ${REEXEC_KOPYA:+"$REEXEC_KOPYA"}' EXIT
 echo "  $(t "indiriliyor…" "downloading…")"
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$BRANCH" | tar xz -C "$TMP" \
   || die "$(t "indirme başarısız — repo public mi / '$BRANCH' dalı var mı?" "download failed — is the repo public / does branch '$BRANCH' exist?")"
@@ -118,6 +123,20 @@ fi
 (cd "$SRC" && sha256sum -c assets/SHA256SUMS >/dev/null) ||
   die "$(t "release asset SHA-256 doğrulaması başarısız" "release asset SHA-256 verification failed")"
 ok "$(t "release asset bütünlüğü doğrulandı" "release asset integrity verified")"
+
+# Kendini yenile: çalışan betik kurulu (ESKİ) kopyadır; yeni sürümün eklediği
+# onarım adımları ancak bir SONRAKİ güncellemede çalışırdı. İmzası doğrulanmış
+# yeni kopyaya aynı argümanlarla devredilir; o da kendi indirme+imza doğrulamasını
+# yapar. Ortam değişkeni ikinci devri engeller (döngü yok). exec EXIT trap'ini
+# çalıştırmadığı için $TMP elle silinir; kopya $TMP dışında, yeni betik onu siler.
+YENI_BETIK="$A/ops/sanalcp-update"
+if [ -z "${SANALCP_UPDATE_REEXEC:-}" ] && [ -f "$YENI_BETIK" ] && ! cmp -s "$YENI_BETIK" "$0"; then
+  KOPYA=$(mktemp) || die "$(t "geçici dosya oluşturulamadı" "could not create a temp file")"
+  cp "$YENI_BETIK" "$KOPYA" && chmod 0700 "$KOPYA" || die "$(t "yeni güncelleme betiği kopyalanamadı" "could not copy the new update script")"
+  ok "$(t "güncelleme betiği yeni sürüme devrediliyor" "handing over to the new update script")"
+  rm -rf "$TMP"
+  SANALCP_UPDATE_REEXEC="$KOPYA" exec bash "$KOPYA" "${ORIG_ARGS[@]}"
+fi
 
 # Aile tespiti + paket adları: İNDİRİLEN release'ten source edilir, kurulu
 # kopyadan değil. Eski bir sunucuda /usr/local/bin/sanalcp-ortak henüz yoktur
