@@ -47,10 +47,17 @@ fi
 BP_MB=$(( RAM_MB * BP_PCT / 100 ))
 BP_MB=$(( (BP_MB / 256) * 256 ))          # 256M katına yuvarla (instance hizalama)
 [ "$BP_MB" -lt 256 ] && BP_MB=256
-# düşürme koruması: canlı MariaDB'den mevcut buffer_pool'u oku, hesaplanan bundan düşükse mevcudu koru
-CUR_BP_MB=$(mysql -N -e "SELECT ROUND(@@global.innodb_buffer_pool_size/1048576)" 2>/dev/null)
-[ -z "$CUR_BP_MB" ] && CUR_BP_MB=0
-BP_MB=$(mx "$BP_MB" "$CUR_BP_MB")
+# RAM yüzdesi yalnız TAVAN: pool, InnoDB veri+index boyutunun 2 katını aşmaz. 73 MB veriye
+# 2.3 GB pool ayırmak RAM'i boşa tutuyordu. Düşürme koruması burada bilerek YOK.
+# shortcut: veri büyüyünce pool kendiliğinden büyümez; Optimize (bu betik) yeniden çalıştırılınca büyür.
+DATA_MB=$(mysql -N -e "SELECT CEIL(COALESCE(SUM(data_length+index_length),0)/1048576) FROM information_schema.tables WHERE engine='InnoDB'" 2>/dev/null)
+if [ -n "$DATA_MB" ] && [ "$DATA_MB" -ge 0 ] 2>/dev/null; then
+  VERI_BP=$(( (DATA_MB * 2 + 255) / 256 * 256 ))
+  [ "$VERI_BP" -lt 256 ] && VERI_BP=256
+  [ "$VERI_BP" -lt "$BP_MB" ] && BP_MB=$VERI_BP
+else
+  DATA_MB="?"   # MariaDB okunamadı → yalnız RAM yüzdesi (eski davranış)
+fi
 BP_INST=$(( BP_MB / 1024 )); [ "$BP_INST" -lt 1 ] && BP_INST=1; [ "$BP_INST" -gt 8 ] && BP_INST=8
 # redo log: buffer pool'un ~1/3'ü, 128M–512M arası, 128M katı
 LOG_MB=$(( BP_MB / 3 )); LOG_MB=$(( (LOG_MB / 128) * 128 ))
@@ -78,7 +85,7 @@ CUR_BACKLOG=$(sysctl -n net.core.netdev_max_backlog 2>/dev/null)
 BACKLOG=$(mx "$BACKLOG" "$CUR_BACKLOG")
 
 echo "$(t "════════ Hesaplanan değerler (RAM=${RAM_MB}MB, CPU=${CPU}) ════════" "════════ Computed values (RAM=${RAM_MB}MB, CPU=${CPU}) ════════")"
-log "MariaDB: buffer_pool=${BP_MB}M (${BP_PCT}%, ${BP_INST} instance) · redo_log=${LOG_MB}M · thread_cache=${THREAD_CACHE} · io_threads=${IO_THREADS}"
+log "MariaDB: buffer_pool=${BP_MB}M ($(t "veri" "data")=${DATA_MB}M, $(t "tavan" "cap") %${BP_PCT}, ${BP_INST} instance) · redo_log=${LOG_MB}M · thread_cache=${THREAD_CACHE} · io_threads=${IO_THREADS}"
 log "MariaDB: flush_log_at_trx_commit=2 (perf) · io_capacity=1000/2000 (SSD) · skip_name_resolve=ON · utf8mb4"
 log "nginx: worker_connections=${NGX_CONN} · worker_rlimit_nofile=65535 · multi_accept+epoll · http tuning"
 log "sysctl: fs.file-max=${FILEMAX} · net.core.netdev_max_backlog=${BACKLOG}"
@@ -114,7 +121,7 @@ mkdir -p "$MYSQL_CONF_DIR"
 cat > "$MYSQL_CNF" <<CNF
 # SanalCP tuning — otomatik üretildi (RAM=${RAM_MB}MB, CPU=${CPU}). sanalcp-optimize ile yenile.
 [mysqld]
-# --- InnoDB buffer pool (en önemli cache; RAM'in %${BP_PCT}'i) ---
+# --- InnoDB buffer pool (en önemli cache; veri×2, tavan RAM'in %${BP_PCT}'i) ---
 innodb_buffer_pool_size          = ${BP_MB}M
 innodb_buffer_pool_instances     = ${BP_INST}
 innodb_buffer_pool_dump_at_shutdown = ON

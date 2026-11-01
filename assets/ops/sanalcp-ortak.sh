@@ -208,6 +208,15 @@ servis_ad(){
   esac
 }
 
+# ClamAV: panel taramayı clamscan ile yapar (internal/antivirus), clamd'ye hiç
+# bağlanmaz; Debian paketi clamd'yi açık kurar ve ~1 GB RAM'i boşa tutar.
+# İmza güncelleyici ise AÇIK olmalı, yoksa taramalar eski imzalarla yapılır.
+# Idempotent; kurulum ve sanalcp-update çağırır.
+clamav_servisleri_ayarla(){
+  systemctl disable --now "$(servis_ad antivirus)" >/dev/null 2>&1 || true
+  systemctl enable --now clamav-freshclam >/dev/null 2>&1
+}
+
 # WEB_USER: the user nginx runs as — PHP-FPM pools' listen.owner/group. A wrong
 # value means nginx can't open the FPM socket and EVERY site 502s.
 WEB_USER=$(debian_mi && echo www-data || echo nginx)

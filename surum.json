@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.84",
-  "duyuru": "Güvenlik ve sağlamlık düzeltmeleri: güncelleme altyapısı güçlendirildi, sistem araçlarına zaman aşımı eklendi, FTP parolasında panelin genel parola politikası zorunlu hale getirildi ve arayüz metinleri düzeltildi.",
+  "son_surum": "0.9.85",
+  "duyuru": "Bellek iyileştirmesi: kullanılmayan ClamAV servisi (clamd) kapatıldı, virüs imzası otomatik güncellemesi açıldı ve MariaDB önbelleği veri boyutuna göre ayarlanıyor. Küçük sunucularda 1,5 GB'a kadar RAM boşalır.",
   "kritik": false,
-  "yayin_tarihi": "2026-10-30"
+  "yayin_tarihi": "2026-11-01"
 }

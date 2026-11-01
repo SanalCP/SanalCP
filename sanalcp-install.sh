@@ -291,6 +291,8 @@ fi
 pkg_kur $BASE_SYS \
   && ok "nginx, mariadb, certbot, clamav, bind, nftables, unzip/zip, bubblewrap, acl, lftp, sshpass, tools" \
   || die "base package install"
+clamav_servisleri_ayarla && ok "ClamAV: clamd off (panel uses clamscan), freshclam on" \
+  || warn "clamav-freshclam could not be started — signatures will not auto-update"
 
 # RAR extractor (file manager .rar extract) — PRIMARY: bsdtar (libarchive, in the
 # base repo, reliably reads RAR/RAR5 and itself rejects path-traversal). 🔴 NOTE:

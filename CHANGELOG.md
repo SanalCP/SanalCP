@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.85** (2026-11-01) — bellek kullanımı
+
+- **ClamAV.** Panel taramayı `clamscan` ile yaptığı halde Debian'da `clamd`
+  servisi açık kalıyor ve ~1 GB RAM'i boşa tutuyordu; kurulum ve güncelleme artık
+  onu kapatır. İmza güncelleyici (`clamav-freshclam`) açılır — kapalı kaldığı
+  sunucularda taramalar aylarca eski imzalarla yapılıyordu.
+- **MariaDB buffer pool.** `sanalcp-optimize` havuzu artık InnoDB veri boyutunun
+  2 katı olarak hesaplar (en az 256M); RAM yüzdesi yalnız tavandır. Değeri hiç
+  düşürmeyen koruma kaldırıldı. Veri büyüdüğünde Optimize yeniden çalıştırılmalıdır.
+
 **0.9.84** (2026-10-30) — güvenlik ve sağlamlık düzeltmeleri
 
 - **Güncelleme altyapısı.** Migration dosyaları artık her biri tek işlemde

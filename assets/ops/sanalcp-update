@@ -289,6 +289,12 @@ if [ -d "$A/ops" ]; then
   ok "$(t "ops-tool'lar güncellendi" "ops tools updated")"
 fi
 
+if command -v clamav_servisleri_ayarla >/dev/null 2>&1; then
+  clamav_servisleri_ayarla \
+    && ok "$(t "ClamAV: kullanılmayan clamd kapalı, imza güncelleyici açık" "ClamAV: unused clamd off, signature updater on")" \
+    || warn "$(t "ClamAV imza güncelleyici (clamav-freshclam) başlatılamadı" "ClamAV signature updater (clamav-freshclam) could not be started")"
+fi
+
 # Cut over existing installations to the panel scheduler. Never remove archives
 # or overwrite per-domain scheduling/retention preferences.
 rm -f /etc/cron.d/sanalcp-backup /usr/local/bin/sanalcp-backup-all \
