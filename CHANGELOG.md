@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.88** (2026-11-01) — panel sertifikası
+
+- **Panel SSL yenilemesi.** Panelin kendi alan adı sertifikası acme.sh ile
+  yenilendiğinde nginx yeniden yüklenmiyordu; eski sertifika süresi dolana dek
+  sunulabiliyordu. Kurulum artık yenileme sonrası reload komutunu kaydeder.
+  Mevcut kurulumlarda Panel Ayarları'ndan SSL bir kez yeniden kurulmalıdır.
+- **Bitiş tarihi.** Panel Ayarları'ndaki SSL bitiş tarihi kurulum anındaki
+  değer yerine sertifika dosyasından okunur.
+
 **0.9.87** (2026-11-01) — SSL yenileme
 
 - **Taşınan sitelerin sertifikaları yenilenmiyordu.** acme.sh deposunda kaydı

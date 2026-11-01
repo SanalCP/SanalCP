@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.87",
-  "duyuru": "SSL yenileme düzeltmesi: başka sunucudan taşınan sitelerin Let's Encrypt sertifikaları otomatik yenilenmiyordu ve panel yanlış bitiş tarihi gösteriyordu. Panel artık gerçek bitiş tarihini okur ve yenilenmemiş sertifikaları kendisi yeniler. Güncelleme önerilir.",
+  "son_surum": "0.9.88",
+  "duyuru": "Panel SSL düzeltmesi: panelin kendi sertifikası otomatik yenilendiğinde nginx yeniden yüklenmiyordu, eski sertifika sunulmaya devam edebiliyordu. Panel ayarlarındaki SSL bitiş tarihi artık sertifikadan okunuyor.",
   "kritik": false,
   "yayin_tarihi": "2026-11-01"
 }
