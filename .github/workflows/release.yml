@@ -37,6 +37,15 @@ jobs:
           [[ "$REQUESTED_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::Geçersiz sürüm etiketi"; exit 1;
           }
+          # Birden çok etiket aynı push'la gelirse çalıştırmalar paralel koşar ve
+          # en son biten /kur'u ezer (v0.9.86, v0.9.87'yi böyle ezdi). Yalnız en yeni yayımlanır.
+          EN_YENI=$(git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [[ "$REQUESTED_TAG" != "$EN_YENI" ]]; then
+            echo "::notice::$REQUESTED_TAG en yeni sürüm değil ($EN_YENI); /kur'a dokunulmadı"
+            echo "atla=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git fetch --no-tags --depth=1 origin "refs/tags/$REQUESTED_TAG"
           REF=$(git rev-parse 'FETCH_HEAD^{commit}')
           VERSION=$(git show "$REF:surum.json" | jq -er '.son_surum')
@@ -52,6 +61,7 @@ jobs:
           echo "Doğrulanan: $REQUESTED_TAG / $REF / $SHA256"
 
       - name: kur betiğini üret
+        if: steps.pin.outputs.atla != '1'
         env:
           TAG: ${{ steps.pin.outputs.tag }}
           REF: ${{ steps.pin.outputs.ref }}
@@ -62,6 +72,7 @@ jobs:
           bash -n kur
 
       - name: Sınırlı SSH erişimiyle sunucuya yükle
+        if: steps.pin.outputs.atla != '1'
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -89,6 +100,7 @@ jobs:
           fi
 
       - name: Canlı dosyanın tamamını doğrula
+        if: steps.pin.outputs.atla != '1'
         run: |
           set -euo pipefail
           for attempt in 1 2 3 4 5; do
