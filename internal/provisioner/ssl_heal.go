@@ -77,6 +77,16 @@ func leafOku(certPath, keyPath string) (*x509.Certificate, bool) {
 	return leaf, true
 }
 
+// CertBitis: kurulu sertifikanın GERÇEK bitiş zamanı (key eşleşmeli). DB'deki
+// ssl_bitis tahmin değil bu olmalı: acme.sh yenilemeleri ve reuse yolu DB'yi bilmez.
+func CertBitis(certPath, keyPath string) (time.Time, bool) {
+	leaf, ok := leafOku(certPath, keyPath)
+	if !ok {
+		return time.Time{}, false
+	}
+	return leaf.NotAfter, true
+}
+
 // certKapsar: leaf sertifika verilen host'u SAN (DNSNames) veya CN ile kapsiyor mu.
 func certKapsar(leaf *x509.Certificate, host string) bool {
 	host = strings.ToLower(strings.TrimSpace(host))

@@ -329,6 +329,7 @@ func main() {
 	go maildelivery.Run(context.Background(), d)
 	uyariH := &uyari.Handlers{DB: d, Gonderici: uyari.Uretim}
 	go uyari.Run(context.Background(), d)
+	go domains.SSLYenileRun(context.Background(), d)
 	phpExtH := &phpext.Handlers{DB: d}
 	paketlerH := &paketler.Handlers{DB: d}
 	phpSurumH := &phpsurum.Handlers{DB: d}

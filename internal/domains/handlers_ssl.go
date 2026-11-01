@@ -105,9 +105,13 @@ func (h *Handlers) SSLIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bitis := time.Now().Add(365 * 24 * time.Hour)
-	if gercekTip == "letsencrypt" {
-		bitis = time.Now().Add(90 * 24 * time.Hour)
+	// Reuse yolu mevcut (ör. taşınmış) bir cert'i kurabilir; "şimdi+90" yalan söylerdi.
+	bitis, ok := provisioner.CertBitis(certYol, keyYol)
+	if !ok {
+		bitis = time.Now().Add(365 * 24 * time.Hour)
+		if gercekTip == "letsencrypt" {
+			bitis = time.Now().Add(90 * 24 * time.Hour)
+		}
 	}
 
 	// Sertifika kurulumu (EnableLetsEncrypt/EnableSelfSigned) burada zaten
