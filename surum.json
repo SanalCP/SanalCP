@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.89",
-  "duyuru": "Bellek iyileştirmesi: Rspamd spam filtresi artık tek tarama süreciyle çalışıyor (yaklaşık 100 MB RAM tasarrufu).",
+  "son_surum": "0.9.90",
+  "duyuru": "Güncelleme altyapısı: güncelleme betiği, imzası doğrulanmış yeni sürümüne devrederek yeni onarım adımlarını aynı güncellemede çalıştırır. Paketleme betiğindeki manifest testi sırası düzeltildi.",
   "kritik": false,
   "yayin_tarihi": "2026-11-01"
 }

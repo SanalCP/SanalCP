@@ -13,6 +13,16 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.90** (2026-11-01) — güncelleme altyapısı
+
+- **Güncelleme betiği kendini yeniler.** Çalışan `sanalcp-update` kurulu (eski)
+  kopya olduğundan yeni sürümün onarım adımları ancak bir sonraki güncellemede
+  çalışıyordu. Artık release imzası ve bütünlüğü doğrulandıktan sonra yeni
+  betiğe aynı argümanlarla devreder. Etkisi bu sürüm kurulduktan sonraki
+  güncellemelerde görülür.
+- **Paketleme.** Manifest kapsama testi manifest yeniden üretildikten sonra
+  koşar; yeni asset dosyası eklenen release'lerde paketleme artık düşmez.
+
 **0.9.89** (2026-11-01) — Rspamd belleği
 
 - **Tek tarama süreci.** Rspamd CPU sayısına göre 2+ tarama süreci açıyordu ve
