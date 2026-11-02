@@ -13,6 +13,15 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.91** (2026-11-02) — phpMyAdmin tek kullanımlık giriş
+
+- **Saat dilimi düzeltmesi.** Token süresi artık MariaDB saatiyle oluşturulur
+  ve kontrol edilir. Go sürücüsü UTC, MariaDB oturumu UTC+3 olduğunda yeni
+  token'ın hemen silinmesine yol açan hata giderildi. İki dakikalık süre,
+  atomik tek kullanım ve tüketilen parolanın temizlenmesi korundu.
+- **Regresyon testi.** Gerçek MariaDB üzerinde UTC ve UTC+3 için oluşturma,
+  temizlik, süre aşımı, yetkilendirme ve eşzamanlı tüketim CI'da sınanır.
+
 **0.9.90** (2026-11-01) — güncelleme altyapısı
 
 - **Güncelleme betiği kendini yeniler.** Çalışan `sanalcp-update` kurulu (eski)

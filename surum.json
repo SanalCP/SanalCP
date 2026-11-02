@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.90",
-  "duyuru": "Güncelleme altyapısı: güncelleme betiği, imzası doğrulanmış yeni sürümüne devrederek yeni onarım adımlarını aynı güncellemede çalıştırır. Paketleme betiğindeki manifest testi sırası düzeltildi.",
+  "son_surum": "0.9.91",
+  "duyuru": "phpMyAdmin tek kullanımlık giriş: token oluşturma, temizleme ve tüketim aynı veritabanı saatini kullanır; UTC+3 sunuculardaki anında süre dolması hatası giderildi.",
   "kritik": false,
-  "yayin_tarihi": "2026-11-01"
+  "yayin_tarihi": "2026-11-02"
 }
