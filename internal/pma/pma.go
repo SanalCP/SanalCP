@@ -87,13 +87,14 @@ func (h *Handlers) TokenIste(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TIMESTAMP oturum saat diliminde yorumlanır; yazma ve tüm kontroller SQL saatini kullanır.
 	token := randomHex(24)
-	expires := time.Now().Add(2 * time.Minute) // 2 dakika kısa pencere
+	expires := time.Now().Add(2 * time.Minute) // Yanıttaki bilgilendirme zamanı; geçerliliği SQL saati belirler.
 
 	_, err = h.DB.ExecContext(r.Context(),
 		`INSERT INTO pma_tokens(token, domain_id, db_kullanici, db_parola, db_adi, son_kullanma)
-		 VALUES(?,?,?,?,?,?)`,
-		token, domainID, dbKul, dbPar, dbAdi, expires)
+		 VALUES(?,?,?,?,?,NOW() + INTERVAL 2 MINUTE)`,
+		token, domainID, dbKul, dbPar, dbAdi)
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -132,12 +133,12 @@ func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var dbKul, dbPar, dbAdi string
-	var sonKul time.Time
+	var suresiDoldu bool
 	var kul int
 	err := h.DB.QueryRowContext(r.Context(),
-		`SELECT db_kullanici, db_parola, db_adi, son_kullanma, kullanildi
+		`SELECT db_kullanici, db_parola, db_adi, son_kullanma < NOW(), kullanildi
 		 FROM pma_tokens WHERE token=?`, req.Token).
-		Scan(&dbKul, &dbPar, &dbAdi, &sonKul, &kul)
+		Scan(&dbKul, &dbPar, &dbAdi, &suresiDoldu, &kul)
 	if errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "token bulunamadı", http.StatusNotFound)
 		return
@@ -151,7 +152,7 @@ func (h *Handlers) Bozdur(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "token zaten kullanılmış", http.StatusGone)
 		return
 	}
-	if time.Now().After(sonKul) {
+	if suresiDoldu {
 		http.Error(w, "token süresi doldu", http.StatusGone)
 		return
 	}

@@ -79,6 +79,32 @@ jobs:
       - name: go test
         run: go test -race -count=1 ./...
 
+  pma:
+    name: phpMyAdmin — MariaDB UTC ve UTC+3 regresyonu
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: pma-test-only
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: Test internal auth dosyası
+        run: |
+          sudo install -d -m 755 /etc/sanalcp
+          echo pma-test-internal-only | sudo tee /etc/sanalcp/pma-internal.token >/dev/null
+      - name: Saat dilimi, süre ve atomik tek kullanım
+        env:
+          SANALCP_PMA_TEST_DSN: 'root:pma-test-only@tcp(127.0.0.1:3306)/?parseTime=true'
+        run: go test -race -count=1 -v ./internal/pma
+
   govulncheck:
     name: Go — bağımlılık/stdlib açık taraması
     runs-on: ubuntu-latest
