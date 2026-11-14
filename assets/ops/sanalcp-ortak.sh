@@ -140,7 +140,15 @@ pkg_kur(){ # install, quiet; non-zero on failure
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
       apt-get install -y -o Dpkg::Options::=--force-confold -o Dpkg::Options::=--force-confdef "$@" >/dev/null 2>&1
   else
-    dnf install -y "$@" >/dev/null 2>&1
+    # 🔴 Çıktı yutulmaz: hata olursa dnf'in KENDİ mesajı (eksik paket adı,
+    # bağımlılık çatışması, depo hatası) ekrana basılır. Eskiden /dev/null'a
+    # gidiyordu ve kurulum yalnızca "base package install" deyip duruyordu.
+    local cikti rc
+    cikti=$(dnf install -y "$@" 2>&1); rc=$?
+    if [ "$rc" -ne 0 ]; then
+      printf '%s\n' "$cikti" | tail -n 25 >&2
+    fi
+    return "$rc"
   fi
 }
 pkg_kurulu(){

@@ -13,6 +13,14 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.95** (2026-11-14) — Kurulum hata görünürlüğü
+
+- **RHEL ailesinde `dnf install` hatası artık görünür.** Kurulum betiğinin ortak
+  `pkg_kur` yardımcısı dnf çıktısını `/dev/null`'a atıyordu; eksik paket adı,
+  bağımlılık çatışması veya depo hatası olduğunda kurulum yalnızca "base package
+  install" deyip duruyordu. Hata olursa dnf'in kendi mesajının son 25 satırı
+  stderr'e basılır ve dönüş kodu korunur. Debian davranışı değişmedi.
+
 **0.9.94** (2026-11-14) — Go 1.26.11 (net/http güvenlik yaması)
 
 - **Go standart kütüphanesi açığı kapatıldı (GO-2026-6859).** `net/http`'deki
