@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.93",
-  "duyuru": "Paketler sayfası: tarayıcı bağlantısı kesilse bile apt/dpkg işlemi yarıda kalmaz; yarım kalmış dpkg durumu kurulumdan önce otomatik onarılır.",
+  "son_surum": "0.9.94",
+  "duyuru": "Güvenlik: Go 1.26.11 ile derlendi (net/http GO-2026-6859 — MaxBytesReader başlık yarışı kaynaklı HTTP/1 sunucu çökmesi kapatıldı).",
   "kritik": false,
   "yayin_tarihi": "2026-11-14"
 }

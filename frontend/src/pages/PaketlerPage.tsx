@@ -13,6 +13,11 @@ type Paket = {
   kurulu: boolean; korunan: boolean
 }
 
+// apt/dnf kurulum-kaldırma-güncelleme uzun sürebilir (npm gibi paketler onlarca bağımlılık
+// çeker); genel 30 sn'lik axios zaman aşımı işlem sürerken sahte "timeout" hatası
+// gösteriyordu. Sunucu tarafı üst sınırlarıyla (kur 10 dk, güncelle 15 dk) uyumlu.
+const PAKET_ISLEM_ZAMAN_ASIMI = 15 * 60_000
+
 type Grup = { ad: string; paketler: string[]; aciklama: string }
 
 type Sekme = 'ara' | 'kurulu'
@@ -88,7 +93,7 @@ export default function PaketlerPage() {
 
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
-      const r = await api.post(`/paketler/${eylem}`, { paket })
+      const r = await api.post(`/paketler/${eylem}`, { paket }, { timeout: PAKET_ISLEM_ZAMAN_ASIMI })
       setBasari(t(suankiKurulu ? 'PaketlerPage:toggle_success_removed' : 'PaketlerPage:toggle_success_installed', { package: paket }))
       setGrupDurum(prev => ({ ...prev, [paket]: !suankiKurulu }))
       setOutputModal({
@@ -121,7 +126,7 @@ export default function PaketlerPage() {
     if (!(await modalOnay(t('PaketlerPage:confirm.install_generic', { package: paket })))) return
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
-      const r = await api.post('/paketler/kur', { paket })
+      const r = await api.post('/paketler/kur', { paket }, { timeout: PAKET_ISLEM_ZAMAN_ASIMI })
       setBasari(t('PaketlerPage:toggle_success_installed', { package: paket }))
       setOutputModal({ baslik: t('PaketlerPage:output_modal.install_title', { package: paket }), output: r.data.output || '' })
       setTimeout(() => setBasari(null), 4000)
@@ -133,7 +138,7 @@ export default function PaketlerPage() {
     if (!(await modalOnay(t('PaketlerPage:confirm.remove_generic', { package: paket })))) return
     setIsleniyor(paket); setHata(null); setBasari(null)
     try {
-      const r = await api.post('/paketler/kaldir', { paket })
+      const r = await api.post('/paketler/kaldir', { paket }, { timeout: PAKET_ISLEM_ZAMAN_ASIMI })
       setBasari(t('PaketlerPage:toggle_success_removed', { package: paket }))
       setOutputModal({ baslik: t('PaketlerPage:output_modal.remove_title', { package: paket }), output: r.data.output || '' })
       setTimeout(() => setBasari(null), 4000)

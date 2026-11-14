@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.94** (2026-11-14) — Go 1.26.11 (net/http güvenlik yaması)
+
+- **Go standart kütüphanesi açığı kapatıldı (GO-2026-6859).** `net/http`'deki
+  `MaxBytesReader` başlık yarışı HTTP/1 sunucusunun çökmesine yol açabiliyordu;
+  govulncheck CI taraması bunu 0.9.92/0.9.93 üzerinde yakaladı. Panel artık
+  Go 1.26.11 ile derleniyor; `scripts/package-release.sh` en az 1.26.11 ister.
+
 **0.9.93** (2026-11-14) — Paketler sayfasında "dpkg was interrupted" hatası
 
 - **Debian'da paket kurulumu yarıda kesilince sonraki tüm kurulumlar kilitleniyordu.**
