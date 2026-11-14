@@ -179,7 +179,7 @@ paket_ad(){
     cache)      if debian_mi; then valkey_yok && echo redis-server || echo valkey-server
                 else echo valkey; fi ;;
     antivirus)  debian_mi && echo clamav-daemon    || echo clamav ;;
-    av-guncel)  debian_mi && echo clamav-freshclam || echo clamav-update ;;
+    av-guncel)  echo clamav-freshclam ;;  # EPEL 9 ve 10: "clamav-update" yok, freshclam bu pakette
     cron)       debian_mi && echo cron          || echo cronie ;;
     apache)     debian_mi && echo apache2       || echo httpd ;;
     apache-ara) debian_mi && echo apache2-utils || echo httpd-tools ;;

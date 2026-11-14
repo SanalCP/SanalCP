@@ -13,6 +13,13 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.92** (2026-11-14) — AlmaLinux kurulum düzeltmesi
+
+- **Kurulum "base package install" adımında duruyordu.** Betik RHEL ailesinde
+  EPEL'de artık bulunmayan `clamav-update` paketini istiyordu; `dnf` tek eksik
+  paket yüzünden tüm işlemi iptal ediyordu. ClamAV imza güncelleyicisi artık
+  `clamav-freshclam` paketiyle kuruluyor (AlmaLinux/Rocky 9 ve 10).
+
 **0.9.91** (2026-11-02) — phpMyAdmin tek kullanımlık giriş
 
 - **Saat dilimi düzeltmesi.** Token süresi artık MariaDB saatiyle oluşturulur

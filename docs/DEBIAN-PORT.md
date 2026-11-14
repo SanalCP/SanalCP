@@ -138,7 +138,7 @@ diye kapatılabilir** (dürüst ve düşük riskli).
 | db | `mariadb-server` | `mariadb-server` | sürüm farkı: 10.11 → **11.8** |
 | dns | `bind`, `bind-utils` / servis `named` | `bind9`, `bind9-utils` / servis `bind9` | `named-checkconf/checkzone` ikisinde de aynı ad |
 | ftp | `pure-ftpd` | `pure-ftpd-mysql` | Debian'da MySQL desteği ayrı pakette |
-| antivirüs | `clamav`, `clamav-update` / `clamd` | `clamav-daemon`, `clamav-freshclam` | servis adları farklı |
+| antivirüs | `clamav`, `clamav-freshclam` / `clamd` | `clamav-daemon`, `clamav-freshclam` | servis adları farklı |
 | cache | `valkey` | `valkey-server` (doğrulanacak) | Debian 13'te valkey var mı, yoksa `redis-server`'a mı düşülecek |
 | cron | `cronie` | `cron` | |
 | kota araçları | `xfsprogs` + `quota` | `xfsprogs` + `quota` | Backend fs tipine göre seçilir (aileye göre DEĞİL) → her iki araç seti her iki ailede kurulur; `osfam.PaketKotaXFS` / `PaketKotaExt` |

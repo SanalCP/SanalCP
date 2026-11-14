@@ -45,7 +45,7 @@ var paketAdlari = map[string]map[Aile]string{
 	PaketFTP:       {RHEL: "pure-ftpd", Debian: "pure-ftpd-mysql"},
 	PaketCache:     {RHEL: "valkey", Debian: "valkey-server"}, // bkz. ozelPaket
 	PaketAntivirus: {RHEL: "clamav", Debian: "clamav-daemon"},
-	PaketAVGuncel:  {RHEL: "clamav-update", Debian: "clamav-freshclam"},
+	PaketAVGuncel:  {RHEL: "clamav-freshclam", Debian: "clamav-freshclam"},
 	PaketCron:      {RHEL: "cronie", Debian: "cron"},
 	// Kota backend'i AİLEYE DEĞİL, kök dosya sisteminin tipine göre seçilir
 	// (bkz. internal/kaynaklimit/kota.go) — AlmaLinux ext4 köke de kurulabilir,
