@@ -13,6 +13,17 @@ sayfa altbilgisinden görebilirsiniz.
 
 ## 0.9.x — Lisans numarası
 
+**0.9.93** (2026-11-14) — Paketler sayfasında "dpkg was interrupted" hatası
+
+- **Debian'da paket kurulumu yarıda kesilince sonraki tüm kurulumlar kilitleniyordu.**
+  Paketler sayfası apt/dpkg'yi HTTP isteğinin context'iyle çalıştırıyordu;
+  tarayıcı sekmesi kapanınca ya da proxy bağlantıyı kesince apt'ye SIGTERM gidiyor,
+  dpkg yarıda kalıyor ve her sonraki kurulum
+  `dpkg was interrupted, you must manually run 'dpkg --configure -a'` ile
+  reddediliyordu. Kur / Kaldır / Güncelle artık istekten bağımsız çalışır
+  (zaman aşımı korunur) ve kurulumdan önce yarım kalmış dpkg durumu
+  `dpkg --configure -a` ile otomatik onarılır.
+
 **0.9.92** (2026-11-14) — AlmaLinux kurulum düzeltmesi
 
 - **Kurulum "base package install" adımında duruyordu.** Betik RHEL ailesinde

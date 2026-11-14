@@ -145,6 +145,11 @@ type opReq struct {
 }
 
 // Kur: dnf install
+//
+// apt/dpkg istek context'inden BAĞIMSIZ çalışır (WithoutCancel): tarayıcı sekmesi
+// kapanınca ya da proxy bağlantıyı kesince apt'ye SIGTERM gitmesin, dpkg yarıda
+// kalıp "dpkg was interrupted" hatasıyla sonraki tüm kurulumları kilitlemesin.
+// Zaman aşımı yine geçerli.
 func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 	var req opReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -155,7 +160,7 @@ func (h *Handlers) Kur(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "gecersiz paket adi")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Minute)
 	defer cancel()
 	out, err := osfam.PaketKur(ctx, req.Paket)
 	if err != nil {
@@ -186,7 +191,7 @@ func (h *Handlers) Kaldir(w http.ResponseWriter, r *http.Request) {
 			"bu paket sistem icin kritik, kaldirilamaz: "+req.Paket)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Minute)
 	defer cancel()
 	out, err := osfam.PaketSil(ctx, req.Paket)
 	if err != nil {
@@ -212,9 +217,10 @@ func (h *Handlers) Guncelle(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusBadRequest, "gecersiz paket")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 15*time.Minute)
 	defer cancel()
 	b := osfam.Mevcut()
+	osfam.DpkgOnar(ctx)
 	out, err := b.Komut(ctx, b.YukseltArgs(req.Paket)).CombinedOutput()
 	if err != nil {
 		httpx.WriteError(w, http.StatusInternalServerError,

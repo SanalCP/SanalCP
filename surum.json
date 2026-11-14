@@ -1,6 +1,6 @@
 {
-  "son_surum": "0.9.92",
-  "duyuru": "AlmaLinux 10 ve 9 kurulum düzeltmesi: ClamAV imza güncelleyicisi EPEL'deki yeni adıyla (clamav-freshclam) kuruluyor; temel paket adımı artık başarısız olmuyor.",
+  "son_surum": "0.9.93",
+  "duyuru": "Paketler sayfası: tarayıcı bağlantısı kesilse bile apt/dpkg işlemi yarıda kalmaz; yarım kalmış dpkg durumu kurulumdan önce otomatik onarılır.",
   "kritik": false,
   "yayin_tarihi": "2026-11-14"
 }

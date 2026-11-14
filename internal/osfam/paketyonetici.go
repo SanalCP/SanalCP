@@ -222,15 +222,30 @@ func (b Bilgi) Komut(ctx context.Context, args []string) *exec.Cmd {
 	return cmd
 }
 
+// DpkgOnar: Debian'da yarıda kalmış bir dpkg işlemini (kesilen kurulum, bekleyen
+// trigger'lar) `dpkg --configure -a` ile tamamlar. Aksi halde apt "dpkg was
+// interrupted, you must manually run 'dpkg --configure -a'" diyerek her kurulumu
+// reddeder. RHEL'de ve sağlıklı durumda etkisizdir; hata yutulur çünkü asıl komut
+// kendi hatasını zaten raporlar.
+func DpkgOnar(ctx context.Context) {
+	b := Mevcut()
+	if !b.DebianMi() {
+		return
+	}
+	_ = b.Komut(ctx, []string{"dpkg", "--configure", "-a"}).Run()
+}
+
 // PaketKur: paketleri kurar, komut çıktısını döner.
 func PaketKur(ctx context.Context, paketler ...string) ([]byte, error) {
 	b := Mevcut()
+	DpkgOnar(ctx)
 	return b.Komut(ctx, b.KurArgs(paketler...)).CombinedOutput()
 }
 
 // PaketSil: paketleri kaldırır.
 func PaketSil(ctx context.Context, paketler ...string) ([]byte, error) {
 	b := Mevcut()
+	DpkgOnar(ctx)
 	return b.Komut(ctx, b.SilArgs(paketler...)).CombinedOutput()
 }
 
